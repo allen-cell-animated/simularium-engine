@@ -44,6 +44,43 @@ TEST_F(AgentTest, ConstructorSetLocation) {
   EXPECT_EQ(v, a.GetLocation());
 }
 
+TEST_F(AgentTest, DoesNotInteractWithSelf)
+{
+		Agent a1;
+		ASSERT_FALSE(a1.CanInteractWith(a1));
+}
+
+
+TEST_F(AgentTest, InteractionDistCheck)
+{
+		Agent a1, a2;
+
+		a1.SetInteractionDistance(100);
+		a2.SetInteractionDistance(100);
+
+		Eigen::Vector3d v;
+
+		v << 0, 150, 0;
+		a2.SetLocation(v);
+
+		ASSERT_TRUE(a1.CanInteractWith(a2));
+}
+
+TEST_F(AgentTest, InteractionDistCheckFail)
+{
+		Agent a1, a2;
+
+		a1.SetInteractionDistance(100);
+		a2.SetInteractionDistance(100);
+
+		Eigen::Vector3d v;
+		
+		v << 0, 300, 0;
+		a2.SetLocation(v);
+
+		ASSERT_FALSE(a1.CanInteractWith(a2));
+}
+
 } // namespace test
 } // namespace agentsim
 } // namespace aics
