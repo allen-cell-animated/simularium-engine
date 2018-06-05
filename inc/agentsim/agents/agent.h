@@ -17,9 +17,12 @@ public:
 		}
 
 		void SetLocation(Eigen::Vector3d newLocation) { m_location = newLocation; }
+		void SetRotation(Eigen::Vector3d newRotation) { m_rotation = newRotation; }
 
 		const Eigen::Vector3d GetLocation() const { return m_location; }
 		const Eigen::Vector3d GetRotation() const { return m_rotation; }
+
+		void AddBoundPartner(Agent* other);
 
 private:
 		Eigen::Vector3d m_location;
