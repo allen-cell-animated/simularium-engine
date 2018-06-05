@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "agentsim/agents/agent.h"
+#include <time.h>
 
 namespace aics {
 namespace agentsim {
@@ -58,9 +59,7 @@ TEST_F(AgentTest, InteractionDistCheck)
 		a1.SetInteractionDistance(100);
 		a2.SetInteractionDistance(100);
 
-		Eigen::Vector3d v;
-
-		v << 0, 150, 0;
+		Eigen::Vector3d v(0,150,0);
 		a2.SetLocation(v);
 
 		ASSERT_TRUE(a1.CanInteractWith(a2));
@@ -74,11 +73,24 @@ TEST_F(AgentTest, InteractionDistCheckFail)
 		a2.SetInteractionDistance(100);
 
 		Eigen::Vector3d v;
-		
+
 		v << 0, 300, 0;
 		a2.SetLocation(v);
 
 		ASSERT_FALSE(a1.CanInteractWith(a2));
+}
+
+TEST_F(AgentTest, CollisionRadius)
+{
+		Agent a1, a2;
+		a1.SetCollisionRadius(50);
+		a2.SetCollisionRadius(50);
+
+		Eigen::Vector3d v;
+		v << 0, 98, 0;
+		a2.SetLocation(v);
+
+		ASSERT_TRUE(a1.IsCollidingWith(a2));
 }
 
 } // namespace test

@@ -16,6 +16,7 @@ public:
 		void SetLocation(Eigen::Vector3d newLocation) { m_location = newLocation; }
 		void SetRotation(Eigen::Vector3d newRotation) { m_rotation = newRotation; }
 		void SetInteractionDistance(float newDistance) { m_interaction_distance = newDistance; }
+		void SetCollisionRadius(float newRadius) { m_collision_radius = newRadius; }
 
 		const Eigen::Vector3d GetLocation() const { return m_location; }
 		const Eigen::Vector3d GetRotation() const { return m_rotation; }
@@ -24,6 +25,7 @@ public:
 		void AddBoundPartner(Agent* other);
 
 		bool CanInteractWith(const Agent& other);
+		bool IsCollidingWith(const Agent& other);
 
 private:
 		Eigen::Vector3d m_location;

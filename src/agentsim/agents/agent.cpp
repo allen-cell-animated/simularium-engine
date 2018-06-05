@@ -49,7 +49,16 @@ bool Agent::CanInteractWith(const Agent& other)
 
 		float dist_squared = (this->m_location - other.m_location).squaredNorm();
 
-		return dist_squared < interaction_dist_squared;
+		return dist_squared <= interaction_dist_squared;
+}
+
+bool Agent::IsCollidingWith(const Agent& other)
+{
+		float dist_squared = (this->m_location - other.m_location).squaredNorm();
+		float coll_dist_squared = (this->m_collision_radius + other.m_collision_radius) *
+																(this->m_collision_radius + other.m_collision_radius);
+
+		return dist_squared <= coll_dist_squared;
 }
 
 } // namespace agentsim
