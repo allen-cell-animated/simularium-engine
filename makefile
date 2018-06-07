@@ -3,38 +3,39 @@ CC=g++
 INCLUDE_DIR=inc
 EXTERNAL_DIR=ext
 SOURCE_DIR=src
+OBJ_DIR=obj
 PROJECT_DIR=agentsim
 LIBRARY_DIR=lib
 BUILD_DIR=bin
 
 SOURCE:=$(shell find $(SOURCE_DIR)/$(PROJECT_DIR) -name *.cpp)
+OBJ_FILES:=$(patsubst $(SOURCE_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCE))
 
 TARGET=agentsim
 TEST_TARGET=agentsim_tests
 
-VPATH= $(SOURCE_DIR):$(INCLUDE_DIR)
 CFLAGS=-Wall -g
 INC= -I $(INCLUDE_DIR)
 
-all: agentsim.a agentsim.o agentsim_tests.o
+all: prep agentsim_prog agentsim_lib agentsim_tests
 
-agentsim.a: $(SOURCE)
-	$(CC) \
-	-c $(SOURCE) \
-	$(CFLAGS) \
-	-I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) \
-	-o $(BUILD_DIR)/$(TARGET).o
+prep:
+	mkdir -p ./$(OBJ_DIR)/$(PROJECT_DIR)
 
-	ar rvs $(LIBRARY_DIR)/$(TARGET).a $(BUILD_DIR)/$(TARGET).o
-
-agentsim.o: $(SOURCE_DIR)/agentsim.cpp
+agentsim_prog: $(OBJ_FILES)
 	$(CC) $(SOURCE_DIR)/agentsim.cpp \
 	$(CFLAGS) \
 	-I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) \
 	-o $(BUILD_DIR)/$(TARGET) \
-	$(LIBRARY_DIR)/$(TARGET).a
+	$(OBJ_FILES)
 
-agentsim_tests.o: $(SOURCE_DIR)/agentsim_tests.cpp
+$(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
+	$(CC) $(CFLAGS) -c $< -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) -o $@
+
+agentsim_lib:
+	ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
+
+agentsim_tests: $(SOURCE_DIR)/agentsim_tests.cpp
 	$(CC) $(SOURCE_DIR)/agentsim_tests.cpp \
 	$(CFLAGS) \
 	-I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) \
@@ -45,3 +46,4 @@ agentsim_tests.o: $(SOURCE_DIR)/agentsim_tests.cpp
 clean:
 	rm -f ./bin/*
 	rm -f ./$(LIBRARY_DIR)/$(TARGET).a
+	rm -f ./$(OBJ_DIR)/$(PROJECT_DIR)/*.o

@@ -1,6 +1,7 @@
-#ifndef AGENTSIM_H
-#define AGENTSIM_H
+#ifndef AICS_AGENTSIM_H
+#define AICS_AGENTSIM_H
 
+#include "simulation.h"
 #include "agents/agent.h"
 
-#endif // AGENTSIM_H
+#endif // AICS_AGENTSIM_H

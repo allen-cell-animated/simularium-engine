@@ -1,5 +1,5 @@
-#ifndef AGENT_H
-#define AGENT_H
+#ifndef AICS_AGENT_H
+#define AICS_AGENT_H
 
 #include <string>
 #include <vector>
@@ -41,4 +41,4 @@ private:
 } // namespace agentsim
 } // namespace aics
 
-#endif // AGENT_H
+#endif // AICS_AGENT_H
