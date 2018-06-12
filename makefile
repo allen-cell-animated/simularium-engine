@@ -21,6 +21,7 @@ all: prep agentsim_prog agentsim_lib agentsim_tests
 
 prep:
 	mkdir -p ./$(OBJ_DIR)/$(PROJECT_DIR)
+	mkdir -p ./$(BUILD_DIR)
 
 agentsim_prog: $(OBJ_FILES)
 	$(CC) $(SOURCE_DIR)/agentsim.cpp \
