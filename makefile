@@ -30,7 +30,7 @@ agentsim_prog: $(OBJ_FILES)
 	$(OBJ_FILES)
 
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
-	$(CC) $(CFLAGS) -c $< -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) -o $@
+	$(CC) $(CFLAGS) -c $< -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) -I $(EXTERNAL_DIR)/openmm -o $@
 
 agentsim_lib:
 	ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o

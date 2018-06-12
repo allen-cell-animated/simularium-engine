@@ -39,9 +39,8 @@ while read line; do
 	cp  $line $TARGET_DIR/$fpath
 done < $TMP_FILE
 
+rm $TARGET_DIR/pthread.h #includes a windows header
 rm $TMP_FILE
-
-mv $TARGET_DIR/OpenMM.h OpenMM.h
 
 find $OPENMM_DIR -name "*.so" -exec cp {} $LIB_DIR \;
 find $OPENMM_DIR -name "*.a" -exec cp {} $LIB_DIR \;
