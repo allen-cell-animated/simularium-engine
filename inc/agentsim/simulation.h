@@ -9,23 +9,20 @@ namespace aics {
 namespace agentsim {
 
 class Agent;
-class MovementSimulator;
-class ReactionSimulator;
+class SimPkg;
 
 class Simulation
 {
 public:
-		Simulation(
-			std::shared_ptr<MovementSimulator> ms_shared_ptr,
-			std::shared_ptr<ReactionSimulator> rs_shared_ptr);
+		Simulation(std::vector<std::shared_ptr<SimPkg>> simPkgs);
+		~Simulation();
 
 		void RunTimeStep(float timeStep);
 
 private:
 		std::vector<Agent*> m_agents;
 
-		std::shared_ptr<MovementSimulator> m_MovementSimulator;
-		std::shared_ptr<ReactionSimulator> m_ReactionSimulator;
+		std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
 };
 
 }

@@ -1,22 +1,33 @@
 #include "agentsim/simulation.h"
-#include "agentsim/simulators/movement_simulator.h"
-#include "agentsim/simulators/reaction_simulator.h"
+#include "agentsim/simpkg/simpkg.h"
 
 namespace aics {
 namespace agentsim {
 
 Simulation::Simulation(
-	std::shared_ptr<MovementSimulator> ms_shared_ptr,
-	std::shared_ptr<ReactionSimulator> rs_shared_ptr)
+	std::vector<std::shared_ptr<SimPkg>> simPkgs)
 {
-		m_MovementSimulator = ms_shared_ptr;
-		m_ReactionSimulator = rs_shared_ptr;
+		for(std::size_t i = 0; i < simPkgs.size(); ++i)
+		{
+				this->m_SimPkgs.push_back(simPkgs[i]);
+				this->m_SimPkgs[i]->Setup();
+		}
+}
+
+Simulation::~Simulation()
+{
+	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+	{
+			this->m_SimPkgs[i]->Shutdown();
+	}
 }
 
 void Simulation::RunTimeStep(float timeStep)
 {
-		m_MovementSimulator->RunTimeStep(timeStep, this->m_agents);
-		m_ReactionSimulator->RunTimeStep(timeStep, this->m_agents);
+		for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+		{
+				this->m_SimPkgs[i]->RunTimeStep(timeStep);
+		}
 }
 
 } // namespace agentsim
