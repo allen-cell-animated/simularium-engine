@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "OpenMM.h"
+#include <cstdio>
 
 namespace aics {
 namespace agentsim {
@@ -35,9 +36,9 @@ class OpenMMTest : public ::testing::Test
 		// Objects declared here can be used by all tests in the test case for Foo.
 };
 
-TEST_F(OpenMMTest, ConstructorSetLocation) {
-	OpenMM::System system;
-  EXPECT_EQ(0, 0);
+
+TEST_F(OpenMMTest, ActinSimulation) {
+
 }
 
 } // namespace test

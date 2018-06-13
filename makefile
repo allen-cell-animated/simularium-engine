@@ -17,7 +17,7 @@ TEST_TARGET=agentsim_tests
 
 CFLAGS=-Wall -g
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) -isystem $(EXTERNAL_DIR)/openmm
-LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a)
+LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a) -ldl -pthread
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
 
@@ -39,13 +39,13 @@ agentsim_prog: $(SOURCE_DIR)/$(TARGET).cpp
 		$(CC) $(SOURCE_DIR)/$(TARGET).cpp \
 		$(CFLAGS) $(INCLUDES) \
 		-o $(BUILD_DIR)/$(TARGET) \
-		$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a -pthread \
+		$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a \
 
 agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
 	$(CFLAGS) $(INCLUDES) \
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
-	$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a -pthread \
+	$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a \
 
 clean:
 	rm -f ./bin/*
