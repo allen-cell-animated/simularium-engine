@@ -15,9 +15,11 @@ DUMMY_TARGET=main
 TARGET=agentsim
 TEST_TARGET=agentsim_tests
 
-CFLAGS=-Wall -g
-INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) -isystem $(EXTERNAL_DIR)/openmm
-LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a) -ldl -pthread
+CFLAGS=-Wall -g -Wl,-rpath $(LIBRARY_DIR)
+INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) \
+-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
+LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a)
+DLLS:= -L$(LIBRARY_DIR) -lreaddy -ldl -pthread -lhdf5
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
 
@@ -39,13 +41,13 @@ agentsim_prog: $(SOURCE_DIR)/$(TARGET).cpp
 		$(CC) $(SOURCE_DIR)/$(TARGET).cpp \
 		$(CFLAGS) $(INCLUDES) \
 		-o $(BUILD_DIR)/$(TARGET) \
-		$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a \
+		$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a $(DLLS)\
 
 agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
 	$(CFLAGS) $(INCLUDES) \
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
-	$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a \
+	$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a $(DLLS)\
 
 clean:
 	rm -f ./bin/*

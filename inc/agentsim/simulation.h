@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <vector>
-#include "agentsim/agents/agent.h"
 
 namespace aics {
 namespace agentsim {

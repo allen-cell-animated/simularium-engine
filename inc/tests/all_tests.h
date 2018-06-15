@@ -4,5 +4,6 @@
 #include "agents/agent_test.h"
 
 #include "extpkg/openmm_test.h"
+#include "extpkg/readdy_test.h"
 
 #endif // ALLTESTS_H

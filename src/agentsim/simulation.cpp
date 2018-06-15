@@ -16,17 +16,17 @@ Simulation::Simulation(
 
 Simulation::~Simulation()
 {
-	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
-	{
-			this->m_SimPkgs[i]->Shutdown();
-	}
+		for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+		{
+				this->m_SimPkgs[i]->Shutdown();
+		}
 }
 
 void Simulation::RunTimeStep(float timeStep)
 {
 		for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
 		{
-				this->m_SimPkgs[i]->RunTimeStep(timeStep);
+				this->m_SimPkgs[i]->RunTimeStep(timeStep, this->m_agents);
 		}
 }
 

@@ -61,7 +61,7 @@ TEST_F(OpenMMTest, LinearActinSprings) {
 		for(int i = 0; i < numMonomers; ++i)
 		{
 				initPosInNm[i] = OpenMM::Vec3(rand() % 5, rand() % 6, rand() % 7);
-				system.addParticle(1.0);
+				system.addParticle(g_actin_mass);
 		}
 
 		// Attach the monomers by harmonic bonds
