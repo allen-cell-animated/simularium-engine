@@ -6,10 +6,13 @@ LIB_DIR="../lib"
 
 # This script imports the needed OpenMM Headers & libraries
 #  from an OpenMM Directory that has already been built
-while getopts "d:" option; do
+while getopts "d:b:" option; do
 	case "${option}" in
 		d)
-			OPENMM_DIR="$OPTARG"
+			OPENMM_PROJECT_DIR="$OPTARG"
+			;;
+		b)
+			OPENMM_BUILD_DIR="$OPTARG"
 			;;
 		\?)
 		       	echo "Invalid option: -${OPTARG}"
@@ -18,15 +21,20 @@ while getopts "d:" option; do
 	esac
 done
 
-if [ -z ${OPENMM_DIR} ]; then
-	echo "ERROR: no openMM directory specified with -d"
+if [ -z ${OPENMM_PROJECT_DIR} ]; then
+	echo "ERROR: no openMM project directory specified with -d"
+	exit 1
+fi
+
+if [ -z ${OPENMM_BUILD_DIR} ]; then
+	echo "ERROR: no openMM build specified with -b"
 	exit 1
 fi
 
 rm -rf $TARGET_DIR
 mkdir -p $TARGET_DIR
 
-find $OPENMM_DIR -wholename "*/include/*.h" > $TMP_FILE
+find $OPENMM_PROJECT_DIR -wholename "*/include/*.h" > $TMP_FILE
 
 while read line; do
 	fpath="*/include/"
@@ -42,5 +50,5 @@ done < $TMP_FILE
 rm $TARGET_DIR/pthread.h #includes a windows header
 rm $TMP_FILE
 
-find $OPENMM_DIR -name "*.so" -exec cp {} $LIB_DIR \;
-find $OPENMM_DIR -name "*.a" -exec cp {} $LIB_DIR \;
+find $OPENMM_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR \;
+find $OPENMM_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR \;
