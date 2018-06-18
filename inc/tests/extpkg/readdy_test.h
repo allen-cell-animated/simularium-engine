@@ -38,7 +38,23 @@ class ReaDDyTest : public ::testing::Test
 // This is intended as a verification of ReaDDy functionality
 //  not an accurate simulation
 TEST_F(ReaDDyTest, BasicSimulation) {
-		
+		double boxSize = 1000; // 1000 nm
+		readdy::Simulation simulation;
+
+		simulation.setKernel("SingleCPU");
+		simulation.setKBT(300); // probably kelvin?
+		simulation.setBoxSize(boxSize, boxSize, boxSize);
+
+		readdy::model::Context context;
+		context.topology_registry().addType("actin-polymer");
+
+		// actin binding sites
+		context.particle_types().addTopologyType("pointed", 0.);
+		context.particle_types().addTopologyType("side1", 0.);
+		context.particle_types().addTopologyType("side2", 0.);
+		context.particle_types().addTopologyType("barbed", 0.);
+
+		context.particle_types().addTopologyType("actin-monomer", 0.);
 }
 
 } // namespace test

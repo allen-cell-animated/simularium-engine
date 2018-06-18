@@ -8,6 +8,16 @@ namespace agentsim {
 
 class Agent;
 
+/**
+* SimPkg
+*
+* A Simulation Package (SimPkg) is any class/entity that may
+* alter simulation agents, or evaluate thier behavior
+*
+* For instance, a third party library that evalutates Simulation
+* will have it's results interpreted by a SimPkg subclass,
+* to return a list of aics::agentsim::Agent entitites
+*/
 class SimPkg
 {
 public:

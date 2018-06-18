@@ -2,6 +2,8 @@
 #define AICS_SIMPLEMOVE_H
 
 #include "agentsim/simpkg/simpkg.h"
+#include <random>
+#include "Eigen/Dense"
 
 namespace aics {
 namespace agentsim {
@@ -23,6 +25,12 @@ public:
 		*/
 		virtual void RunTimeStep(
 			float timeStep, std::vector<Agent*>& agents) override;
+
+		void SampleDiffusionStep(Agent* agent, Eigen::Vector3d& newLocation);
+
+private:
+		std::default_random_engine m_rng;
+		std::exponential_distribution<double> m_exp_dist;
 };
 
 } // namespace agentsim

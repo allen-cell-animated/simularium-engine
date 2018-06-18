@@ -16,6 +16,8 @@ public:
 		Simulation(std::vector<std::shared_ptr<SimPkg>> simPkgs);
 		~Simulation();
 
+		void AddAgent(Agent* newAgent);
+
 		void RunTimeStep(float timeStep);
 
 private:

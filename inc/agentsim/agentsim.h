@@ -3,5 +3,8 @@
 
 #include "simulation.h"
 #include "agents/agent.h"
+#include "simpkg/simpkg.h"
+#include "simpkg/simplemove.h"
+#include "simpkg/simpleinteraction.h"
 
 #endif // AICS_AGENTSIM_H

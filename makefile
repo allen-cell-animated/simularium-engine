@@ -19,7 +19,7 @@ CFLAGS=-Wall -g -Wl,-rpath $(LIBRARY_DIR)
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) \
 -isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
 LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a)
-DLLS:= -L$(LIBRARY_DIR) -lreaddy -ldl -pthread -lhdf5
+DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
 

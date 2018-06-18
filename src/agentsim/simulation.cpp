@@ -30,5 +30,10 @@ void Simulation::RunTimeStep(float timeStep)
 		}
 }
 
+void Simulation::AddAgent(Agent* agent)
+{
+		this->m_agents.push_back(agent);
+}
+
 } // namespace agentsim
 } // namespace aics
