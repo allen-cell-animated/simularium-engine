@@ -21,6 +21,7 @@ class Agent;
 class SimPkg
 {
 public:
+	virtual ~SimPkg() {}
 	virtual void Setup() = 0;
 	virtual void Shutdown() = 0;
 

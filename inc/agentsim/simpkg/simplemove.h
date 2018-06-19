@@ -11,6 +11,8 @@ namespace agentsim {
 class SimpleMove : public SimPkg
 {
 public:
+		virtual ~SimpleMove() {}
+
 		virtual void Setup() override;
 		virtual void Shutdown() override;
 
