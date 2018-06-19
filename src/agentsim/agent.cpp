@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "agentsim/pattern/agent_pattern.h"
+#include "agentsim/common/logger.h"
 
 namespace aics {
 namespace agentsim {
@@ -32,14 +33,28 @@ Agent::Agent()
 	agents::GenerateLocalUUID(this->m_agentID);
 }
 
-void Agent::AddBoundPartner(std::shared_ptr<Agent> other)
+bool Agent::AddBoundPartner(std::shared_ptr<Agent> other)
 {
+	if(other->m_agentID == this->m_agentID)
+	{
+		PRINT_WARNING("Agent.cpp: An Agent cannot be bound to itself.\n")
+		return false;
+	}
+
 	this->m_boundPartners.push_back(other);
+	return true;
 }
 
-void Agent::AddChildAgent(std::shared_ptr<Agent> other)
+bool Agent::AddChildAgent(std::shared_ptr<Agent> other)
 {
+	if(other->m_agentID == this->m_agentID)
+	{
+		PRINT_WARNING("Agent.cpp: An Agent cannot be parented to itself.\n")
+		return false;
+	}
+
 	this->m_childAgents.push_back(other);
+	return true;
 }
 
 bool Agent::CanInteractWith(const Agent& other)
@@ -78,7 +93,7 @@ const bool Agent::Matches(const AgentPattern& pattern) const
 	for(std::size_t i = 0; i < pattern.ChildAgents.size(); ++i)
 	{
 		Agent* outptr = nullptr;
-		if(!this->FindChild(pattern.ChildAgents[i], outptr))
+		if(!this->FindChildAgent(pattern.ChildAgents[i], outptr))
 		{
 			return false;
 		}
@@ -87,7 +102,7 @@ const bool Agent::Matches(const AgentPattern& pattern) const
 	return true;
 }
 
-const bool Agent::FindChild(const AgentPattern& pattern, Agent*& outptr) const
+const bool Agent::FindChildAgent(const AgentPattern& pattern, Agent*& outptr) const
 {
 	for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
 	{

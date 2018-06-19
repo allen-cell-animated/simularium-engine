@@ -97,13 +97,35 @@ TEST_F(AgentTest, CollisionRadius)
 TEST_F(AgentTest, PatternMatching)
 {
 	Agent a1;
-	a1.SetName("MrAgent");
+	a1.SetName("Agent");
 
 	AgentPattern ap;
-	ap.Name = "MrAgent";
+	ap.Name = "Agent";
 
 	ASSERT_TRUE(a1.Matches(ap));
+}
 
+TEST_F(AgentTest, CannotParentToSelf)
+{
+	std::shared_ptr<Agent> a1(new Agent());
+	ASSERT_FALSE(a1->AddChildAgent(a1));
+}
+
+TEST_F(AgentTest, FindChild)
+{
+	std::shared_ptr<Agent> a1(new Agent());
+	std::shared_ptr<Agent> a2(new Agent());
+
+	a1->SetName("Parent");
+	a2->SetName("Child");
+
+	a1->AddChildAgent(a2);
+
+	AgentPattern ap;
+	ap.Name = "Child";
+
+	Agent* outptr = nullptr;
+	ASSERT_TRUE(a1->FindChildAgent(ap, outptr));
 }
 
 } // namespace test

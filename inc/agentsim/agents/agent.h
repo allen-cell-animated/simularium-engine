@@ -32,14 +32,14 @@ public:
 	const float GetDiffusionCoefficient() { return m_diffusion_coefficient; }
 	const std::string GetName() { return m_agentName; }
 
-	void AddBoundPartner(std::shared_ptr<Agent> other);
-	void AddChildAgent(std::shared_ptr<Agent> other);
+	bool AddBoundPartner(std::shared_ptr<Agent> other);
+	bool AddChildAgent(std::shared_ptr<Agent> other);
 
 	bool CanInteractWith(const Agent& other);
 	bool IsCollidingWith(const Agent& other);
 
 	const bool Matches(const AgentPattern& pattern) const;
-	const bool FindChild(const AgentPattern& pattern, Agent*& outptr) const;
+	const bool FindChildAgent(const AgentPattern& pattern, Agent*& outptr) const;
 
 private:
 	Eigen::Vector3d m_location;
