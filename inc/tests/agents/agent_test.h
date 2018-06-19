@@ -128,6 +128,31 @@ TEST_F(AgentTest, FindChild)
 	ASSERT_TRUE(a1->FindChildAgent(ap, outptr));
 }
 
+TEST_F(AgentTest, FindMultipleChildren)
+{
+	std::shared_ptr<Agent> a1(new Agent());
+	std::shared_ptr<Agent> a2(new Agent());
+	std::shared_ptr<Agent> a3(new Agent());
+	std::unordered_map<std::string, bool> ignore;
+	Agent* outptr = nullptr;
+	Agent* outptr2 = nullptr;
+
+	a1->SetName("Parent");
+	a2->SetName("Child");
+	a3->SetName("Child");
+
+	a1->AddChildAgent(a2);
+	a1->AddChildAgent(a3);
+
+	AgentPattern ap;
+	ap.Name = "Child";
+
+	ASSERT_TRUE(a1->FindChildAgent(ap, outptr));
+	ignore[outptr->GetID()] = true;
+	ASSERT_TRUE(a1->FindChildAgent(ap, outptr2, ignore));
+	ASSERT_TRUE(outptr != outptr2);
+}
+
 } // namespace test
 } // namespace agentsim
 } // namespace aics

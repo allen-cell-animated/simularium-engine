@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 #include "Eigen/Dense"
 
 namespace aics {
@@ -31,6 +32,7 @@ public:
 	const float GetMass() { return m_mass; }
 	const float GetDiffusionCoefficient() { return m_diffusion_coefficient; }
 	const std::string GetName() { return m_agentName; }
+	const std::string GetID() { return m_agentID; }
 
 	bool AddBoundPartner(std::shared_ptr<Agent> other);
 	bool AddChildAgent(std::shared_ptr<Agent> other);
@@ -39,7 +41,10 @@ public:
 	bool IsCollidingWith(const Agent& other);
 
 	const bool Matches(const AgentPattern& pattern) const;
-	const bool FindChildAgent(const AgentPattern& pattern, Agent*& outptr) const;
+	const bool FindChildAgent(
+		const AgentPattern& pattern,
+		Agent*& outptr,
+		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
 
 private:
 	Eigen::Vector3d m_location;
@@ -54,6 +59,7 @@ private:
 
 	std::vector<std::shared_ptr<Agent>> m_boundPartners;
 	std::vector<std::shared_ptr<Agent>> m_childAgents;
+
 };
 
 } // namespace agentsim

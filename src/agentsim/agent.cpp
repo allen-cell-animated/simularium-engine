@@ -102,10 +102,16 @@ const bool Agent::Matches(const AgentPattern& pattern) const
 	return true;
 }
 
-const bool Agent::FindChildAgent(const AgentPattern& pattern, Agent*& outptr) const
+const bool Agent::FindChildAgent(
+	const AgentPattern& pattern,
+	Agent*& outptr,
+	std::unordered_map<std::string, bool> ignore) const
 {
 	for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
 	{
+		if(ignore[this->m_childAgents[i]->GetID()])
+			continue;
+
 		if(this->m_childAgents[i]->Matches(pattern))
 		{
 			outptr = this->m_childAgents[i].get();
