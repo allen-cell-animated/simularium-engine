@@ -37,7 +37,7 @@ class SimpleMoveTest : public ::testing::Test
 };
 
 TEST_F(SimpleMoveTest, CollisionResolution) {
-	  /*std::vector<Agent*> agents;
+	  std::vector<Agent*> agents;
 		std::size_t agent_num = 1000;
 		int numTimeSteps = 100;
 		SimPkg* simpleMove = new SimpleMove();
@@ -53,9 +53,9 @@ TEST_F(SimpleMoveTest, CollisionResolution) {
 		{
 				simpleMove->RunTimeStep(1.0, agents);
 
-				for(int k = 0; k < numAgents; ++k)
+				for(std::size_t k = 0; k < agent_num; ++k)
 				{
-						for(int l = k; l > 0; --l)
+						for(std::size_t l = k; l > 0; --l)
 						{
 								bool overlapping = agents[k]->IsCollidingWith(*(agents[l]));
 								ASSERT_FALSE(overlapping);
@@ -63,14 +63,13 @@ TEST_F(SimpleMoveTest, CollisionResolution) {
 				}
 		}
 
-		std::size_t agent_num = 1000;
 		for(std::size_t i = 0; i < agent_num; ++i)
 		{
 				delete agents[i];
 		}
 
 		simpleMove->Shutdown();
-		delete simpleMove;*/
+		delete simpleMove;
 }
 
 } // namespace test

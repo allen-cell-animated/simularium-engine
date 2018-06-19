@@ -15,13 +15,16 @@ DUMMY_TARGET=main
 TARGET=agentsim
 TEST_TARGET=agentsim_tests
 
-CFLAGS=-Wall -g -Wl,-rpath $(LIBRARY_DIR)
+CFLAGS=-Wall -g
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
+
 EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
-LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a)
+EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)
 DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
+
+rebuild: clean all
 
 prep:
 	mkdir -p ./$(OBJ_DIR)/$(PROJECT_DIR)

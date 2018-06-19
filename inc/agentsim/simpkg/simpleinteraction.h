@@ -18,6 +18,7 @@ public:
 				Agent* a2;
 		};
 
+		virtual ~SimpleInteraction() {}
 		virtual void Setup() override;
 		virtual void Shutdown() override;
 
