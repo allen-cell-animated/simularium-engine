@@ -57,6 +57,7 @@ TEST_F(SimpleMoveTest, CollisionResolution) {
 				{
 						for(std::size_t l = k; l > 0; --l)
 						{
+								printf("simple move iteration %lu\n", k);
 								bool overlapping = agents[k]->IsCollidingWith(*(agents[l]));
 								ASSERT_FALSE(overlapping);
 						}

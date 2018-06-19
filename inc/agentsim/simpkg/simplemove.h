@@ -20,7 +20,7 @@ public:
 		* RunTimeStep
 		*
 		*	@param timeStep		the time to advance simulation, in picoseconds
-		* @param agents			a list of Agents to be moved
+		*	@param agents			a list of Agents to be moved
 		*
 		* description				this function will randomly place agents,
 		*										avoiding spherical collision
@@ -29,7 +29,7 @@ public:
 			float timeStep, std::vector<Agent*>& agents) override;
 
 		void SampleDiffusionStep(
-			float timeStep,Agent* agent, Eigen::Vector3d& newLocation);
+			float timeStep, Agent* agent, Eigen::Vector3d& newLocation);
 
 private:
 		std::default_random_engine m_rng;
