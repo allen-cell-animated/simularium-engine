@@ -12,6 +12,8 @@ class Reaction
 public:
 	virtual bool RegisterReactant(AgentPattern& ap) = 0;
 	virtual bool IsReactant(Agent* a) = 0;
+	virtual bool React(Agent* a) = 0;
+	virtual bool React(Agent* a, Agent* b) = 0;
 };
 
 } // namespace agentsim
