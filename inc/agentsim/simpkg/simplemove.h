@@ -26,7 +26,7 @@ public:
 	*										avoiding spherical collision
 	*/
 	virtual void RunTimeStep(
-		float timeStep, std::vector<Agent*>& agents) override;
+		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
 
 	void SampleDiffusionStep(
 		float timeStep, Agent* agent, Eigen::Vector3d& newLocation);

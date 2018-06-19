@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 #include "agentsim/agents/agent.h"
 #include <time.h>
+#include "agentsim/pattern/agent_pattern.h"
 
 namespace aics {
 namespace agentsim {
@@ -91,6 +92,18 @@ TEST_F(AgentTest, CollisionRadius)
 	a2.SetLocation(v);
 
 	ASSERT_TRUE(a1.IsCollidingWith(a2));
+}
+
+TEST_F(AgentTest, PatternMatching)
+{
+	Agent a1;
+	a1.SetName("MrAgent");
+
+	AgentPattern ap;
+	ap.Name = "MrAgent";
+
+	ASSERT_TRUE(a1.Matches(ap));
+
 }
 
 } // namespace test

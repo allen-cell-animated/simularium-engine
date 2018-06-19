@@ -31,10 +31,10 @@ public:
 	* description				this function will evaluate interaction
 	*/
 	virtual void RunTimeStep(
-		float timeStep, std::vector<Agent*>& agents) override;
+		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
 
 	void EvaluateInteractions(
-		std::vector<Agent*>& agents,
+		std::vector<std::shared_ptr<Agent>>& agents,
 		std::vector<SimpleInteraction::InteractionEvent>& interactions);
 
 private:

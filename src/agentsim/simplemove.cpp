@@ -17,11 +17,12 @@ void SimpleMove::Shutdown()
 
 }
 
-void SimpleMove::RunTimeStep(float timeStep, std::vector<Agent*>& agents)
+void SimpleMove::RunTimeStep(
+	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
 	for(std::size_t i = 0; i < agents.size(); ++i)
 	{
-			Agent* agent = agents[i];
+			Agent* agent = agents[i].get();
 			Eigen::Vector3d newLocation;
 			SampleDiffusionStep(timeStep, agent, newLocation);
 			agent->SetLocation(newLocation);
@@ -31,7 +32,7 @@ void SimpleMove::RunTimeStep(float timeStep, std::vector<Agent*>& agents)
 			{
 					if(agent->IsCollidingWith(*(agents[j])))
 					{
-							collidingAgent = agents[j];
+							collidingAgent = agents[j].get();
 							break;
 					}
 			}

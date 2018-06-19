@@ -32,12 +32,12 @@ Agent::Agent()
 	agents::GenerateLocalUUID(this->m_agentID);
 }
 
-void Agent::AddBoundPartner(Agent* other)
+void Agent::AddBoundPartner(std::shared_ptr<Agent> other)
 {
 	this->m_boundPartners.push_back(other);
 }
 
-void Agent::AddChildAgent(Agent* other)
+void Agent::AddChildAgent(std::shared_ptr<Agent> other)
 {
 	this->m_childAgents.push_back(other);
 }
@@ -93,7 +93,7 @@ const bool Agent::FindChild(const AgentPattern& pattern, Agent*& outptr) const
 	{
 		if(this->m_childAgents[i]->Matches(pattern))
 		{
-			outptr = this->m_childAgents[i];
+			outptr = this->m_childAgents[i].get();
 			break;
 		}
 	}

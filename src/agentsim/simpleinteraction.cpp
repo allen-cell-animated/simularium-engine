@@ -15,13 +15,13 @@ void SimpleInteraction::Shutdown()
 }
 
 void SimpleInteraction::RunTimeStep(
-	float timeStep, std::vector<Agent*>& agents)
+	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
 	this->EvaluateInteractions(agents, this->m_interactions);
 }
 
 void SimpleInteraction::EvaluateInteractions(
-	std::vector<Agent*>& agents,
+	std::vector<std::shared_ptr<Agent>>& agents,
 	std::vector<SimpleInteraction::InteractionEvent>& interactions)
 {
 	for(std::size_t i = 0; i < agents.size(); ++i)
@@ -31,8 +31,8 @@ void SimpleInteraction::EvaluateInteractions(
 					if(agents[i]->CanInteractWith(*(agents[j])))
 					{
 							InteractionEvent interaction;
-							interaction.a1 = agents[i];
-							interaction.a2 = agents[j];
+							interaction.a1 = agents[i].get();
+							interaction.a2 = agents[j].get();
 							interactions.push_back(interaction);
 					}
 			}

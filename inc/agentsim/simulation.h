@@ -16,12 +16,12 @@ public:
 	Simulation(std::vector<std::shared_ptr<SimPkg>> simPkgs);
 	~Simulation();
 
-	void AddAgent(Agent* newAgent);
+	void AddAgent(std::shared_ptr<Agent> newAgent);
 
 	void RunTimeStep(float timeStep);
 
 private:
-	std::vector<Agent*> m_agents;
+	std::vector<std::shared_ptr<Agent>> m_agents;
 
 	std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
 };

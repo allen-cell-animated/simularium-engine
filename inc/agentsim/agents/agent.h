@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 #include "Eigen/Dense"
 
 namespace aics {
@@ -31,8 +32,8 @@ public:
 	const float GetDiffusionCoefficient() { return m_diffusion_coefficient; }
 	const std::string GetName() { return m_agentName; }
 
-	void AddBoundPartner(Agent* other);
-	void AddChildAgent(Agent* other);
+	void AddBoundPartner(std::shared_ptr<Agent> other);
+	void AddChildAgent(std::shared_ptr<Agent> other);
 
 	bool CanInteractWith(const Agent& other);
 	bool IsCollidingWith(const Agent& other);
@@ -51,8 +52,8 @@ private:
 	std::string m_agentID = "";
 	std::string m_agentName = "";
 
-	std::vector<Agent*> m_boundPartners;
-	std::vector<Agent*> m_childAgents;
+	std::vector<std::shared_ptr<Agent>> m_boundPartners;
+	std::vector<std::shared_ptr<Agent>> m_childAgents;
 };
 
 } // namespace agentsim
