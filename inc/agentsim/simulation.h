@@ -13,17 +13,17 @@ class SimPkg;
 class Simulation
 {
 public:
-		Simulation(std::vector<std::shared_ptr<SimPkg>> simPkgs);
-		~Simulation();
+	Simulation(std::vector<std::shared_ptr<SimPkg>> simPkgs);
+	~Simulation();
 
-		void AddAgent(Agent* newAgent);
+	void AddAgent(Agent* newAgent);
 
-		void RunTimeStep(float timeStep);
+	void RunTimeStep(float timeStep);
 
 private:
-		std::vector<Agent*> m_agents;
+	std::vector<Agent*> m_agents;
 
-		std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
+	std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
 };
 
 }
