@@ -26,7 +26,8 @@ public:
 		virtual void RunTimeStep(
 			float timeStep, std::vector<Agent*>& agents) override;
 
-		void SampleDiffusionStep(Agent* agent, Eigen::Vector3d& newLocation);
+		void SampleDiffusionStep(
+			float timeStep,Agent* agent, Eigen::Vector3d& newLocation);
 
 private:
 		std::default_random_engine m_rng;

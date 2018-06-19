@@ -16,8 +16,8 @@ TARGET=agentsim
 TEST_TARGET=agentsim_tests
 
 CFLAGS=-Wall -g -Wl,-rpath $(LIBRARY_DIR)
-INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) \
--isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
+INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
+EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
 LIBRARIES:=$(shell find $(LIBRARY_DIR) -name *.a)
 DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5
 
@@ -41,13 +41,14 @@ agentsim_prog: $(SOURCE_DIR)/$(TARGET).cpp
 		$(CC) $(SOURCE_DIR)/$(TARGET).cpp \
 		$(CFLAGS) $(INCLUDES) \
 		-o $(BUILD_DIR)/$(TARGET) \
-		$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a $(DLLS)\
+		$(LIBRARY_DIR)/$(TARGET).a\
 
 agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
 	$(CFLAGS) $(INCLUDES) \
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
-	$(LIBRARIES) $(LIBRARY_DIR)/$(TARGET).a $(DLLS)\
+	$(LIBRARY_DIR)/$(TARGET).a \
+	$(LIBRARY_DIR)/gtest_main.a -pthread
 
 clean:
 	rm -f ./bin/*

@@ -23,7 +23,7 @@ void SimpleMove::RunTimeStep(float timeStep, std::vector<Agent*>& agents)
 		{
 				Agent* agent = agents[i];
 				Eigen::Vector3d newLocation;
-				SampleDiffusionStep(agent, newLocation);
+				SampleDiffusionStep(timeStep, agent, newLocation);
 				agent->SetLocation(newLocation);
 
 				Agent* collidingAgent = nullptr;
@@ -49,19 +49,19 @@ void SimpleMove::RunTimeStep(float timeStep, std::vector<Agent*>& agents)
 		}
 }
 
-void SimpleMove::SampleDiffusionStep(Agent* agent, Eigen::Vector3d& newLocation)
+void SimpleMove::SampleDiffusionStep(
+	float timeStep, Agent* agent, Eigen::Vector3d& newLocation)
 {
 		double ed = this->m_exp_dist(this->m_rng);
-		double m = agent->GetMass();
 		double dc = agent->GetDiffusionCoefficient();
-		double dist = ed * dc / m;
+		double msd = 6 * dc * timeStep;
 
-		double x = (double)(rand() % 101 - 50) / 100.0;
-		double y = (double)(rand() % 101 - 50) / 100.0;
-		double z = (double)(rand() % 101 - 50) / 100.0;
+		double x = msd * ed * (double)(rand() % 101 - 50) / 100.0;
+		double y = msd * ed * (double)(rand() % 101 - 50) / 100.0;
+		double z = msd * ed * (double)(rand() % 101 - 50) / 100.0;
 
 		Eigen::Vector3d old = agent->GetLocation();
-		newLocation << x * dist + old(0), y * dist + old(1), z * dist + old(2);
+		newLocation << x + old(0), y + old(1), z + old(2);
 }
 
 } // namespace agentsim
