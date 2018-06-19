@@ -23,7 +23,8 @@ public:
 	void SetCollisionRadius(float newRadius) { m_collision_radius = newRadius; }
 	void SetMass(float mass) { m_mass = mass; }
 	void SetDiffusionCoefficient(float dc) { m_diffusion_coefficient = dc; }
-	void SetName(std::string name) {m_agentName = name; }
+	void SetName(std::string name) { m_agentName = name; }
+	void SetState(std::string state) { m_agentState = state; }
 
 	const Eigen::Vector3d GetLocation() const { return m_location; }
 	const Eigen::Vector3d GetRotation() const { return m_rotation; }
@@ -31,7 +32,8 @@ public:
 	const float GetCollisionRadius() { return m_collision_radius; }
 	const float GetMass() { return m_mass; }
 	const float GetDiffusionCoefficient() { return m_diffusion_coefficient; }
-	const std::string GetName() { return m_agentName; }
+	const std::string GetName() const { return m_agentName; }
+	const std::string GetState() const { return m_agentState; }
 	const std::string GetID() { return m_agentID; }
 
 	bool AddBoundPartner(std::shared_ptr<Agent> other);
@@ -42,6 +44,10 @@ public:
 
 	const bool Matches(const AgentPattern& pattern) const;
 	const bool FindChildAgent(
+		const AgentPattern& pattern,
+		Agent*& outptr,
+		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
+	const bool FindBoundPartner(
 		const AgentPattern& pattern,
 		Agent*& outptr,
 		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
@@ -56,6 +62,7 @@ private:
 	float m_collision_radius = 50.f;
 	std::string m_agentID = "";
 	std::string m_agentName = "";
+	std::string m_agentState = "";
 
 	std::vector<std::shared_ptr<Agent>> m_boundPartners;
 	std::vector<std::shared_ptr<Agent>> m_childAgents;

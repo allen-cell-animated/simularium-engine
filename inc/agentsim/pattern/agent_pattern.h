@@ -18,7 +18,10 @@ struct AgentPattern
 {
 public:
 	std::string Name = "";
+	std::string State = "";
 	std::vector<AgentPattern> ChildAgents;
+	std::vector<AgentPattern> BoundPartners;
+	bool IsWildCardBound = false;
 };
 
 } // namespace agentsim

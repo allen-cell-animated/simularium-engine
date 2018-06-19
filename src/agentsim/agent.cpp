@@ -90,13 +90,43 @@ const bool Agent::Matches(const AgentPattern& pattern) const
 		return false;
 	}
 
+	if(pattern.State != this->m_agentState)
+	{
+		return false;
+	}
+
+	if(pattern.IsWildCardBound && this->m_boundPartners.size() == 0)
+	{
+		return false;
+	}
+
+	std::unordered_map<std::string, bool> ignore;
 	for(std::size_t i = 0; i < pattern.ChildAgents.size(); ++i)
 	{
 		Agent* outptr = nullptr;
-		if(!this->FindChildAgent(pattern.ChildAgents[i], outptr))
+		if(!this->FindChildAgent(pattern.ChildAgents[i], outptr, ignore))
 		{
 			return false;
 		}
+		ignore[outptr->GetID()] = true;
+	}
+
+	// Above, we check for wild-card bond mismatch
+	if(pattern.IsWildCardBound)
+	{
+		return true;
+	}
+
+	// assuming id collisions are rare
+	//  for this reason, the ignore list is not being cleared
+	for(std::size_t i = 0; i < pattern.BoundPartners.size(); ++i)
+	{
+		Agent* outptr = nullptr;
+		if(!this->FindBoundPartner(pattern.ChildAgents[i], outptr, ignore))
+		{
+			return false;
+		}
+		ignore[outptr->GetID()] = true;
 	}
 
 	return true;
@@ -115,6 +145,26 @@ const bool Agent::FindChildAgent(
 		if(this->m_childAgents[i]->Matches(pattern))
 		{
 			outptr = this->m_childAgents[i].get();
+			break;
+		}
+	}
+
+	return outptr != nullptr;
+}
+
+const bool Agent::FindBoundPartner(
+	const AgentPattern& pattern,
+	Agent*& outptr,
+	std::unordered_map<std::string, bool> ignore) const
+{
+	for(std::size_t i = 0; i < this->m_boundPartners.size(); ++i)
+	{
+		if(ignore[this->m_boundPartners[i]->GetID()])
+			continue;
+
+		if(this->m_boundPartners[i]->Matches(pattern))
+		{
+			outptr = this->m_boundPartners[i].get();
 			break;
 		}
 	}
