@@ -37,13 +37,19 @@ class AgentTest : public ::testing::Test
 	// Objects declared here can be used by all tests in the test case for Foo.
 };
 
-TEST_F(AgentTest, ConstructorSetLocation) {
-Agent a;
+TEST_F(AgentTest, BasicParenting) {
+	std::shared_ptr<Agent> a1(new Agent());
+	std::shared_ptr<Agent> a2(new Agent());
 
-Eigen::Vector3d v;
-v << 0, 0, 0;
+	Eigen::Vector3d v;
+	v << 1, 5, 7;
+	a1->SetLocation(v);
+	a1->AddChildAgent(a2);
 
-EXPECT_EQ(v, a.GetLocation());
+	EXPECT_EQ(a2->GetGlobalTransform(), a1->GetGlobalTransform());
+	a2->SetLocation(v);
+	EXPECT_NE(a2->GetGlobalTransform(), a1->GetGlobalTransform());
+	EXPECT_EQ(a2->GetGlobalTransform(), a1->GetGlobalTransform() * a2->GetTransform());
 }
 
 TEST_F(AgentTest, DoesNotInteractWithSelf)

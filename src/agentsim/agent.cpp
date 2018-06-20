@@ -96,6 +96,7 @@ bool Agent::AddChildAgent(std::shared_ptr<Agent> other)
 	}
 
 	this->m_childAgents.push_back(other);
+	other->UpdateParentTransform(this->GetGlobalTransform());
 	return true;
 }
 
@@ -276,7 +277,7 @@ void Agent::UpdateParentTransform(Eigen::Matrix4d parentTransform)
 	this->m_parentTransform = parentTransform;
 	for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
 	{
-		this->m_childAgents[i]->UpdateParentTransform(this->m_parentTransform * this->GetTransform());
+		this->m_childAgents[i]->UpdateParentTransform(this->GetGlobalTransform());
 	}
 }
 
