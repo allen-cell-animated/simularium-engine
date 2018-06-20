@@ -42,6 +42,7 @@ public:
 	bool CanInteractWith(const Agent& other);
 	bool IsCollidingWith(const Agent& other);
 
+	const bool FindSubAgent(const AgentPattern& pattern, Agent*& outptr);
 	const bool Matches(const AgentPattern& pattern) const;
 	const bool FindChildAgent(
 		const AgentPattern& pattern,
@@ -51,6 +52,7 @@ public:
 		const AgentPattern& pattern,
 		Agent*& outptr,
 		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
+	bool CopyState(AgentPattern& pattern);
 
 private:
 	Eigen::Vector3d m_location;

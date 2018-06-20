@@ -8,10 +8,16 @@ namespace agentsim {
 
 class Agent;
 
+/*
+*	Reaction Center
+*
+*	A reaction center describes the before and after states
+* of a single reaction participant
+*/
 struct ReactionCenter
 {
-	AgentPattern a1;
-	AgentPattern a2;
+	AgentPattern before;
+	AgentPattern after;
 };
 
 } // namespace agentsim

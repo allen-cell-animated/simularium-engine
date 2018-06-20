@@ -3,6 +3,7 @@
 #include <time.h>
 #include "agentsim/pattern/agent_pattern.h"
 #include "agentsim/common/logger.h"
+#include <iostream>
 
 namespace aics {
 namespace agentsim {
@@ -81,6 +82,32 @@ bool Agent::IsCollidingWith(const Agent& other)
 		(this->m_collision_radius + other.m_collision_radius);
 
 	return dist_squared <= coll_dist_squared;
+}
+
+const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr)
+{
+	bool matches = this->Matches(pattern);
+	std::size_t child_count = this->m_childAgents.size();
+	if(matches)
+	{
+		outptr = this;
+		return true;
+	}
+
+	if(!matches && child_count > 0)
+	{
+		for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
+		{
+			if(this->m_childAgents[i]->FindSubAgent(pattern, outptr))
+			{
+				outptr = this->m_childAgents[i].get();
+				return true;
+			}
+		}
+	}
+
+	// no matches and no children left to search
+	return false;
 }
 
 const bool Agent::Matches(const AgentPattern& pattern) const
@@ -170,6 +197,26 @@ const bool Agent::FindBoundPartner(
 	}
 
 	return outptr != nullptr;
+}
+
+bool Agent::CopyState(AgentPattern& pattern)
+{
+	this->m_agentState = pattern.State;
+
+	std::unordered_map<std::string, bool> ignore;
+	for(std::size_t i = 0; i < pattern.ChildAgents.size(); ++i)
+	{
+		Agent* outptr = nullptr;
+		if(!this->FindChildAgent(pattern.ChildAgents[i], outptr, ignore))
+		{
+			PRINT_ERROR("Agent.cpp: a match could not be found for a child agent while copying state.\n")
+			return false;
+		}
+		ignore[outptr->GetID()] = true;
+		outptr->CopyState(pattern.ChildAgents[i]);
+	}
+
+	return true;
 }
 
 } // namespace agentsim

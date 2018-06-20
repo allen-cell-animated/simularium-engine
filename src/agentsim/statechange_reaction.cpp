@@ -12,33 +12,36 @@ bool StateChangeReaction::RegisterReactant(AgentPattern& ap)
 	return true;
 }
 
+void StateChangeReaction::RegisterReactinoCenter(ReactionCenter rc)
+{
+	this->m_reactionCenters.push_back(rc);
+}
+
 bool StateChangeReaction::IsReactant(Agent* a)
 {
-	return a->Matches(this->m_reactant);
+	Agent* outptr = nullptr;
+	bool isReactant = a->FindSubAgent(this->m_reactant, outptr);
+	return isReactant;
 }
 
 bool StateChangeReaction::React(Agent* a)
 {
-	std::unordered_map<std::string, bool> ignore;
-	Agent* outptr = nullptr;
 	for(std::size_t i = 0; i < this->m_reactionCenters.size(); ++i)
 	{
-		if(!a->FindChildAgent(this->m_reactionCenters[i].a1, outptr, ignore))
+		Agent* outptr = nullptr;
+		if(!(a->FindSubAgent(this->m_reactionCenters[i].before, outptr)))
 		{
-			PRINT_ERROR("StateChange_Reaction.cpp: attempted a reaction on a non-qualified reactant")
+			PRINT_ERROR("StateChange_Reaction.cpp: could not find a sub agent for a reaction center.\n")
 			return false;
 		}
-
-		ignore[outptr->GetID()] = true;
-		//@TODO copy state from a2
+		outptr->CopyState(this->m_reactionCenters[i].after);
 	}
-
 	return true;
 }
 
 bool StateChangeReaction::React(Agent* a, Agent* b)
 {
-	PRINT_ERROR("StateChange_Reaction.cpp: this reaction type only has one reactant")
+	PRINT_ERROR("StateChange_Reaction.cpp: this reaction type only has one reactant.\n")
 	return false;
 }
 
