@@ -3,7 +3,6 @@
 #include <time.h>
 #include "agentsim/pattern/agent_pattern.h"
 #include "agentsim/common/logger.h"
-#include <iostream>
 
 namespace aics {
 namespace agentsim {
@@ -100,7 +99,6 @@ const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr)
 		{
 			if(this->m_childAgents[i]->FindSubAgent(pattern, outptr))
 			{
-				outptr = this->m_childAgents[i].get();
 				return true;
 			}
 		}
