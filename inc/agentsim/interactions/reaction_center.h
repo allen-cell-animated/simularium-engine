@@ -13,6 +13,9 @@ class Agent;
 *
 *	A reaction center describes the before and after states
 * of a single reaction participant
+*
+*	@TODO: verify that before and after are infact the
+*	"same" molecule, (same agent tree depth, same children, etc.)
 */
 struct ReactionCenter
 {

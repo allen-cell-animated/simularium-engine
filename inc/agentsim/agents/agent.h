@@ -52,7 +52,7 @@ public:
 		const AgentPattern& pattern,
 		Agent*& outptr,
 		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
-	bool CopyState(AgentPattern& pattern);
+	bool CopyState(AgentPattern& oldState, AgentPattern& newState);
 
 private:
 	Eigen::Vector3d m_location;

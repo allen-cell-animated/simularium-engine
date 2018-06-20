@@ -197,21 +197,33 @@ const bool Agent::FindBoundPartner(
 	return outptr != nullptr;
 }
 
-bool Agent::CopyState(AgentPattern& pattern)
+bool Agent::CopyState(AgentPattern& oldState, AgentPattern& newState)
 {
-	this->m_agentState = pattern.State;
+	std::size_t ap_child_count = oldState.ChildAgents.size();
+	std::size_t this_child_count = this->m_childAgents.size();
 
-	std::unordered_map<std::string, bool> ignore;
-	for(std::size_t i = 0; i < pattern.ChildAgents.size(); ++i)
+	if(ap_child_count == 0 && this->Matches(oldState))
 	{
-		Agent* outptr = nullptr;
-		if(!this->FindChildAgent(pattern.ChildAgents[i], outptr, ignore))
+		this->m_agentState = newState.State;
+		return true;
+	}
+
+	if(ap_child_count > this_child_count)
+	{
+		PRINT_ERROR("Agent::CopyStateChanges: this agent pattern has more levels that this agent.\n")
+	}
+
+	Agent* outptr = nullptr;
+	for(std::size_t i = 0; i < oldState.ChildAgents.size(); ++i)
+	{
+		if(this->FindSubAgent(oldState.ChildAgents[i],outptr))
 		{
-			PRINT_ERROR("Agent.cpp: a match could not be found for a child agent while copying state.\n")
-			return false;
+			if(!outptr->CopyState(oldState.ChildAgents[i], newState.ChildAgents[i]))
+			{
+				PRINT_ERROR("Agent::CopyStateChanges: a match could not be found for a child agent while copying state.\n")
+				return false;
+			}
 		}
-		ignore[outptr->GetID()] = true;
-		outptr->CopyState(pattern.ChildAgents[i]);
 	}
 
 	return true;

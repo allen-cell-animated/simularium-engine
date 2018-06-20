@@ -34,7 +34,9 @@ bool StateChangeReaction::React(Agent* a)
 			PRINT_ERROR("StateChange_Reaction.cpp: could not find a sub agent for a reaction center.\n")
 			return false;
 		}
-		outptr->CopyState(this->m_reactionCenters[i].after);
+		outptr->CopyState(
+			this->m_reactionCenters[i].before,
+			this->m_reactionCenters[i].after);
 	}
 	return true;
 }

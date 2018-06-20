@@ -107,6 +107,17 @@ TEST_F(AgentSubtreeTest, FindSubAgent)
 	ASSERT_TRUE(outptr->GetName() == "sc21");
 }
 
+TEST_F(AgentSubtreeTest, CopyState)
+{
+	AgentPattern new_parent_ap = parent_ap;
+	new_parent_ap.ChildAgents[0].ChildAgents[0].State = "1";
+	new_parent_ap.ChildAgents[0].ChildAgents[1].State = "2";
+	new_parent_ap.ChildAgents[1].ChildAgents[0].State = "3";
+	new_parent_ap.ChildAgents[1].ChildAgents[1].State = "4";
+	ASSERT_TRUE(parent_agent->CopyState(parent_ap, new_parent_ap));
+	ASSERT_TRUE(parent_agent->Matches(new_parent_ap));
+}
+
 } // namespace test
 } // namespace agentsim
 } // namespace aics
