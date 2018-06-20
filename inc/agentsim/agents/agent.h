@@ -6,6 +6,7 @@
 #include <memory>
 #include <unordered_map>
 #include "Eigen/Dense"
+#include "Eigen/Geometry"
 
 namespace aics {
 namespace agentsim {
@@ -17,8 +18,8 @@ class Agent
 public:
 	Agent();
 
-	void SetLocation(Eigen::Vector3d newLocation) { m_location = newLocation; }
-	void SetRotation(Eigen::Vector3d newRotation) { m_rotation = newRotation; }
+	void SetLocation(Eigen::Vector3d newLocation);
+	void SetRotation(Eigen::Vector3d newRotation);
 	void SetInteractionDistance(float newDistance) { m_interaction_distance = newDistance; }
 	void SetCollisionRadius(float newRadius) { m_collision_radius = newRadius; }
 	void SetMass(float mass) { m_mass = mass; }
@@ -26,6 +27,8 @@ public:
 	void SetName(std::string name) { m_agentName = name; }
 	void SetState(std::string state) { m_agentState = state; }
 
+	const Eigen::Matrix4d GetGlobalTransform();
+	const Eigen::Matrix4d GetTransform();
 	const Eigen::Vector3d GetLocation() const { return m_location; }
 	const Eigen::Vector3d GetRotation() const { return m_rotation; }
 	const float GetInteractionDistance() { return m_interaction_distance; }
@@ -55,8 +58,12 @@ public:
 	bool CopyState(AgentPattern& oldState, AgentPattern& newState);
 
 private:
+	void UpdateParentTransform(Eigen::Matrix4d parentTransform);
 	Eigen::Vector3d m_location;
 	Eigen::Vector3d m_rotation;
+	Eigen::Affine3d m_localLocation;
+	Eigen::Affine3d m_localRotation;
+	Eigen::Matrix4d m_parentTransform;
 
 	float m_diffusion_coefficient = 5.0f;
 	float m_mass = 1.0f;
