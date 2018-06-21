@@ -50,6 +50,10 @@ public:
 	const bool Matches(const AgentPattern& pattern) const;
 	const bool FindChildAgent(
 		const AgentPattern& pattern,
+		std::shared_ptr<Agent>& outptr,
+		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
+	const bool FindChildAgent(
+		const AgentPattern& pattern,
 		Agent*& outptr,
 		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
 	const bool FindBoundPartner(

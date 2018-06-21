@@ -32,6 +32,35 @@ std::shared_ptr<Agent> create_actin_agent()
 	return actin;
 }
 
+AgentPattern create_actin_agent_pattern()
+{
+	AgentPattern actinap;
+	AgentPattern pointedap;
+	AgentPattern side1ap;
+	AgentPattern side2ap;
+	AgentPattern barbedap;
+	AgentPattern nucap;
+
+	pointedap.Name = "pointed";
+	side1ap.Name = "side1";
+	side2ap.Name = "side2";
+	barbedap.Name = "barbed";
+	nucap.Name = "nuc";
+	nucap.State = "ADP/Pi";
+	actinap.ChildAgents.push_back(pointedap);
+	actinap.ChildAgents.push_back(side1ap);
+	actinap.ChildAgents.push_back(side2ap);
+	actinap.ChildAgents.push_back(barbedap);
+	actinap.ChildAgents.push_back(nucap);
+	return actinap;
+}
+
+std::shared_ptr<CombinationReaction> create_actin_nucleation_rx()
+{
+	std::shared_ptr<CombinationReaction> rx;
+	return rx;
+}
+
 class CombinationReactionTest : public ::testing::Test
 {
 	protected:
@@ -40,26 +69,6 @@ class CombinationReactionTest : public ::testing::Test
 
 	CombinationReactionTest() {
 		// You can do set-up work for each test here.
-		pointedap.Name = "pointed";
-		side1ap.Name = "side1";
-		side2ap.Name = "side2";
-		barbedap.Name = "barbed";
-		nucap.Name = "nuc";
-		nucap.State = "ADP/Pi";
-		actinap.ChildAgents.push_back(pointedap);
-		actinap.ChildAgents.push_back(side1ap);
-		actinap.ChildAgents.push_back(side2ap);
-		actinap.ChildAgents.push_back(barbedap);
-		actinap.ChildAgents.push_back(nucap);
-
-		nucap_after.Name = "nuc";
-		nucap_after.State = "ADP";
-		actinap_after.ChildAgents.push_back(pointedap);
-		actinap_after.ChildAgents.push_back(side1ap);
-		actinap_after.ChildAgents.push_back(side2ap);
-		actinap_after.ChildAgents.push_back(barbedap);
-		actinap_after.ChildAgents.push_back(nucap_after);
-
 	}
 
 	virtual ~CombinationReactionTest() {
@@ -79,19 +88,22 @@ class CombinationReactionTest : public ::testing::Test
 		// before the destructor).
 	}
 	// Objects declared here can be used by all tests in the test case for Foo.
-	AgentPattern actinap_after;
-	AgentPattern actinap;
-	AgentPattern pointedap;
-	AgentPattern side1ap;
-	AgentPattern side2ap;
-	AgentPattern barbedap;
-	AgentPattern nucap;
-	AgentPattern nucap_after;
 };
 
 TEST_F(CombinationReactionTest, ActinNucleation)
 {
+	std::shared_ptr<Agent> actin1, actin2;
+	actin1 = create_actin_agent();
+	actin2 = create_actin_agent();
 
+	AgentPattern ap = create_actin_agent_pattern();
+	ReactionBondChange rb;
+	rb.reactant_patterns.push_back(ap);
+	rb.reactant_patterns.push_back(ap);
+	rb.end_reactant_1 = 1;
+
+	rb.bond_indices.push_back(Eigen::Vector2i(0,0));
+	rb.bond_indices.push_back(Eigen::Vector2i(1,3));
 }
 
 TEST_F(CombinationReactionTest, ActinTrimer)

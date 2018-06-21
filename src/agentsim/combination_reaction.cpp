@@ -2,6 +2,7 @@
 #include "agentsim/pattern/agent_pattern.h"
 #include "agentsim/agents/agent.h"
 #include "agentsim/common/logger.h"
+#include <unordered_map>
 
 namespace aics {
 namespace agentsim {
@@ -51,6 +52,7 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 	}
 
 	std::vector<Agent*> reactants;
+	std::unordered_map<std::size_t, std::shared_ptr<Agent>> reactantChildren;
 	for(std::size_t i = 0; i < this->m_bondChanges.reactant_patterns.size(); ++i)
 	{
 		AgentPattern ap = this->m_bondChanges.reactant_patterns[i];
@@ -63,6 +65,18 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 		}
 
 		reactants.push_back(outptr);
+		for(std::size_t j = 0; j < ap.ChildAgents.size(); ++i)
+		{
+			std::shared_ptr<Agent> childoutptr = nullptr;
+			if(!outptr->FindChildAgent(ap.ChildAgents[j], childoutptr))
+			{
+				PRINT_ERROR("Combination_Reaction.cpp: could not find a sub agent child needed for bond formation.\n")
+				return false;
+			}
+
+			// assuming < 100 child agents
+			reactantChildren[100 * i + j] = childoutptr;
+		}
 	}
 
 	for(std::size_t i = 0; i < this->m_bondChanges.bond_indices.size(); i+= 2)
@@ -70,8 +84,8 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 		Eigen::Vector2i v1 = this->m_bondChanges.bond_indices[i];
 		Eigen::Vector2i v2 = this->m_bondChanges.bond_indices[i+1];
 
-		std::shared_ptr<Agent> ab1 = reactants[v1[0]]->GetChildAgent(v1[1]);
-		std::shared_ptr<Agent> ab2 = reactants[v2[0]]->GetChildAgent(v2[1]);
+		std::shared_ptr<Agent> ab1 = reactantChildren[v1[0] * 100 + v1[1]];
+		std::shared_ptr<Agent> ab2 = reactantChildren[v2[0] * 100 + v2[1]];;
 		ab1->AddBoundPartner(ab2);
 		ab2->AddBoundPartner(ab1);
 	}
