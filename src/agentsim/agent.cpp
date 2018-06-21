@@ -100,6 +100,17 @@ bool Agent::AddChildAgent(std::shared_ptr<Agent> other)
 	return true;
 }
 
+std::shared_ptr<Agent> Agent::GetChildAgent(std::size_t index)
+{
+	if(index < 0 || index > this->m_childAgents.size())
+	{
+		PRINT_ERROR("Agent.cpp: GetChildAgent: invalid index")
+		return nullptr;
+	}
+
+	return this->m_childAgents[index];
+}
+
 bool Agent::CanInteractWith(const Agent& other)
 {
 	if(this->m_agentID == other.m_agentID)

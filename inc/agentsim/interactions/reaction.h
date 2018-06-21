@@ -2,6 +2,7 @@
 #define AICS_REACTION_H
 
 #include "agentsim/interactions/reaction_state_change.h"
+#include "agentsim/interactions/reaction_bond_change.h"
 
 namespace aics {
 namespace agentsim {

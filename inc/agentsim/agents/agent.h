@@ -41,6 +41,7 @@ public:
 
 	bool AddBoundPartner(std::shared_ptr<Agent> other);
 	bool AddChildAgent(std::shared_ptr<Agent> other);
+	std::shared_ptr<Agent> GetChildAgent(std::size_t index);
 
 	bool CanInteractWith(const Agent& other);
 	bool IsCollidingWith(const Agent& other);
