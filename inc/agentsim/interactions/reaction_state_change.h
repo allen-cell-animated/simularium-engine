@@ -1,5 +1,5 @@
-#ifndef AICS_REACTION_CENTER_H
-#define AICS_REACTION_CENTER_H
+#ifndef AICS_REACTION_STATE_CHANGE_H
+#define AICS_REACTION_STATE_CHANGE_H
 
 #include "agentsim/pattern/agent_pattern.h"
 
@@ -9,15 +9,15 @@ namespace agentsim {
 class Agent;
 
 /*
-*	Reaction Center
+*	Reaction State Change
 *
-*	A reaction center describes the before and after states
+*	A reaction state change describes the before and after states
 * of a single reaction participant
 *
 *	@TODO: verify that before and after are infact the
 *	"same" molecule, (same agent tree depth, same children, etc.)
 */
-struct ReactionCenter
+struct ReactionStateChange
 {
 	AgentPattern before;
 	AgentPattern after;
@@ -26,4 +26,4 @@ struct ReactionCenter
 } // namespace agentsim
 } // namespace aics
 
-#endif // AICS_REACTION_CENTER_H
+#endif // AICS_REACTION_STATE_CHANGE_H

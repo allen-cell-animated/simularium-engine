@@ -102,10 +102,10 @@ TEST_F(StateChangeReactionTest, 2_Level_StateChange)
 	Reaction* srx = new StateChangeReaction();
 	srx->RegisterReactant(actinap);
 
-	ReactionCenter rc;
-	rc.before = nucap;
-	rc.after = nucap_after;
-	srx->RegisterReactinoCenter(rc);
+	ReactionStateChange rsc;
+	rsc.before = nucap;
+	rsc.after = nucap_after;
+	static_cast<StateChangeReaction*>(srx)->RegisterStateChange(rsc);
 
 	ASSERT_TRUE(actin_agent->Matches(actinap));
 	srx->React(actin_agent.get());

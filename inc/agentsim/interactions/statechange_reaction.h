@@ -13,7 +13,7 @@ class StateChangeReaction : public Reaction
 public:
 	virtual ~StateChangeReaction() {}
 	virtual bool RegisterReactant(AgentPattern& ap) override;
-	virtual void RegisterReactinoCenter(ReactionCenter rc) override;
+	virtual void RegisterStateChange(ReactionStateChange rc);
 	virtual bool IsReactant(Agent* a) override;
 	virtual bool React(Agent* a) override;
 	virtual bool React(Agent* a, Agent* b) override;
@@ -21,7 +21,7 @@ public:
 private:
 	AgentPattern m_reactant;
 
-	std::vector<ReactionCenter> m_reactionCenters;
+	std::vector<ReactionStateChange> m_stateChanges;
 };
 
 } // namespace agentsim

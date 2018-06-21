@@ -12,9 +12,9 @@ bool StateChangeReaction::RegisterReactant(AgentPattern& ap)
 	return true;
 }
 
-void StateChangeReaction::RegisterReactinoCenter(ReactionCenter rc)
+void StateChangeReaction::RegisterStateChange(ReactionStateChange rsc)
 {
-	this->m_reactionCenters.push_back(rc);
+	this->m_stateChanges.push_back(rsc);
 }
 
 bool StateChangeReaction::IsReactant(Agent* a)
@@ -26,17 +26,17 @@ bool StateChangeReaction::IsReactant(Agent* a)
 
 bool StateChangeReaction::React(Agent* a)
 {
-	for(std::size_t i = 0; i < this->m_reactionCenters.size(); ++i)
+	for(std::size_t i = 0; i < this->m_stateChanges.size(); ++i)
 	{
 		Agent* outptr = nullptr;
-		if(!(a->FindSubAgent(this->m_reactionCenters[i].before, outptr)))
+		if(!(a->FindSubAgent(this->m_stateChanges[i].before, outptr)))
 		{
 			PRINT_ERROR("StateChange_Reaction.cpp: could not find a sub agent for a reaction center.\n")
 			return false;
 		}
 		outptr->CopyState(
-			this->m_reactionCenters[i].before,
-			this->m_reactionCenters[i].after);
+			this->m_stateChanges[i].before,
+			this->m_stateChanges[i].after);
 	}
 	return true;
 }
