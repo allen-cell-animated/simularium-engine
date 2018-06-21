@@ -6,7 +6,7 @@
 namespace aics {
 namespace agentsim {
 
-bool StateChangeReaction::RegisterReactant(AgentPattern& ap)
+bool StateChangeReaction::RegisterReactant(AgentPattern ap)
 {
 	this->m_reactant = ap;
 	return true;
@@ -14,7 +14,7 @@ bool StateChangeReaction::RegisterReactant(AgentPattern& ap)
 
 void StateChangeReaction::RegisterStateChange(ReactionStateChange rsc)
 {
-	this->m_stateChanges.push_back(rsc);
+	this->m_stateChanges = rsc;
 }
 
 bool StateChangeReaction::IsReactant(Agent* a)
@@ -24,27 +24,25 @@ bool StateChangeReaction::IsReactant(Agent* a)
 	return isReactant;
 }
 
-bool StateChangeReaction::React(Agent* a)
+bool StateChangeReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent> b)
 {
-	for(std::size_t i = 0; i < this->m_stateChanges.size(); ++i)
+	if(b.get() != nullptr)
 	{
-		Agent* outptr = nullptr;
-		if(!(a->FindSubAgent(this->m_stateChanges[i].before, outptr)))
-		{
-			PRINT_ERROR("StateChange_Reaction.cpp: could not find a sub agent for a reaction center.\n")
-			return false;
-		}
-		outptr->CopyState(
-			this->m_stateChanges[i].before,
-			this->m_stateChanges[i].after);
+		PRINT_WARNING("StateChange_Reaction.cpp: this reaction only accepts one reactant.\n")
+		return false;
 	}
-	return true;
-}
 
-bool StateChangeReaction::React(Agent* a, Agent* b)
-{
-	PRINT_ERROR("StateChange_Reaction.cpp: this reaction type only has one reactant.\n")
-	return false;
+	Agent* outptr = nullptr;
+	if(!(a->FindSubAgent(this->m_stateChanges.before, outptr)))
+	{
+		PRINT_ERROR("StateChange_Reaction.cpp: could not find a sub agent for a reaction center.\n")
+		return false;
+	}
+	outptr->CopyState(
+		this->m_stateChanges.before,
+		this->m_stateChanges.after);
+
+	return true;
 }
 
 } // namespace agentsim

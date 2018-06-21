@@ -57,6 +57,7 @@ public:
 		Agent*& outptr,
 		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>()) const;
 	bool CopyState(AgentPattern& oldState, AgentPattern& newState);
+	const int GetSubTreeDepth() const;
 
 private:
 	void UpdateParentTransform(Eigen::Matrix4d parentTransform);

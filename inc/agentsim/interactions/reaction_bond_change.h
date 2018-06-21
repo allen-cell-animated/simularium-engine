@@ -2,7 +2,7 @@
 #define AICS_REACTION_BOND_CHANGE_H
 
 #include <vector>
-#include <tuple>
+#include "Eigen/Dense"
 #include "agentsim/pattern/agent_pattern.h"
 
 namespace aics {
@@ -33,11 +33,16 @@ namespace agentsim {
 *	e.g. [... [0, 1] , [1, 0], ...] indicates a bond between
 * MatchFor(reactant_patterns[0])->GetChildAgent(1) and
 *	MatchFor(reactant_patterns[1])->GetChildAgent(0)
+*
+*	the final value indicates which agent is the final agent of reactant 1
+*	e.g. end_reactant_1 = 7, indicates that indices 0 - 6 belong to reactant 1,
+*	in reactant_patterns
 */
 struct ReactionBondChange
 {
 	std::vector<AgentPattern> reactant_patterns;
-	std::vector<std::tuple<int,int>> bond_indices;
+	std::vector<Eigen::Vector2i> bond_indices;
+	std::size_t end_reactant_1;
 };
 
 } // namespace agentsim

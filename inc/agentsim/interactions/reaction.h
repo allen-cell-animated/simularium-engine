@@ -3,6 +3,7 @@
 
 #include "agentsim/interactions/reaction_state_change.h"
 #include "agentsim/interactions/reaction_bond_change.h"
+#include <memory>
 
 namespace aics {
 namespace agentsim {
@@ -14,10 +15,9 @@ class Reaction
 {
 public:
 	virtual ~Reaction() {}
-	virtual bool RegisterReactant(AgentPattern& ap) = 0;
+	virtual bool RegisterReactant(AgentPattern ap) = 0;
 	virtual bool IsReactant(Agent* a) = 0;
-	virtual bool React(Agent* a) = 0;
-	virtual bool React(Agent* a, Agent* b) = 0;
+	virtual bool React(std::shared_ptr<Agent> a, std::shared_ptr<Agent> b = nullptr) = 0;
 };
 
 } // namespace agentsim

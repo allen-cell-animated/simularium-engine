@@ -104,7 +104,6 @@ std::shared_ptr<Agent> Agent::GetChildAgent(std::size_t index)
 {
 	if(index < 0 || index > this->m_childAgents.size())
 	{
-		PRINT_ERROR("Agent.cpp: GetChildAgent: invalid index")
 		return nullptr;
 	}
 
@@ -281,6 +280,16 @@ bool Agent::CopyState(AgentPattern& oldState, AgentPattern& newState)
 	}
 
 	return true;
+}
+
+const int Agent::GetSubTreeDepth() const
+{
+	if(this->m_childAgents.size() == 0)
+	{
+		return 0;
+	}
+
+	return this->m_childAgents[0]->GetSubTreeDepth() + 1;
 }
 
 void Agent::UpdateParentTransform(Eigen::Matrix4d parentTransform)
