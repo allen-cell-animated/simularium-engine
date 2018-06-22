@@ -55,12 +55,6 @@ AgentPattern create_actin_agent_pattern()
 	return actinap;
 }
 
-std::shared_ptr<CombinationReaction> create_actin_nucleation_rx()
-{
-	std::shared_ptr<CombinationReaction> rx;
-	return rx;
-}
-
 class CombinationReactionTest : public ::testing::Test
 {
 	protected:
@@ -69,6 +63,11 @@ class CombinationReactionTest : public ::testing::Test
 
 	CombinationReactionTest() {
 		// You can do set-up work for each test here.
+		boundBarbedap.Name = "barbed";
+		boundBarbedap.IsWildCardBound = true;
+
+		boundPointedap.Name = "pointed";
+		boundPointedap.IsWildCardBound = true;
 	}
 
 	virtual ~CombinationReactionTest() {
@@ -88,6 +87,8 @@ class CombinationReactionTest : public ::testing::Test
 		// before the destructor).
 	}
 	// Objects declared here can be used by all tests in the test case for Foo.
+	AgentPattern boundPointedap;
+	AgentPattern boundBarbedap;
 };
 
 TEST_F(CombinationReactionTest, ActinNucleation)
@@ -104,6 +105,17 @@ TEST_F(CombinationReactionTest, ActinNucleation)
 
 	rb.bond_indices.push_back(Eigen::Vector2i(0,0));
 	rb.bond_indices.push_back(Eigen::Vector2i(1,3));
+
+	std::shared_ptr<CombinationReaction> rx(new CombinationReaction());
+	rx->RegisterBondChange(rb);
+	rx->RegisterReactant(ap);
+	rx->RegisterReactant(ap);
+
+	ASSERT_TRUE(rx->React(actin1, actin2));
+	std::shared_ptr<Agent> product = rx->GetProduct();
+	Agent* outptr = nullptr;
+	ASSERT_TRUE(product->FindSubAgent(boundPointedap, outptr));
+	ASSERT_TRUE(product->FindSubAgent(boundBarbedap, outptr));
 }
 
 TEST_F(CombinationReactionTest, ActinTrimer)

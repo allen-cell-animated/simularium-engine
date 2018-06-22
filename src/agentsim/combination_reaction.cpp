@@ -63,9 +63,10 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 			PRINT_ERROR("Combination_Reaction.cpp: could not find a sub agent needed for bond formation.\n")
 			return false;
 		}
+		//@TODO: find 1, search bonded for 2, 3, ...
 
 		reactants.push_back(outptr);
-		for(std::size_t j = 0; j < ap.ChildAgents.size(); ++i)
+		for(std::size_t j = 0; j < ap.ChildAgents.size(); ++j)
 		{
 			std::shared_ptr<Agent> childoutptr = nullptr;
 			if(!outptr->FindChildAgent(ap.ChildAgents[j], childoutptr))
@@ -99,6 +100,7 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 		while(b->GetChildAgent(i))
 		{
 			a->AddChildAgent(b->GetChildAgent(i));
+			++i;
 		}
 
 		this->m_lastProduct = a;
@@ -118,13 +120,13 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 
 	if(stda == 1 && stdb == 1)
 	{
-		std::shared_ptr<Agent> product;
+		std::shared_ptr<Agent> product(new Agent());
 		product->AddChildAgent(a);
 		product->AddChildAgent(b);
 		this->m_lastProduct = product;
 	}
 
-	return false;
+	return true;
 }
 
 std::shared_ptr<Agent> CombinationReaction::GetProduct()
