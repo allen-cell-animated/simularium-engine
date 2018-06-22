@@ -8,7 +8,7 @@ namespace aics {
 namespace agentsim {
 namespace test {
 
-std::shared_ptr<Agent> create_actin_agent()
+std::shared_ptr<Agent> create_actin_monomer()
 {
 	std::shared_ptr<Agent> actin(new Agent());
 	std::shared_ptr<Agent> pointed(new Agent());
@@ -32,7 +32,25 @@ std::shared_ptr<Agent> create_actin_agent()
 	return actin;
 }
 
-AgentPattern create_actin_agent_pattern()
+std::shared_ptr<Agent> create_actin_dimer()
+{
+	std::shared_ptr<Agent> actin1 = create_actin_monomer();
+	std::shared_ptr<Agent> actin2 = create_actin_monomer();
+	std::shared_ptr<Agent> dimer(new Agent());
+
+	std::shared_ptr<Agent> pointed = actin1->GetChildAgent(0);
+	std::shared_ptr<Agent> barbed = actin2->GetChildAgent(3);
+
+	pointed->AddBoundPartner(barbed);
+	barbed->AddBoundPartner(pointed);
+
+	dimer->AddChildAgent(actin1);
+	dimer->AddChildAgent(actin2);
+
+	return dimer;
+}
+
+AgentPattern create_actin_monomer_pattern()
 {
 	AgentPattern actinap;
 	AgentPattern pointedap;
@@ -55,11 +73,44 @@ AgentPattern create_actin_agent_pattern()
 	return actinap;
 }
 
+AgentPattern create_actin_dimer_pattern()
+{
+	AgentPattern dimerap;
+	AgentPattern actinap;
+	AgentPattern pointedap;
+	AgentPattern side1ap;
+	AgentPattern side2ap;
+	AgentPattern barbedap;
+	AgentPattern nucap;
+
+	pointedap.Name = "pointed";
+	side1ap.Name = "side1";
+	side2ap.Name = "side2";
+	barbedap.Name = "barbed";
+	nucap.Name = "nuc";
+	nucap.State = "ADP/Pi";
+	actinap.ChildAgents.push_back(pointedap);
+	actinap.ChildAgents.push_back(side1ap);
+	actinap.ChildAgents.push_back(side2ap);
+	actinap.ChildAgents.push_back(barbedap);
+	actinap.ChildAgents.push_back(nucap);
+
+	dimerap.ChildAgents.push_back(actinap);
+	dimerap.ChildAgents.push_back(actinap);
+
+	AgentPattern* pointedptr = &(dimerap.ChildAgents[0].ChildAgents[0]);
+	AgentPattern* barbedptr = &(dimerap.ChildAgents[1].ChildAgents[3]);
+
+	pointedptr->BoundPartners.push_back(*(barbedptr));
+	barbedptr->BoundPartners.push_back(*(pointedptr));
+	return actinap;
+}
+
 class CombinationReactionTest : public ::testing::Test
 {
 	protected:
 	// You can remove any or all of the following functions if its body
-	// is empty.
+	// is empty.create_actin_agent
 
 	CombinationReactionTest() {
 		// You can do set-up work for each test here.
@@ -94,10 +145,10 @@ class CombinationReactionTest : public ::testing::Test
 TEST_F(CombinationReactionTest, ActinNucleation)
 {
 	std::shared_ptr<Agent> actin1, actin2;
-	actin1 = create_actin_agent();
-	actin2 = create_actin_agent();
+	actin1 = create_actin_monomer();
+	actin2 = create_actin_monomer();
 
-	AgentPattern ap = create_actin_agent_pattern();
+	AgentPattern ap = create_actin_monomer_pattern();
 	ReactionBondChange rb;
 	rb.reactant_patterns.push_back(ap);
 	rb.reactant_patterns.push_back(ap);
@@ -120,7 +171,16 @@ TEST_F(CombinationReactionTest, ActinNucleation)
 
 TEST_F(CombinationReactionTest, ActinTrimer)
 {
+	std::shared_ptr<Agent> monomer, dimer;
+	monomer = create_actin_monomer();
+	dimer = create_actin_dimer();
 
+	AgentPattern map, dap;
+	map = create_actin_monomer_pattern();
+	dap = create_actin_dimer_pattern();
+
+	ASSERT_TRUE(monomer->Matches(map));
+	ASSERT_TRUE(dimer->Matches(dap));
 }
 
 TEST_F(CombinationReactionTest, BarbedEndPolymerization)

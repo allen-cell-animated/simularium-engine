@@ -235,6 +235,7 @@ const bool Agent::FindChildAgent(
 	std::shared_ptr<Agent>& outptr,
 	std::unordered_map<std::string, bool> ignore) const
 {
+	outptr = nullptr;
 	for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
 	{
 		if(ignore[this->m_childAgents[i]->GetID()])
@@ -255,6 +256,7 @@ const bool Agent::FindBoundPartner(
 	Agent*& outptr,
 	std::unordered_map<std::string, bool> ignore) const
 {
+	outptr = nullptr;
 	for(std::size_t i = 0; i < this->m_boundPartners.size(); ++i)
 	{
 		if(ignore[this->m_boundPartners[i]->GetID()])

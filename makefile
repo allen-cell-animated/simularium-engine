@@ -22,31 +22,48 @@ EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
 EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)
 DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5
 
+.SILENT:
+
+build: begin all end
+
+rebuild: begin clean all end
+
 all: prep agentsim_lib agentsim_prog agentsim_tests
 
-rebuild: clean all
+begin:
+	@echo begin build:
+	@date
+
+end:
+	@echo end build:
+	@date
 
 prep:
-	mkdir -p ./$(OBJ_DIR)/$(PROJECT_DIR)
-	mkdir -p ./$(BUILD_DIR)
+	@echo creating build folders ...
+	@mkdir -p ./$(OBJ_DIR)/$(PROJECT_DIR)
+	@mkdir -p ./$(BUILD_DIR)
 
 agentsim_lib: $(OBJ_FILES)
+	@echo $(LIBRARY_DIR)/$(TARGET).a
 	$(CC) $(SOURCE_DIR)/$(DUMMY_TARGET).cpp \
 	$(CFLAGS) \
 	-o $(BUILD_DIR)/$(DUMMY_TARGET) \
 	$(OBJ_FILES)
-	ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
+	@ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
 
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
+	@echo $@
 	$(CC) $(CFLAGS) -c $< $(INCLUDES) -o $@
 
 agentsim_prog: $(SOURCE_DIR)/$(TARGET).cpp
-		$(CC) $(SOURCE_DIR)/$(TARGET).cpp \
-		$(CFLAGS) $(INCLUDES) \
-		-o $(BUILD_DIR)/$(TARGET) \
-		$(LIBRARY_DIR)/$(TARGET).a\
+	@echo $(BUILD_DIR)/$(TARGET)
+	$(CC) $(SOURCE_DIR)/$(TARGET).cpp \
+	$(CFLAGS) $(INCLUDES) \
+	-o $(BUILD_DIR)/$(TARGET) \
+	$(LIBRARY_DIR)/$(TARGET).a\
 
 agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
+	@echo $(BUILD_DIR)/$(TEST_TARGET)
 	$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
 	$(CFLAGS) $(INCLUDES) \
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
@@ -54,6 +71,7 @@ agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	$(LIBRARY_DIR)/gtest_main.a -pthread
 
 clean:
-	rm -f ./bin/*
-	rm -f ./$(LIBRARY_DIR)/$(TARGET).a
-	rm -f ./$(OBJ_DIR)/$(PROJECT_DIR)/*.o
+	@echo cleaning build dir ...
+	@rm -f ./bin/*
+	@rm -f ./$(LIBRARY_DIR)/$(TARGET).a
+	@rm -f ./$(OBJ_DIR)/$(PROJECT_DIR)/*.o
