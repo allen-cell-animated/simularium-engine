@@ -55,15 +55,37 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 	std::unordered_map<std::size_t, std::shared_ptr<Agent>> reactantChildren;
 	for(std::size_t i = 0; i < this->m_bondChanges.reactant_patterns.size(); ++i)
 	{
+		std::size_t r1_start = 0;
+		std::size_t r2_start = this->m_bondChanges.end_reactant_1;
 		AgentPattern ap = this->m_bondChanges.reactant_patterns[i];
-		Agent* tosearch = i < this->m_bondChanges.end_reactant_1 ? a.get() : b.get();
 		Agent* outptr = nullptr;
-		if(!tosearch->FindSubAgent(ap, outptr))
+
+		/*
+		*	Assumption: reactions happen between two reactants
+		*	Assumption:	multiple level-1 agent reactants must be bound
+		*	and owned by a level-2 agent
+		*
+		*	Find the first level-1 agent by searching the level-2 agent
+		*	Find subsequent agents by search the first agent's bound partners
+		*/
+		if(i == r1_start || i == r2_start)
 		{
-			PRINT_ERROR("Combination_Reaction.cpp: could not find a sub agent needed for bond formation.\n")
-			return false;
+			Agent* tosearch = i < r2_start ? a.get() : b.get();
+			if(!tosearch->FindSubAgent(ap, outptr))
+			{
+				PRINT_ERROR("Combination_Reaction.cpp: could not find a sub agent needed for bond formation.\n")
+				return false;
+			}
 		}
-		//@TODO: find 1, search bonded for 2, 3, ...
+		else
+		{
+			Agent* tosearch = i < r2_start ? reactants[r1_start] : reactants[r2_start];
+			if(!tosearch->FindBoundPartner(ap, outptr))
+			{
+				PRINT_ERROR("Combination_Reaction.cpp: could not find a sub agent needed for bond formation.\n")
+				return false;
+			}
+		}
 
 		reactants.push_back(outptr);
 		for(std::size_t j = 0; j < ap.ChildAgents.size(); ++j)
