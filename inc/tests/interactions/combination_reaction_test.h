@@ -29,6 +29,7 @@ std::shared_ptr<Agent> create_actin_monomer()
 	actin->AddChildAgent(side2);
 	actin->AddChildAgent(barbed);
 	actin->AddChildAgent(nuc);
+	actin->SetName("actin");
 	return actin;
 }
 
@@ -70,6 +71,7 @@ AgentPattern create_actin_monomer_pattern()
 	actinap.ChildAgents.push_back(side2ap);
 	actinap.ChildAgents.push_back(barbedap);
 	actinap.ChildAgents.push_back(nucap);
+	actinap.Name = "actin";
 	return actinap;
 }
 
@@ -94,6 +96,7 @@ AgentPattern create_actin_dimer_pattern()
 	actinap.ChildAgents.push_back(side2ap);
 	actinap.ChildAgents.push_back(barbedap);
 	actinap.ChildAgents.push_back(nucap);
+	actinap.Name = "actin";
 
 	dimerap.ChildAgents.push_back(actinap);
 	dimerap.ChildAgents.push_back(actinap);
@@ -103,7 +106,7 @@ AgentPattern create_actin_dimer_pattern()
 
 	pointedptr->BoundPartners.push_back(*(barbedptr));
 	barbedptr->BoundPartners.push_back(*(pointedptr));
-	return actinap;
+	return dimerap;
 }
 
 class CombinationReactionTest : public ::testing::Test

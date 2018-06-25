@@ -136,7 +136,8 @@ bool Agent::IsCollidingWith(const Agent& other)
 	return dist_squared <= coll_dist_squared;
 }
 
-const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr)
+const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr,
+	std::unordered_map<std::string, bool> ignore)
 {
 	bool matches = this->Matches(pattern);
 	std::size_t child_count = this->m_childAgents.size();
@@ -150,6 +151,11 @@ const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr)
 	{
 		for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
 		{
+			if(ignore[this->m_childAgents[i]->GetID()] == true)
+			{
+				continue;
+			}
+
 			if(this->m_childAgents[i]->FindSubAgent(pattern, outptr))
 			{
 				return true;
@@ -158,10 +164,11 @@ const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr)
 	}
 
 	// no matches and no children left to search
+	outptr = nullptr;
 	return false;
 }
 
-const bool Agent::Matches(const AgentPattern& pattern) const
+const bool Agent::Matches(const AgentPattern& pattern)
 {
 	if(pattern.Name != this->m_agentName)
 	{
@@ -178,11 +185,16 @@ const bool Agent::Matches(const AgentPattern& pattern) const
 		return false;
 	}
 
+	if(pattern.BoundPartners.size() > this->m_boundPartners.size())
+	{
+		return false;
+	}
+
 	std::unordered_map<std::string, bool> ignore;
 	for(std::size_t i = 0; i < pattern.ChildAgents.size(); ++i)
 	{
 		Agent* outptr = nullptr;
-		if(!this->FindChildAgent(pattern.ChildAgents[i], outptr, ignore))
+		if(!this->FindSubAgent(pattern.ChildAgents[i], outptr, ignore))
 		{
 			return false;
 		}
@@ -195,12 +207,11 @@ const bool Agent::Matches(const AgentPattern& pattern) const
 		return true;
 	}
 
-	// assuming id collisions are rare
-	//  for this reason, the ignore list is not being cleared
+	ignore.clear();
 	for(std::size_t i = 0; i < pattern.BoundPartners.size(); ++i)
 	{
 		Agent* outptr = nullptr;
-		if(!this->FindBoundPartner(pattern.ChildAgents[i], outptr, ignore))
+		if(!this->FindBoundPartner(pattern.BoundPartners[i], outptr, ignore))
 		{
 			return false;
 		}

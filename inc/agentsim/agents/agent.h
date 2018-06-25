@@ -46,8 +46,9 @@ public:
 	bool CanInteractWith(const Agent& other);
 	bool IsCollidingWith(const Agent& other);
 
-	const bool FindSubAgent(const AgentPattern& pattern, Agent*& outptr);
-	const bool Matches(const AgentPattern& pattern) const;
+	const bool FindSubAgent(const AgentPattern& pattern, Agent*& outptr,
+		std::unordered_map<std::string, bool> ignore = std::unordered_map<std::string, bool>());
+	const bool Matches(const AgentPattern& pattern);
 	const bool FindChildAgent(
 		const AgentPattern& pattern,
 		std::shared_ptr<Agent>& outptr,
