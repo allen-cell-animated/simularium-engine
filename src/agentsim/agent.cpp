@@ -23,6 +23,10 @@ void GenerateLocalUUID(std::string& uuid)
 
 	uuid = strUuid;
 }
+
+enum MatchOptions {
+	IgnoreBonds = 0x01 // matches bound partners by number of bonds instead of a search
+};
 } // namespace agents
 
 namespace math_util
@@ -178,17 +182,12 @@ const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr,
 	return false;
 }
 
-const bool Agent::Matches(const AgentPattern& pattern)
+const bool Agent::Matches(const AgentPattern& pattern, unsigned char flags)
 {
 	printf("comparing: %s | %s\n", pattern.Name.c_str(), this->m_agentName.c_str());
 	if(pattern.Name != this->m_agentName)
 	{
 		return false;
-	}
-
-	if(pattern.Name == "bound pointed")
-	{
-		printf("searching for bound pointed in %s\n", this->m_agentName.c_str());
 	}
 
 	if(pattern.State != this->m_agentState)
@@ -206,7 +205,8 @@ const bool Agent::Matches(const AgentPattern& pattern)
 		return false;
 	}
 
-	if(pattern.BoundPartners.size() == 0
+	if(!(flags & agents::MatchOptions::IgnoreBonds)
+		&& pattern.BoundPartners.size() == 0
 		&& pattern.IsWildCardBound == false
 		&& this->m_boundPartners.size() > 0)
 	{
@@ -231,17 +231,25 @@ const bool Agent::Matches(const AgentPattern& pattern)
 		return true;
 	}
 
-	ignore.clear();
-	for(std::size_t i = 0; i < pattern.BoundPartners.size(); ++i)
+	if(flags & agents::MatchOptions::IgnoreBonds)
 	{
-		Agent* outptr = nullptr;
-		if(!this->FindBoundPartner(pattern.BoundPartners[i], outptr, ignore))
+		printf("Agent %s is being matched without considering bonds\n", pattern.Name.c_str());
+	}
+	else
+	{
+		ignore.clear();
+		for(std::size_t i = 0; i < pattern.BoundPartners.size(); ++i)
 		{
-			return false;
+			Agent* outptr = nullptr;
+			if(!this->FindBoundPartner(pattern.BoundPartners[i], outptr, ignore))
+			{
+				return false;
+			}
+			ignore[outptr->GetID()] = true;
 		}
-		ignore[outptr->GetID()] = true;
 	}
 
+	printf("Found Agent %s\n", pattern.Name.c_str());
 	return true;
 }
 
@@ -291,13 +299,14 @@ const bool Agent::FindBoundPartner(
 	Agent*& outptr,
 	std::unordered_map<std::string, bool> ignore) const
 {
+	unsigned char options = agents::MatchOptions::IgnoreBonds;
 	outptr = nullptr;
 	for(std::size_t i = 0; i < this->m_boundPartners.size(); ++i)
 	{
 		if(ignore[this->m_boundPartners[i]->GetID()])
 			continue;
 
-		if(this->m_boundPartners[i]->Matches(pattern))
+		if(this->m_boundPartners[i]->Matches(pattern, options))
 		{
 			outptr = this->m_boundPartners[i].get();
 			break;
