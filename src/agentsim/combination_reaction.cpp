@@ -59,7 +59,7 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 		std::size_t r2_start = this->m_bondChanges.end_reactant_1;
 		AgentPattern ap = this->m_bondChanges.reactant_patterns[i];
 		Agent* outptr = nullptr;
-
+		
 		/*
 		*	Assumption: reactions happen between two reactants
 		*	Assumption:	multiple level-1 agent reactants must be bound

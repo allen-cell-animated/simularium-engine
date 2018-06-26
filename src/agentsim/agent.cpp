@@ -110,6 +110,16 @@ std::shared_ptr<Agent> Agent::GetChildAgent(std::size_t index)
 	return this->m_childAgents[index];
 }
 
+std::shared_ptr<Agent> Agent::GetBoundPartner(std::size_t index)
+{
+	if(index < 0 || index > this->m_boundPartners.size())
+	{
+		return nullptr;
+	}
+
+	return this->m_boundPartners[index];
+}
+
 bool Agent::CanInteractWith(const Agent& other)
 {
 	if(this->m_agentID == other.m_agentID)
@@ -170,9 +180,15 @@ const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr,
 
 const bool Agent::Matches(const AgentPattern& pattern)
 {
+	printf("comparing: %s | %s\n", pattern.Name.c_str(), this->m_agentName.c_str());
 	if(pattern.Name != this->m_agentName)
 	{
 		return false;
+	}
+
+	if(pattern.Name == "bound pointed")
+	{
+		printf("searching for bound pointed in %s\n", this->m_agentName.c_str());
 	}
 
 	if(pattern.State != this->m_agentState)
@@ -190,12 +206,20 @@ const bool Agent::Matches(const AgentPattern& pattern)
 		return false;
 	}
 
+	if(pattern.BoundPartners.size() == 0
+		&& pattern.IsWildCardBound == false
+		&& this->m_boundPartners.size() > 0)
+	{
+		return false;
+	}
+
 	std::unordered_map<std::string, bool> ignore;
 	for(std::size_t i = 0; i < pattern.ChildAgents.size(); ++i)
 	{
 		Agent* outptr = nullptr;
 		if(!this->FindSubAgent(pattern.ChildAgents[i], outptr, ignore))
 		{
+			printf("Failed to find subagent %s in %s\n", pattern.ChildAgents[i].Name.c_str(), this->m_agentName.c_str());
 			return false;
 		}
 		ignore[outptr->GetID()] = true;

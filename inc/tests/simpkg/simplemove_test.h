@@ -36,7 +36,7 @@ class SimpleMoveTest : public ::testing::Test
 	// Objects declared here can be used by all tests in the test case for Foo.
 };
 
-TEST_F(SimpleMoveTest, CollisionResolution) {
+TEST_F(SimpleMoveTest, DISABLED_CollisionResolution) {
   std::vector<std::shared_ptr<Agent>> agents;
 	std::size_t agent_num = 1000;
 	int numTimeSteps = 100;
