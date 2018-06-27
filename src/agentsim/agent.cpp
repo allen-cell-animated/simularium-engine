@@ -184,7 +184,6 @@ const bool Agent::FindSubAgent(const AgentPattern& pattern, Agent*& outptr,
 
 const bool Agent::Matches(const AgentPattern& pattern, unsigned char flags)
 {
-	printf("comparing: %s | %s\n", pattern.Name.c_str(), this->m_agentName.c_str());
 	if(pattern.Name != this->m_agentName)
 	{
 		return false;
@@ -219,7 +218,6 @@ const bool Agent::Matches(const AgentPattern& pattern, unsigned char flags)
 		Agent* outptr = nullptr;
 		if(!this->FindSubAgent(pattern.ChildAgents[i], outptr, ignore))
 		{
-			printf("Failed to find subagent %s in %s\n", pattern.ChildAgents[i].Name.c_str(), this->m_agentName.c_str());
 			return false;
 		}
 		ignore[outptr->GetID()] = true;
@@ -233,7 +231,7 @@ const bool Agent::Matches(const AgentPattern& pattern, unsigned char flags)
 
 	if(flags & agents::MatchOptions::IgnoreBonds)
 	{
-		printf("Agent %s is being matched without considering bonds\n", pattern.Name.c_str());
+		// This agent is being matched without considering bonds
 	}
 	else
 	{
@@ -249,7 +247,6 @@ const bool Agent::Matches(const AgentPattern& pattern, unsigned char flags)
 		}
 	}
 
-	printf("Found Agent %s\n", pattern.Name.c_str());
 	return true;
 }
 

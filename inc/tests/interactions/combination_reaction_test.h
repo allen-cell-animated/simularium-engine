@@ -199,26 +199,19 @@ TEST_F(CombinationReactionTest, ActinTrimer)
 	monomer = create_actin_monomer();
 	dimer = create_actin_dimer();
 
-	AgentPattern map, map_bound_pointed, map_bound_barbed, dap;
+	AgentPattern map, dap;
 	map = create_actin_monomer_pattern();
-	map_bound_barbed = create_actin_monomer_pattern();
-	map_bound_pointed = create_actin_monomer_pattern();
 	dap = create_actin_dimer_pattern();
 
-	AgentPattern* pointedptr = &(map_bound_pointed.ChildAgents[0]);
-	AgentPattern* barbedptr = &(map_bound_barbed.ChildAgents[3]);
 
-	pointedptr->BoundPartners.push_back(*(barbedptr));
-	barbedptr->BoundPartners.push_back(*(pointedptr));
-
-	//ASSERT_TRUE(monomer->Matches(map));
-	//ASSERT_TRUE(dimer->Matches(dap));
+	ASSERT_TRUE(monomer->Matches(map));
+	ASSERT_TRUE(dimer->Matches(dap));
 
 	ReactionBondChange rb;
 	rb.reactant_patterns.push_back(map);
-	rb.reactant_patterns.push_back(map_bound_pointed);
-	rb.reactant_patterns.push_back(map_bound_barbed);
-	rb.end_reactant_1 = 2;
+	rb.reactant_patterns.push_back(dap.ChildAgents[0]);
+	rb.reactant_patterns.push_back(dap.ChildAgents[1]);
+	rb.end_reactant_1 = 1;
 
 	// bind #1(side2) to #2(side1)
 	rb.bond_indices.push_back(Eigen::Vector2i(0,2));
