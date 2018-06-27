@@ -66,6 +66,8 @@ public:
 	bool CopyState(AgentPattern& oldState, AgentPattern& newState);
 	const int GetSubTreeDepth() const;
 
+	const void PrintDbg() const;
+
 private:
 	void UpdateParentTransform(Eigen::Matrix4d parentTransform);
 	Eigen::Vector3d m_location;

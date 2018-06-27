@@ -355,6 +355,21 @@ const int Agent::GetSubTreeDepth() const
 	return this->m_childAgents[0]->GetSubTreeDepth() + 1;
 }
 
+const void Agent::PrintDbg() const
+{
+	printf("[Agent] %s\n", this->m_agentName.c_str());
+
+	for(std::size_t i = 0; i < this->m_boundPartners.size(); ++i)
+	{
+		printf("[bound] %s\n", this->m_boundPartners[i]->GetName().c_str());
+	}
+
+	for(std::size_t i = 0; i < this->m_childAgents.size(); ++i)
+	{
+		printf("[child] %s\n", this->m_childAgents[i]->GetName().c_str());
+	}
+}
+
 void Agent::UpdateParentTransform(Eigen::Matrix4d parentTransform)
 {
 	this->m_parentTransform = parentTransform;
