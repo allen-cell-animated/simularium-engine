@@ -1,5 +1,6 @@
 #include "agentsim/simulation.h"
 #include "agentsim/simpkg/simpkg.h"
+#include "agentsim/agents/agent.h"
 
 namespace aics {
 namespace agentsim {
@@ -31,6 +32,31 @@ void Simulation::RunTimeStep(float timeStep)
 	{
 			this->m_SimPkgs[i]->RunTimeStep(timeStep, this->m_agents);
 	}
+}
+
+std::vector<AgentData> Simulation::GetData()
+{
+	std::vector<AgentData> out;
+	for(std::size_t i = 0; i < this->m_agents.size(); ++i)
+	{
+		auto agent = this->m_agents[i];
+		AgentData ad;
+
+		ad.type = agent->GetTypeID();
+		auto location = agent->GetLocation();
+		ad.x = location[0];
+		ad.y = location[1];
+		ad.z = location[2];
+
+		auto rotation = agent->GetRotation();
+		ad.xrot = rotation[0];
+		ad.yrot = rotation[1];
+		ad.zrot = rotation[2];
+
+		out.push_back(ad);
+	}
+
+	return out;
 }
 
 } // namespace agentsim

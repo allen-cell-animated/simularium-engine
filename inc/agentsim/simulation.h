@@ -10,6 +10,13 @@ namespace agentsim {
 class Agent;
 class SimPkg;
 
+struct AgentData
+{
+	float type;
+	float x, y, z;
+	float xrot, yrot, zrot;
+};
+
 class Simulation
 {
 public:
@@ -20,7 +27,7 @@ public:
 	~Simulation();
 
 	void RunTimeStep(float timeStep);
-
+	std::vector<AgentData> GetData();
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
 

@@ -26,6 +26,7 @@ public:
 	void SetDiffusionCoefficient(float dc) { m_diffusion_coefficient = dc; }
 	void SetName(std::string name) { m_agentName = name; }
 	void SetState(std::string state) { m_agentState = state; }
+	void SetTypeID(unsigned int typeID) { m_typeId = typeID; }
 
 	const Eigen::Matrix4d GetGlobalTransform();
 	const Eigen::Matrix4d GetTransform();
@@ -38,6 +39,7 @@ public:
 	const std::string GetName() const { return m_agentName; }
 	const std::string GetState() const { return m_agentState; }
 	const std::string GetID() { return m_agentID; }
+	const unsigned int GetTypeID() { return m_typeId; }
 
 	bool AddBoundPartner(std::shared_ptr<Agent> other);
 	bool AddChildAgent(std::shared_ptr<Agent> other);
@@ -80,6 +82,7 @@ private:
 	float m_mass = 1.0f;
 	float m_interaction_distance = 100.f;
 	float m_collision_radius = 50.f;
+	unsigned int m_typeId = 0;
 	std::string m_agentID = "";
 	std::string m_agentName = "";
 	std::string m_agentState = "";
