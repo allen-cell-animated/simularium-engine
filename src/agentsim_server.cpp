@@ -110,7 +110,7 @@ int main(void)
   			auto simData = simulation.GetData();
 
         bs.Write((MessageID)ID_VIS_DATA_ARRIVE);
-        bs.Write(simData.size());
+        bs.Write((float)simData.size());
 
         for(std::size_t i = 0; i < simData.size(); ++i)
         {
