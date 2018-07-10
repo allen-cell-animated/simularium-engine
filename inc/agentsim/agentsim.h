@@ -7,4 +7,8 @@
 #include "simpkg/simplemove.h"
 #include "simpkg/simpleinteraction.h"
 
+#ifdef MAKE_EXT_PKGS
+#include "simpkg/readdypkg.h"
+#endif // MAKE_EXT_PKGS
+
 #endif // AICS_AGENTSIM_H

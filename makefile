@@ -32,7 +32,7 @@ rebuild: begin clean all end
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
 server: begin prep agentsim_lib agentsim_server end
-ext: begin prep agentsim_lib agentsim_ext_tests end
+ext: begin prep agentsim_ext_lib agentsim_ext_tests end
 
 help:
 	@echo build
@@ -97,6 +97,19 @@ agentsim_ext_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 		$(LIBRARY_DIR)/$(TARGET).a \
 		$(LIBRARY_DIR)/gtest_main.a -pthread \
 		$(EXT_DLLS)
+
+agentsim_ext_lib: $(OBJ_FILES)
+	@echo $(LIBRARY_DIR)/$(TARGET).a
+	$(CC) $(SOURCE_DIR)/$(DUMMY_TARGET).cpp \
+	$(CFLAGS) $(EXT_CFLAGS) \
+	-o $(BUILD_DIR)/$(DUMMY_TARGET) \
+	$(OBJ_FILES) $(EXT_DLLS)
+	@ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
+
+$(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
+	@echo $@
+	$(CC) $(CFLAGS) -c $< $(INCLUDES) $(EXT_INCLUDES) -o $@
+
 
 clean:
 	@echo cleaning build dir ...
