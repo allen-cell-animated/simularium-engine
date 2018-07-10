@@ -20,8 +20,8 @@ CFLAGS=-Wall -g
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
 
 EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
-EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)
-EXT_DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5
+EXT_CFLAGS=-D MAKE_EXT_PKGS -Wl,-rpath $(LIBRARY_DIR)
+EXT_DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5 -lOpenMM
 SERVER_INCLUDES=-I $(EXTERNAL_DIR)/raknet
 SERVER_DLLS=-Llib -lRakNetDLL
 
@@ -32,6 +32,14 @@ rebuild: begin clean all end
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
 server: begin prep agentsim_lib agentsim_server end
+ext: begin prep agentsim_lib agentsim_ext_tests end
+
+help:
+	@echo build
+	@echo rebuild
+	@echo clean
+	@echo "server (build UDP RakNet server)"
+	@echo "ext    (include external simulation packages)"
 
 begin:
 	@echo begin build:
@@ -79,6 +87,16 @@ agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
 	$(LIBRARY_DIR)/$(TARGET).a \
 	$(LIBRARY_DIR)/gtest_main.a -pthread
+
+agentsim_ext_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
+		@echo $(BUILD_DIR)/$(TEST_TARGET)
+		$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
+		$(CFLAGS) $(EXT_CFLAGS) \
+		$(INCLUDES) $(EXT_INCLUDES) \
+		-o $(BUILD_DIR)/$(TEST_TARGET) \
+		$(LIBRARY_DIR)/$(TARGET).a \
+		$(LIBRARY_DIR)/gtest_main.a -pthread \
+		$(EXT_DLLS)
 
 clean:
 	@echo cleaning build dir ...

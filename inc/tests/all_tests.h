@@ -7,7 +7,9 @@
 #include "interactions/statechange_reaction_test.h"
 #include "interactions/combination_reaction_test.h"
 
-//#include "extpkg/openmm_test.h"
-//#include "extpkg/readdy_test.h"
+#ifdef MAKE_EXT_PKGS
+#include "extpkg/openmm_test.h"
+#include "extpkg/readdy_test.h"
+#endif // MAKE_EXT_PKGS
 
 #endif // ALLTESTS_H
