@@ -17,7 +17,8 @@
 
 enum {
       ID_VIS_DATA_ARRIVE = ID_USER_PACKET_ENUM,
-      ID_VIS_DATA_REQUEST
+      ID_VIS_DATA_REQUEST,
+      ID_VIS_DATA_FINISH
 };
 
 enum  {
@@ -85,11 +86,15 @@ int main(void)
       {
         isRunningSimulation = false;
         printf("Finished running requested simulation\n");
+
+        RakNet::BitStream bs;
+        bs.Write((MessageID)ID_VIS_DATA_FINISH);
+        peer->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, clientAddress, false);
       }
       else
       {
   			RakNet::BitStream bs;
-  			simulation.RunTimeStep(1.0f);
+  			simulation.RunTimeStep(requestData.step_size);
   			auto simData = simulation.GetData();
 
         bs.Write((MessageID)ID_VIS_DATA_ARRIVE);
@@ -109,7 +114,6 @@ int main(void)
           bs.Write(agentData.zrot);
         }
 
-  			//@TODO: send to all system addresses? (multi-addressing generally)
   			peer->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, clientAddress, false);
         timeStepCounter++;
       }
