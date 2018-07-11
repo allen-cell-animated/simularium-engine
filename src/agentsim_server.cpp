@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <thread>
 #include "RakString.h"
 #include "BitStream.h"
 #include "RakNetTypes.h"
@@ -61,7 +63,6 @@ int main(void)
 
 	// Simulation setup
   ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
-  readdySimPkg->InitParticles();
 
   std::shared_ptr<SimPkg> readdyPkg;
   readdyPkg.reset(readdySimPkg);
@@ -76,6 +77,9 @@ int main(void)
 	vis_data_request_params requestData;
 	bool isRunningSimulation = false;
 	int timeStepCounter = 0;
+
+  // timer setup
+  auto start = std::chrono::steady_clock::now();
 
 	// Server Run-Time Loop
 	while (1)
@@ -93,29 +97,37 @@ int main(void)
       }
       else
       {
-  			RakNet::BitStream bs;
-  			simulation.RunTimeStep(requestData.step_size);
-  			auto simData = simulation.GetData();
-
-        bs.Write((MessageID)ID_VIS_DATA_ARRIVE);
-        bs.Write((float)simData.size());
-
-        for(std::size_t i = 0; i < simData.size(); ++i)
+        // Limit packet sending to 120 pps
+        auto now = std::chrono::steady_clock::now();
+        auto diff = now - start;
+        if(diff >= std::chrono::milliseconds(8))
         {
-          auto agentData = simData[i];
-          bs.Write(agentData.type);
+          start = now;
 
-          bs.Write(agentData.x);
-          bs.Write(agentData.y);
-          bs.Write(agentData.z);
+          RakNet::BitStream bs;
+    			simulation.RunTimeStep(requestData.step_size);
+    			auto simData = simulation.GetData();
 
-          bs.Write(agentData.xrot);
-          bs.Write(agentData.yrot);
-          bs.Write(agentData.zrot);
+          bs.Write((MessageID)ID_VIS_DATA_ARRIVE);
+          bs.Write((float)simData.size());
+
+          for(std::size_t i = 0; i < simData.size(); ++i)
+          {
+            auto agentData = simData[i];
+            bs.Write(agentData.type);
+
+            bs.Write(agentData.x);
+            bs.Write(agentData.y);
+            bs.Write(agentData.z);
+
+            bs.Write(agentData.xrot);
+            bs.Write(agentData.yrot);
+            bs.Write(agentData.zrot);
+          }
+
+    			peer->Send(&bs, LOW_PRIORITY, UNRELIABLE_SEQUENCED, 0, clientAddress, false);
+          timeStepCounter++;
         }
-
-  			peer->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, clientAddress, false);
-        timeStepCounter++;
       }
 		}
 
@@ -146,8 +158,10 @@ int main(void)
 						printf("A client has disconnected.\n");
 					break;
 				case ID_CONNECTION_LOST:
-						printf("A client lost the connection.\n");
-					break;
+          {
+  						printf("A client lost the connection.\n");
+              isRunningSimulation = false;
+  				}	break;
 				case ID_VIS_DATA_ARRIVE:
 				  {
 				    printf("Simulation data has arrived/\n");
@@ -166,6 +180,7 @@ int main(void)
             clientAddress = packet->systemAddress;
 						isRunningSimulation = true;
 						timeStepCounter = 0;
+            start = std::chrono::steady_clock::now();
 				  } break;
 				default:
 					printf("Message with identifier %i has arrived.\n", packet->data[0]);

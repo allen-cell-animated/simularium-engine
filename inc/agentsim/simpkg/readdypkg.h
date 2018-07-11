@@ -21,9 +21,6 @@ public:
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
 
-	void InitReactions();
-	void InitParticles();
-
 private:
 	readdy::Simulation m_simulation;
 };
