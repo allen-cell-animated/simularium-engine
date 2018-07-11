@@ -21,7 +21,7 @@ void ReaDDyPkg::Shutdown()
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	this->m_simulation.run(1, timeStep);
+	this->m_simulation.run(1, timeStep * 1e-9);
 
 	agents.clear();
 	std::vector<std::string> pTypes = { "core", "end", "monomer"};
