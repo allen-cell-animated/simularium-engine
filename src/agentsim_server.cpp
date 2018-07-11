@@ -59,33 +59,14 @@ int main(void)
 	peer->SetMaximumIncomingConnections(MAX_CLIENTS);
 
 	// Simulation setup
-	std::shared_ptr<SimPkg> simpleMove;
-	simpleMove.reset(new SimpleMove);
+  ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
+  std::shared_ptr<SimPkg> readdyPkg;
+  readdyPkg.reset(readdySimPkg);
 
 	std::vector<std::shared_ptr<SimPkg>> simulators;
-	simulators.push_back(simpleMove);
+  simulators.push_back(readdyPkg);
 
-	std::size_t numAgents = 1000;
-	std::vector<std::shared_ptr<Agent>> agents;
-	for(std::size_t i = 0; i < numAgents; ++i)
-	{
-		std::shared_ptr<Agent> a;
-		a.reset(new Agent());
-
-    if( i % 2 == 0)
-    {
-      a->SetName("Even");
-      a->SetTypeID(1);
-    }
-    else
-    {
-      a->SetName("Odd");
-      a->SetTypeID(2);
-    }
-
-		agents.push_back(a);
-	}
-
+  std::vector<std::shared_ptr<Agent>> agents;
 	Simulation simulation(simulators, agents);
 
 	// Sim request setup

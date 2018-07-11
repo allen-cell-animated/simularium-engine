@@ -20,8 +20,10 @@ CFLAGS=-Wall -g
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
 
 EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
-EXT_CFLAGS=-D MAKE_EXT_PKGS -Wl,-rpath $(LIBRARY_DIR)
-EXT_DLLS:= -L$(LIBRARY_DIR) -lreaddy -lreaddy_model -ldl -pthread -lhdf5 -lOpenMM
+EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)
+READDY_DLLS= -lreaddy -lreaddy_model -lreaddy_kernel_cpu \
+-lreaddy_kernel_singlecpu -lreaddy_common -lreaddy_io -lreaddy_plugin
+EXT_DLLS:= -L$(LIBRARY_DIR) $(READDY_DLLS) -ldl -pthread -lhdf5 -lOpenMM
 SERVER_INCLUDES=-I $(EXTERNAL_DIR)/raknet
 SERVER_DLLS=-Llib -lRakNetDLL
 
@@ -32,14 +34,12 @@ rebuild: begin clean all end
 
 all: prep agentsim_lib agentsim_prog agentsim_tests
 server: begin prep agentsim_lib agentsim_server end
-ext: begin prep agentsim_ext_lib agentsim_ext_tests end
 
 help:
 	@echo build
 	@echo rebuild
 	@echo clean
 	@echo "server (build UDP RakNet server)"
-	@echo "ext    (include external simulation packages)"
 
 begin:
 	@echo begin build:
@@ -54,51 +54,36 @@ prep:
 	@mkdir -p ./$(OBJ_DIR)/$(PROJECT_DIR)
 	@mkdir -p ./$(BUILD_DIR)
 
-agentsim_lib: $(OBJ_FILES)
-	@echo $(LIBRARY_DIR)/$(TARGET).a
-	$(CC) $(SOURCE_DIR)/$(DUMMY_TARGET).cpp \
-	$(CFLAGS) \
-	-o $(BUILD_DIR)/$(DUMMY_TARGET) \
-	$(OBJ_FILES)
-	@ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
-
-$(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
-	@echo $@
-	$(CC) $(CFLAGS) -c $< $(INCLUDES) -o $@
-
 agentsim_prog: $(SOURCE_DIR)/$(TARGET).cpp
 	@echo $(BUILD_DIR)/$(TARGET)
 	$(CC) $(SOURCE_DIR)/$(TARGET).cpp \
-	$(CFLAGS) $(INCLUDES) \
+	$(CFLAGS) $(EXT_CFLAGS) \
+	$(INCLUDES) $(EXT_INCLUDES) \
 	-o $(BUILD_DIR)/$(TARGET) \
 	$(LIBRARY_DIR)/$(TARGET).a \
+	$(LIBRARY_DIR)/gtest_main.a -pthread \
+	$(EXT_DLLS)
 
 agentsim_server: $(SOURCE_DIR)/$(SERVER_TARGET).cpp
 	@echo $(BUILD_DIR)/$(SERVER_TARGET)
 	$(CC) $(SOURCE_DIR)/$(SERVER_TARGET).cpp \
-	$(CFLAGS) $(EXT_CFLAGS) $(INCLUDES) $(SERVER_INCLUDES) \
+	$(CFLAGS) $(EXT_CFLAGS) $(INCLUDES) \
+	$(SERVER_INCLUDES) $(EXT_INCLUDES) \
 	-o $(BUILD_DIR)/$(SERVER_TARGET) \
 	$(LIBRARY_DIR)/$(TARGET).a $(SERVER_DLLS) \
+	$(EXT_DLLS)
 
 agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	@echo $(BUILD_DIR)/$(TEST_TARGET)
 	$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
-	$(CFLAGS) $(INCLUDES) \
+	$(CFLAGS) $(EXT_CFLAGS) \
+	$(INCLUDES) $(EXT_INCLUDES) \
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
 	$(LIBRARY_DIR)/$(TARGET).a \
-	$(LIBRARY_DIR)/gtest_main.a -pthread
+	$(LIBRARY_DIR)/gtest_main.a -pthread \
+	$(EXT_DLLS)
 
-agentsim_ext_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
-		@echo $(BUILD_DIR)/$(TEST_TARGET)
-		$(CC) $(SOURCE_DIR)/$(TEST_TARGET).cpp \
-		$(CFLAGS) $(EXT_CFLAGS) \
-		$(INCLUDES) $(EXT_INCLUDES) \
-		-o $(BUILD_DIR)/$(TEST_TARGET) \
-		$(LIBRARY_DIR)/$(TARGET).a \
-		$(LIBRARY_DIR)/gtest_main.a -pthread \
-		$(EXT_DLLS)
-
-agentsim_ext_lib: $(OBJ_FILES)
+agentsim_lib: $(OBJ_FILES)
 	@echo $(LIBRARY_DIR)/$(TARGET).a
 	$(CC) $(SOURCE_DIR)/$(DUMMY_TARGET).cpp \
 	$(CFLAGS) $(EXT_CFLAGS) \

@@ -1,27 +1,11 @@
 #ifndef AICS_READDYPKG_H
 #define AICS_READDYPKG_H
 
+#include "agentsim/simpkg/simpkg.h"
+#include "readdy/readdy.h"
+
 #include <vector>
 #include <string>
-
-namespace readdy {
-namespace model {
-class Context;
-} // namespace model
-
-class Simulation;
-} // namespace readdy
-
-namespace ext {
-namespace readdy {
-
-struct rxd
-{
-
-};
-
-} // namespace readdy
-} // namespace ext
 
 namespace aics {
 namespace agentsim {
@@ -37,17 +21,14 @@ public:
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
 
-	void InitReactions(std::vector<ext::readdy::rxd> rxs);
-	void InitParticles(std::vector<std::shared_ptr<Agent>>& agents);
+	void InitReactions();
+	void InitParticles();
 
 private:
-	float m_minTimeStep = 1.0f;
-	readdy::Simulation* m_simulation;
-	readdy::model::Context* m_context;
-
-	std::vector<std::string> m_particleTypes;
+	readdy::Simulation m_simulation;
 };
 
 } // namespace agentsim
 } // namespace aics
+
 #endif // AICS_READDYPKG_H
