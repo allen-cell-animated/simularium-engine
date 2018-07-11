@@ -10,13 +10,7 @@ namespace agentsim {
 
 void ReaDDyPkg::Setup()
 {
-	this->m_simulation.setKernel("SingleCPU");
-	this->m_simulation.setKBT(300);
 
-	float boxSize = 100.f;
-	this->m_simulation.currentContext().boxSize()[0] = boxSize;
-	this->m_simulation.currentContext().boxSize()[1] = boxSize;
-	this->m_simulation.currentContext().boxSize()[2] = boxSize;
 }
 
 void ReaDDyPkg::Shutdown()
@@ -30,16 +24,14 @@ void ReaDDyPkg::RunTimeStep(
 	this->m_simulation.run(1, timeStep);
 
 	agents.clear();
-	std::vector<std::string> pTypes = { "core", "end"};
-
-	std::vector<readdy::Vec3> positions = this->m_simulation.getParticlePositions("core");
+	std::vector<std::string> pTypes = { "core", "end", "monomer"};
 
 	for(std::size_t i = 0; i < pTypes.size(); ++i)
 	{
 		std::vector<readdy::Vec3> positions = this->m_simulation.getParticlePositions(pTypes[i]);
-		for(std::size_t i = 0; i < positions.size(); ++i)
+		for(std::size_t j = 0; j < positions.size(); ++j)
 		{
-			readdy::Vec3 v = positions[i];
+			readdy::Vec3 v = positions[j];
 			std::shared_ptr<Agent> newAgent;
 			newAgent.reset(new Agent());
 			newAgent->SetName(pTypes[i]);
@@ -52,6 +44,14 @@ void ReaDDyPkg::RunTimeStep(
 
 void ReaDDyPkg::InitParticles()
 {
+	this->m_simulation.setKernel("SingleCPU");
+	this->m_simulation.setKBT(300);
+
+	float boxSize = 100.f;
+	this->m_simulation.currentContext().boxSize()[0] = boxSize;
+	this->m_simulation.currentContext().boxSize()[1] = boxSize;
+	this->m_simulation.currentContext().boxSize()[2] = boxSize;
+
 	this->m_simulation.registerParticleType("monomer", 6.25e6);
 	this->m_simulation.registerParticleType(
 		"end", 6.25e6, readdy::model::particleflavor::TOPOLOGY);
@@ -86,11 +86,15 @@ void ReaDDyPkg::InitParticles()
 		this->m_simulation.addParticle("monomer", x, y, z);
 	}
 
+	this->m_simulation.addParticle("monomer", 0, 0, 0);
+
 	std::vector<readdy::model::TopologyParticle> tp;
 	tp.push_back(this->m_simulation.createTopologyParticle("end", readdy::Vec3(1,0,0)));
 	tp.push_back(this->m_simulation.createTopologyParticle("core", readdy::Vec3(0,0,0)));
 	tp.push_back(this->m_simulation.createTopologyParticle("end", readdy::Vec3(-1,0,0)));
-	this->m_simulation.addTopology("filament", tp);
+	auto tp_inst = this->m_simulation.addTopology("filament", tp);
+	tp_inst->graph().addEdgeBetweenParticles(0,1);
+	tp_inst->graph().addEdgeBetweenParticles(1,2);
 }
 
 void ReaDDyPkg::InitReactions()

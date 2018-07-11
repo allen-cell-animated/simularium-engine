@@ -60,6 +60,8 @@ int main(void)
 
 	// Simulation setup
   ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
+  readdySimPkg->InitParticles();
+
   std::shared_ptr<SimPkg> readdyPkg;
   readdyPkg.reset(readdySimPkg);
 
