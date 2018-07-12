@@ -23,7 +23,8 @@ enum {
       ID_VIS_DATA_FINISH,
       ID_VIS_DATA_PAUSE,
       ID_VIS_DATA_RESUME,
-      ID_VIS_DATA_ABORT
+      ID_VIS_DATA_ABORT,
+      ID_UPDATE_TIME_STEP
 };
 
 enum  {
@@ -49,6 +50,9 @@ using namespace aics::agentsim;
 
 void deserialize_vis_data_request(
 	RakNet::BitStream* bs, vis_data_request_params& v);
+
+void deserialize_timestep_update(
+  RakNet::BitStream* bs, float& timeStep);
 
 int main(void)
 {
@@ -202,6 +206,12 @@ int main(void)
             isRunningSimulation = true;
             timeStepCounter = requestData.num_time_steps + 1; // @HACK to end simulation for now
 				  } break;
+        case ID_UPDATE_TIME_STEP:
+        {
+          printf("TimeStep update arrived");
+          RakNet::BitStream bs(packet->data, packet->length, false);
+          deserialize_timestep_update(&bs, requestData.step_size);
+        } break;
 				default:
 					printf("Message with identifier %i has arrived.\n", packet->data[0]);
 					break;
@@ -228,4 +238,12 @@ void deserialize_vis_data_request(
   printf("Simulator: %s\n", SimulatorNames[(int)v.simulator]);
   printf("Num TimeSteps: %i\n", (int)v.num_time_steps);
   printf("Timestep size: %f\n", v.step_size);
+}
+
+void deserialize_timestep_update(
+  RakNet::BitStream* bs, float& timeStep)
+{
+  RakNet::MessageID id;
+	bs->Read(id);
+	bs->Read(timeStep);
 }
