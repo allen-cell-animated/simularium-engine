@@ -20,7 +20,10 @@
 enum {
       ID_VIS_DATA_ARRIVE = ID_USER_PACKET_ENUM,
       ID_VIS_DATA_REQUEST,
-      ID_VIS_DATA_FINISH
+      ID_VIS_DATA_FINISH,
+      ID_VIS_DATA_PAUSE,
+      ID_VIS_DATA_RESUME,
+      ID_VIS_DATA_ABORT
 };
 
 enum  {
@@ -164,7 +167,7 @@ int main(void)
   				}	break;
 				case ID_VIS_DATA_ARRIVE:
 				  {
-				    printf("Simulation data has arrived/\n");
+				    printf("Simulation data has arrived\n");
 				  } break;
 				case ID_VIS_DATA_REQUEST:
 				  {
@@ -181,6 +184,22 @@ int main(void)
 						isRunningSimulation = true;
 						timeStepCounter = 0;
             start = std::chrono::steady_clock::now();
+				  } break;
+        case ID_VIS_DATA_PAUSE:
+				  {
+				    printf("Simulation data streaming paused\n");
+            isRunningSimulation = false;
+				  } break;
+        case ID_VIS_DATA_RESUME:
+				  {
+				    printf("Simulation data streaming resuming\n");
+            isRunningSimulation = true;
+				  } break;
+        case ID_VIS_DATA_ABORT:
+				  {
+				    printf("Simulation Aborted/\n");
+            isRunningSimulation = true;
+            timeStepCounter = requestData.num_time_steps + 1; // @HACK to end simulation for now
 				  } break;
 				default:
 					printf("Message with identifier %i has arrived.\n", packet->data[0]);
