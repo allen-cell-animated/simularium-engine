@@ -103,6 +103,16 @@ void ReaDDyPkg::RunTimeStep(
 			newAgent->SetName(pTypes[i]);
 			newAgent->SetTypeID(i);
 			newAgent->SetLocation(Eigen::Vector3d(v[0], v[1], v[2]));
+
+			// Purely for visual effect; ReaDDy doesn't have a concept of rotations
+			float rotMultiplier = 1e7;
+			float xrot = rand() % 360;
+			float yrot = rand() % 360;
+			float zrot = rand() % 360;
+			Eigen::Vector3d newRot = newAgent->GetRotation() +
+				Eigen::Vector3d(xrot,yrot,zrot);
+			newAgent->SetRotation(rotMultiplier * timeStep * newRot);
+
 			agents.push_back(newAgent);
 		}
 	}
