@@ -93,7 +93,8 @@ int main(void)
 	{
 		if(isRunningSimulation)
 		{
-      if(timeStepCounter >= requestData.num_time_steps)
+      if(requestData.num_time_steps >= 0 &&
+        timeStepCounter >= requestData.num_time_steps)
       {
         isRunningSimulation = false;
         printf("Finished running requested simulation\n");
@@ -204,7 +205,7 @@ int main(void)
 				  {
 				    printf("Simulation Aborted\n");
             isRunningSimulation = true;
-            timeStepCounter = requestData.num_time_steps + 1; // @HACK to end simulation for now
+            requestData.num_time_steps = 0;
 				  } break;
         case ID_UPDATE_TIME_STEP:
         {
