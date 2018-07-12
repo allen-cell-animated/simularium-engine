@@ -202,13 +202,13 @@ int main(void)
 				  } break;
         case ID_VIS_DATA_ABORT:
 				  {
-				    printf("Simulation Aborted/\n");
+				    printf("Simulation Aborted\n");
             isRunningSimulation = true;
             timeStepCounter = requestData.num_time_steps + 1; // @HACK to end simulation for now
 				  } break;
         case ID_UPDATE_TIME_STEP:
         {
-          printf("TimeStep update arrived");
+          printf("TimeStep update arrived\n");
           RakNet::BitStream bs(packet->data, packet->length, false);
           deserialize_timestep_update(&bs, requestData.step_size);
         } break;
