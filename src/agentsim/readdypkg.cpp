@@ -10,34 +10,37 @@ namespace agentsim {
 
 void ReaDDyPkg::Setup()
 {
-	this->m_simulation.setKernel("SingleCPU");
-	this->m_simulation.setKBT(300);
+	this->m_resetWorkaround.push_back(readdy::Simulation());
+	this->m_simulation = &(this->m_resetWorkaround[0]);
+
+	this->m_simulation->setKernel("SingleCPU");
+	this->m_simulation->setKBT(300);
 
 	int boxSize = 100;
-	this->m_simulation.currentContext().boxSize()[0] = boxSize;
-	this->m_simulation.currentContext().boxSize()[1] = boxSize;
-	this->m_simulation.currentContext().boxSize()[2] = boxSize;
+	this->m_simulation->currentContext().boxSize()[0] = boxSize;
+	this->m_simulation->currentContext().boxSize()[1] = boxSize;
+	this->m_simulation->currentContext().boxSize()[2] = boxSize;
 
-	this->m_simulation.registerParticleType("monomer", 6.25e6);
-	this->m_simulation.registerParticleType(
+	this->m_simulation->registerParticleType("monomer", 6.25e6);
+	this->m_simulation->registerParticleType(
 		"end", 6.25e6, readdy::model::particleflavor::TOPOLOGY);
-	this->m_simulation.registerParticleType(
+	this->m_simulation->registerParticleType(
 		"core", 6.25e6, readdy::model::particleflavor::TOPOLOGY);
-	this->m_simulation.registerTopologyType("filament");
+	this->m_simulation->registerTopologyType("filament");
 
-	this->m_simulation.configureTopologyBondPotential(
+	this->m_simulation->configureTopologyBondPotential(
 		"end", "core", 10, 0.5);
 
-	this->m_simulation.configureTopologyBondPotential(
+	this->m_simulation->configureTopologyBondPotential(
 		"core", "core", 10, 0.5);
 
-	this->m_simulation.configureTopologyAnglePotential(
+	this->m_simulation->configureTopologyAnglePotential(
 		"core", "core", "core", 1000, 3.14);
 
-	this->m_simulation.registerHarmonicRepulsionPotential(
+	this->m_simulation->registerHarmonicRepulsionPotential(
 		"core","core", 10,0.5);
 
-	this->m_simulation.registerSpatialTopologyReaction(
+	this->m_simulation->registerSpatialTopologyReaction(
 		"Bind: filament(end) + (monomer) -> filament(core--end)", 3.3e3, 50
 	);
 
@@ -48,10 +51,10 @@ void ReaDDyPkg::Setup()
 		x = rand() % boxSize - boxSize / 2;
 		y = rand() % boxSize - boxSize / 2;
 		z = rand() % boxSize - boxSize / 2;
-		this->m_simulation.addParticle("monomer", x, y, z);
+		this->m_simulation->addParticle("monomer", x, y, z);
 	}
 
-	this->m_simulation.addParticle("monomer", 0, 0, 0);
+	this->m_simulation->addParticle("monomer", 0, 0, 0);
 
 	std::size_t filamentCount = 5;
 	for(std::size_t i = 0; i < filamentCount; ++i)
@@ -62,13 +65,13 @@ void ReaDDyPkg::Setup()
 		z = rand() % boxSize - boxSize / 2;
 
 		std::vector<readdy::model::TopologyParticle> tp;
-		tp.push_back(this->m_simulation.createTopologyParticle(
+		tp.push_back(this->m_simulation->createTopologyParticle(
 			"end", readdy::Vec3(1,0,0) + readdy::Vec3(x / 2,y / 2,z / 2)));
-		tp.push_back(this->m_simulation.createTopologyParticle(
+		tp.push_back(this->m_simulation->createTopologyParticle(
 			"core", readdy::Vec3(0,0,0) + readdy::Vec3(x / 2,y / 2,z / 2)));
-		tp.push_back(this->m_simulation.createTopologyParticle(
+		tp.push_back(this->m_simulation->createTopologyParticle(
 			"end", readdy::Vec3(-1,0,0) + readdy::Vec3(x / 2,y / 2,z / 2)));
-		auto tp_inst = this->m_simulation.addTopology("filament", tp);
+		auto tp_inst = this->m_simulation->addTopology("filament", tp);
 		tp_inst->graph().addEdgeBetweenParticles(0,1);
 		tp_inst->graph().addEdgeBetweenParticles(1,2);
 	}
@@ -76,20 +79,22 @@ void ReaDDyPkg::Setup()
 
 void ReaDDyPkg::Shutdown()
 {
-
+	this->m_resetWorkaround.clear();
+	this->m_resetWorkaround.push_back(readdy::Simulation());
+	this->m_simulation = &(this->m_resetWorkaround[0]);
 }
 
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	this->m_simulation.run(1, timeStep);
+	this->m_simulation->run(1, timeStep);
 
 	agents.clear();
 	std::vector<std::string> pTypes = { "core", "end", "monomer"};
 
 	for(std::size_t i = 0; i < pTypes.size(); ++i)
 	{
-		std::vector<readdy::Vec3> positions = this->m_simulation.getParticlePositions(pTypes[i]);
+		std::vector<readdy::Vec3> positions = this->m_simulation->getParticlePositions(pTypes[i]);
 		for(std::size_t j = 0; j < positions.size(); ++j)
 		{
 			readdy::Vec3 v = positions[j];

@@ -180,6 +180,7 @@ int main(void)
                 SimulatorNames[(int)requestData.simulator]);
 
 						// Start simulation
+            simulation.Reset();
             clientAddress = packet->systemAddress;
 						isRunningSimulation = true;
 						timeStepCounter = 0;

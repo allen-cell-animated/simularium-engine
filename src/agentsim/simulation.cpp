@@ -59,5 +59,14 @@ std::vector<AgentData> Simulation::GetData()
 	return out;
 }
 
+void Simulation::Reset()
+{
+	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+	{
+			this->m_SimPkgs[i]->Shutdown();
+			this->m_SimPkgs[i]->Setup();
+	}
+}
+
 } // namespace agentsim
 } // namespace aics

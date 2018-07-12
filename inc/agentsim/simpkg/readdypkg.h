@@ -22,7 +22,8 @@ public:
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
 
 private:
-	readdy::Simulation m_simulation;
+	readdy::Simulation* m_simulation;
+	std::vector<readdy::Simulation> m_resetWorkaround;
 };
 
 } // namespace agentsim

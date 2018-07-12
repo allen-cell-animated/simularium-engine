@@ -28,6 +28,9 @@ public:
 
 	void RunTimeStep(float timeStep);
 	std::vector<AgentData> GetData();
+
+	void Reset();
+
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
 
