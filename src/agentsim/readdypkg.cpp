@@ -16,16 +16,16 @@ void ReaDDyPkg::Setup()
 	this->m_simulation->setKernel("SingleCPU");
 	this->m_simulation->setKBT(300);
 
-	int boxSize = 100;
+	int boxSize = 1000;
 	this->m_simulation->currentContext().boxSize()[0] = boxSize;
 	this->m_simulation->currentContext().boxSize()[1] = boxSize;
 	this->m_simulation->currentContext().boxSize()[2] = boxSize;
 
-	this->m_simulation->registerParticleType("monomer", 6.25e6);
+	this->m_simulation->registerParticleType("monomer", 6.25e14);
 	this->m_simulation->registerParticleType(
-		"end", 6.25e6, readdy::model::particleflavor::TOPOLOGY);
+		"end", 6.25e9, readdy::model::particleflavor::TOPOLOGY);
 	this->m_simulation->registerParticleType(
-		"core", 6.25e6, readdy::model::particleflavor::TOPOLOGY);
+		"core", 6.25e9, readdy::model::particleflavor::TOPOLOGY);
 	this->m_simulation->registerTopologyType("filament");
 
 	this->m_simulation->configureTopologyBondPotential(
@@ -105,7 +105,17 @@ void ReaDDyPkg::RunTimeStep(
 			newAgent->SetLocation(Eigen::Vector3d(v[0], v[1], v[2]));
 
 			// Purely for visual effect; ReaDDy doesn't have a concept of rotations
-			float rotMultiplier = 1e7;
+			float rotMultiplier = 1;
+
+			if(pTypes[i] == "monomer")
+			{
+				rotMultiplier = 6e14;
+			}
+			else
+			{
+				rotMultiplier = 6e9;
+			}
+
 			float xrot = rand() % 360;
 			float yrot = rand() % 360;
 			float zrot = rand() % 360;
