@@ -23,11 +23,11 @@ void ReaDDyPkg::Setup()
 	particles.addTopologyType("core", 6.25e9);
 
 	readdy::api::Bond bond;
-	bond.forceConstant = 10;
-	bond.length = 0.5;
+	bond.forceConstant = 1;
+	bond.length = 10;
 
 	readdy::api::Angle angle;
-	angle.forceConstant = 1000;
+	angle.forceConstant = 5;
 	angle.equilibriumAngle = 3.14;
 
 	auto &topologies = this->m_simulation->context().topologyRegistry();
@@ -40,7 +40,7 @@ void ReaDDyPkg::Setup()
 	);
 
 	auto &potentials = this->m_simulation->context().potentials();
-	potentials.addHarmonicRepulsion("core", "core", 10, 0.5);
+	potentials.addHarmonicRepulsion("core", "core", 5, 0.5);
 
 	std::size_t monomerCount = 500;
 	for(std::size_t i = 0; i < monomerCount; ++i)
