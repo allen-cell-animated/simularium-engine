@@ -10,39 +10,37 @@ namespace agentsim {
 
 void ReaDDyPkg::Setup()
 {
-	this->m_resetWorkaround.push_back(readdy::Simulation());
-	this->m_simulation = &(this->m_resetWorkaround[0]);
-
-	this->m_simulation->setKernel("SingleCPU");
-	this->m_simulation->setKBT(300);
+	this->m_simulation = new readdy::Simulation("SingleCPU");
 
 	int boxSize = 1000;
-	this->m_simulation->currentContext().boxSize()[0] = boxSize;
-	this->m_simulation->currentContext().boxSize()[1] = boxSize;
-	this->m_simulation->currentContext().boxSize()[2] = boxSize;
+	this->m_simulation->context().boxSize()[0] = boxSize;
+	this->m_simulation->context().boxSize()[1] = boxSize;
+	this->m_simulation->context().boxSize()[2] = boxSize;
 
-	this->m_simulation->registerParticleType("monomer", 6.25e14);
-	this->m_simulation->registerParticleType(
-		"end", 6.25e9, readdy::model::particleflavor::TOPOLOGY);
-	this->m_simulation->registerParticleType(
-		"core", 6.25e9, readdy::model::particleflavor::TOPOLOGY);
-	this->m_simulation->registerTopologyType("filament");
+	auto &particles = this->m_simulation->context().particleTypes();
+	particles.add("monomer", 6.25e14);
+	particles.addTopologyType("end", 6.25e9);
+	particles.addTopologyType("core", 6.25e9);
 
-	this->m_simulation->configureTopologyBondPotential(
-		"end", "core", 10, 0.5);
+	readdy::api::Bond bond;
+	bond.forceConstant = 10;
+	bond.length = 0.5;
 
-	this->m_simulation->configureTopologyBondPotential(
-		"core", "core", 10, 0.5);
+	readdy::api::Angle angle;
+	angle.forceConstant = 1000;
+	angle.equilibriumAngle = 3.14;
 
-	this->m_simulation->configureTopologyAnglePotential(
-		"core", "core", "core", 1000, 3.14);
-
-	this->m_simulation->registerHarmonicRepulsionPotential(
-		"core","core", 10,0.5);
-
-	this->m_simulation->registerSpatialTopologyReaction(
-		"Bind: filament(end) + (monomer) -> filament(core--end)", 3.3e3, 50
+	auto &topologies = this->m_simulation->context().topologyRegistry();
+	topologies.addType("filament");
+	topologies.configureBondPotential("end","core", bond);
+	topologies.configureBondPotential("core","core", bond);
+	topologies.configureAnglePotential("core","core","core", angle);
+	topologies.addSpatialReaction(
+		"Bind: filament(end) + (monomer) -> filament(core--end)", 3.3e7, 50
 	);
+
+	auto &potentials = this->m_simulation->context().potentials();
+	potentials.addHarmonicRepulsion("core", "core", 10, 0.5);
 
 	std::size_t monomerCount = 500;
 	for(std::size_t i = 0; i < monomerCount; ++i)
@@ -79,9 +77,8 @@ void ReaDDyPkg::Setup()
 
 void ReaDDyPkg::Shutdown()
 {
-	this->m_resetWorkaround.clear();
-	this->m_resetWorkaround.push_back(readdy::Simulation());
-	this->m_simulation = &(this->m_resetWorkaround[0]);
+	delete this->m_simulation;
+	this->m_simulation = nullptr;
 }
 
 void ReaDDyPkg::RunTimeStep(

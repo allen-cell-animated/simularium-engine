@@ -51,14 +51,14 @@ public:
 
     Positions(Kernel* kernel, stride_type stride, std::vector<std::string> typesToCount);
 
-    Positions(Kernel* kernel, stride_type stride, std::vector<particle_type_type> typesToCount);
+    Positions(Kernel* kernel, stride_type stride, std::vector<ParticleTypeId> typesToCount);
 
     Positions(const Positions&) = delete;
     Positions& operator=(const Positions&) = delete;
     Positions(Positions&&) = default;
     Positions& operator=(Positions&&) = delete;
 
-    virtual ~Positions();
+    ~Positions() override;
 
 protected:
 
@@ -71,7 +71,7 @@ public:
 
 protected:
 
-    std::vector<particle_type_type> typesToCount;
+    std::vector<ParticleTypeId> typesToCount;
 
     struct Impl;
     std::unique_ptr<Impl> pimpl;

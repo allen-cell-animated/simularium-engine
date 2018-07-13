@@ -47,15 +47,16 @@ class PotentialOrder1 : public Potential {
 protected:
     using particle_type_type = readdy::model::Particle::type_type;
 public:
-    explicit PotentialOrder1(particle_type_type ptype) : Potential(1), _particleType(ptype) {}
+    explicit PotentialOrder1(particle_type_type ptype) : _particleType(ptype) {}
 
     virtual scalar calculateEnergy(const Vec3 &position) const = 0;
 
     virtual void calculateForce(Vec3 &force, const Vec3 &position) const = 0;
 
-    virtual void calculateForceAndEnergy(Vec3 &force, scalar &energy, const Vec3 &position) const = 0;
-
-    virtual scalar getRelevantLengthScale() const noexcept = 0;
+    void calculateForceAndEnergy(Vec3 &force, scalar &energy, const Vec3 &position) const {
+        energy += calculateEnergy(position);
+        calculateForce(force, position);
+    };
 
     friend std::ostream &operator<<(std::ostream &os, const PotentialOrder1 &potential) {
         os << potential.describe();
