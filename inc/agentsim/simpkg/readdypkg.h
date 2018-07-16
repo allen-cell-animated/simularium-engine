@@ -23,7 +23,6 @@ public:
 
 private:
 	readdy::Simulation* m_simulation;
-	std::vector<readdy::Simulation> m_resetWorkaround;
 };
 
 } // namespace agentsim
