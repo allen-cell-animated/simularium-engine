@@ -1,5 +1,5 @@
 /********************************************************************
- * Copyright © 2016 Computational Molecular Biology Group,          * 
+ * Copyright © 2016 Computational Molecular Biology Group,          *
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
  * This file is part of ReaDDy.                                     *
@@ -134,6 +134,11 @@ public:
 
     const scalar rate() const {
         return _rate;
+    }
+
+    void setRate(scalar rate)
+    {
+      _rate = rate;
     }
 
     const scalar radius() const {

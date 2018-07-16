@@ -36,7 +36,7 @@ void ReaDDyPkg::Setup()
 	topologies.configureBondPotential("core","core", bond);
 	topologies.configureAnglePotential("core","core","core", angle);
 	topologies.addSpatialReaction(
-		"Bind: filament(end) + (monomer) -> filament(core--end)", 3.3e7, 50
+		"Bind: filament(end) + (monomer) -> filament(core--end)", 7, 50
 	);
 
 	auto &potentials = this->m_simulation->context().potentials();
@@ -84,6 +84,9 @@ void ReaDDyPkg::Shutdown()
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
+	auto &topologies = this->m_simulation->context().topologyRegistry();
+	auto &bindrx = topologies.spatialReactionByName("Bind");
+	printf("bind rate: %lu\n", (long unsigned int)bindrx.rate());
 	this->m_simulation->run(1, timeStep);
 
 	agents.clear();
@@ -123,6 +126,48 @@ void ReaDDyPkg::RunTimeStep(
 			agents.push_back(newAgent);
 		}
 	}
+}
+
+void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
+{
+	std::string recognized_params[2] = {"NucleationRate", "GrowthRate"};
+	std::size_t paramIndex = 252; // assuming less than 252 parameters
+
+	for(std::size_t i = 0; i < 2; ++i)
+	{
+		if(recognized_params[i] == param_name)
+		{
+			paramIndex = i;
+			break;
+		}
+	}
+
+	if(paramIndex == 252)
+	{
+		printf("Unrecognized parameter %s passed into ReaddyPkg.\n", param_name.c_str());
+		return;
+	}
+
+	switch(paramIndex)
+	{
+		case 0: // NucleationRate
+		{
+
+		} break;
+		case 1: // GrowthRate
+		{
+			auto &topologies = this->m_simulation->context().topologyRegistry();
+			auto &bindrx = topologies.spatialReactionByName("Bind");
+			bindrx.setRate(param_value);
+		} break;
+		default:
+		{
+			printf("Recognized but unimplemented parameter %s in ReaDDy SimPkg.\n",
+				param_name.c_str());
+			return;
+		} break;
+	}
+
 }
 
 } // namespace agentsim

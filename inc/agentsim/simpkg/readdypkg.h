@@ -21,6 +21,10 @@ public:
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
 
+	virtual void UpdateParameter(
+		std::string param_name, float param_value
+	) override;
+
 private:
 	readdy::Simulation* m_simulation;
 };

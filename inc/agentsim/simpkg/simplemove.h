@@ -19,7 +19,7 @@ public:
 	/**
 	* RunTimeStep
 	*
-	*	@param timeStep		the time to advance simulation, in picoseconds
+	*	@param timeStep		the time to advance simulation
 	*	@param agents			a list of Agents to be moved
 	*
 	* description				this function will randomly place agents,
@@ -27,6 +27,10 @@ public:
 	*/
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
+
+	virtual void UpdateParameter(
+		std::string param_name, float param_value
+	) override { }
 
 	void SampleDiffusionStep(
 		float timeStep, Agent* agent, Eigen::Vector3d& newLocation);

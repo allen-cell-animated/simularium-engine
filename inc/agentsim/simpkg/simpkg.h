@@ -1,6 +1,7 @@
 #ifndef AICS_SIMPKG_H
 #define AICS_SIMPKG_H
 
+#include <string>
 #include <memory>
 #include <vector>
 
@@ -29,11 +30,15 @@ public:
 	/**
 	* RunTimeStep
 	*
-	*	@param timeStep		the time to advance simulation, in picoseconds
+	*	@param timeStep		the time to advance simulation, in seconds
 	* @param agents			a list of Agents to be manipulated
 	*/
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) = 0;
+
+	virtual void UpdateParameter(
+		std::string param_name, float param_value
+	) = 0;
 };
 
 } // namespace agentsim

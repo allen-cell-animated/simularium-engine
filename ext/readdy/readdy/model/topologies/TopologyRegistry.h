@@ -1,5 +1,5 @@
 /********************************************************************
- * Copyright © 2016 Computational Molecular Biology Group,          * 
+ * Copyright © 2016 Computational Molecular Biology Group,          *
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
  * This file is part of ReaDDy.                                     *
@@ -241,6 +241,17 @@ public:
     const SpatialReaction &spatialReactionByName(const std::string &name) const {
         for(const auto &e : _spatialReactions) {
             for(const auto &reaction : e.second) {
+                if(reaction.name() == name) {
+                    return reaction;
+                }
+            }
+        }
+        throw std::invalid_argument("No reaction with name \"" + name + "\" registered.");
+    }
+
+    SpatialReaction &spatialReactionByName(const std::string &name) {
+        for(auto &e : _spatialReactions) {
+            for(auto &reaction : e.second) {
                 if(reaction.name() == name) {
                     return reaction;
                 }

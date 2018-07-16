@@ -25,13 +25,17 @@ public:
 	/**
 	* RunTimeStep
 	*
-	*	@param timeStep		the time to advance simulation, in picoseconds
+	*	@param timeStep		the time to advance simulation
 	* @param agents			a list of Agents to be moved
 	*
 	* description				this function will evaluate interaction
 	*/
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) override;
+
+	virtual void UpdateParameter(
+		std::string param_name, float param_value
+	) override { }
 
 	void EvaluateInteractions(
 		std::vector<std::shared_ptr<Agent>>& agents,
