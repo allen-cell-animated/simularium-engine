@@ -109,10 +109,11 @@ int main(void)
       }
       else
       {
-        // Limit packet sending to 120 pps
         auto now = std::chrono::steady_clock::now();
         auto diff = now - start;
-        if(diff >= std::chrono::milliseconds(8))
+
+        // limit to 15 packets-per-second
+        if(diff >= std::chrono::milliseconds(66))
         {
           start = now;
 

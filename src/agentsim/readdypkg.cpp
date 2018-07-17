@@ -18,8 +18,7 @@ void ReaDDyPkg::Setup()
 		this->m_simulation.context().boxSize()[2] = boxSize;
 
 		auto &particles = this->m_simulation.context().particleTypes();
-		particles.add("monomer", 6.25e14);
-		particles.addTopologyType("fmonomer", 6.25e14);
+		particles.addTopologyType("monomer", 6.25e14);
 		particles.addTopologyType("end", 6.25e9);
 		particles.addTopologyType("core", 6.25e9);
 
@@ -33,16 +32,23 @@ void ReaDDyPkg::Setup()
 
 		auto &topologies = this->m_simulation.context().topologyRegistry();
 		topologies.addType("filament");
+		topologies.addType("free");
 		topologies.configureBondPotential("end","end", bond);
 		topologies.configureBondPotential("end","core", bond);
 		topologies.configureBondPotential("core","core", bond);
 		topologies.configureAnglePotential("core","core","core", angle);
+		topologies.configureAnglePotential("end","core","core", angle);
+		topologies.configureAnglePotential("end","core","end", angle);
 
 		topologies.addSpatialReaction(
-			"Growth: filament(end) + (monomer) -> filament(core--end)", 3.7e-6, 50
+			"Growth: filament(end) + free(monomer) -> filament(core--core)", 3.7e-6, 50
 		);
 		topologies.addSpatialReaction(
-			"Nucleate: filament(fmonomer) + (monomer) -> filament(end--end)", 3.7e-6, 50
+			"Combine: filament(end) + free(monomer) -> filament(core--core)", 3.7e-6, 50
+		);
+
+		topologies.addSpatialReaction(
+			"Nucleate: free(monomer) + free(monomer) -> filament(end--end)", 3.7e-6, 50
 		);
 
 		auto &potentials = this->m_simulation.context().potentials();
@@ -59,17 +65,10 @@ void ReaDDyPkg::Setup()
 		y = rand() % boxSize - boxSize / 2;
 		z = rand() % boxSize - boxSize / 2;
 
-		if(i % 2 == 0)
-		{
-			this->m_simulation.addParticle("monomer", x, y, z);
-		}
-		else
-		{
-			std::vector<readdy::model::TopologyParticle> tp;
-			tp.push_back(this->m_simulation.createTopologyParticle(
-				"fmonomer", readdy::Vec3(x,y,z)));
-			this->m_simulation.addTopology("filament", tp);
-		}
+		std::vector<readdy::model::TopologyParticle> tp;
+		tp.push_back(this->m_simulation.createTopologyParticle(
+			"monomer", readdy::Vec3(x,y,z)));
+		this->m_simulation.addTopology("free", tp);
 	}
 
 	std::size_t filamentCount = 5;
@@ -104,8 +103,7 @@ void ReaDDyPkg::RunTimeStep(
 	this->m_simulation.run(1, timeStep);
 
 	agents.clear();
-	std::vector<std::string> pTypes = { "core", "end", "monomer", "fmonomer" };
-	std::vector<int> typeIds = { 0, 1, 2, 2 };
+	std::vector<std::string> pTypes = { "core", "end", "monomer" };
 
 	for(std::size_t i = 0; i < pTypes.size(); ++i)
 	{
@@ -116,13 +114,13 @@ void ReaDDyPkg::RunTimeStep(
 			std::shared_ptr<Agent> newAgent;
 			newAgent.reset(new Agent());
 			newAgent->SetName(pTypes[i]);
-			newAgent->SetTypeID(typeIds[i]);
+			newAgent->SetTypeID(i);
 			newAgent->SetLocation(Eigen::Vector3d(v[0], v[1], v[2]));
 
 			// Purely for visual effect; ReaDDy doesn't have a concept of rotations
 			float rotMultiplier = 1;
 
-			if(pTypes[i] == "monomer" || pTypes[i] == "fmonomer")
+			if(pTypes[i] == "monomer")
 			{
 				rotMultiplier = 6e14;
 			}
@@ -176,6 +174,9 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 			auto &topologies = this->m_simulation.context().topologyRegistry();
 			auto &growthrx = topologies.spatialReactionByName("Growth");
 			growthrx.setRate(param_value);
+
+			auto& combinerx = topologies.spatialReactionByName("Combine");
+			combinerx.setRate(param_value);
 		} break;
 		default:
 		{
