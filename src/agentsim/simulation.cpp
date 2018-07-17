@@ -68,5 +68,13 @@ void Simulation::Reset()
 	}
 }
 
+void Simulation::UpdateParameter(std::string name, float value)
+{
+	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+	{
+			this->m_SimPkgs[i]->UpdateParameter(name, value);
+	}
+}
+
 } // namespace agentsim
 } // namespace aics

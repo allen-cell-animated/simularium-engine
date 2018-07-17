@@ -84,9 +84,6 @@ void ReaDDyPkg::Shutdown()
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	auto &topologies = this->m_simulation->context().topologyRegistry();
-	auto &bindrx = topologies.spatialReactionByName("Bind");
-	printf("bind rate: %lu\n", (long unsigned int)bindrx.rate());
 	this->m_simulation->run(1, timeStep);
 
 	agents.clear();
@@ -130,7 +127,7 @@ void ReaDDyPkg::RunTimeStep(
 
 void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 {
-	std::string recognized_params[2] = {"NucleationRate", "GrowthRate"};
+	std::string recognized_params[2] = {"Nucleation Rate", "Growth Rate"};
 	std::size_t paramIndex = 252; // assuming less than 252 parameters
 
 	for(std::size_t i = 0; i < 2; ++i)

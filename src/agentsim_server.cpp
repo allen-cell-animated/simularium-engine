@@ -24,7 +24,8 @@ enum {
       ID_VIS_DATA_PAUSE,
       ID_VIS_DATA_RESUME,
       ID_VIS_DATA_ABORT,
-      ID_UPDATE_TIME_STEP
+      ID_UPDATE_TIME_STEP,
+      ID_UPDATE_RATE_PARAM
 };
 
 enum  {
@@ -53,6 +54,9 @@ void deserialize_vis_data_request(
 
 void deserialize_timestep_update(
   RakNet::BitStream* bs, float& timeStep);
+
+void deserialize_rate_param_update(
+  RakNet::BitStream* bs, std::string& paramName, float& paramValue);
 
 int main(void)
 {
@@ -213,6 +217,18 @@ int main(void)
           RakNet::BitStream bs(packet->data, packet->length, false);
           deserialize_timestep_update(&bs, requestData.step_size);
         } break;
+        case ID_UPDATE_RATE_PARAM:
+        {
+          printf("Rate param update arrived\n");
+          RakNet::BitStream bs(packet->data, packet->length, false);
+
+          std::string pname;
+          float pval;
+
+          deserialize_rate_param_update(&bs, pname, pval);
+          simulation.UpdateParameter(pname, pval);
+
+        } break;
 				default:
 					printf("Message with identifier %i has arrived.\n", packet->data[0]);
 					break;
@@ -247,4 +263,17 @@ void deserialize_timestep_update(
   RakNet::MessageID id;
 	bs->Read(id);
 	bs->Read(timeStep);
+}
+
+void deserialize_rate_param_update(
+  RakNet::BitStream* bs, std::string& paramName, float& paramValue)
+{
+  RakNet::MessageID id;
+	bs->Read(id);
+
+  RakNet::RakString rs;
+	bs->Read(rs);
+  paramName = rs;
+
+	bs->Read(paramValue);
 }

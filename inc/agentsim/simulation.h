@@ -2,6 +2,7 @@
 #define AICS_SIMULATION_H
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace aics {
@@ -30,6 +31,8 @@ public:
 	std::vector<AgentData> GetData();
 
 	void Reset();
+
+	void UpdateParameter(std::string name, float val);
 
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
