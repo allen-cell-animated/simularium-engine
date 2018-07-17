@@ -35,8 +35,13 @@ void ReaDDyPkg::Setup()
 	topologies.configureBondPotential("end","core", bond);
 	topologies.configureBondPotential("core","core", bond);
 	topologies.configureAnglePotential("core","core","core", angle);
+
+	// @TODO: Currently there seems to be a bug with Topology-Topology fusion
 	topologies.addSpatialReaction(
-		"Bind: filament(end) + (monomer) -> filament(core--end)", 7, 50
+		"Growth: filament(end) + (monomer) -> filament(core--end)", 3.7e-6, 50
+	);
+	topologies.addSpatialReaction(
+		"Nucleate: filament(end) + (monomer) -> filament(core--end)", 3.7e-6, 50
 	);
 
 	auto &potentials = this->m_simulation->context().potentials();
@@ -49,10 +54,9 @@ void ReaDDyPkg::Setup()
 		x = rand() % boxSize - boxSize / 2;
 		y = rand() % boxSize - boxSize / 2;
 		z = rand() % boxSize - boxSize / 2;
+
 		this->m_simulation->addParticle("monomer", x, y, z);
 	}
-
-	this->m_simulation->addParticle("monomer", 0, 0, 0);
 
 	std::size_t filamentCount = 5;
 	for(std::size_t i = 0; i < filamentCount; ++i)
@@ -149,13 +153,15 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 	{
 		case 0: // NucleationRate
 		{
-
+			auto &topologies = this->m_simulation->context().topologyRegistry();
+			auto &nucrx = topologies.spatialReactionByName("Nucleate");
+			nucrx.setRate(param_value);
 		} break;
 		case 1: // GrowthRate
 		{
 			auto &topologies = this->m_simulation->context().topologyRegistry();
-			auto &bindrx = topologies.spatialReactionByName("Bind");
-			bindrx.setRate(param_value);
+			auto &growthrx = topologies.spatialReactionByName("Growth");
+			growthrx.setRate(param_value);
 		} break;
 		default:
 		{
