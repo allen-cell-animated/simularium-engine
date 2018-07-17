@@ -13,7 +13,8 @@ namespace agentsim {
 class ReaDDyPkg : public SimPkg
 {
 public:
-	virtual ~ReaDDyPkg() {}
+	ReaDDyPkg() : m_simulation("SingleCPU") {}
+	virtual ~ReaDDyPkg() { }
 
 	virtual void Setup() override;
 	virtual void Shutdown() override;
@@ -26,7 +27,8 @@ public:
 	) override;
 
 private:
-	readdy::Simulation* m_simulation;
+	readdy::Simulation m_simulation;
+	bool initialized = false;
 };
 
 } // namespace agentsim
