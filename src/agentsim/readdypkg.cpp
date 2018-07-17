@@ -41,10 +41,10 @@ void ReaDDyPkg::Setup()
 		topologies.configureAnglePotential("end","core","end", angle);
 
 		topologies.addSpatialReaction(
-			"Growth: filament(end) + free(monomer) -> filament(core--core)", 3.7e-6, 50
+			"Growth: filament(end) + free(monomer) -> filament(core--end)", 3.7e-6, 50
 		);
 		topologies.addSpatialReaction(
-			"Combine: filament(end) + free(monomer) -> filament(core--core)", 3.7e-6, 50
+			"Combine: filament(end) + filament(end) -> filament(core--end)", 3.7e-6, 50
 		);
 
 		topologies.addSpatialReaction(
