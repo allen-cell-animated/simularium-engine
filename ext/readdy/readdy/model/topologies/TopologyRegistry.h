@@ -157,6 +157,11 @@ public:
     }
 
     const TopologyType::StructuralReactionCollection &structuralReactionsOf(TopologyTypeId type) const {
+        if(type == -1)
+        {
+          return _defaultStructuralTopologyReactions;
+        }
+
         auto it = std::find_if(_registry.begin(), _registry.end(), [type](const auto &e) {
             return e.type == type;
         });
@@ -330,6 +335,7 @@ private:
     SpatialReactionMap _spatialReactions{};
     SpatialReactionCollection _defaultTopologyReactions{};
     SpatialReactionTypeIds _spatialReactionTypes{};
+    StructuralReactionCollection _defaultStructuralTopologyReactions{};
 
     std::reference_wrapper<const ParticleTypeRegistry> _typeRegistry;
 
