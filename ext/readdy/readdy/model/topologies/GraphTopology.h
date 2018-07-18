@@ -1,5 +1,5 @@
 /********************************************************************
- * Copyright © 2016 Computational Molecular Biology Group,          *
+ * Copyright © 2016 Computational Molecular Biology Group,          * 
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
  * This file is part of ReaDDy.                                     *
@@ -33,7 +33,6 @@
 #pragma once
 
 #include <readdy/common/macros.h>
-#include <csignal>
 
 #include "Topology.h"
 #include "graph/Graph.h"
@@ -112,9 +111,8 @@ public:
 
     void validate() {
         if (!graph().isConnected()) {
-            /*throw std::invalid_argument(fmt::format("The graph is not connected! (GEXF representation: {})",
-                                                    util::to_gexf(graph())));*/
-            printf("Either graph is not connected, or thread is occuring too quickly.\n");
+            throw std::invalid_argument(fmt::format("The graph is not connected! (GEXF representation: {})",
+                                                    util::to_gexf(graph())));
         }
     }
 
