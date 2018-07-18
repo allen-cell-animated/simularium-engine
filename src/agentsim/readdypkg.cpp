@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <time.h>
+#include <thread>
+#include <chrono>
 
 namespace aics {
 namespace agentsim {
@@ -50,6 +52,39 @@ void ReaDDyPkg::Setup()
 		topologies.addSpatialReaction(
 			"Nucleate: free(monomer) + free(monomer) -> filament(end--end)", 3.7e-6, 50
 		);
+
+		auto rGrowthFunc = [&](readdy::model::top::GraphTopology &top) {
+			readdy::model::top::reactions::Recipe recipe(top);
+
+			if(top.graph().vertices().size() < 4)
+			{
+				return recipe;
+			}
+
+			auto v1 = top.graph().vertices().begin();
+			auto v2 = top.graph().vertices().begin();
+			++v2;
+
+			for(std::size_t i = 0; i < top.graph().vertices().size() / 2; ++i)
+			{
+				++v1;
+				++v2;
+			}
+
+			if(v1->particleType() == 2 && v2->particleType() == 2) // core
+			{
+				v1->setParticleType(1); // end
+				v2->setParticleType(1); // end
+				recipe.removeEdge(v1, v2);
+			}
+
+			return recipe;
+		};
+
+		readdy::model::top::reactions::StructuralTopologyReaction rGrowthRx(
+			rGrowthFunc, 3.7e-6
+		);
+		topologies.addStructuralReaction("filament", rGrowthRx);
 
 		auto &potentials = this->m_simulation.context().potentials();
 		potentials.addHarmonicRepulsion("core", "core", 5, 0.5);
@@ -143,10 +178,12 @@ void ReaDDyPkg::RunTimeStep(
 
 void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 {
-	std::string recognized_params[2] = {"Nucleation Rate", "Growth Rate"};
+	static const int num_params = 3;
+	std::string recognized_params[num_params] = {
+		"Nucleation Rate", "Growth Rate", "Dissociation Rate" };
 	std::size_t paramIndex = 252; // assuming less than 252 parameters
 
-	for(std::size_t i = 0; i < 2; ++i)
+	for(std::size_t i = 0; i < num_params; ++i)
 	{
 		if(recognized_params[i] == param_name)
 		{
@@ -178,10 +215,20 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 			auto& combinerx = topologies.spatialReactionByName("Combine");
 			combinerx.setRate(param_value);
 		} break;
+		case 2: // DissociationRate
+		{
+			auto &topologies = this->m_simulation.context().topologyRegistry();
+			auto &srxs = topologies.getStructuralReactionsOf("filament");
+
+			for(std::size_t i = 0; i < srxs.size(); ++i)
+			{
+				srxs[i].setRate(param_value);
+			}
+		} break;
 		default:
 		{
-			printf("Recognized but unimplemented parameter %s in ReaDDy SimPkg.\n",
-				param_name.c_str());
+			printf("Recognized but unimplemented parameter %s in ReaDDy SimPkg, resolved as index %lu.\n",
+				param_name.c_str(), paramIndex);
 			return;
 		} break;
 	}

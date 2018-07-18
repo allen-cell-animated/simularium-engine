@@ -177,6 +177,27 @@ public:
         return structuralReactionsOf(idOf(type));
     }
 
+    TopologyType::StructuralReactionCollection &getStructuralReactionsOf(TopologyTypeId type) {
+        if(type == -1)
+        {
+          return _defaultStructuralTopologyReactions;
+        }
+
+        auto it = std::find_if(_registry.begin(), _registry.end(), [type](const auto &e) {
+            return e.type == type;
+        });
+        if (it != _registry.end()) {
+            return it->structuralReactions;
+        }
+        throw std::invalid_argument(
+                fmt::format("requested structural topology reactions of type {} which did not exist!", type)
+        );
+    }
+
+    StructuralReactionCollection &getStructuralReactionsOf(const std::string &type) {
+        return getStructuralReactionsOf(idOf(type));
+    }
+
     std::string describe() const;
 
     void addSpatialReaction(reactions::SpatialTopologyReaction &&reaction);

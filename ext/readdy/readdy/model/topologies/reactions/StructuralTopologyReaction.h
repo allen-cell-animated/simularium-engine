@@ -1,5 +1,5 @@
 /********************************************************************
- * Copyright © 2016 Computational Molecular Biology Group,          * 
+ * Copyright © 2016 Computational Molecular Biology Group,          *
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
  * This file is part of ReaDDy.                                     *
@@ -164,6 +164,16 @@ public:
      */
     scalar rate(const GraphTopology &topology) const {
         return _rate_function(topology);
+    }
+
+
+    /**
+    * Resets the rate function to a new scalar value
+    * @param rate the new constant rate for this reaction
+    */
+    void setRate(scalar rate)
+    {
+      _rate_function = [rate](const GraphTopology&) -> scalar { return rate; };
     }
 
     /**
