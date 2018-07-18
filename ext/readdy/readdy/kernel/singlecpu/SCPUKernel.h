@@ -96,6 +96,7 @@ private:
     SCPUStateModel _model;
     actions::SCPUActionFactory _actionFactory;
     observables::SCPUObservableFactory _observables;
+    bool _isInitialized = false;
 };
 
 }
