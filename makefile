@@ -1,4 +1,5 @@
 CC=g++
+PLATFORM=linux
 
 INCLUDE_DIR=inc
 EXTERNAL_DIR=ext
@@ -20,12 +21,12 @@ CFLAGS=-Wall -g
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
 
 EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
-EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)
+EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)/$(PLATFORM)
 READDY_DLLS= -lreaddy -lreaddy_model -lreaddy_kernel_cpu \
 -lreaddy_kernel_singlecpu -lreaddy_common -lreaddy_io -lreaddy_plugin
-EXT_DLLS:= -L$(LIBRARY_DIR) $(READDY_DLLS) -ldl -pthread -lhdf5 -lOpenMM
+EXT_DLLS:= -L$(LIBRARY_DIR)/$(PLATFORM) $(READDY_DLLS) -ldl -pthread -lhdf5 -lOpenMM
 SERVER_INCLUDES=-I $(EXTERNAL_DIR)/raknet
-SERVER_DLLS=-Llib -lRakNetDLL
+SERVER_DLLS=-L$(LIBRARY_DIR)/$(PLATFORM) -lRakNetDLL
 
 .SILENT:
 
