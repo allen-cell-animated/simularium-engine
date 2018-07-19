@@ -20,8 +20,7 @@ TEST_TARGET=agentsim_tests
 CFLAGS=-Wall -g -std=c++14
 INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
 
-EXT_INCLUDES=-I $(EXTERNAL_DIR)/hdf5 -I $(EXTERNAL_DIR)/blosc \
--isystem $(EXTERNAL_DIR)/openmm -isystem \$(EXTERNAL_DIR)/readdy
+EXT_INCLUDES=-I $(EXTERNAL_DIR)/hdf5 -isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
 EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)/$(PLATFORM)
 READDY_DLLS= -lreaddy -lreaddy_model -lreaddy_kernel_cpu \
 -lreaddy_kernel_singlecpu -lreaddy_common -lreaddy_io -lreaddy_plugin
