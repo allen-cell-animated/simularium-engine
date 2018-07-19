@@ -3,6 +3,7 @@
 TMP_FILE="opmm.tmp"
 TARGET_DIR="openmm"
 LIB_DIR="../lib"
+PLATFORM="linux"
 
 # This script imports the needed OpenMM Headers & libraries
 #  from an OpenMM Directory that has already been built
@@ -50,5 +51,5 @@ done < $TMP_FILE
 rm $TARGET_DIR/pthread.h #includes a windows header
 rm $TMP_FILE
 
-find $OPENMM_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR \;
-find $OPENMM_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR \;
+find $OPENMM_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR/$PLATFORM \;
+find $OPENMM_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR/$PLATFORM \;

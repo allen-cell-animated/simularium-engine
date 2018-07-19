@@ -4,8 +4,7 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <time.h>
-#include <thread>
-#include <chrono>
+#include <csignal>
 
 namespace aics {
 namespace agentsim {
@@ -81,7 +80,7 @@ void ReaDDyPkg::Setup()
 		};
 
 		readdy::model::top::reactions::StructuralTopologyReaction rGrowthRx(
-			rGrowthFunc, 3.7e-6
+			rGrowthFunc, 3.7e-16
 		);
 		topologies.addStructuralReaction("filament", rGrowthRx);
 
@@ -128,7 +127,7 @@ void ReaDDyPkg::Setup()
 
 void ReaDDyPkg::Shutdown()
 {
-	this->m_simulation.stateModel().removeAllParticles();
+	// @TODO: I haven't figured out how to restart this without crashing yet
 }
 
 void ReaDDyPkg::RunTimeStep(

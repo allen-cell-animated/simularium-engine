@@ -17,8 +17,9 @@ TARGET=agentsim
 SERVER_TARGET=agentsim_server
 TEST_TARGET=agentsim_tests
 
-CFLAGS=-Wall -g
-INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR)
+CFLAGS=-Wall -g -std=c++14
+INCLUDES= -I $(INCLUDE_DIR) -I $(EXTERNAL_DIR) -I /usr/include/hdf5/serial \
+-I /usr/include -I /usr/local/include
 
 EXT_INCLUDES=-isystem $(EXTERNAL_DIR)/openmm -isystem $(EXTERNAL_DIR)/readdy
 EXT_CFLAGS=-Wl,-rpath $(LIBRARY_DIR)/$(PLATFORM)
@@ -61,8 +62,8 @@ agentsim_prog: $(SOURCE_DIR)/$(TARGET).cpp
 	$(CFLAGS) $(EXT_CFLAGS) \
 	$(INCLUDES) $(EXT_INCLUDES) \
 	-o $(BUILD_DIR)/$(TARGET) \
-	$(LIBRARY_DIR)/$(TARGET).a \
-	$(LIBRARY_DIR)/gtest_main.a -pthread \
+	$(LIBRARY_DIR)/$(PLATFORM)/$(TARGET).a \
+	$(LIBRARY_DIR)/$(PLATFORM)/gtest_main.a -pthread \
 	$(EXT_DLLS)
 
 agentsim_server: $(SOURCE_DIR)/$(SERVER_TARGET).cpp
@@ -71,7 +72,7 @@ agentsim_server: $(SOURCE_DIR)/$(SERVER_TARGET).cpp
 	$(CFLAGS) $(EXT_CFLAGS) $(INCLUDES) \
 	$(SERVER_INCLUDES) $(EXT_INCLUDES) \
 	-o $(BUILD_DIR)/$(SERVER_TARGET) \
-	$(LIBRARY_DIR)/$(TARGET).a $(SERVER_DLLS) \
+	$(LIBRARY_DIR)/$(PLATFORM)/$(TARGET).a $(SERVER_DLLS) \
 	$(EXT_DLLS)
 
 agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
@@ -80,17 +81,17 @@ agentsim_tests: $(SOURCE_DIR)/$(TEST_TARGET).cpp
 	$(CFLAGS) $(EXT_CFLAGS) \
 	$(INCLUDES) $(EXT_INCLUDES) \
 	-o $(BUILD_DIR)/$(TEST_TARGET) \
-	$(LIBRARY_DIR)/$(TARGET).a \
-	$(LIBRARY_DIR)/gtest_main.a -pthread \
+	$(LIBRARY_DIR)/$(PLATFORM)/$(TARGET).a \
+	$(LIBRARY_DIR)/$(PLATFORM)/gtest_main.a -pthread \
 	$(EXT_DLLS)
 
 agentsim_lib: $(OBJ_FILES)
-	@echo $(LIBRARY_DIR)/$(TARGET).a
+	@echo $(LIBRARY_DIR)/$(PLATFORM)/$(TARGET).a
 	$(CC) $(SOURCE_DIR)/$(DUMMY_TARGET).cpp \
 	$(CFLAGS) $(EXT_CFLAGS) \
 	-o $(BUILD_DIR)/$(DUMMY_TARGET) \
 	$(OBJ_FILES) $(EXT_DLLS)
-	@ar rvs $(LIBRARY_DIR)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
+	@ar rvs $(LIBRARY_DIR)/$(PLATFORM)/$(TARGET).a $(OBJ_DIR)/$(PROJECT_DIR)/*.o
 
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
 	@echo $@
@@ -100,5 +101,5 @@ $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
 clean:
 	@echo cleaning build dir ...
 	@rm -f ./bin/*
-	@rm -f ./$(LIBRARY_DIR)/$(TARGET).a
+	@rm -f ./$(LIBRARY_DIR)/$(PLATFORM)/$(TARGET).a
 	@rm -f ./$(OBJ_DIR)/$(PROJECT_DIR)/*.o

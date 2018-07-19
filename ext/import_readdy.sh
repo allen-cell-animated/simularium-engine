@@ -3,6 +3,7 @@
 TMP_FILE="readdy.tmp"
 TARGET_DIR="readdy"
 LIB_DIR="../lib"
+PLATFORM="linux"
 
 # This script imports the needed ReaDDy Headers & libraries
 #  from an ReaDDY Directory that has already been built
@@ -76,5 +77,5 @@ while read line; do
 done < $TMP_FILE
 rm $TMP_FILE
 
-find $READDY_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR \;
-find $READDY_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR \;
+find $READDY_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR/$PLATFORM \;
+find $READDY_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR/$PLATFORM \;

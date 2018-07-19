@@ -1,7 +1,8 @@
 # BUILD #
 bin/
 obj/
-lib/agentsim.a
+lib/linux/agentsim.a
+lib/mac/agentsim.a
 
 # EMACS #
 # -*- mode: gitignore; -*-

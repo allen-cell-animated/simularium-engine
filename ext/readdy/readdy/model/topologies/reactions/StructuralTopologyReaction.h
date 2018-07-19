@@ -171,9 +171,9 @@ public:
     * Resets the rate function to a new scalar value
     * @param rate the new constant rate for this reaction
     */
-    void setRate(scalar rate)
+    void setRate(const scalar& rate)
     {
-      _rate_function = [rate](const GraphTopology&) -> scalar { return rate; };
+      _rate_function = rate_function([rate](const GraphTopology&) -> scalar { return rate; });
     }
 
     /**
