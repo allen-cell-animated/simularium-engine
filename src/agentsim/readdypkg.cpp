@@ -34,7 +34,6 @@ void ReaDDyPkg::Setup()
 
 		auto &topologies = this->m_simulation.context().topologyRegistry();
 		topologies.addType("filament");
-		topologies.addType("free");
 		topologies.configureBondPotential("end","end", bond);
 		topologies.configureBondPotential("end","core", bond);
 		topologies.configureBondPotential("core","core", bond);
@@ -43,14 +42,14 @@ void ReaDDyPkg::Setup()
 		topologies.configureAnglePotential("end","core","end", angle);
 
 		topologies.addSpatialReaction(
-			"Growth: filament(end) + free(monomer) -> filament(core--end)", 3.7e-6, 50
+			"Growth: filament(end) + filament(monomer) -> filament(core--end)", 3.7e-6, 50
 		);
 		topologies.addSpatialReaction(
-			"Combine: filament(end) + filament(end) -> filament(core--end)", 3.7e-6, 50
+			"Combine: filament(end) + filament(end) -> filament(core--core)", 3.7e-6, 50
 		);
 
 		topologies.addSpatialReaction(
-			"Nucleate: free(monomer) + free(monomer) -> filament(end--end)", 3.7e-6, 50
+			"Nucleate: filament(monomer) + filament(monomer) -> filament(end--end)", 3.7e-6, 50
 		);
 
 		auto rGrowthFunc = [&](readdy::model::top::GraphTopology &top) {
@@ -103,7 +102,7 @@ void ReaDDyPkg::Setup()
 		std::vector<readdy::model::TopologyParticle> tp;
 		tp.push_back(this->m_simulation.createTopologyParticle(
 			"monomer", readdy::Vec3(x,y,z)));
-		this->m_simulation.addTopology("free", tp);
+		this->m_simulation.addTopology("filament", tp);
 	}
 
 	std::size_t filamentCount = 5;
