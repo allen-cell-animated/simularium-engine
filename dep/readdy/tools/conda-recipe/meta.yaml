@@ -1,0 +1,45 @@
+package:
+  name: readdy
+  version: {{ environ.get('GIT_DESCRIBE_TAG', 'dev') }}
+source:
+  git_url: ../..
+
+build:
+  number: {{ environ.get('GIT_DESCRIBE_NUMBER', 0) }}
+  {% if environ.get('GIT_DESCRIBE_NUMBER', '0') == '0' %}string: py{{ environ.get('PY_VER').replace('.', '') }}_0
+  {% else %}string: py{{ environ.get('PY_VER').replace('.', '') }}_{{ environ.get('GIT_BUILD_STR', 'GIT_STUB') }}{% endif %}
+  rpaths:
+    - lib/
+    - readdy/readdy_plugins/
+
+requirements:
+  host:
+    - python
+    - h5py
+    - hdf5
+    - bzip2
+    - numpy
+    - zlib 1.2.*
+    - vs2015_runtime  # [win]
+
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    - cmake # [not win]
+
+  run:
+    - python
+    - numpy
+    - h5py
+    - progress_reporter
+    - pint
+    - hdf5
+    - zlib 1.2.*
+    - libgcc # [linux]
+    - vs2015_runtime  # [win]
+
+test:
+  imports:
+    - readdy
+  requires:
+    - nose
