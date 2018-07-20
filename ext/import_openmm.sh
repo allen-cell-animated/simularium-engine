@@ -50,6 +50,3 @@ done < $TMP_FILE
 
 rm $TARGET_DIR/pthread.h #includes a windows header
 rm $TMP_FILE
-
-find $OPENMM_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR/$PLATFORM \;
-find $OPENMM_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR/$PLATFORM \;

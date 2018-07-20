@@ -76,6 +76,3 @@ while read line; do
 	cp  $line $TARGET_DIR/$fpath
 done < $TMP_FILE
 rm $TMP_FILE
-
-find $READDY_BUILD_DIR -name "*.so" -exec cp {} $LIB_DIR/$PLATFORM \;
-find $READDY_BUILD_DIR -name "*.a" -exec cp {} $LIB_DIR/$PLATFORM \;
