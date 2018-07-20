@@ -7,7 +7,7 @@
 #include "interactions/statechange_reaction_test.h"
 #include "interactions/combination_reaction_test.h"
 
-#include "extpkg/openmm_test.h"
+//#include "extpkg/openmm_test.h" // @TODO update OpenMM's Cmake files
 #include "extpkg/readdy_test.h"
 
 #endif // ALLTESTS_H
