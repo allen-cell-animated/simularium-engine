@@ -7,9 +7,9 @@ set(TEST_TARGET "agentsim_tests")
 # The file extension to attach to executables built
 set(EXE_FILE_TYPE "exe")
 
-set(PROGRAM "${TARGET}.${TARGET_FILE_TYPE}")
-set(SERVER_PROGRAM "${SERVER_TARGET}.${TARGET_FILE_TYPE}")
-set(TEST_PROGRAM "${TEST_TARGET}.${TARGET_FILE_TYPE}")
+set(PROGRAM "${TARGET}.${EXE_FILE_TYPE}")
+set(SERVER_PROGRAM "${SERVER_TARGET}.${EXE_FILE_TYPE}")
+set(TEST_PROGRAM "${TEST_TARGET}.${EXE_FILE_TYPE}")
 
 set(SOURCE_DIRECTORY "src")
 set(INCLUDE_DIRECTORY "inc")
