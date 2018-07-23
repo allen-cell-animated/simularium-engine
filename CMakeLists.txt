@@ -42,7 +42,6 @@ set(READDY_DLLS
 "readdy_common"
 "readdy_io"
 "readdy_plugin"
-"pthread"
 )
 
 set(RAKNET_DLLS "RakNetDLL")
