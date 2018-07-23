@@ -33,7 +33,6 @@ include_directories(${CMAKE_SOURCE_DIR}/${INCLUDE_DIRECTORY} ${CMAKE_SOURCE_DIR}
 
 # Disable options in subdirectory
 set(READDY_BUILD_PYTHON_WRAPPER OFF CACHE BOOL "Build Python wrappers")
-set(READDY_CREATE_TEST_TARGET OFF CACHE BOOL "Determines if the test target should be added.")
 
 add_subdirectory(${SOURCE_DIRECTORY})
 add_subdirectory(${DEPENDENCY_DIRECTORY})
