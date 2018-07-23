@@ -1,0 +1,20 @@
+Description
+	Agentsim is a project to create an integrated visualization environment for
+	biological systems. The goal is to use various simulation approaches
+	to represent the myriad phenomena that occur in a cell. Currently, ReaDDy
+	is being used for Molecular Dynamics.
+
+Dependencies
+	In Repository
+	- RakNet
+	- ReaDDy
+
+	Arch packages
+	- blosc
+	- hdf5
+
+	Debian (Ubuntu) packages
+	- libhdf5-cpp-100
+	- libhdf5-dev
+	- libblosc-dev
+	- libblosc1

@@ -21,10 +21,12 @@ add_executable(${PROGRAM} ${SOURCE_DIRECTORY}/${TARGET}.cpp)
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
+# HDF5 directory below is included for Ubuntu
 set(EXTERNAL_INCLUDES
 "${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY}/raknet"
 "${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY}/readdy"
 "${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY}/openmm"
+"/usr/include/hdf5/serial"
 )
 
 include_directories(${CMAKE_SOURCE_DIR}/${INCLUDE_DIRECTORY} ${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY} ${EXTERNAL_INCLUDES})
@@ -41,7 +43,6 @@ set(READDY_DLLS
 "readdy_io"
 "readdy_plugin"
 "pthread"
-"hdf5"
 )
 
 set(RAKNET_DLLS "RakNetDLL")
