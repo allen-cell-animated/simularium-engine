@@ -25,10 +25,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 # HDF5 directory below is included for Ubuntu
 set(EXTERNAL_INCLUDES
-"${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY}/raknet"
-"${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY}/readdy"
-"${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY}/openmm"
+"${DEPENDENCY_DIRECTORY}/RakNet/include/RakNet"
 "/usr/include/hdf5/serial"
+"${DEPENDENCY_DIRECTORY}/readdy/include"
+"${DEPENDENCY_DIRECTORY}/readdy/libraries/h5rd/include"
+"${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include"
+"${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include"
 )
 
 include_directories(${CMAKE_SOURCE_DIR}/${INCLUDE_DIRECTORY} ${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY} ${EXTERNAL_INCLUDES})
