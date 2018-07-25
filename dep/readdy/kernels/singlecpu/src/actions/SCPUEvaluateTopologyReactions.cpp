@@ -327,7 +327,7 @@ void SCPUEvaluateTopologyReactions::handleTopologyTopologyReaction(SCPUStateMode
                 data.entry_at(pidx).topology_index = event.topology_idx;
             }
             auto &topologies = model.topologies();
-            printf("Fusing topology %i & %i into topology %i\n", t2->type(), t1->type());
+            printf("Fusing topology %i & %i into topology %i\n", t2->type(), t1->type(), top_type_to1);
             t1->appendTopology(*t2, event.idx2, entry2Type, event.idx1, entry1Type, top_type_to1);
             printf("Resulting Topology is of type %i\n", t1->type());
             topologies.erase(topologies.begin() + event.topology_idx2);
