@@ -44,7 +44,7 @@ void ReaDDyPkg::Setup()
 		topologies.addSpatialReaction(
 			"Growth: filament(end) + free(monomer) -> filament(core--end)", 3.7e-6, 50
 		);
-		
+
 		topologies.addSpatialReaction(
 			"Combine: filament(end) + filament(end) -> filament(core--core)", 3.7e-6, 50
 		);
@@ -139,19 +139,6 @@ void ReaDDyPkg::RunTimeStep(
 
 	agents.clear();
 	std::vector<std::string> pTypes = { "core", "end", "monomer" };
-
-	printf("NEW SIM FRAME\n");
-	auto &topologies = this->m_simulation.context().topologyRegistry();
-	auto tops = this->m_simulation.currentTopologies();
-	for(const auto& top : tops)
-	{
-		auto id = top->type();
-
-		if(id != 1)
-		{
-			printf("Topology of type %i\n", id);
-		}
-	}
 
 	for(std::size_t i = 0; i < pTypes.size(); ++i)
 	{
