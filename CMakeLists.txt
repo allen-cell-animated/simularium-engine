@@ -11,35 +11,52 @@ set(PROGRAM "${TARGET}.${EXE_FILE_TYPE}")
 set(SERVER_PROGRAM "${SERVER_TARGET}.${EXE_FILE_TYPE}")
 set(TEST_PROGRAM "${TEST_TARGET}.${EXE_FILE_TYPE}")
 
-set(SOURCE_DIRECTORY "src")
-set(INCLUDE_DIRECTORY "inc")
-set(EXTERNAL_DIRECTORY "ext")
-set(DEPENDENCY_DIRECTORY "dep")
+set(SOURCE_DIRECTORY "${CMAKE_SOURCE_DIR}/src")
+set(INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/inc")
+set(EXTERNAL_DIRECTORY "${CMAKE_SOURCE_DIR}/ext")
+set(DEPENDENCY_DIRECTORY "${CMAKE_SOURCE_DIR}/dep")
 
 project(${TARGET})
 add_executable(${PROGRAM} ${SOURCE_DIRECTORY}/${TARGET}.cpp)
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
-
 # HDF5 directory below is included for Ubuntu
 set(EXTERNAL_INCLUDES
-"${DEPENDENCY_DIRECTORY}/RakNet/include/RakNet"
 "/usr/include/hdf5/serial"
-"${DEPENDENCY_DIRECTORY}/readdy/include"
-"${DEPENDENCY_DIRECTORY}/readdy/libraries/h5rd/include"
-"${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include"
-"${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include"
+"${EXTERNAL_DIRECTORY}/raknet"
+"${EXTERNAL_DIRECTORY}/readdy"
 )
 
-include_directories(${CMAKE_SOURCE_DIR}/${INCLUDE_DIRECTORY} ${CMAKE_SOURCE_DIR}/${EXTERNAL_DIRECTORY} ${EXTERNAL_INCLUDES})
+set(INTERNAL_INCLUDES
+"${INCLUDE_DIRECTORY}"
+"${EXTERNAL_DIRECTORY}"
+)
+
+target_include_directories(${PROGRAM} PUBLIC
+${INTERNAL_INCLUDES}
+${EXTERNAL_INCLUDES}
+)
+
+target_include_directories(${SERVER_PROGRAM} PUBLIC
+${INTERNAL_INCLUDES}
+${EXTERNAL_INCLUDES}
+)
+
+target_include_directories(${TEST_PROGRAM} PUBLIC
+${INTERNAL_INCLUDES}
+${EXTERNAL_INCLUDES}
+)
+
 
 # Disable options in subdirectory
 set(READDY_BUILD_PYTHON_WRAPPER OFF CACHE BOOL "Build Python wrappers")
 
 add_subdirectory(${SOURCE_DIRECTORY})
 add_subdirectory(${DEPENDENCY_DIRECTORY})
+
+add_dependencies(${TARGET} readdy)
+add_dependencies(${TARGET} RakNetDLL)
 
 set(READDY_DLLS
 "readdy"

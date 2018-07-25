@@ -9,3 +9,8 @@ set(SOURCES
 )
 
 add_library(${TARGET} SHARED ${SOURCES})
+
+target_include_directories(${TARGET} PRIVATE
+${INTERNAL_INCLUDES}
+${EXTERNAL_INCLUDES}
+)
