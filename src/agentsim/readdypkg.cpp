@@ -64,7 +64,7 @@ void ReaDDyPkg::Setup()
 			auto v1 = top.graph().vertices().begin();
 			if(v1->particleType() == 1) // end
 			{
-				++v1;
+				v1 = v1->neighbors()[0];
 			}
 
 			auto v2 = v1->neighbors()[0];
