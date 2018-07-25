@@ -1,5 +1,5 @@
 /********************************************************************
- * Copyright © 2016 Computational Molecular Biology Group,          * 
+ * Copyright © 2016 Computational Molecular Biology Group,          *
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
  * This file is part of ReaDDy.                                     *
@@ -144,6 +144,11 @@ public:
 
     TopologyTypeId &type() {
         return _topology_type;
+    }
+
+    void setType(TopologyTypeId type)
+    {
+      _topology_type = type;
     }
 
     topology_graph::vertex_ref vertexForParticle(particle_index particle) {

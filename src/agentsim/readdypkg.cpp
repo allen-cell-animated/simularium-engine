@@ -44,6 +44,7 @@ void ReaDDyPkg::Setup()
 		topologies.addSpatialReaction(
 			"Growth: filament(end) + free(monomer) -> filament(core--end)", 3.7e-6, 50
 		);
+		
 		topologies.addSpatialReaction(
 			"Combine: filament(end) + filament(end) -> filament(core--core)", 3.7e-6, 50
 		);

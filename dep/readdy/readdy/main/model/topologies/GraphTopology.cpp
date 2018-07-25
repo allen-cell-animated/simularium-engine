@@ -214,7 +214,6 @@ void GraphTopology::appendTopology(GraphTopology &other, Topology::particle_inde
                                    ParticleTypeId otherNewParticleType, Topology::particle_index thisParticle,
                                    ParticleTypeId thisNewParticleType, TopologyTypeId newType) {
     auto &otherGraph = other.graph();
-    printf("Append topology and converting to type %i\n", newType);
     if(!otherGraph.vertices().empty()) {
 
 
