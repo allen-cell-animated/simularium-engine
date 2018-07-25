@@ -138,7 +138,9 @@ public:
 
     void setRate(scalar rate)
     {
+      printf("Spatial rx rate change: Old result: %i\n", std::get<0>(_top_types_to));
       _rate = rate;
+      printf("Spatial rx rate change: Old result: %i\n", std::get<0>(_top_types_to));
     }
 
     const scalar radius() const {
