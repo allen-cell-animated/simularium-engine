@@ -226,6 +226,15 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 			{
 				srxs[i].setRate(param_value);
 			}
+
+			auto tops = this->m_simulation.currentTopologies();
+			for(auto&& top : tops)
+			{
+				if(top->type() == 0)
+				{
+					top->updateReactionRates(topologies.structuralReactionsOf(top->type()));
+				}
+			}
 		} break;
 		default:
 		{
