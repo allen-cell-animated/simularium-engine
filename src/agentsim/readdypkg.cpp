@@ -62,21 +62,23 @@ void ReaDDyPkg::Setup()
 			}
 
 			auto v1 = top.graph().vertices().begin();
-			auto v2 = top.graph().vertices().begin();
-			++v2;
-
-			for(std::size_t i = 0; i < top.graph().vertices().size() / 2; ++i)
+			if(v1->particleType() == 1) // end
 			{
 				++v1;
-				++v2;
 			}
 
-			if(v1->particleType() == 2 && v2->particleType() == 2) // core
+			auto v2 = v1->neighbors()[0];
+			if(v2->particleType() == 1)
 			{
-				v1->setParticleType(1); // end
-				v2->setParticleType(1); // end
-				recipe.removeEdge(v1, v2);
+				v2 = v1->neighbors()[1];
 			}
+
+			printf("Performing dissociation.\n");
+			recipe.removeEdge(v1, v2);
+
+			recipe.changeParticleType(v1, "end");
+			recipe.changeParticleType(v2, "end");
+			recipe.removeEdge(v1, v2);
 
 			return recipe;
 		};
