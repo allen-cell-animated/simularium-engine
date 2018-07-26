@@ -56,29 +56,77 @@ void ReaDDyPkg::Setup()
 		auto rGrowthFunc = [&](readdy::model::top::GraphTopology &top) {
 			readdy::model::top::reactions::Recipe recipe(top);
 
-			if(top.graph().vertices().size() < 4)
+			if(top.graph().vertices().size() == 1)
 			{
+				printf("Encountered a filament with only one element. Correcting topology type to free.\n");
+				auto v1 = top.graph().vertices().begin();
+				recipe.changeParticleType(v1, "monomer");
+				recipe.changeTopologyType("free");
 				return recipe;
 			}
 
-			auto v1 = top.graph().vertices().begin();
-			if(v1->particleType() == 1) // end
+			// Dissociate dimer
+			if(top.graph().vertices().size() == 2)
 			{
-				v1 = v1->neighbors()[0];
+				auto v1 = top.graph().vertices().begin();
+				auto v2 = v1->neighbors()[0];
+
+				recipe.removeEdge(v1, v2);
+				recipe.changeParticleType(v1, "monomer");
+				recipe.changeParticleType(v2, "monomer");
+				recipe.changeTopologyType("free");
+				recipe.removeEdge(v1, v2);
+
+				return recipe;
 			}
 
-			auto v2 = v1->neighbors()[0];
-			if(v2->particleType() == 1)
+			// Dissociate trimer
+			if(top.graph().vertices().size() == 3)
 			{
-				v2 = v1->neighbors()[1];
+				auto v1 = top.graph().vertices().begin();
+				if(v1->neighbors().size() == 1)
+				{
+					v1 = v1->neighbors()[0];
+				}
+
+				auto v2 = v1->neighbors()[0];
+				auto v3 = v1->neighbors()[1];
+
+				recipe.removeEdge(v1, v2);
+				recipe.removeEdge(v1, v3);
+				recipe.changeParticleType(v1, "monomer");
+				recipe.changeParticleType(v2, "monomer");
+				recipe.changeParticleType(v3, "monomer");
+				recipe.changeTopologyType("free");
+				recipe.removeEdge(v1, v2);
+
+				return recipe;
 			}
 
-			printf("Performing dissociation.\n");
-			recipe.removeEdge(v1, v2);
+			// Break filament
+			if(top.graph().vertices().size() >= 4)
+			{
+				// Assumption: an end is not connected to another end
+				//  in a filament with 4+ monomers
+				auto v1 = top.graph().vertices().begin();
+				if(v1->particleType() == 1) // end
+				{
+					v1 = v1->neighbors()[0];
+				}
 
-			recipe.changeParticleType(v1, "end");
-			recipe.changeParticleType(v2, "end");
-			recipe.removeEdge(v1, v2);
+				auto v2 = v1->neighbors()[0];
+				if(v2->particleType() == 1)
+				{
+					v2 = v1->neighbors()[1];
+				}
+
+				recipe.removeEdge(v1, v2);
+				recipe.changeParticleType(v1, "end");
+				recipe.changeParticleType(v2, "end");
+				recipe.removeEdge(v1, v2);
+
+				return recipe;
+			}
 
 			return recipe;
 		};
