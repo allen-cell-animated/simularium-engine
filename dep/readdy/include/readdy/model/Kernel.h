@@ -133,9 +133,9 @@ public:
     };
 
     /*
-     * 
+     *
      * Accessors
-     * 
+     *
      */
 
     virtual const readdy::model::StateModel &stateModel() const = 0;
@@ -172,6 +172,10 @@ public:
 
     bool doublePrecision() const noexcept {
         return readdy::double_precision;
+    }
+
+    virtual void reset() {
+
     }
 
 protected:

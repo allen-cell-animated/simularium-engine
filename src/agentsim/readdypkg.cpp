@@ -109,6 +109,14 @@ void ReaDDyPkg::Setup()
 				// Assumption: an end is not connected to another end
 				//  in a filament with 4+ monomers
 				auto v1 = top.graph().vertices().begin();
+
+				// choose a random vertex
+				std::size_t r = rand() % top.graph().vertices().size();
+				for(std::size_t i = 0; i < r; ++i)
+				{
+					++v1;
+				}
+
 				if(v1->particleType() == 1) // end
 				{
 					v1 = v1->neighbors()[0];
@@ -179,7 +187,7 @@ void ReaDDyPkg::Setup()
 
 void ReaDDyPkg::Shutdown()
 {
-	// @TODO: I haven't figured out how to restart this without crashing yet
+	this->m_simulation.resetParticles();
 }
 
 void ReaDDyPkg::RunTimeStep(

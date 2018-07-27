@@ -58,6 +58,7 @@ public:
     };
 
     void initialize() override;
+    void reset() override;
 
     const readdy::model::observables::ObservableFactory &observe() const override {
         return _observables;

@@ -277,6 +277,11 @@ public:
         return _kernel->stateModel();
     }
 
+    void resetParticles() {
+      stateModel().removeAllParticles();
+      _kernel->reset();
+    }
+
 private:
     plugin::KernelProvider::kernel_ptr _kernel;
     std::vector<std::unique_ptr<readdy::model::observables::ObservableBase>> _observables{};

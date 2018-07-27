@@ -61,6 +61,11 @@ void SCPUKernel::initialize() {
     }
 }
 
+void SCPUKernel::reset() {
+  _isInitialized = false;
+  getSCPUKernelStateModel().topologies().clear();
+}
+
 }
 }
 }
