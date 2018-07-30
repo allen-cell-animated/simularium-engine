@@ -143,6 +143,12 @@ class CombinationReactionTest : public ::testing::Test
 
 		boundPointedap.Name = "pointed";
 		boundPointedap.IsWildCardBound = true;
+
+		boundside1ap.Name = "side1";
+		boundside1ap.IsWildCardBound = true;
+
+		boundside2ap.Name = "side2";
+		boundside2ap.IsWildCardBound = true;
 	}
 
 	virtual ~CombinationReactionTest() {
@@ -164,6 +170,8 @@ class CombinationReactionTest : public ::testing::Test
 	// Objects declared here can be used by all tests in the test case for Foo.
 	AgentPattern boundPointedap;
 	AgentPattern boundBarbedap;
+	AgentPattern boundside1ap;
+	AgentPattern boundside2ap;
 };
 
 TEST_F(CombinationReactionTest, ActinNucleation)
@@ -229,6 +237,11 @@ TEST_F(CombinationReactionTest, ActinTrimer)
 	ASSERT_TRUE(rx->IsReactant(monomer.get()));
 	ASSERT_TRUE(rx->IsReactant(dimer.get()));
 	ASSERT_TRUE(rx->React(monomer, dimer));
+
+	std::shared_ptr<Agent> product = rx->GetProduct();
+	Agent* outptr = nullptr;
+	ASSERT_TRUE(product->FindSubAgent(boundside1ap, outptr));
+	ASSERT_TRUE(product->FindSubAgent(boundside2ap, outptr));
 }
 
 TEST_F(CombinationReactionTest, BarbedEndPolymerization)

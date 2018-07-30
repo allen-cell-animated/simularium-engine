@@ -3,19 +3,21 @@
 
 #include "agentsim/simpkg/simpkg.h"
 #include <vector>
+#include <unordered_map>
 
 namespace aics {
 namespace agentsim {
 
 class Agent;
+class Reaction;
 
 class SimpleInteraction : public SimPkg
 {
 public:
 	struct InteractionEvent
 	{
-			Agent* a1;
-			Agent* a2;
+			std::size_t a1;
+			std::size_t a2;
 	};
 
 	virtual ~SimpleInteraction() {}
@@ -39,10 +41,14 @@ public:
 
 	void EvaluateInteractions(
 		std::vector<std::shared_ptr<Agent>>& agents,
-		std::vector<SimpleInteraction::InteractionEvent>& interactions);
+		std::vector<SimpleInteraction::InteractionEvent>& interactions,
+		std::unordered_map<std::string, std::vector<std::shared_ptr<Reaction>>> reactions);
+
+	void AddReaction(std::shared_ptr<Reaction> rx);
 
 private:
 	std::vector<InteractionEvent> m_interactions;
+	std::unordered_map<std::string, std::vector<std::shared_ptr<Reaction>>> m_reactions;
 };
 
 } // namespace agentsim

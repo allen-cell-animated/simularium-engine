@@ -156,5 +156,10 @@ std::shared_ptr<Agent> CombinationReaction::GetProduct()
 	return this->m_lastProduct;
 }
 
+std::string CombinationReaction::GetKey()
+{
+	return this->m_reactants[0].Name + this->m_reactants[1].Name;
+}
+
 } // namespace agentsim
 } // namespace aics

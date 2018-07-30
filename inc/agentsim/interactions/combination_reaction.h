@@ -16,7 +16,8 @@ public:
 	virtual bool IsReactant(Agent* a) override;
 	virtual bool RegisterBondChange(ReactionBondChange rbc);
 	virtual bool React(std::shared_ptr<Agent>, std::shared_ptr<Agent>) override;
-	virtual std::shared_ptr<Agent> GetProduct();
+	virtual std::shared_ptr<Agent> GetProduct() override;
+	virtual std::string GetKey() override;
 
 private:
 	std::vector<AgentPattern> m_reactants;
