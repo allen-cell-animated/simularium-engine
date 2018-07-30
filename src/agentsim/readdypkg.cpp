@@ -12,7 +12,7 @@ namespace agentsim {
 void ReaDDyPkg::Setup()
 {
 	int boxSize = 1000;
-	if(!initialized)
+	if(!this->m_initialized)
 	{
 		this->m_simulation.context().boxSize()[0] = boxSize;
 		this->m_simulation.context().boxSize()[1] = boxSize;
@@ -71,12 +71,16 @@ void ReaDDyPkg::Setup()
 				auto v1 = top.graph().vertices().begin();
 				auto v2 = v1->neighbors()[0];
 
+				if(!top.graph().containsEdge(v1, v2))
+				{
+					printf("Dimer dissociation attempted to remove a non-existent edge.\n");
+					return recipe;
+				}
+
 				recipe.removeEdge(v1, v2);
 				recipe.changeParticleType(v1, "monomer");
 				recipe.changeParticleType(v2, "monomer");
 				recipe.changeTopologyType("free");
-				recipe.removeEdge(v1, v2);
-
 				return recipe;
 			}
 
@@ -92,14 +96,19 @@ void ReaDDyPkg::Setup()
 				auto v2 = v1->neighbors()[0];
 				auto v3 = v1->neighbors()[1];
 
+				if(!top.graph().containsEdge(v1, v2) ||
+					!top.graph().containsEdge(v1, v3))
+				{
+					printf("Trimer dissociation attempted to remove a non-existent edge.\n");
+					return recipe;
+				}
+
 				recipe.removeEdge(v1, v2);
 				recipe.removeEdge(v1, v3);
 				recipe.changeParticleType(v1, "monomer");
 				recipe.changeParticleType(v2, "monomer");
 				recipe.changeParticleType(v3, "monomer");
 				recipe.changeTopologyType("free");
-				recipe.removeEdge(v1, v2);
-
 				return recipe;
 			}
 
@@ -128,11 +137,15 @@ void ReaDDyPkg::Setup()
 					v2 = v1->neighbors()[1];
 				}
 
+				if(!top.graph().containsEdge(v1, v2))
+				{
+					printf("Dimer dissociation attempted to remove a non-existent edge.\n");
+					return recipe;
+				}
+
 				recipe.removeEdge(v1, v2);
 				recipe.changeParticleType(v1, "end");
 				recipe.changeParticleType(v2, "end");
-				recipe.removeEdge(v1, v2);
-
 				return recipe;
 			}
 
@@ -147,7 +160,7 @@ void ReaDDyPkg::Setup()
 		auto &potentials = this->m_simulation.context().potentials();
 		potentials.addHarmonicRepulsion("core", "core", 5, 0.5);
 
-		initialized = true;
+		this->m_initialized = true;
 	}
 
 	std::size_t monomerCount = 500;
@@ -183,17 +196,31 @@ void ReaDDyPkg::Setup()
 		tp_inst->graph().addEdgeBetweenParticles(0,1);
 		tp_inst->graph().addEdgeBetweenParticles(1,2);
 	}
+
+	auto loop = this->m_simulation.createLoop(1);
+	loop.runInitialize();
+	loop.runInitializeNeighborList();
 }
 
 void ReaDDyPkg::Shutdown()
 {
-	this->m_simulation.resetParticles();
+	this->m_simulation.stateModel().removeAllParticles();
+	this->m_timeStepCount = 0;
 }
 
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	this->m_simulation.run(1, timeStep);
+	auto loop = this->m_simulation.createLoop(timeStep);
+
+	this->m_timeStepCount++;
+	loop.runIntegrator(); // propagate particles
+	loop.runUpdateNeighborList(); // neighbor list update
+	loop.runReactions(); // evaluate reactions
+	loop.runTopologyReactions(); // and topology reactions
+	loop.runUpdateNeighborList(); // neighbor list update
+	loop.runForces(); // evaluate forces based on current particle configuration
+	loop.runEvaluateObservables(this->m_timeStepCount); // evaluate observables
 
 	agents.clear();
 	std::vector<std::string> pTypes = { "core", "end", "monomer" };
@@ -261,17 +288,13 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 		case 0: // NucleationRate
 		{
 			auto &topologies = this->m_simulation.context().topologyRegistry();
-			auto &nucrx = topologies.spatialReactionByName("Nucleate");
-			nucrx.setRate(param_value);
+			topologies.spatialReactionByName("Nucleate").rate() = param_value;
 		} break;
 		case 1: // GrowthRate
 		{
 			auto &topologies = this->m_simulation.context().topologyRegistry();
-			auto &growthrx = topologies.spatialReactionByName("Growth");
-			growthrx.setRate(param_value);
-
-			auto& combinerx = topologies.spatialReactionByName("Combine");
-			combinerx.setRate(param_value);
+			topologies.spatialReactionByName("Growth").rate() = param_value;
+			topologies.spatialReactionByName("Combine").rate() = param_value;
 		} break;
 		case 2: // DissociationRate
 		{
@@ -280,7 +303,9 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 
 			for(std::size_t i = 0; i < srxs.size(); ++i)
 			{
-				srxs[i].setRate(param_value);
+				srxs[i].rate() =
+				readdy::model::top::reactions::StructuralTopologyReaction::rate_function(
+					[param_value](const readdy::model::top::GraphTopology&) -> readdy::scalar { return param_value; });
 			}
 
 			auto tops = this->m_simulation.currentTopologies();

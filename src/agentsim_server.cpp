@@ -195,11 +195,15 @@ int main(void)
 					printf("The server is full.\n");
 					break;
 				case ID_DISCONNECTION_NOTIFICATION:
+        {
 						printf("A client has disconnected.\n");
-					break;
+            printf("Enter 'quit' to exit... \n");
+            isRunningSimulation = false;
+				} break;
 				case ID_CONNECTION_LOST:
           {
   						printf("A client lost the connection.\n");
+              printf("Enter 'quit' to exit... \n");
               isRunningSimulation = false;
   				}	break;
 				case ID_VIS_DATA_ARRIVE:

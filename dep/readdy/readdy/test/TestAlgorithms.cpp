@@ -2,21 +2,34 @@
  * Copyright © 2018 Computational Molecular Biology Group,          *
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
- * This file is part of ReaDDy.                                     *
+ * Redistribution and use in source and binary forms, with or       *
+ * without modification, are permitted provided that the            *
+ * following conditions are met:                                    *
+ *  1. Redistributions of source code must retain the above         *
+ *     copyright notice, this list of conditions and the            *
+ *     following disclaimer.                                        *
+ *  2. Redistributions in binary form must reproduce the above      *
+ *     copyright notice, this list of conditions and the following  *
+ *     disclaimer in the documentation and/or other materials       *
+ *     provided with the distribution.                              *
+ *  3. Neither the name of the copyright holder nor the names of    *
+ *     its contributors may be used to endorse or promote products  *
+ *     derived from this software without specific                  *
+ *     prior written permission.                                    *
  *                                                                  *
- * ReaDDy is free software: you can redistribute it and/or modify   *
- * it under the terms of the GNU Lesser General Public License as   *
- * published by the Free Software Foundation, either version 3 of   *
- * the License, or (at your option) any later version.              *
- *                                                                  *
- * This program is distributed in the hope that it will be useful,  *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of   *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the    *
- * GNU Lesser General Public License for more details.              *
- *                                                                  *
- * You should have received a copy of the GNU Lesser General        *
- * Public License along with this program. If not, see              *
- * <http://www.gnu.org/licenses/>.                                  *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND           *
+ * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,      *
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF         *
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE         *
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR            *
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,     *
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,         *
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; *
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER *
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,      *
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)    *
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF      *
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                       *
  ********************************************************************/
 
 
@@ -31,6 +44,8 @@
 
 
 #include <unordered_set>
+#include <readdy/api/SimulationLoop.h>
+#include <readdy/api/Simulation.h>
 #include "gtest/gtest.h"
 #include "readdy/common/algorithm.h"
 
@@ -44,6 +59,39 @@ struct Event {
     scalar rate;
     scalar cumulativeRate;
 };
+
+TEST(TestLoop, Loop) {
+Simulation sim ("SingleCPU");
+sim.context().topologyRegistry().addType("Polymer");
+sim.context().particleTypes().addTopologyType("A", 1);
+sim.context().particleTypes().add("B", 1.);
+sim.context().topologyRegistry().addSpatialReaction("Attach: Polymer(A) + (B) -> Polymer(A--A)", 1., 5.);
+sim.context().reactions().add("myfus: B +(5) B -> B", 10);
+sim.context().reactions().add("myconv: B -> B", 10);
+
+sim.addParticle("B", 0., 0., 0.);
+sim.addTopology("Polymer", {sim.createTopologyParticle("A", {0., 0., 0.})});
+sim.context().topologyRegistry().configureBondPotential("A", "A", {10., 10.});
+
+auto loop = sim.createLoop(1.5);
+
+loop.addCallback([&](const auto t) {
+    // triggers evaluation of rate functions for each topology
+    for (auto topology : sim.stateModel().getTopologies()) {
+        topology->updateReactionRates(
+                sim.context().topologyRegistry().structuralReactionsOf(topology->type())
+        );
+    }
+    // change spatial topology reaction rate
+    sim.context().topologyRegistry().spatialReactionByName("Attach").rate() = 5000;
+    // change unimolecular reaction rate
+    sim.context().reactions().order1ByName("myconv")->rate() = 100;
+    // change bimolecular reaction rate
+    sim.context().reactions().order2ByName("myfus")->rate() = 100;
+});
+
+loop.run(500);
+}
 
 TEST(TestAlgorithms, EvaluateAll) {
     auto n = 1000U;

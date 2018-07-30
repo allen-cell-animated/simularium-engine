@@ -1,22 +1,35 @@
 /********************************************************************
- * Copyright © 2016 Computational Molecular Biology Group,          *
+ * Copyright © 2018 Computational Molecular Biology Group,          *
  *                  Freie Universität Berlin (GER)                  *
  *                                                                  *
- * This file is part of ReaDDy.                                     *
+ * Redistribution and use in source and binary forms, with or       *
+ * without modification, are permitted provided that the            *
+ * following conditions are met:                                    *
+ *  1. Redistributions of source code must retain the above         *
+ *     copyright notice, this list of conditions and the            *
+ *     following disclaimer.                                        *
+ *  2. Redistributions in binary form must reproduce the above      *
+ *     copyright notice, this list of conditions and the following  *
+ *     disclaimer in the documentation and/or other materials       *
+ *     provided with the distribution.                              *
+ *  3. Neither the name of the copyright holder nor the names of    *
+ *     its contributors may be used to endorse or promote products  *
+ *     derived from this software without specific                  *
+ *     prior written permission.                                    *
  *                                                                  *
- * ReaDDy is free software: you can redistribute it and/or modify   *
- * it under the terms of the GNU Lesser General Public License as   *
- * published by the Free Software Foundation, either version 3 of   *
- * the License, or (at your option) any later version.              *
- *                                                                  *
- * This program is distributed in the hope that it will be useful,  *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of   *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the    *
- * GNU Lesser General Public License for more details.              *
- *                                                                  *
- * You should have received a copy of the GNU Lesser General        *
- * Public License along with this program. If not, see              *
- * <http://www.gnu.org/licenses/>.                                  *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND           *
+ * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,      *
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF         *
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE         *
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR            *
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,     *
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,         *
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; *
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER *
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,      *
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)    *
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF      *
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                       *
  ********************************************************************/
 
 
@@ -167,13 +180,13 @@ TEST(CPUTestReactions, CheckInOutTypesAndPositions) {
             if (e1.type == enzymatic.getCatalyst()) {
                 EXPECT_EQ(enzymatic.getCatalyst(), e1.type);
                 EXPECT_EQ(enzymatic.getTo(), e2.type);
-                EXPECT_EQ(p_C.getPos(), e1.pos);
-                EXPECT_EQ(p_A.getPos(), e2.pos);
+                EXPECT_EQ(p_C.pos(), e1.pos);
+                EXPECT_EQ(p_A.pos(), e2.pos);
             } else {
                 EXPECT_EQ(enzymatic.getCatalyst(), e2.type);
                 EXPECT_EQ(enzymatic.getTo(), e1.type);
-                EXPECT_EQ(p_C.getPos(), e2.pos);
-                EXPECT_EQ(p_A.getPos(), e1.pos);
+                EXPECT_EQ(p_C.pos(), e2.pos);
+                EXPECT_EQ(p_A.pos(), e1.pos);
             }
         }
     }
@@ -196,13 +209,13 @@ TEST(CPUTestReactions, CheckInOutTypesAndPositions) {
             if (e1.type == enzymatic.getCatalyst()) {
                 EXPECT_EQ(enzymatic.getCatalyst(), e1.type);
                 EXPECT_EQ(enzymatic.getTo(), e2.type);
-                EXPECT_EQ(p_C.getPos(), e1.pos);
-                EXPECT_EQ(p_A.getPos(), e2.pos);
+                EXPECT_EQ(p_C.pos(), e1.pos);
+                EXPECT_EQ(p_A.pos(), e2.pos);
             } else {
                 EXPECT_EQ(enzymatic.getCatalyst(), e2.type);
                 EXPECT_EQ(enzymatic.getTo(), e1.type);
-                EXPECT_EQ(p_C.getPos(), e2.pos);
-                EXPECT_EQ(p_A.getPos(), e1.pos);
+                EXPECT_EQ(p_C.pos(), e2.pos);
+                EXPECT_EQ(p_A.pos(), e1.pos);
             }
         }
     }
@@ -337,28 +350,28 @@ TEST(CPUTestReactions, TestGillespieParallel) {
         for (auto p : particles) readdy::log::debug("particle {}", p);
         EXPECT_EQ(7, particles.size());
         EXPECT_TRUE(std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
-            return p.getType() == typeB && p.getPos() == vec_t(0, 0, -1.7);
+            return p.type() == typeB && p.pos() == vec_t(0, 0, -1.7);
         }) != particles.end()) << "Particle with type B should not interact with the others and thus stay where it is";
         EXPECT_TRUE(std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
-            return p.getType() == typeC && p.getPos() == vec_t(0, 0, .7);
+            return p.type() == typeC && p.pos() == vec_t(0, 0, .7);
         }) != particles.end()) << "The particle of type C is -very- unlikely to react, thus it should stay where it is";
         EXPECT_TRUE(std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
-            return p.getType() == typeC && p.getPos() == vec_t(0, 0, -1.6);
+            return p.type() == typeC && p.pos() == vec_t(0, 0, -1.6);
         }) != particles.end()) << "The particle of type C is -very- unlikely to react, thus it should stay where it is";
         EXPECT_TRUE(std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
-            return p.getType() == typeA && p.getPos() == vec_t(0, 0, -5.25);
+            return p.type() == typeA && p.pos() == vec_t(0, 0, -5.25);
         }) != particles.end()) << "This particle should be placed between the particles 7 and 8 (see above).";
         EXPECT_TRUE(std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
-            return p.getType() == typeA && p.getPos() == vec_t(0, 0, -.35);
+            return p.type() == typeA && p.pos() == vec_t(0, 0, -.35);
         }) != particles.end()) << "This particle should be placed between the particles 1 and 0 (see above).";
         auto it = std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
             auto fpa = readdy::fp::FloatingPoint<readdy::scalar>(1.65);
-            auto fpb = readdy::fp::FloatingPoint<readdy::scalar>(p.getPos().z);
-            return p.getType() == typeA && fpa.AlmostEquals(fpb);
+            auto fpb = readdy::fp::FloatingPoint<readdy::scalar>(p.pos().z);
+            return p.type() == typeA && fpa.AlmostEquals(fpb);
         });
         EXPECT_TRUE(it != particles.end()) << "This particle should be placed between the particles 4 and 5 (see above).";
         EXPECT_TRUE(std::find_if(particles.begin(), particles.end(), [=](const particle_t &p) -> bool {
-            return p.getType() == typeA && p.getPos() == vec_t(0, 0, 5.25);
+            return p.type() == typeA && p.pos() == vec_t(0, 0, 5.25);
         }) != particles.end()) << "This particle should be placed between the particles 9 and 10 (see above).";
     }
 }

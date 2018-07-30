@@ -28,7 +28,8 @@ public:
 
 private:
 	readdy::Simulation m_simulation;
-	bool initialized = false;
+	bool m_initialized = false;
+	int m_timeStepCount = 0;
 };
 
 } // namespace agentsim
