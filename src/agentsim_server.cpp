@@ -5,6 +5,7 @@
 #include <vector>
 #include <chrono>
 #include <thread>
+#include <mutex>
 #include "RakString.h"
 #include "BitStream.h"
 #include "RakNetTypes.h"
@@ -92,9 +93,35 @@ int main(void)
   // timer setup
   auto start = std::chrono::steady_clock::now();
 
+  // IO thread
+  std::mutex m;
+  std::string io_string;
+  bool io_quit = false;
+
+  printf("Enter 'quit' to exit... \n");
+  auto io_thread = std::thread([&] {
+    std::string s;
+    while(!io_quit && std::getline(std::cin, s, '\n'))
+    {
+      auto lock = std::unique_lock<std::mutex>(m);
+      io_string = std::move(s);
+      if(io_string == "quit")
+      {
+        io_quit = true;
+      }
+    }
+  });
+
+
 	// Server Run-Time Loop
 	while (1)
 	{
+    if(io_quit)
+    {
+      io_thread.join();
+      return 0;
+    }
+
 		if(isRunningSimulation)
 		{
       if(requestData.num_time_steps >= 0 &&
