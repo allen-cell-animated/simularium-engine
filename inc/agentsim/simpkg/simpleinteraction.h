@@ -42,7 +42,7 @@ public:
 	void EvaluateInteractions(
 		std::vector<std::shared_ptr<Agent>>& agents,
 		std::vector<SimpleInteraction::InteractionEvent>& interactions,
-		std::unordered_map<std::string, std::vector<std::shared_ptr<Reaction>>> reactions);
+		std::unordered_map<std::string, std::vector<std::shared_ptr<Reaction>>>& reactions);
 
 	void AddReaction(std::shared_ptr<Reaction> rx);
 

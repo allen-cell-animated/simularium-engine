@@ -24,15 +24,15 @@ void SimpleInteraction::RunTimeStep(
 void SimpleInteraction::EvaluateInteractions(
 	std::vector<std::shared_ptr<Agent>>& agents,
 	std::vector<SimpleInteraction::InteractionEvent>& interactions,
-	std::unordered_map<std::string, std::vector<std::shared_ptr<Reaction>>> reactions)
+	std::unordered_map<std::string, std::vector<std::shared_ptr<Reaction>>>& reactions)
 {
 	interactions.clear();
 
 	for(std::size_t i = 0; i < agents.size(); ++i)
 	{
-			for(std::size_t j = i - 1; j > 0; --j)
+			for(std::size_t j = 0; j < i; ++j)
 			{
-					if(agents[i]->CanInteractWith(*(agents[j])))
+					if(agents[i]->CanInteractWith(*(agents[j].get())))
 					{
 							InteractionEvent interaction;
 							interaction.a1 = i;
