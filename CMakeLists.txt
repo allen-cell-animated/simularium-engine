@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.2.0)
 
 set(TARGET "agentsim")
 set(SERVER_TARGET "agentsim_server")
+set(WEB_SERVER_TARGET "agentsim_websockets_server")
 set(TEST_TARGET "agentsim_tests")
 
 # The file extension to attach to executables built
@@ -9,6 +10,7 @@ set(EXE_FILE_TYPE "exe")
 
 set(PROGRAM "${TARGET}.${EXE_FILE_TYPE}")
 set(SERVER_PROGRAM "${SERVER_TARGET}.${EXE_FILE_TYPE}")
+set(WEB_SERVER_PROGRAM "${WEB_SERVER_TARGET}.${EXE_FILE_TYPE}")
 set(TEST_PROGRAM "${TEST_TARGET}.${EXE_FILE_TYPE}")
 
 set(SOURCE_DIRECTORY "${CMAKE_SOURCE_DIR}/src")
@@ -19,6 +21,7 @@ set(DEPENDENCY_DIRECTORY "${CMAKE_SOURCE_DIR}/dep")
 project(${TARGET})
 add_executable(${PROGRAM} ${SOURCE_DIRECTORY}/${TARGET}.cpp)
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
+add_executable(${WEB_SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${WEB_SERVER_TARGET}.cpp)
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
 # HDF5 directory below is included for Ubuntu
@@ -26,6 +29,9 @@ set(EXTERNAL_INCLUDES
 "/usr/include/hdf5/serial"
 "${EXTERNAL_DIRECTORY}/raknet"
 "${EXTERNAL_DIRECTORY}/readdy"
+"${EXTERNAL_DIRECTORY}/websocketpp"
+"${EXTERNAL_DIRECTORY}/websocketpp/common"
+"${EXTERNAL_DIRECTORY}/asio"
 )
 
 set(INTERNAL_INCLUDES
@@ -39,6 +45,11 @@ ${EXTERNAL_INCLUDES}
 )
 
 target_include_directories(${SERVER_PROGRAM} PUBLIC
+${INTERNAL_INCLUDES}
+${EXTERNAL_INCLUDES}
+)
+
+target_include_directories(${WEB_SERVER_PROGRAM} PUBLIC
 ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
 )
@@ -75,6 +86,9 @@ set(AGENTSIM_DLL
 "gtest_main"
 )
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 target_link_libraries(${PROGRAM}
 "${AGENTSIM_DLL}"
 "${READDY_DLLS}"
@@ -85,6 +99,10 @@ target_link_libraries(${SERVER_PROGRAM}
 "${AGENTSIM_DLL}"
 "${READDY_DLLS}"
 "${RAKNET_DLLS}"
+)
+
+target_link_libraries(${WEB_SERVER_PROGRAM}
+Threads::Threads
 )
 
 target_link_libraries(${TEST_PROGRAM}
