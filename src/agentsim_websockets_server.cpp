@@ -26,24 +26,33 @@ enum {
 };
 
 void on_message(websocketpp::connection_hdl, server::message_ptr msg) {
+  std::cout << msg->get_payload();
+
   mtx.lock();
   net_messages.push_back(msg->get_payload());
   mtx.unlock();
 }
 
+void on_close(websocketpp::connection_hdl) {
+  std::string msg = " ";
+  msg[0] = (char)id_vis_data_abort;
+  net_messages.push_back(msg);
+}
+
 int main() {
   auto ws_thread = std::thread([&] {
-    server print_server;
+    server sim_server;
 
-    print_server.set_message_handler(&on_message);
-    print_server.set_access_channels(websocketpp::log::alevel::all);
-    print_server.set_error_channels(websocketpp::log::elevel::all);
+    sim_server.set_message_handler(&on_message);
+    sim_server.set_close_handler(&on_close);
+    sim_server.set_access_channels(websocketpp::log::alevel::all);
+    sim_server.set_error_channels(websocketpp::log::elevel::all);
 
-    print_server.init_asio();
-    print_server.listen(9002);
-    print_server.start_accept();
+    sim_server.init_asio();
+    sim_server.listen(9002);
+    sim_server.start_accept();
 
-    print_server.run();
+    sim_server.run();
   });
 
   auto sim_thread = std::thread([&] {
