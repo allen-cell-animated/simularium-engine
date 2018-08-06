@@ -15,7 +15,8 @@ std::mutex mtx;
 std::vector<std::string> net_messages;
 
 enum {
-  id_vis_data_arrive = 0,
+  id_undefined_web_request = 0,
+  id_vis_data_arrive = 1,
   id_vis_data_request,
   id_vis_data_finish,
   id_vis_data_pause,
@@ -70,6 +71,11 @@ int main() {
           int msg_type = msg_str[0];
           switch(msg_type)
           {
+            case id_undefined_web_request:
+            {
+              std::cout << "undefined web request received." <<
+              " There may be a typo in the js client. \n";
+            } break;
             case id_vis_data_arrive:
             {
               std::cout << "vis data received\n";
