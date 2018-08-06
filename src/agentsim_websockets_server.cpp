@@ -27,8 +27,6 @@ enum {
 };
 
 void on_message(websocketpp::connection_hdl, server::message_ptr msg) {
-  std::cout << msg->get_payload();
-
   mtx.lock();
   net_messages.push_back(msg->get_payload());
   mtx.unlock();
@@ -58,6 +56,7 @@ int main() {
 
   auto sim_thread = std::thread([&] {
     bool isRunningSimulation = false;
+    bool isSimulationPaused = false;
     auto start = std::chrono::steady_clock::now();
 
     while(1)
@@ -92,15 +91,24 @@ int main() {
             case id_vis_data_pause:
             {
               std::cout << "pause command received\n";
+              if(isRunningSimulation)
+              {
+                isSimulationPaused = true;
+              }
             } break;
             case id_vis_data_resume:
             {
               std::cout << "resume command received\n";
+              if(isRunningSimulation)
+              {
+                isSimulationPaused = false;
+              }
             } break;
             case id_vis_data_abort:
             {
               std::cout << "abort command received\n";
               isRunningSimulation = false;
+              isSimulationPaused = false;
             } break;
             case id_update_time_step:
             {
@@ -121,8 +129,9 @@ int main() {
         mtx.unlock();
       }
 
-      if(!isRunningSimulation)
-      {auto start = std::chrono::steady_clock::now();
+      if(!isRunningSimulation || isSimulationPaused)
+      {
+        auto start = std::chrono::steady_clock::now();
         continue;
       }
 
