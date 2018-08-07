@@ -78,6 +78,8 @@ int main() {
     bool isSimulationPaused = false;
     auto start = std::chrono::steady_clock::now();
 
+    float time_step = 1e-12; // seconds
+
     // Json cpp setup
     Json::StreamWriterBuilder json_stream_writer;
 
@@ -155,7 +157,8 @@ int main() {
             } break;
             case id_update_time_step:
             {
-              std::cout << "time step updated\n";
+              time_step = json_msg["time_step"].asFloat();
+              std::cout << "time step updated to " << time_step << "\n";
             } break;
             case id_update_rate_param:
             {
@@ -193,7 +196,7 @@ int main() {
         Json::Value agents;
         agents["msg_type"] = id_vis_data_arrive;
 
-        simulation.RunTimeStep(1e-9);
+        simulation.RunTimeStep(time_step);
         auto simData = simulation.GetData();
 
         for(std::size_t i = 0; i < simData.size(); ++i)
