@@ -8,11 +8,13 @@
 #include <asio/asio.hpp>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
+#include <json/json.h>
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 
 std::mutex mtx;
 std::vector<std::string> net_messages;
+std::vector<websocketpp::connection_hdl> net_connections;
 
 enum {
   id_undefined_web_request = 0,
@@ -32,20 +34,37 @@ void on_message(websocketpp::connection_hdl, server::message_ptr msg) {
   mtx.unlock();
 }
 
-void on_close(websocketpp::connection_hdl) {
+void on_close(websocketpp::connection_hdl hd1) {
   std::string msg = " ";
   msg[0] = (char)id_vis_data_abort;
   net_messages.push_back(msg);
+
+  for(std::size_t i = 0; i < net_connections.size(); ++i)
+  {
+    auto spt = net_connections[i].lock();
+    auto spt2 = hd1.lock();
+
+    if(spt.get() == spt2.get())
+    {
+      net_connections.erase(net_connections.begin()+i);
+      break;
+    }
+  }
+}
+
+void on_open(websocketpp::connection_hdl hd1) {
+  net_connections.push_back(hd1);
 }
 
 int main() {
-  auto ws_thread = std::thread([&] {
-    server sim_server;
+  server sim_server;
 
+  auto ws_thread = std::thread([&] {
     sim_server.set_message_handler(&on_message);
     sim_server.set_close_handler(&on_close);
-    sim_server.set_access_channels(websocketpp::log::alevel::all);
-    sim_server.set_error_channels(websocketpp::log::elevel::all);
+    sim_server.set_open_handler(&on_open);
+    sim_server.set_access_channels(websocketpp::log::alevel::none);
+    sim_server.set_error_channels(websocketpp::log::elevel::none);
 
     sim_server.init_asio();
     sim_server.listen(9002);
@@ -58,6 +77,8 @@ int main() {
     bool isRunningSimulation = false;
     bool isSimulationPaused = false;
     auto start = std::chrono::steady_clock::now();
+
+    Json::StreamWriterBuilder json_stream_writer;
 
     while(1)
     {
@@ -141,7 +162,22 @@ int main() {
       if(diff >= std::chrono::milliseconds(66))
       {
         start = now;
-        std::cout << "Running Simulation?\n";
+        Json::Value agents;
+        agents["msg_type"] = id_vis_data_arrive;
+        for(std::size_t i = 0; i < 5; ++i)
+        {
+          Json::Value agent;
+          agent["type"] = 0;
+          agent["x"] = i;
+          agent["y"] = i;
+          agent["z"] = i;
+          agents[std::to_string(i)] = agent;
+        }
+
+        mtx.lock();
+        std::string msg = Json::writeString(json_stream_writer, agents);
+        sim_server.send(net_connections[0], msg, websocketpp::frame::opcode::text);
+        mtx.unlock();
       }
     }
   });

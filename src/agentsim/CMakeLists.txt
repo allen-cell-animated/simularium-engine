@@ -1,4 +1,5 @@
 set(SOURCES
+"jsoncpp.cpp"
 "agent.cpp"
 "combination_reaction.cpp"
 "readdypkg.cpp"

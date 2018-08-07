@@ -103,6 +103,9 @@ target_link_libraries(${SERVER_PROGRAM}
 
 target_link_libraries(${WEB_SERVER_PROGRAM}
 Threads::Threads
+"${AGENTSIM_DLL}"
+"${READDY_DLLS}"
+"${RAKNET_DLLS}"
 )
 
 target_link_libraries(${TEST_PROGRAM}
