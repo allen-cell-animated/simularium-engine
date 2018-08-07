@@ -128,6 +128,8 @@ int main() {
             {
               std::cout << "data request received\n";
               isRunningSimulation = true;
+              isSimulationPaused = false;
+              simulation.Reset();
             } break;
             case id_vis_data_finish:
             {
