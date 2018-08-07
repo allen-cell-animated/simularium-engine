@@ -35,21 +35,17 @@ void on_message(websocketpp::connection_hdl, server::message_ptr msg) {
 }
 
 void on_close(websocketpp::connection_hdl hd1) {
-  std::string msg = " ";
-  msg[0] = (char)id_vis_data_abort;
-  net_messages.push_back(msg);
-
+  mtx.lock();
   for(std::size_t i = 0; i < net_connections.size(); ++i)
   {
-    auto spt = net_connections[i].lock();
-    auto spt2 = hd1.lock();
-
-    if(spt.get() == spt2.get())
+    if(net_connections[i].expired())
     {
       net_connections.erase(net_connections.begin()+i);
-      break;
+      --i;
+      continue;
     }
   }
+  mtx.unlock();
 }
 
 void on_open(websocketpp::connection_hdl hd1) {
@@ -80,6 +76,9 @@ int main() {
 
     Json::StreamWriterBuilder json_stream_writer;
 
+    Json::CharReaderBuilder json_read_builder;
+    std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
+
     while(1)
     {
       if(net_messages.size() > 0)
@@ -88,7 +87,12 @@ int main() {
         for(std::size_t i = 0; i < net_messages.size(); ++i)
         {
           std::string msg_str = net_messages[i];
-          int msg_type = msg_str[0];
+          std::string errs;
+          Json::Value json_msg;
+          json_reader->parse(msg_str.c_str(), msg_str.c_str() + msg_str.length(),
+                              &json_msg, &errs);
+
+          int msg_type = json_msg["msg_type"].asInt();
           switch(msg_type)
           {
             case id_undefined_web_request:
@@ -150,6 +154,12 @@ int main() {
         mtx.unlock();
       }
 
+      if(net_connections.size()  == 0)
+      {
+        isRunningSimulation = false;
+        isSimulationPaused = false;
+      }
+
       if(!isRunningSimulation || isSimulationPaused)
       {
         auto start = std::chrono::steady_clock::now();
@@ -176,7 +186,18 @@ int main() {
 
         mtx.lock();
         std::string msg = Json::writeString(json_stream_writer, agents);
-        sim_server.send(net_connections[0], msg, websocketpp::frame::opcode::text);
+
+        for(std::size_t i = 0; i < net_connections.size(); ++i)
+        {
+          if(net_connections[i].expired())
+          {
+            net_connections.erase(net_connections.begin()+i);
+            --i;
+            continue;
+          }
+
+          sim_server.send(net_connections[i], msg, websocketpp::frame::opcode::text);
+        }
         mtx.unlock();
       }
     }
