@@ -10,7 +10,10 @@
 #include <websocketpp/server.hpp>
 #include <json/json.h>
 
+#include "agentsim/agentsim.h"
+
 typedef websocketpp::server<websocketpp::config::asio> server;
+using namespace aics::agentsim;
 
 std::mutex mtx;
 std::vector<std::string> net_messages;
@@ -70,15 +73,30 @@ int main() {
   });
 
   auto sim_thread = std::thread([&] {
+    // Simulation thread/timing variables
     bool isRunningSimulation = false;
     bool isSimulationPaused = false;
     auto start = std::chrono::steady_clock::now();
 
+    // Json cpp setup
     Json::StreamWriterBuilder json_stream_writer;
 
     Json::CharReaderBuilder json_read_builder;
     std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
 
+    // Simulation setup
+    ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
+
+    std::shared_ptr<SimPkg> readdyPkg;
+    readdyPkg.reset(readdySimPkg);
+
+  	std::vector<std::shared_ptr<SimPkg>> simulators;
+    simulators.push_back(readdyPkg);
+
+    std::vector<std::shared_ptr<Agent>> agents;
+  	Simulation simulation(simulators, agents);
+
+    // Runtime loop
     while(1)
     {
       if(net_messages.size() > 0)
@@ -174,13 +192,20 @@ int main() {
         start = now;
         Json::Value agents;
         agents["msg_type"] = id_vis_data_arrive;
-        for(std::size_t i = 0; i < 5; ++i)
+
+        simulation.RunTimeStep(1e-9);
+        auto simData = simulation.GetData();
+
+        for(std::size_t i = 0; i < simData.size(); ++i)
         {
+          auto agentData = simData[i];
+
           Json::Value agent;
-          agent["type"] = 0;
-          agent["x"] = i;
-          agent["y"] = i;
-          agent["z"] = i;
+          agent["type"] = agentData.type;
+          agent["x"] = agentData.x;
+          agent["y"] = agentData.y;
+          agent["z"] = agentData.z;
+
           agents[std::to_string(i)] = agent;
         }
 
