@@ -15,7 +15,6 @@
 typedef websocketpp::server<websocketpp::config::asio> server;
 using namespace aics::agentsim;
 
-std::mutex mtx;
 std::vector<std::string> net_messages;
 std::vector<websocketpp::connection_hdl> net_connections;
 
@@ -32,13 +31,10 @@ enum {
 };
 
 void on_message(websocketpp::connection_hdl, server::message_ptr msg) {
-  mtx.lock();
   net_messages.push_back(msg->get_payload());
-  mtx.unlock();
 }
 
 void on_close(websocketpp::connection_hdl hd1) {
-  mtx.lock();
   for(std::size_t i = 0; i < net_connections.size(); ++i)
   {
     if(net_connections[i].expired())
@@ -48,7 +44,6 @@ void on_close(websocketpp::connection_hdl hd1) {
       continue;
     }
   }
-  mtx.unlock();
 }
 
 void on_open(websocketpp::connection_hdl hd1) {
@@ -93,7 +88,7 @@ int main() {
     readdyPkg.reset(readdySimPkg);
 
   	std::vector<std::shared_ptr<SimPkg>> simulators;
-    simulators.push_back(readdyPkg);
+    simulators.push_back(readdyPkg);http://eric-pc:8000/
 
     std::vector<std::shared_ptr<Agent>> agents;
   	Simulation simulation(simulators, agents);
@@ -103,7 +98,6 @@ int main() {
     {
       if(net_messages.size() > 0)
       {
-        mtx.lock();
         for(std::size_t i = 0; i < net_messages.size(); ++i)
         {
           std::string msg_str = net_messages[i];
@@ -174,13 +168,6 @@ int main() {
         }
 
         net_messages.clear();
-        mtx.unlock();
-      }
-
-      if(net_connections.size()  == 0)
-      {
-        isRunningSimulation = false;
-        isSimulationPaused = false;
       }
 
       if(!isRunningSimulation || isSimulationPaused)
@@ -214,21 +201,14 @@ int main() {
           agents[std::to_string(i)] = agent;
         }
 
-        mtx.lock();
         std::string msg = Json::writeString(json_stream_writer, agents);
-
         for(std::size_t i = 0; i < net_connections.size(); ++i)
         {
-          if(net_connections[i].expired())
-          {
-            net_connections.erase(net_connections.begin()+i);
-            --i;
-            continue;
-          }
+          auto sptr = net_connections[i].lock();
+          if(sptr.get() == nullptr) { continue; }
 
           sim_server.send(net_connections[i], msg, websocketpp::frame::opcode::text);
         }
-        mtx.unlock();
       }
     }
   });
