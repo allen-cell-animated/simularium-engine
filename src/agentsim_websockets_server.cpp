@@ -158,7 +158,12 @@ int main() {
             } break;
             case id_update_rate_param:
             {
-              std::cout << "rate param updated\n";
+              std::string param_name = json_msg["param_name"].asString();
+              float param_value = json_msg["param_value"].asFloat();
+              simulation.UpdateParameter(param_name, param_value);
+
+              std::cout << "rate param " << param_name <<
+              " updated to " << param_value << "\n";
             } break;
             default:
             {
