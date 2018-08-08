@@ -42,15 +42,15 @@ void ReaDDyPkg::Setup()
 		topologies.configureAnglePotential("end","core","end", angle);
 
 		topologies.addSpatialReaction(
-			"Growth: filament(end) + free(monomer) -> filament(core--end)", 3.7e-6, 50
+			"Growth: filament(end) + free(monomer) -> filament(core--end) [self=false]", 3.7e-6, 50
 		);
 
 		topologies.addSpatialReaction(
-			"Combine: filament(end) + filament(end) -> filament(core--core)", 3.7e-6, 50
+			"Combine: filament(end) + filament(end) -> filament(core--core) [self=false]", 3.7e-6, 50
 		);
 
 		topologies.addSpatialReaction(
-			"Nucleate: free(monomer) + free(monomer) -> filament(end--end)", 3.7e-6, 50
+			"Nucleate: free(monomer) + free(monomer) -> filament(end--end) [self=false]", 3.7e-6, 50
 		);
 
 		auto rGrowthFunc = [&](readdy::model::top::GraphTopology &top) {
