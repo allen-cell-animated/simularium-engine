@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "agentsim/model/model.h"
 
 namespace aics {
 namespace agentsim {
@@ -32,12 +33,13 @@ public:
 
 	void Reset();
 
+	void SetModel(Model simModel);
 	void UpdateParameter(std::string name, float val);
 
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
-
 	std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
+	Model m_model;
 };
 
 }

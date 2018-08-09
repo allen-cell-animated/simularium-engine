@@ -76,5 +76,10 @@ void Simulation::UpdateParameter(std::string name, float value)
 	}
 }
 
+void Simulation::SetModel(Model simModel)
+{
+	this->m_model = simModel;
+}
+
 } // namespace agentsim
 } // namespace aics

@@ -3,6 +3,9 @@
 
 #include "simulation.h"
 #include "agents/agent.h"
+
+#include "model/model.h"
+
 #include "simpkg/simpkg.h"
 #include "simpkg/simplemove.h"
 #include "simpkg/simpleinteraction.h"

@@ -27,7 +27,8 @@ enum {
   id_vis_data_resume,
   id_vis_data_abort,
   id_update_time_step,
-  id_update_rate_param
+  id_update_rate_param,
+  id_model_definition
 };
 
 void on_message(websocketpp::connection_hdl, server::message_ptr msg) {
@@ -164,6 +165,13 @@ int main() {
 
               std::cout << "rate param " << param_name <<
               " updated to " << param_value << "\n";
+            } break;
+            case id_model_definition:
+            {
+                std::cout << "model definition arrived\n";
+                aics::agentsim::Model sim_model;
+                parse_model(json_msg, sim_model);
+                simulation.SetModel(sim_model);
             } break;
             default:
             {

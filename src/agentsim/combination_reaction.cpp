@@ -148,6 +148,7 @@ bool CombinationReaction::React(std::shared_ptr<Agent> a, std::shared_ptr<Agent>
 		this->m_lastProduct = product;
 	}
 
+	this->m_lastProduct->SetName("Macromolecule");
 	return true;
 }
 
