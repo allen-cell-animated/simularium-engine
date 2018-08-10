@@ -204,7 +204,7 @@ void ReaDDyPkg::Setup()
 
 void ReaDDyPkg::Shutdown()
 {
-	this->m_simulation.stateModel().removeAllParticles();
+	this->m_simulation.stateModel().clear();
 	this->m_timeStepCount = 0;
 }
 

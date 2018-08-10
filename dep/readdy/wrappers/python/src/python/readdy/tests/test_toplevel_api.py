@@ -51,7 +51,7 @@ ut = readdy.units
 
 class TestTopLevelAPI(ReaDDyTestCase):
     """
-    A bunch of sanity checks
+    A bunch of sanity checks and tests regarding physical units
     """
 
     def test_temperature(self):
@@ -90,7 +90,60 @@ class TestTopLevelAPI(ReaDDyTestCase):
         rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'length_unit': 'kilometer'})
         rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'time_unit': 'hour'})
         rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'energy_unit': 'kcal/mol'})
+        rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'energy_unit': 'joule'})
         rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'temperature_unit': 'rankine'})
+
+    def test_system_with_wrong_unit_dimensions(self):
+        with self.assertRaises(ValueError):
+            rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'energy_unit': 'rankine'})
+
+        with self.assertRaises(ValueError):
+            rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'length_unit': 'kiloseconds'})
+
+        with self.assertRaises(ValueError):
+            rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'time_unit': 'kilonanometer'})
+
+        with self.assertRaises(ValueError):
+            rds = readdy.ReactionDiffusionSystem(box_size=[1., 1., 1.], unit_system={'temperature_unit': 'second'})
+
+    def test_change_temperature(self):
+        rds1 = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], temperature=300.)
+        rds1.temperature = 293.
+        self.assertEquals(rds1.temperature.magnitude, 293.)
+
+        rds2 = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], temperature=300.,
+                                              unit_system={'energy_unit': 'joule'})
+        rds2.temperature = 293.
+        self.assertEquals(rds2.temperature.magnitude, 293.)
+
+        rds3 = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], temperature=30. * readdy.units.kelvin,
+                                              unit_system={'energy_unit': 'joule'})
+        rds3.temperature = 293.
+        self.assertEquals(rds3.temperature.magnitude, 293.)
+
+        rds4 = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], temperature=300.)
+        rds4.temperature = 293. * readdy.units.rankine
+        self.assertAlmostEqual(rds4.temperature.magnitude, 162.77, delta=0.1)
+
+    def test_change_temperature_wrong_dimension(self):
+        rds = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], temperature=300.)
+        with self.assertRaises(ValueError):
+            rds.temperature = 293. * readdy.units.joule
+
+    def test_add_species_wrong_dimension(self):
+        rds = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.])
+        with self.assertRaises(ValueError):
+            rds.add_species("A", diffusion_constant=1. * readdy.units.nanometer / readdy.units.second)
+
+    def test_change_kbt_unitless_wrong_dimension(self):
+        rds = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], unit_system=None)
+        with self.assertRaises(ValueError):
+            rds.kbt = 2.437 * readdy.units.parse_expression("kJ/mol")
+
+    def test_add_species_unitless_wrong_dimension(self):
+        rds = readdy.ReactionDiffusionSystem(box_size=[10., 10., 10.], unit_system=None)
+        with self.assertRaises(ValueError):
+            rds.add_species("A", diffusion_constant=1. * readdy.units.nanometer ** 2 / readdy.units.second)
 
     def test_box_size(self):
         rds = readdy.ReactionDiffusionSystem([1., 2., 3.], unit_system=None)
@@ -141,7 +194,7 @@ class TestTopLevelAPI(ReaDDyTestCase):
 
         def reaction_fun(topology):
             return readdy.StructuralReactionRecipe(topology) \
-                .change_particle_type(0, "foo")
+                .change_particle_type(0, "foo").change_particle_position(0, [0., 0., .1])
 
         def rate_fun(topology):
             return len(topology.particles)
@@ -295,7 +348,7 @@ class TestTopLevelAPIObservables(ReaDDyTestCase):
         system.add_topology_species("T", diffusion_constant=1.)
         system.add_topology_species("unstable T", diffusion_constant=1.)
 
-        system.reactions.add("decay: Decay ->", .1)
+        system.reactions.add("decay: Decay ->", 1e20)
         system.potentials.add_box("Ligand", 10., [-70, -70, -70], [130, 130, 130])
         system.potentials.add_box("Decay", 10., [-70, -70, -70], [130, 130, 130])
         system.potentials.add_box("T", 10., [-70, -70, -70], [130, 130, 130])
@@ -319,8 +372,8 @@ class TestTopLevelAPIObservables(ReaDDyTestCase):
 
         def intermediate_reaction_function(topology):
             recipe = readdy.StructuralReactionRecipe(topology)
-            for i in range(len(topology.get_graph().get_vertices())):
-                recipe.change_particle_type(i, "unstable T")
+            for v in topology.graph.vertices:
+                recipe.change_particle_type(v, "unstable T")
             recipe.change_topology_type("unstable")
             return recipe
 
@@ -336,6 +389,7 @@ class TestTopLevelAPIObservables(ReaDDyTestCase):
             index = np.random.randint(0, len(topology.particles))
             recipe.separate_vertex(index)
             recipe.change_particle_type(index, "Decay")
+            recipe.change_particle_position(index, [0, 0, 0])
             return recipe
 
         system.topologies.add_structural_reaction(topology_type="unstable",
@@ -367,6 +421,11 @@ class TestTopLevelAPIObservables(ReaDDyTestCase):
 
         assert len(time) == len(entries)
         assert len(topology_records) == len(entries)
+
+        for frame in entries:
+            for entry in frame:
+                if entry.type == 'Decay':
+                    np.testing.assert_array_almost_equal(entry.position, np.array([0, 0, 0]))
 
         for timestep, tops in zip(time, topology_records):
             current_edges = []
