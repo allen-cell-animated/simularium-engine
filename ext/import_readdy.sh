@@ -2,30 +2,8 @@
 
 TMP_FILE="readdy.tmp"
 TARGET_DIR="readdy"
-LIB_DIR="../lib"
 PLATFORM="linux"
-
-# This script imports the needed ReaDDy Headers & libraries
-#  from an ReaDDY Directory that has already been built
-while getopts "d:" option; do
-	case "${option}" in
-		d)
-			READDY_PROJECT_DIR="$OPTARG"
-			;;
-		b)
-			READDY_BUILD_DIR="$OPTARG"
-			;;
-		\?)
-		       	echo "Invalid option: -${OPTARG}"
-			exit 1
-			;;
-	esac
-done
-
-if [ -z ${READDY_PROJECT_DIR} ]; then
-	echo "ERROR: no ReaDDy project directory specified with -d"
-	exit 1
-fi
+READDY_PROJECT_DIR="../dep/readdy"
 
 rm -rf $TARGET_DIR
 mkdir -p $TARGET_DIR

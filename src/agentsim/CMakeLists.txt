@@ -2,6 +2,7 @@ set(SOURCES
 "jsoncpp.cpp"
 "agent.cpp"
 "combination_reaction.cpp"
+"model.cpp"
 "readdypkg.cpp"
 "simpleinteraction.cpp"
 "simplemove.cpp"

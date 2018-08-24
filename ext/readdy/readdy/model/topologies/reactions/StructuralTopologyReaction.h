@@ -179,10 +179,6 @@ public:
         return _rate_function(topology);
     }
 
-    rate_function &rate() {
-      return _rate_function;
-    }
-
     /**
      * Yields a reaction recipe for a given topology.
      * @param topology the topology

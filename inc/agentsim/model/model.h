@@ -12,10 +12,7 @@ struct Model
 
 };
 
-void parse_model(Json::Value& json_obj, aics::agentsim::Model& model)
-{
-
-}
+void parse_model(Json::Value& json_obj, aics::agentsim::Model& model);
 
 } // namespace agentsim
 } // namespace aics
