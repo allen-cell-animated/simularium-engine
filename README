@@ -5,15 +5,10 @@ Description
 	is being used for Molecular Dynamics.
 
 Dependencies
-	In Repository
-	- RakNet
-	- ReaDDy
-
-	Arch packages
 	- blosc
 	- hdf5
 
-	Debian (Ubuntu) packages
+	Debian packages
 	- libhdf5-cpp-100
 	- libhdf5-dev
 	- libblosc-dev
