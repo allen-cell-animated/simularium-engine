@@ -16,7 +16,3 @@ target_include_directories(${TARGET} PRIVATE
 ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
 )
-
-target_compile_options(${TARGET} PUBLIC
-"-std=c++17"
-)

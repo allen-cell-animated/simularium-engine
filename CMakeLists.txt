@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.2.0)
+set(CMAKE_CXX_STANDARD 17)
 
 set(TARGET "agentsim")
 set(SERVER_TARGET "agentsim_server")
@@ -24,7 +25,6 @@ add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 # HDF5 directory below is included for Ubuntu
 set(EXTERNAL_INCLUDES
 "/usr/include/hdf5/serial"
-"${EXTERNAL_DIRECTORY}/raknet"
 "${EXTERNAL_DIRECTORY}/readdy"
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
