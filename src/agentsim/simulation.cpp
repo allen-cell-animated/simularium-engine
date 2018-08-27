@@ -5,6 +5,8 @@
 namespace aics {
 namespace agentsim {
 
+void AppendAgentData(std::vector<AgentData>& out, std::shared_ptr<Agent>& agent);
+
 Simulation::Simulation(
 	std::vector<std::shared_ptr<SimPkg>> simPkgs,
 	std::vector<std::shared_ptr<Agent>> agents)
@@ -40,20 +42,7 @@ std::vector<AgentData> Simulation::GetData()
 	for(std::size_t i = 0; i < this->m_agents.size(); ++i)
 	{
 		auto agent = this->m_agents[i];
-		AgentData ad;
-
-		ad.type = agent->GetTypeID();
-		auto location = agent->GetLocation();
-		ad.x = location[0];
-		ad.y = location[1];
-		ad.z = location[2];
-
-		auto rotation = agent->GetRotation();
-		ad.xrot = rotation[0];
-		ad.yrot = rotation[1];
-		ad.zrot = rotation[2];
-
-		out.push_back(ad);
+		AppendAgentData(out, agent);
 	}
 
 	return out;
@@ -79,6 +68,30 @@ void Simulation::UpdateParameter(std::string name, float value)
 void Simulation::SetModel(Model simModel)
 {
 	this->m_model = simModel;
+}
+
+void AppendAgentData(std::vector<AgentData>& out, std::shared_ptr<Agent>& agent)
+{
+	AgentData ad;
+
+	ad.type = agent->GetTypeID();
+	auto location = agent->GetLocation();
+	ad.x = location[0];
+	ad.y = location[1];
+	ad.z = location[2];
+
+	auto rotation = agent->GetRotation();
+	ad.xrot = rotation[0];
+	ad.yrot = rotation[1];
+	ad.zrot = rotation[2];
+
+	out.push_back(ad);
+
+	for(std::size_t i = 0; i < agent->GetNumChildAgents(); ++i)
+	{
+		auto child = agent->GetChildAgent(i);
+		AppendAgentData(out, child);
+	}
 }
 
 } // namespace agentsim

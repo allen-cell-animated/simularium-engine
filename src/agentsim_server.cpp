@@ -211,6 +211,10 @@ int main() {
           agent["y"] = agentData.y;
           agent["z"] = agentData.z;
 
+          agent["x_rot"] = agentData.xrot;
+          agent["y_rot"] = agentData.yrot;
+          agent["z_rot"] = agentData.zrot;
+
           agents[std::to_string(i)] = agent;
         }
 

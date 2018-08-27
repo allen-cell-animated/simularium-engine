@@ -46,6 +46,7 @@ public:
 
 	std::shared_ptr<Agent> GetBoundPartner(std::size_t index);
 	std::shared_ptr<Agent> GetChildAgent(std::size_t index);
+	std::size_t GetNumChildAgents() { return m_childAgents.size(); }
 
 	bool CanInteractWith(const Agent& other);
 	bool IsCollidingWith(const Agent& other);
