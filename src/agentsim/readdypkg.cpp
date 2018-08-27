@@ -106,6 +106,7 @@ void createHelixBindRx(
 	int helix_pid_0 = 0; // the id of the first helix_type
 
 	std::vector<std::string> particle_types;
+	std::vector<float> particle_radii;
 
 	// oriented binding
 	std::string parent_type = "parent";
@@ -127,6 +128,7 @@ void ReaDDyPkg::Setup()
 		this->m_simulation.context().boxSize()[1] = boxSize;
 		this->m_simulation.context().boxSize()[2] = boxSize;
 
+		// Helix
 		auto &particles = this->m_simulation.context().particleTypes();
 		particles.addTopologyType("M", 1e3);
 		particles.addTopologyType("U", 0.1);
@@ -168,8 +170,29 @@ void ReaDDyPkg::Setup()
 
 		auto &potentials = this->m_simulation.context().potentials();
 		this->m_initialized = true;
+
+		// Oriented Binding
+		float parent_dc = 0.5f;
+		float child_dc = 0.5f;
+		float parent_radius = 1;
+		float child_radius = 1;
+
+		add_oriented_species(this->m_simulation,
+			child_type, child_dc, particle_types, particle_radii);
+		if(parent_type != child_type)
+		{
+			add_oriented_species(this->m_simulation,
+				parent_type, parent_dc, particle_types, particle_radii);
+		}
+		add_bound_constraints(this->m_simulation,
+			child_type, parent_type,
+			child_radius, parent_radius);
+
+		potentials.addHarmonicRepulsion(child_type, parent_type, 50, parent_radius + child_radius);
+		add_parent_child_bind_reaction(this->m_simulation, parent_type, child_type);
 	}
 
+	// helix
 	std::size_t monomerCount = 500;
 	for(std::size_t i = 0; i < monomerCount; ++i)
 	{
@@ -198,6 +221,10 @@ void ReaDDyPkg::Setup()
 			this->m_simulation,
 			filemant_size, pos, helix_types,"FT");
 	}
+
+	// oriented binding
+	add_oriented_particle(this->m_simulation, parent_type, Eigen::Vector3d(5,0,0));
+	add_oriented_particle(this->m_simulation, child_type, Eigen::Vector3d(5,-3,0));
 
 	auto loop = this->m_simulation.createLoop(1);
 	loop.runInitialize();
@@ -228,7 +255,28 @@ void ReaDDyPkg::RunTimeStep(
 	std::vector<std::string> pTypes = particle_types;
 	for(std::size_t i = 0; i < pTypes.size(); ++i)
 	{
+		std::string pt = pTypes[i];
+		if(pt.find("_x") != std::string::npos
+			|| pt.find("_y") != std::string::npos
+			|| pt.find("_z") != std::string::npos)
+		{
+			continue;
+		}
+
 		std::vector<readdy::Vec3> positions = this->m_simulation.getParticlePositions(pTypes[i]);
+		std::vector<readdy::Vec3> xpositions;
+		std::vector<readdy::Vec3> ypositions;
+		std::vector<readdy::Vec3> zpositions;
+
+		bool has_orientation = false;
+		if(std::find(pTypes.begin(), pTypes.end(), pTypes[i] + "_x") != pTypes.end())
+		{
+			has_orientation = true;
+			xpositions = this->m_simulation.getParticlePositions(pTypes[i] + "_x");
+			ypositions = this->m_simulation.getParticlePositions(pTypes[i] + "_y");
+			zpositions = this->m_simulation.getParticlePositions(pTypes[i] + "_z");
+		}
+
 		for(std::size_t j = 0; j < positions.size(); ++j)
 		{
 			readdy::Vec3 v = positions[j];
@@ -237,6 +285,23 @@ void ReaDDyPkg::RunTimeStep(
 			newAgent->SetName(pTypes[i]);
 			newAgent->SetTypeID(i);
 			newAgent->SetLocation(Eigen::Vector3d(v[0], v[1], v[2]));
+
+			if(has_orientation)
+			{
+				readdy::Vec3 x = xpositions[j];
+				readdy::Vec3 y = ypositions[j];
+				readdy::Vec3 z = zpositions[j];
+
+				std::vector<Eigen::Vector3d> basis;
+				basis.push_back(newAgent->GetLocation());
+				basis.push_back(Eigen::Vector3d(x[0],x[1],x[2]));
+				basis.push_back(Eigen::Vector3d(y[0],y[1],y[2]));
+				basis.push_back(Eigen::Vector3d(z[0],z[1],z[2]));
+				Eigen::Matrix3d rm = get_rotation_matrix(basis);
+				Eigen::Vector3d rea = rm.eulerAngles(0, 1, 2);
+				newAgent->SetRotation(rea);
+			}
+
 			agents.push_back(newAgent);
 		}
 	}
@@ -341,6 +406,7 @@ void add_oriented_species(readdy::Simulation& sim,
 	out_radii.push_back(radii);
 
 	float fc = diff_coeff == 0 ? 1 : 15 * pow(10, -log(diff_coeff));
+	fc = 1;
 
 	readdy::api::Bond bond;
 	bond.forceConstant = fc;
@@ -420,10 +486,10 @@ void add_bound_constraints(
 	topologies.addType("complex_" + n1 + n2 + "_bound");
 
 	readdy::api::Bond bond;
-	bond.forceConstant = 1000;
+	bond.forceConstant = 1;
 	bond.length = r1 + r2;
 
-	bond.forceConstant = 30;
+	bond.forceConstant = 10;
 	topologies.configureBondPotential(n1 + "_bound", n2 + "_bound", bond);
 
 	bond.forceConstant = 1e-13;
@@ -440,7 +506,7 @@ void add_bound_constraints(
 	topologies.configureBondPotential(n1 + "_bound_z", n2 + "_bound_z", bond);
 
 	readdy::api::Angle angle;
-	angle.forceConstant = 50;
+	angle.forceConstant = 10;
 	angle.equilibriumAngle = M_PI;
 
 	topologies.configureAnglePotential(
@@ -462,7 +528,7 @@ void add_bound_constraints(
 		n2 + "_bound_y", n2 + "_bound", n1 + "_bound_y", angle);
 
 	readdy::api::TorsionAngle tangle;
-	tangle.forceConstant = 500;
+	tangle.forceConstant = 50;
 	tangle.multiplicity = 1;
 	tangle.phi_0 = 0;
 
