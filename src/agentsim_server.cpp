@@ -171,6 +171,7 @@ int main() {
                 std::cout << "model definition arrived\n";
                 aics::agentsim::Model sim_model;
                 parse_model(json_msg, sim_model);
+                print_model(sim_model);
                 simulation.SetModel(sim_model);
             } break;
             default:
