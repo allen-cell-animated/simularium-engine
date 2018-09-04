@@ -24,13 +24,22 @@ add_executable(${PROGRAM} ${SOURCE_DIRECTORY}/${TARGET}.cpp)
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
-# HDF5 directory below is included for Ubuntu
+find_package(HDF5 COMPONENTS HL REQUIRED)
+set(HDF5_INCLUDES
+"${HDF5_INCLUDE_DIRS}"
+"${HDF5_HL_INCLUDE_DIR}"
+)
+set(HDF5_DLLS
+"${HDF5_LIBRARIES}"
+"${HDF5_HL_LIBRARIES}"
+)
+
 set(EXTERNAL_INCLUDES
-"/usr/include/hdf5/serial"
 "${EXTERNAL_DIRECTORY}/readdy"
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
+"${HDF5_INCLUDES}"
 )
 
 set(INTERNAL_INCLUDES
@@ -81,6 +90,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 target_link_libraries(${PROGRAM}
+"${HDF5_DLLS}"
 "${AGENTSIM_DLL}"
 "${READDY_DLLS}"
 )
