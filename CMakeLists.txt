@@ -97,11 +97,13 @@ target_link_libraries(${PROGRAM}
 
 target_link_libraries(${SERVER_PROGRAM}
 Threads::Threads
+"${HDF5_DLLS}"
 "${AGENTSIM_DLL}"
 "${READDY_DLLS}"
 )
 
 target_link_libraries(${TEST_PROGRAM}
+"${HDF5_DLLS}"
 "${AGENTSIM_DLL}"
 "${READDY_DLLS}"
 )
