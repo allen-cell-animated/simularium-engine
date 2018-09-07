@@ -24,6 +24,22 @@ add_executable(${PROGRAM} ${SOURCE_DIRECTORY}/${TARGET}.cpp)
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
+set(READDY_DLLS
+"readdy"
+"readdy_model"
+"readdy_kernel_cpu"
+"readdy_kernel_singlecpu"
+"readdy_common"
+"readdy_io"
+"readdy_plugin"
+)
+
+set(AGENTSIM_DLL
+"agentsim"
+"gtest_main"
+"gtest"
+)
+
 find_package(HDF5 COMPONENTS HL REQUIRED)
 set(HDF5_INCLUDES
 "${HDF5_INCLUDE_DIRS}"
@@ -40,6 +56,7 @@ set(EXTERNAL_INCLUDES
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
 "${HDF5_INCLUDES}"
+"${DEPENDENCY_DIRECTORY}/gtest/googletest/include"
 )
 
 set(INTERNAL_INCLUDES
@@ -70,40 +87,26 @@ add_subdirectory(${SOURCE_DIRECTORY})
 add_subdirectory(${DEPENDENCY_DIRECTORY})
 
 add_dependencies(${TARGET} readdy)
-
-set(READDY_DLLS
-"readdy"
-"readdy_model"
-"readdy_kernel_cpu"
-"readdy_kernel_singlecpu"
-"readdy_common"
-"readdy_io"
-"readdy_plugin"
-)
-
-set(AGENTSIM_DLL
-"agentsim"
-"gtest_main"
-)
+add_dependencies(${TARGET} gtest)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 target_link_libraries(${PROGRAM}
 "${HDF5_DLLS}"
-"${AGENTSIM_DLL}"
 "${READDY_DLLS}"
+"${AGENTSIM_DLL}"
 )
 
 target_link_libraries(${SERVER_PROGRAM}
 Threads::Threads
 "${HDF5_DLLS}"
-"${AGENTSIM_DLL}"
 "${READDY_DLLS}"
+"${AGENTSIM_DLL}"
 )
 
 target_link_libraries(${TEST_PROGRAM}
 "${HDF5_DLLS}"
-"${AGENTSIM_DLL}"
 "${READDY_DLLS}"
+"${AGENTSIM_DLL}"
 )

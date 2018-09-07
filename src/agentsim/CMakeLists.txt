@@ -19,4 +19,5 @@ ${EXTERNAL_INCLUDES}
 
 target_link_libraries(${TARGET} PRIVATE
 "${HDF5_DLLS}"
+"${READDY_DLLS}"
 )
