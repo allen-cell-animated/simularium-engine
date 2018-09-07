@@ -56,7 +56,6 @@ set(EXTERNAL_INCLUDES
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
 "${HDF5_INCLUDES}"
-"${DEPENDENCY_DIRECTORY}/gtest/googletest/include"
 )
 
 set(INTERNAL_INCLUDES
