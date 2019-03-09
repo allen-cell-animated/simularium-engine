@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include "agentsim/model/model.h"
 
 namespace aics {
 namespace agentsim {
@@ -26,6 +27,8 @@ public:
 	virtual ~SimPkg() {}
 	virtual void Setup() = 0;
 	virtual void Shutdown() = 0;
+	virtual void InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model) = 0;
+	virtual void InitReactions(Model& model) = 0;
 
 	/**
 	* RunTimeStep
@@ -39,6 +42,25 @@ public:
 	virtual void UpdateParameter(
 		std::string param_name, float param_value
 	) = 0;
+
+	/**
+	*	Run
+	*
+	* Executes a simulation in its entirety
+	*/
+	virtual void Run() = 0;
+
+	virtual void GetNextFrame(std::vector<std::shared_ptr<Agent>>& agents) = 0;
+
+	/**
+	*	IsFinished
+	*
+	*	Has the simulation this SimPKG is responsible for finished running?
+	*	For a 'live' simulation or one without an end, this will likely
+	*	return false in every case
+	*/
+	virtual bool IsFinished() = 0;
+	virtual bool IsRunningLive() = 0;
 };
 
 } // namespace agentsim

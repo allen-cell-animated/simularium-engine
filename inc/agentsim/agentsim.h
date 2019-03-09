@@ -7,9 +7,7 @@
 #include "model/model.h"
 
 #include "simpkg/simpkg.h"
-#include "simpkg/simplemove.h"
-#include "simpkg/simpleinteraction.h"
-
 #include "simpkg/readdypkg.h"
+#include "simpkg/cytosimpkg.h"
 
 #endif // AICS_AGENTSIM_H
