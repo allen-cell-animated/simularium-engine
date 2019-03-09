@@ -1,16 +1,20 @@
 set(SOURCES
+"${PROJECT_SOURCE_DIR}/dep/cytosim/src/play/frame_reader.cc"
 "jsoncpp.cpp"
 "agent.cpp"
-"combination_reaction.cpp"
 "model.cpp"
 "readdypkg.cpp"
-"simpleinteraction.cpp"
-"simplemove.cpp"
+"cytosimpkg.cpp"
 "simulation.cpp"
-"statechange_reaction.cpp"
 )
 
-add_library(${TARGET} SHARED ${SOURCES})
+find_library(LAPACK_LIB lapack REQUIRED)
+find_library(BLAS_LIB blas REQUIRED)
+
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+add_library(${TARGET} STATIC ${SOURCES})
 
 target_include_directories(${TARGET} PRIVATE
 ${INTERNAL_INCLUDES}
@@ -20,4 +24,5 @@ ${EXTERNAL_INCLUDES}
 target_link_libraries(${TARGET} PRIVATE
 "${HDF5_DLLS}"
 "${READDY_DLLS}"
+"${CYTOSIM_LIBRARIES}"
 )

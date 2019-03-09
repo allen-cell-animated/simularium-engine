@@ -7,9 +7,11 @@ Description
 Dependencies
 	- blosc
 	- hdf5
+	- blas
+	- lapack
 
-	Debian packages
-	- libhdf5-cpp-100
-	- libhdf5-dev
-	- libblosc-dev
-	- libblosc1
+To create the docker image:
+sudo docker build -t agentsim-dev .
+
+To run the docker image:
+sudo docker run -it -p 9002:9002 agentsim-dev:latest agentsim_server.exe
