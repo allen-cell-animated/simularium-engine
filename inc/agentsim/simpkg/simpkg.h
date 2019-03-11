@@ -39,6 +39,12 @@ public:
 	virtual void RunTimeStep(
 		float timeStep, std::vector<std::shared_ptr<Agent>>& agents) = 0;
 
+	/**
+	* UpdateParameter
+	*
+	*	@param	name		the name of the parameter to update
+	*	@param	val			the value to update the parameter to
+	*/
 	virtual void UpdateParameter(
 		std::string param_name, float param_value
 	) = 0;
@@ -60,7 +66,6 @@ public:
 	*	return false in every case
 	*/
 	virtual bool IsFinished() = 0;
-	virtual bool IsRunningLive() = 0;
 };
 
 } // namespace agentsim

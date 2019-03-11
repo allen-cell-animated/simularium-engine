@@ -1,11 +1,14 @@
 #ifndef AICS_SIMULATION_H
 #define AICS_SIMULATION_H
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include "agentsim/model/model.h"
+#include "agentsim/simulation_frame.h"
+#include "agentsim/agent_data.h"
 
 namespace aics {
 namespace agentsim {
@@ -13,76 +16,127 @@ namespace agentsim {
 class Agent;
 class SimPkg;
 
-struct AgentData
-{
-	float type = 0;
-	float x = 0, y = 0, z = 0;
-	float xrot = 0, yrot = 0, zrot = 0;
-	float collision_radius = 0;
-	std::vector<float> subpoints;
-	float vis_type = 0;
-};
-
-typedef std::vector<AgentData> AgentDataFrame;
-typedef std::vector<AgentDataFrame> FrameList;
-
-class SimulationCache
-{
-public:
-	void AddFrame(AgentDataFrame data) {
-		this->m_frames.push_back(data);
-
-		if(this->m_frames.size() > this->m_cacheSize)
-		{
-			this->m_frames.erase(this->m_frames.begin());
-		}
-	}
-
-	AgentDataFrame GetLatestFrame() {
-		return this->m_frames[this->m_frames.size() - 1];
-	}
-
-	void SetCacheSize(std::size_t size) {
-		this->m_cacheSize = size;
-		this->m_frames.clear();
-		this->m_frames.reserve(size);
-	}
-
-	std::size_t GetCacheSize() { return m_cacheSize; }
-
-private:
-	std::size_t m_cacheSize = 0;
-	FrameList m_frames;
-};
-
 class Simulation
 {
 public:
+	/**
+	*
+	*
+	*	@param 	simPkgs		a list of SimPKGs that this simulation object will own
+	*	@param	agents		a list of Agents that this simulation object will own
+	*/
 	Simulation(
 		std::vector<std::shared_ptr<SimPkg>> simPkgs,
 		std::vector<std::shared_ptr<Agent>> agents
 	);
 	~Simulation();
 
+	/**
+	*	RunTimeStep
+	*
+	*	@param timeStep		the time to advance simulation, in seconds
+	*
+	*	Advance the SimPKGs by the amount of time specified, in
+	*	a 'live' manner. Generally will run a single time-step
+	*/
 	void RunTimeStep(float timeStep);
+
+	/**
+	*	GetData
+	*
+	*	Get a list of data corresponding to the agents owned by this simulation object
+	*	Includes information regarding position, type, and other relevant visualization
+	* information to be streamed to a front-end
+	*/
 	std::vector<AgentData> GetData();
 
+	/**
+	*	Reset
+	*
+	*	Reset the simulation to an 'un-run' state
+	*/
 	void Reset();
 
+	/**
+	*	SetModel
+	*
+	*	@param	simModel		a Model object containing information about the simulation to run
+	*
+	*
+	*/
 	void SetModel(Model simModel);
+
+	/*
+	*	UpdateParameter
+	*
+	*	@param	name		the name of the parameter to update
+	*	@param	val			the value to update the parameter to
+	*
+	*	Updates a simulation relevant parameter
+	*/
 	void UpdateParameter(std::string name, float val);
 
-	void Run();
-	bool IsFinished();
-	void GetNextFrame();
+	/**
+	*	RunAndSaveFrames
+	*
+	*	Runs every owned SimPKG from start to completion
+	* Intended to run and save a simulation in some way
+	*	GetNextFrame() should be used to retrieve results frame by frame
+	*/
+	void RunAndSaveFrames();
 
+	/**
+	*	HasLoadedAllFrames
+	*
+	*	returns true if every SimPKG has finished retrieving/saving data
+	* returns false if there is more to retrieve using GetNextFrame()
+	*/
+	bool HasLoadedAllFrames();
+
+	/**
+	*	LoadNextFrame
+	*
+	*	Loads the next simulation frames worth of information from a SimPKG
+	*/
+	void LoadNextFrame();
+
+	/**
+	*	PlayCacheFromFrame
+	*
+	*	@param	frame_number	The index used to tell the cache where to start
+	*												playing a simulation from. 0 represents the
+	*												beginning (start at the first indexed frame)
+	*/
+	void PlayCacheFromFrame(std::size_t frame_number);
+
+	/**
+	*	IncrementCacheFrame
+	*
+	*	Increment the current cache frame (e.g. move from frame 4 -> frame 5)
+	*/
+	void IncrementCacheFrame();
+
+	/**
+	*	CacheCurrentAgents
+	*
+	*	Saves an AgentFrame with the visualization data for the current
+	*	state of agents owned by this simulation
+	*/
 	void CacheCurrentAgents();
+
+	/**
+	*	IsPlayingFromCache
+	*
+	*	Is this simulation object currently streaming from cached visualization information?
+	*/
+	bool IsPlayingFromCache() { return this->m_isPlayingFromCache; }
 
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
 	std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
 	Model m_model;
 	SimulationCache m_cache;
+	bool m_isPlayingFromCache = false;
 };
 
 }

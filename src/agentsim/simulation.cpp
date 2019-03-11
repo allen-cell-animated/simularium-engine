@@ -28,7 +28,7 @@ Simulation::Simulation(
 	}
 
 	this->m_agents = agents;
-	this->m_cache.SetCacheSize(5);
+	this->m_cache.SetCacheSize(100);
 }
 
 Simulation::~Simulation()
@@ -51,7 +51,14 @@ void Simulation::RunTimeStep(float timeStep)
 
 std::vector<AgentData> Simulation::GetData()
 {
-	return this->m_cache.GetLatestFrame();
+	if(this->IsPlayingFromCache())
+	{
+		return this->m_cache.GetCurrentFrame();
+	}
+	else
+	{
+		return this->m_cache.GetLatestFrame();
+	}
 }
 
 void Simulation::Reset()
@@ -86,18 +93,15 @@ void Simulation::SetModel(Model simModel)
 	this->Reset();
 }
 
-void Simulation::Run()
+void Simulation::RunAndSaveFrames()
 {
 	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
 	{
-		if(!this->m_SimPkgs[i]->IsRunningLive())
-		{
-			this->m_SimPkgs[i]->Run();
-		}
+		this->m_SimPkgs[i]->Run();
 	}
 }
 
-bool Simulation::IsFinished()
+bool Simulation::HasLoadedAllFrames()
 {
 	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
 	{
@@ -110,7 +114,7 @@ bool Simulation::IsFinished()
 	return true;
 }
 
-void Simulation::GetNextFrame()
+void Simulation::LoadNextFrame()
 {
 	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
 	{
@@ -121,6 +125,22 @@ void Simulation::GetNextFrame()
 	}
 
 	this->CacheCurrentAgents();
+}
+
+void Simulation::PlayCacheFromFrame(std::size_t frame_number)
+{
+	this->m_cache.SetCurrentFrame(frame_number);
+	this->m_isPlayingFromCache = true;
+}
+
+void Simulation::IncrementCacheFrame()
+{
+	this->m_cache.IncrementCurrentFrame();
+
+	if(this->m_cache.CurrentIsLatestFrame())
+	{
+		this->m_isPlayingFromCache = false;
+	}
 }
 
 void Simulation::CacheCurrentAgents()
