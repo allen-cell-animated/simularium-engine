@@ -304,7 +304,7 @@ int main() {
 
       if(!runLive)
       {
-        simulation.Run();
+        simulation.RunAndSaveFrames();
       }
 
       if(diff >= std::chrono::milliseconds(66))
@@ -313,20 +313,24 @@ int main() {
         Json::Value agents;
         agents["msg_type"] = id_vis_data_arrive;
 
-        if(runLive)
+        if(simulation.IsPlayingFromCache())
+        {
+          simulation.IncrementCacheFrame();
+        }
+        else if(runLive)
         {
           simulation.RunTimeStep(time_step);
         }
-
-        if(!runLive)
+        else if(!runLive)
         {
-          if(simulation.IsFinished())
+          if(simulation.HasLoadedAllFrames())
           {
-            isRunningSimulation = false;
+            std::cout << "Starting cached play" << std::endl;
+            simulation.PlayCacheFromFrame(0);
           }
           else
           {
-            simulation.GetNextFrame();
+            simulation.LoadNextFrame();
           }
         }
 

@@ -32,7 +32,6 @@ public:
 		std::vector<std::shared_ptr<Agent>>& agents) override;
 
 	virtual bool IsFinished() override;
-	virtual bool IsRunningLive() override { return false; }
 
 private:
 	bool m_hasAlreadyRun = false;

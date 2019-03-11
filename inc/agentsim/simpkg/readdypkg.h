@@ -34,8 +34,6 @@ public:
 
 	virtual bool IsFinished() override { return false; }
 	virtual void Run() override { return; }
-	virtual bool IsRunningLive() override { return true; }
-
 private:
 	readdy::Simulation m_simulation;
 	bool m_agents_initialized = false;

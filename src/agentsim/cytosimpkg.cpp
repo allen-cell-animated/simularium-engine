@@ -27,60 +27,6 @@ FrameReader reader;
 std::string input_file = "./dep/cytosim/cym/aster.cym";
 std::string output_file = "./objects.cmo";
 
-int verbose = 1;
-
-void report_raw(std::ostream& os, std::string const& what, int frm, Glossary& opt)
-{
-    if ( verbose > 0 )
-    {
-        os << "% frame   " << frm << '\n';
-        simul.report(os, what, opt);
-    }
-    else
-    {
-        std::stringstream ss;
-        simul.report(ss, what, opt);
-        StreamFunc::skip_lines(os, ss, '%');
-    }
-}
-
-
-void report_prefix(std::ostream& os, std::string const& what, int frm, Glossary& opt)
-{
-    char prefix[256] = { 0 };
-    snprintf(prefix, sizeof(prefix), "%9.3f ", simul.simTime());
-
-    std::stringstream ss;
-
-    if ( verbose )
-    {
-        os << "% frame   " << frm << '\n';
-        simul.report(ss, what, opt);
-        StreamFunc::prefix_lines(os, ss, prefix, '%', 0);
-    }
-    else
-    {
-        simul.report(ss, what, opt);
-        StreamFunc::prefix_lines(os, ss, prefix, 0, '%');
-    }
-}
-
-
-void report(std::ostream& os, std::string const& what, int frm, Glossary& opt)
-{
-    try
-    {
-        report_raw(os, what, frm, opt);
-    }
-    catch( Exception & e )
-    {
-        std::cerr << "Aborted: " << e.what() << '\n';
-        exit(EXIT_FAILURE);
-    }
-}
-
-void PrintAllFrames();
-
 void GetFiberPositionsFromFrame(
   std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
@@ -186,7 +132,7 @@ void CytosimPkg::Run()
 
 bool CytosimPkg::IsFinished()
 {
-	return !(this->m_hasAlreadyRun) && this->m_hasFinishedStreaming;
+	return this->m_hasAlreadyRun && this->m_hasFinishedStreaming;
 }
 
 void CytosimPkg::GetNextFrame(std::vector<std::shared_ptr<Agent>>& agents)
@@ -222,52 +168,13 @@ void CytosimPkg::GetNextFrame(std::vector<std::shared_ptr<Agent>>& agents)
   }
   else
   {
+    std::cout << "Finished Streaming Cytosim Run from File" << std::endl;
     this->m_hasFinishedStreaming = true;
   }
-
-  //PrintAllFrames();
-  //this->m_hasFinishedStreaming = true;
 }
 
 } // namespace agentsim
 } // namespace aics
-
-void PrintAllFrames()
-{
-  std::string what = "fiber:points";
-  std::ostream * osp = &std::cout;
-  unsigned int frame = 0;
-  unsigned int period = 1;
-  FrameReader reader;
-
-  Glossary arg;
-  std::string input = output_file;
-
-  //arg.readStrings(argc-1, argv+1);
-  arg.set(input, ".cmo") || arg.set(input, "input");;
-  arg.set(verbose, "verbose");
-  arg.set(period, "period");
-
-  try {
-    reader.openFile(input);
-  }
-  catch( Exception & e)
-  {
-    std::cerr << "Aborted: " << e.what() << std::endl;
-    return;
-  }
-
-  if(!reader.good())
-  {
-    printf("File could not be opened\n");
-    return;
-  }
-
-  while(0 == reader.readNextFrame(simul))
-  {
-    report(*osp, what, frame, arg);
-  }
-}
 
 void GetFiberPositionsFromFrame(
   std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents)

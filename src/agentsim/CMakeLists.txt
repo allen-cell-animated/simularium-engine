@@ -5,6 +5,7 @@ set(SOURCES
 "model.cpp"
 "readdypkg.cpp"
 "cytosimpkg.cpp"
+"simulation_frame.cpp"
 "simulation.cpp"
 )
 
