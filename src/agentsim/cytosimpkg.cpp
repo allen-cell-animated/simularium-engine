@@ -75,6 +75,11 @@ void CytosimPkg::Shutdown()
 	this->m_hasAlreadyRun = false;
 	this->m_hasFinishedStreaming = false;
   this->m_hasLoadedFrameReader = false;
+  this->m_hasSetupLiveRun = false;
+
+  simul.erase();
+  glos.clear();
+  reader.clearPositions();
 }
 
 void CytosimPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)
@@ -96,8 +101,26 @@ void CytosimPkg::InitReactions(Model& model)
 void CytosimPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	//simul.prop->time_step = timeStep;
-	//simul.step();
+  if(!this->m_hasSetupLiveRun)
+  {
+    try {
+        Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
+    }
+    catch( Exception & e ) {
+        std::cerr << std::endl << "Error: " << e.what() << std::endl;
+        return;
+    }
+    catch(...) {
+        std::cerr << std::endl << "Error: an unknown exception occured" << std::endl;
+        return;
+    }
+
+    this->m_hasSetupLiveRun = true;
+  }
+
+  Parser(simul, 0, 0, 0, 1, 0).execute_run(glos, 1, 0);
+
+  GetFiberPositionsFromFrame(agents);
 }
 
 void CytosimPkg::UpdateParameter(std::string param_name, float param_value)

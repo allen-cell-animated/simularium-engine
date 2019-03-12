@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "agentsim/simulation_frame.h"
+#include "agentsim/simulation_cache.h"
 
 
 namespace aics {

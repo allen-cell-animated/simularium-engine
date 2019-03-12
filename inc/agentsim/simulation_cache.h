@@ -1,5 +1,5 @@
-#ifndef AICS_SIMULATION_FRAME_H
-#define AICS_SIMULATION_FRAME_H
+#ifndef AICS_SIMULATION_CACHE_H
+#define AICS_SIMULATION_CACHE_H
 
 #include <algorithm>
 #include <iostream>
@@ -43,4 +43,4 @@ private:
 }
 }
 
-#endif // AICS_SIMULATION_FRAME_H
+#endif // AICS_SIMULATION_CACHE_H

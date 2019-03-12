@@ -27,8 +27,9 @@ std::atomic<bool> has_unhandled_new_connection { false };
 std::string most_recent_model = "";
 std::vector<std::string> param_cache;
 
-bool use_readdy = true;
+bool use_readdy = false;
 bool use_cytosim = !use_readdy;
+bool run_live = true;
 
 enum {
   id_undefined_web_request = 0,
@@ -300,9 +301,7 @@ int main() {
       auto now = std::chrono::steady_clock::now();
       auto diff = now - start;
 
-      bool runLive = !use_cytosim;
-
-      if(!runLive)
+      if(!run_live)
       {
         simulation.RunAndSaveFrames();
       }
@@ -317,11 +316,11 @@ int main() {
         {
           simulation.IncrementCacheFrame();
         }
-        else if(runLive)
+        else if(run_live)
         {
           simulation.RunTimeStep(time_step);
         }
-        else if(!runLive)
+        else if(!run_live)
         {
           if(simulation.HasLoadedAllFrames())
           {

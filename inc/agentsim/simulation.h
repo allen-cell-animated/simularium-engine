@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 #include "agentsim/model/model.h"
-#include "agentsim/simulation_frame.h"
+#include "agentsim/simulation_cache.h"
 #include "agentsim/agent_data.h"
 
 namespace aics {
