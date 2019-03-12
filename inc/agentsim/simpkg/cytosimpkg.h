@@ -37,6 +37,8 @@ private:
 	bool m_hasAlreadyRun = false;
 	bool m_hasFinishedStreaming = false;
 	bool m_hasLoadedFrameReader = false;
+
+	bool m_hasSetupLiveRun = false;
 };
 
 } // namespace agentsim
