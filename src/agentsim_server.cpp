@@ -182,6 +182,10 @@ int main() {
               std::cout << "data request received\n";
               isRunningSimulation = true;
               isSimulationPaused = false;
+
+              run_live = json_msg["live"].asBool();
+              std::cout << (run_live ? "running live" : "running pre-cached") << std::endl;
+
               simulation.Reset();
             } break;
             case id_vis_data_finish:
