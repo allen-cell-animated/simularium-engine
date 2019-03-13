@@ -38,7 +38,7 @@ namespace agentsim {
 
 void CytosimPkg::Setup()
 {
-	if(this->m_hasAlreadyRun)
+	if(this->m_hasAlreadySetup)
 		return;
 
 	std::cout << "CYTOSIM SETUP STARTED" << endl;
@@ -55,6 +55,7 @@ void CytosimPkg::Setup()
 
 	try {
 			simul.initialize(glos);
+      Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
 	}
 	catch( Exception & e ) {
 			std::cerr << "Error: " << e.what() << std::endl;
@@ -67,15 +68,16 @@ void CytosimPkg::Setup()
 
 	glos.warnings(std::cerr);
 
+  this->m_hasAlreadySetup = true;
 	std::cout << "CYTOSIM SETUP ENDED" << endl;
 }
 
 void CytosimPkg::Shutdown()
 {
 	this->m_hasAlreadyRun = false;
+	this->m_hasAlreadySetup = false;
 	this->m_hasFinishedStreaming = false;
   this->m_hasLoadedFrameReader = false;
-  this->m_hasSetupLiveRun = false;
 
   simul.erase();
   glos.clear();
@@ -101,24 +103,20 @@ void CytosimPkg::InitReactions(Model& model)
 void CytosimPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-  if(!this->m_hasSetupLiveRun)
+  float max_time_step = 0.1f;
+
+  if(timeStep > max_time_step)
   {
-    try {
-        Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
-    }
-    catch( Exception & e ) {
-        std::cerr << std::endl << "Error: " << e.what() << std::endl;
-        return;
-    }
-    catch(...) {
-        std::cerr << std::endl << "Error: an unknown exception occured" << std::endl;
-        return;
-    }
+    unsigned n_iterations = timeStep / max_time_step;
 
-    this->m_hasSetupLiveRun = true;
+    simul.prop->time_step = max_time_step;
+    Parser(simul, 0, 0, 0, 1, 0).execute_run(glos, n_iterations, 0);
   }
-
-  Parser(simul, 0, 0, 0, 1, 0).execute_run(glos, 1, 0);
+  else
+  {
+    simul.prop->time_step = timeStep;
+    Parser(simul, 0, 0, 0, 1, 0).execute_run(glos, 1, 0);
+  }
 
   GetFiberPositionsFromFrame(agents);
 }
@@ -136,7 +134,7 @@ void CytosimPkg::Run()
 	std::cout << "CYTOSIM RUN STARTED" << endl;
 	std::cout << "..." << endl;
 	try {
-			Parser(simul, 1, 1, 1, 1, 1).readConfig(input_file);
+			Parser(simul, 0, 0, 0, 1, 1).readConfig(input_file);
 	}
 	catch( Exception & e ) {
 			std::cerr << std::endl << "Error: " << e.what() << std::endl;
