@@ -23,5 +23,6 @@ RUN cd /agentsim-dev/build && \
 #expose port 9002 for server
 EXPOSE 9002
 
-#move the server to teh root dir
+#move the server to the root dir
 RUN cp /agentsim-dev/build/agentsim_server.exe /usr/bin/agentsim_server.exe
+RUN cp -r /agentsim-dev/build/. /
