@@ -30,20 +30,6 @@ while read line; do
 done < $TMP_FILE
 rm $TMP_FILE
 
-#find $PROJECT_DIRECTORY -wholename "*/$INCLUDE_DIRECTORY/*.cc" > $TMP_FILE
-
-while read line; do
-	fpath="*/$INCLUDE_DIRECTORY/"
-	fpath=${line##$fpath}
-	fdir="/*.cc"
-	fdir=${fpath%$fdir}
-	if [[ ${fdir} != *".cc"* ]]; then
-		mkdir -p $TARGET_DIR/$fdir
-	fi
-	cp  $line $TARGET_DIR/$fpath
-done < $TMP_FILE
-rm $TMP_FILE
-
 find $PROJECT_DIRECTORY -wholename "*/$INCLUDE_DIRECTORY/*.hpp" > $TMP_FILE
 
 while read line; do

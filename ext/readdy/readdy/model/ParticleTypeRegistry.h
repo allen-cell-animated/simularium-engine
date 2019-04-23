@@ -44,7 +44,7 @@
  * @brief Header file containing definitions for particle flavors, particle type info and the particle type registry.
  * @author clonker
  * @date 29.03.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -62,7 +62,7 @@ static constexpr particle_flavor NORMAL = 0;
 static constexpr particle_flavor TOPOLOGY = 1;
 static constexpr particle_flavor MEMBRANE = 2;
 
-inline static std::string particle_flavor_to_str(particle_flavor flavor) {
+inline static std::string particleFlavorToString(particle_flavor flavor) {
     switch(flavor) {
         case model::particleflavor::NORMAL: return "NORMAL";
         case model::particleflavor::TOPOLOGY: return "TOPOLOGY";

@@ -34,29 +34,31 @@
 
 
 /**
- * << detailed description >>
- *
  * @file Utils.h
- * @brief << brief description >>
+ * @brief Utils for testing
  * @author clonker
  * @date 13.07.16
  */
 
-#ifndef READDY_TESTING_UTILS_H
-#define READDY_TESTING_UTILS_H
+#pragma once
+
+#include <catch2/catch.hpp>
 
 #include <string>
+
 #include <readdy/common/Utils.h>
 #include <readdy/common/string.h>
 #include <readdy/common/logging.h>
 
-// use this to check floating point equality of readdy's Vec3 object
-#define EXPECT_VEC3_EQ(u, v) EXPECT_DOUBLE_EQ((u)[0], (v)[0]); EXPECT_DOUBLE_EQ((u)[1], (v)[1]); EXPECT_DOUBLE_EQ((u)[2], (v)[2])
-#define EXPECT_FVEC3_EQ(u, v) EXPECT_FLOAT_EQ((u)[0], (v)[0]); EXPECT_FLOAT_EQ((u)[1], (v)[1]); EXPECT_FLOAT_EQ((u)[2], (v)[2])
-#define EXPECT_VEC3_NEAR(u, v, abs_error) EXPECT_NEAR((u)[0], (v)[0], abs_error); EXPECT_NEAR((u)[1], (v)[1], abs_error); EXPECT_NEAR((u)[2], (v)[2], abs_error)
+namespace readdy::testing {
 
-namespace readdy {
-namespace testing {
+static bool vec3eq(const readdy::Vec3 &v1, const readdy::Vec3 &v2, double epsilon=0) {
+    using namespace Catch::Floating;
+    for(auto i : {0, 1, 2}) {
+        if (v1[i] != Approx(v2[i]).epsilon(epsilon)) return false;
+    }
+    return true;
+}
 
 inline std::vector<std::string> getKernelsToTest() {
 #ifdef READDY_KERNELS_TO_TEST
@@ -91,5 +93,3 @@ inline std::string getPluginsDirectory() {
     return pluginDir;
 }
 }
-}
-#endif //READDY_TESTING_UTILS_H

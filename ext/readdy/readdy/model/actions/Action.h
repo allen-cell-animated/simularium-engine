@@ -48,7 +48,6 @@
 
 #include <memory>
 #include <readdy/common/common.h>
-#include <readdy/common/Timer.h>
 
 #if READDY_OSX
 #include <string>
@@ -62,19 +61,17 @@ class Action {
 public:
 
     Action() = default;
+    virtual ~Action() = default;
 
-    virtual void perform(const util::PerformanceNode &node) = 0;
-
-    void perform() {
-        /*static */util::PerformanceNode dummy("dummy", false);
-        this->perform(dummy);
-    }
+    virtual void perform() = 0;
 
 };
 
 class TimeStepDependentAction : public Action {
 public:
     explicit TimeStepDependentAction(scalar timeStep) : _timeStep(timeStep) {}
+
+    ~TimeStepDependentAction() override = default;
 
     scalar &timeStep() { return _timeStep; }
     const scalar &timeStep() const { return _timeStep; }

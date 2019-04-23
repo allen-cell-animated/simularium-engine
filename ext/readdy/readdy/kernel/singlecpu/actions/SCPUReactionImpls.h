@@ -34,11 +34,13 @@
 
 
 /**
- * << detailed description >>
+ * Reaction handler declaration specific to Single CPU kernel. Defines additional structs: a reaction Event
+ * to be used by the reaction handlers, and ParticleBackup to be used by the DetailedBalance reaction handler.
  *
- * @file SingleCPUDefaultReactionProgram.h.h
- * @brief << brief description >>
+ * @file SCPUReactionImpls.h
+ * @brief Single CPU kernel declaration of reaction handlers
  * @author clonker
+ * @author chrisfroe
  * @date 21.06.16
  */
 
@@ -57,7 +59,7 @@ class SCPUUncontrolledApproximation : public readdy::model::actions::reactions::
 public:
     SCPUUncontrolledApproximation(SCPUKernel* kernel, scalar timeStep);
 
-    void perform(const util::PerformanceNode &node) override;
+    void perform() override;
 
 protected:
     SCPUKernel *const kernel;
@@ -88,7 +90,7 @@ public:
     SCPUGillespie(SCPUKernel *const kernel, scalar timeStep)
             : readdy::model::actions::reactions::Gillespie(timeStep), kernel(kernel) {};
 
-    void perform(const util::PerformanceNode &node) override;
+    void perform() override;
 
 protected:
     SCPUKernel *const kernel;
@@ -115,13 +117,13 @@ public:
         searchReversibleReactions(kernel->context());
     };
 
-    void perform(const util::PerformanceNode &node) override;
+    void perform() override;
 
 protected:
     SCPUKernel *const kernel;
 
     // calculate first-order interactions and second-order non-bonded interactions
-    void calculateEnergies(const util::PerformanceNode &node);
+    void calculateEnergies();
 
     std::pair<model::SCPUParticleData::entries_update, scalar>
     performReversibleReactionEvent(const Event &event,

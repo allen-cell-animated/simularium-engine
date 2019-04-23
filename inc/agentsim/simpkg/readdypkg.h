@@ -2,6 +2,9 @@
 #define AICS_READDYPKG_H
 
 #include "agentsim/simpkg/simpkg.h"
+#include "readdy/model/observables/io/TrajectoryEntry.h"
+#include "readdy/model/observables/io/Types.h"
+#include <fstream>
 #include "readdy/readdy.h"
 
 #include <vector>
@@ -13,7 +16,7 @@ namespace agentsim {
 class ReaDDyPkg : public SimPkg
 {
 public:
-	ReaDDyPkg() : m_simulation("SingleCPU") {}
+	ReaDDyPkg() : m_simulation("SingleCPU") { }
 	virtual ~ReaDDyPkg() { }
 
 	virtual void Setup() override;
@@ -30,15 +33,20 @@ public:
 
 	// Cached Sim API
 	virtual void GetNextFrame(
-		std::vector<std::shared_ptr<Agent>>& agents) override { };
+		std::vector<std::shared_ptr<Agent>>& agents) override;
 
-	virtual bool IsFinished() override { return false; }
-	virtual void Run() override { return; }
+	virtual bool IsFinished() override;
+	virtual void Run() override;
 private:
 	readdy::Simulation m_simulation;
 	bool m_agents_initialized = false;
 	bool m_reactions_initialized = false;
 	int m_timeStepCount = 0;
+
+	bool m_hasAlreadyRun = false;
+	bool m_realTimeInitialized = false;
+	bool m_hasLoadedRunFile = false;
+	bool m_hasFinishedStreaming = false;
 };
 
 } // namespace agentsim

@@ -35,7 +35,7 @@
 
 /**
  * This file contains the base class definitions for Kernel and KernelProvider.
- * A Kernel is used to execute Programs, i.e., instances of readdy::plugin::Program.
+ * A Kernel is used to execute Actions, i.e., instances of readdy::model::Action.
  * The derived kernels can be built in or provided by shared libs in directories, which are loaded by the KernelProvider.
  * Each Kernel has a readdy::plugin::Kernel::name by which it can be accessed in the KernelProvider.
  *
@@ -136,7 +136,10 @@ public:
     TopologyParticle createTopologyParticle(const std::string &type, const Vec3 &pos) const {
         const auto& info = context().particleTypes().infoOf(type);
         if(info.flavor != particleflavor::TOPOLOGY) {
-            throw std::invalid_argument("You can only create topology particles of a type that is topology flavored.");
+            throw std::invalid_argument(fmt::format(
+                    "You can only create topology particles of a type that is topology flavored. "
+                    "Type was {}, flavor {}.", type, readdy::model::particleflavor::particleFlavorToString(info.flavor)
+                    ));
         }
         return TopologyParticle(pos, info.typeId);
     };

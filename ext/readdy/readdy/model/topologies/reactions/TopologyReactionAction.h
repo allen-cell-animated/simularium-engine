@@ -39,7 +39,7 @@
  * @brief << brief description >>
  * @author clonker
  * @date 03.04.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -154,6 +154,16 @@ public:
 protected:
     vertex _vertex;
     Vec3 _posTo;
+};
+
+class AppendParticle : public TopologyReactionAction {
+public:
+    AppendParticle(GraphTopology *topology, std::vector<vertex> neighbors, ParticleTypeId type, Vec3 pos);
+
+protected:
+    std::vector<vertex> neighbors;
+    ParticleTypeId  type;
+    Vec3 pos;
 };
 
 class AddEdge : public TopologyReactionAction {

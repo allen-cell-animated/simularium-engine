@@ -55,7 +55,6 @@
 #include <readdy/model/reactions/ReactionRecord.h>
 #include <readdy/model/observables/ReactionCounts.h>
 #include <readdy/common/index_persistent_vector.h>
-#include <readdy/common/Timer.h>
 #include <readdy/api/KernelConfiguration.h>
 #include <readdy/kernel/cpu/data/DefaultDataContainer.h>
 #include <readdy/kernel/cpu/nl/CellLinkedList.h>
@@ -97,21 +96,13 @@ public:
 
     const std::vector<particle_type> getParticles() const override;
 
-    void initializeNeighborList(scalar skin, const util::PerformanceNode &node) {
-        _neighborList->setUp(skin, _neighborListCellRadius, node.subnode("set_up"));
-        _neighborList->update(node.subnode("update"));
-    };
-
-    void initializeNeighborList(scalar skin) override {
-        initializeNeighborList(skin, {});
-    };
-
-    void updateNeighborList(const util::PerformanceNode &node) {
-        _neighborList->update(node.subnode("update"));
+    void initializeNeighborList(scalar interactionDistance) override {
+        _neighborList->setUp(interactionDistance, _neighborListCellRadius);
+        _neighborList->update();
     };
 
     void updateNeighborList() override {
-        updateNeighborList({});
+        _neighborList->update();
     };
 
     void addParticle(const particle_type &p) override {
@@ -154,6 +145,14 @@ public:
         return _observableData.energy;
     };
 
+    scalar time() const override {
+        return _observableData.time;
+    };
+
+    scalar &time() override {
+        return _observableData.time;
+    };
+
     data_type const *const getParticleData() const {
         return &_data.get();
     };
@@ -172,10 +171,6 @@ public:
     };
 
     void clearNeighborList() override {
-        clearNeighborList({});
-    };
-
-    void clearNeighborList(const util::PerformanceNode &node) {
         _neighborList->clear();
     };
 

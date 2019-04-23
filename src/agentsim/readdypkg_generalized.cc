@@ -6,8 +6,9 @@
 #include <math.h>
 #include <csignal>
 #include <unordered_map>
+#include <array>
 
-#define debug_printf printf
+#define debug_printf //printf
 
 /**
 *	Assumes the particle rotations are reasonably orthogonal
@@ -42,14 +43,6 @@ bool find_reactant(
 	aics::agentsim::rxComplex complex,
 	std::vector<readdy::model::top::graph::Vertex*>& out,
 	std::vector<readdy::model::top::graph::Vertex*>& ignore_list);
-
-void reparent_children(
-	const readdy::model::ParticleTypeRegistry &particles,
-	readdy::model::top::reactions::Recipe& recipe,
-	readdy::model::top::GraphTopology& top,
-	readdy::model::top::graph::Vertex* vertex,
-	std::string parent_name,
-	readdy::Vec3 parent_pos);
 
 void configure_fusion_reaction(
 	readdy::Simulation& sim,
@@ -97,6 +90,8 @@ void construct_fission_reaction(
 	}
 
 	#define IMMEDIATE_RATE 1e30
+	#include "readdypkg_fileio.cc"
+
 /**
 *	Simulation API
 **/
@@ -123,6 +118,7 @@ void ReaDDyPkg::Shutdown()
 	this->m_timeStepCount = 0;
 	this->m_agents_initialized = false;
 	this->m_reactions_initialized = false;
+	this->m_hasAlreadyRun = false;
 
 	ResetStaticVariables();
 }
@@ -147,8 +143,6 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 			{
 				topologies.addType(agent_model_data.name);
 
-				particles.addTopologyType(
-					agent_model_data.name + "_ORIGIN", 0); // used by diffusing children
 				particles.addTopologyType(
 					agent_model_data.name + "_FLAGGED", 0); // used for reaction evaluation
 				particles.addTopologyType(
@@ -261,25 +255,25 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 
 		std::vector<readdy::model::TopologyParticle> tp;
 
+		// create the parent particles
 		Eigen::Vector3d v = parent->GetLocation();
 		tp.push_back(this->m_simulation.createTopologyParticle(
 			parent->GetName(), readdy::Vec3(v[0], v[1], v[2])));
-		v = Eigen::Vector3d(0,0,0);
-		tp.push_back(this->m_simulation.createTopologyParticle(
-			parent->GetName() + "_ORIGIN", readdy::Vec3(v[0], v[1], v[2])));
+
+		// create the child particles
 		for(std::size_t j = 0; j < parent->GetNumChildAgents(); ++j)
 		{
 			auto child = parent->GetChildAgent(j);
-			v = child->GetLocation();
+			v += child->GetLocation();
 			tp.push_back(this->m_simulation.createTopologyParticle(
 				child->GetName() + "_CHILD", readdy::Vec3(v[0], v[1], v[2])));
 		}
 
+		// connect the parent-child particles
 		auto tp_inst = this->m_simulation.addTopology(parent->GetName(), tp);
-		tp_inst->graph().addEdgeBetweenParticles(0,1);
 		for(std::size_t j = 0; j < parent->GetNumChildAgents(); ++j)
 		{
-			tp_inst->graph().addEdgeBetweenParticles(1, j+2);
+			tp_inst->graph().addEdgeBetweenParticles(0, j+1);
 		}
 
 		if(parent->GetNumChildAgents() > 2)
@@ -301,10 +295,6 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 			parent->SetInverseChildRotationMatrix(rm.inverse());
 		}
 	}
-
-	auto loop = this->m_simulation.createLoop(1);
-	loop.runInitialize();
-	loop.runInitializeNeighborList();
 }
 
 void ReaDDyPkg::InitReactions(Model& model)
@@ -368,21 +358,52 @@ void ReaDDyPkg::InitReactions(Model& model)
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
+	if(!this->m_realTimeInitialized)
+	{
+		auto loop = this->m_simulation.createLoop(1);
+		loop.runInitialize();
+		loop.runInitializeNeighborList();
+		this->m_realTimeInitialized = true;
+	}
+
 	if(agents.size() == 0)
 	{
 		return;
 	}
 
-	auto loop = this->m_simulation.createLoop(timeStep);
+	float max_time_step = 1.000f;
 
-	this->m_timeStepCount++;
-	loop.runIntegrator(); // propagate particles
-	loop.runUpdateNeighborList(); // neighbor list update
-	loop.runReactions(); // evaluate reactions
-	loop.runTopologyReactions(); // and topology reactions
-	loop.runUpdateNeighborList(); // neighbor list update
-	loop.runForces(); // evaluate forces based on current particle configuration
-	loop.runEvaluateObservables(this->m_timeStepCount); // evaluate observables
+	if(timeStep > max_time_step)
+	{
+		auto loop = this->m_simulation.createLoop(max_time_step);
+		unsigned n_iterations = timeStep / max_time_step;
+
+		for(unsigned i = 0; i < n_iterations; ++i)
+		{
+			std::cout << "Running iteration " << i << " of " << n_iterations << std::endl;
+			this->m_timeStepCount++;
+			loop.runIntegrator(); // propagate particles
+			loop.runUpdateNeighborList(); // neighbor list update
+			loop.runReactions(); // evaluate reactions
+			loop.runTopologyReactions(); // and topology reactions
+			loop.runUpdateNeighborList(); // neighbor list update
+			loop.runForces(); // evaluate forces based on current particle configuration
+			loop.runEvaluateObservables(this->m_timeStepCount); // evaluate observables
+		}
+	}
+	else
+	{
+		auto loop = this->m_simulation.createLoop(timeStep);
+
+		this->m_timeStepCount++;
+		loop.runIntegrator(); // propagate particles
+		loop.runUpdateNeighborList(); // neighbor list update
+		loop.runReactions(); // evaluate reactions
+		loop.runTopologyReactions(); // and topology reactions
+		loop.runUpdateNeighborList(); // neighbor list update
+		loop.runForces(); // evaluate forces based on current particle configuration
+		loop.runEvaluateObservables(this->m_timeStepCount); // evaluate observables
+	}
 
   auto unused_agents = agents;
 
@@ -400,8 +421,7 @@ void ReaDDyPkg::RunTimeStep(
 			bool foundAgent = false;
 			std::size_t index = 0;
 
-			if(name.find("_CHILD") != std::string::npos
-				|| name.find("_ORIGIN") != std::string::npos)
+			if(name.find("_CHILD") != std::string::npos)
 			{
 				continue;
 			}
@@ -591,11 +611,11 @@ void add_spatial_constraints(
 
 		bond.length = (positions[0] - positions[i]).norm();
 		bond.forceConstant = bond_force_constant;
-		topologies.configureBondPotential(names[0] + "_ORIGIN", names[i], bond);
+		topologies.configureBondPotential(names[0], names[i], bond);
 		topologies.configureBondPotential(names[0] + "_BOUND", names[i], bond);
 		topologies.configureBondPotential(names[0] + "_FLAGGED", names[i], bond);
 
-		potentials.addHarmonicRepulsion(names[0] + "_BOUND", names[i], 1, parent_repel_dist - 0.01f);
+		potentials.addHarmonicRepulsion(names[0] + "_BOUND", names[i], 70, parent_repel_dist - 0.01f);
 
 		for(std::size_t j = i + 1; j < positions.size(); ++j)
 		{
@@ -608,7 +628,7 @@ void add_spatial_constraints(
 			auto v2 = (positions[i] - positions[0]).normalized();
 			angle.equilibriumAngle = acos(v1.dot(v2));
 
-			topologies.configureAnglePotential(names[i], names[0] + "_ORIGIN", names[j], angle);
+			topologies.configureAnglePotential(names[i], names[0], names[j], angle);
 			topologies.configureAnglePotential(names[i], names[0] + "_BOUND", names[j], angle);
 
 			potentials.addHarmonicRepulsion(names[i], names[j], 1, child_repel_dist - 0.01f);
@@ -617,9 +637,7 @@ void add_spatial_constraints(
 
 	bond.forceConstant = 0;
 	bond.length = radii[0];
-	topologies.configureBondPotential(names[0], names[0] + "_ORIGIN", bond);
-	topologies.configureBondPotential(names[0] + "_FLAGGED", names[0] + "_ORIGIN", bond);
-	topologies.configureBondPotential(names[0] + "_BOUND", names[0] + "_ORIGIN", bond);
+	topologies.configureBondPotential(names[0], names[0], bond);
 }
 
 /**
@@ -630,30 +648,6 @@ const readdy::model::ParticleTypeRegistry& particles,
 readdy::model::top::graph::Vertex* vert,
 aics::agentsim::rxParentState parent_state)
 {
-	// determine if the children are on origin particle
-	auto origin = *std::find_if(
-		vert->neighbors().begin(),
-		vert->neighbors().end(),
-		[&particles](auto vert)
-		{
-			auto type = vert->particleType();
-			auto name = particles.nameOf(type);
-
-			if(name.find("_ORIGIN") != std::string::npos)
-			{
-				return true;
-			}
-
-			return false;
-		}
-	);
-
-	if(origin != *vert->neighbors().end() &&
-		origin->neighbors().size() > vert->neighbors().size())
-	{
-		vert = &*origin;
-	}
-
 	// match state of child molecules
 	for(auto child : vert->neighbors())
 	{
@@ -722,7 +716,6 @@ bool find_reactant(
 				auto name = particles.nameOf(type);
 
 				if(name.find(first_parent_state.name) == std::string::npos
-					|| name.find("_ORIGIN") != std::string::npos
 					|| name.find("_CHILD") != std::string::npos)
 				{
 					return false;
@@ -754,14 +747,7 @@ bool find_reactant(
 			auto partner_id = partner->particleType();
 			auto partner_name = particles.nameOf(partner_id);
 
-			std::size_t pos = partner_name.find("_CHILD");
-			if(pos != std::string::npos)
-			{
-				continue;
-			}
-
-			pos = partner_name.find("_ORIGIN");
-			if(pos != std::string::npos)
+			if(partner_name.find("_CHILD") != std::string::npos)
 			{
 				continue;
 			}
@@ -783,43 +769,6 @@ bool find_reactant(
 	}
 
 	return true;
-}
-
-void reparent_children(
-	const readdy::model::ParticleTypeRegistry &particles,
-	readdy::model::top::reactions::Recipe& recipe,
-	readdy::model::top::GraphTopology& top,
-	readdy::model::top::graph::Vertex* vertex,
-	std::string parent_name,
-	readdy::Vec3 parent_pos)
-{
-	auto origin_id = particles.idOf(parent_name + "_ORIGIN");
-	auto origin_vertex = *std::find_if(
-		vertex->neighbors().begin(),
-		vertex->neighbors().end(),
-		[&origin_id](const auto vert) {
-			return vert->particleType() == origin_id;
-		});
-
-	if(origin_vertex == *vertex->neighbors().end())
-	{
-		std::raise(SIGABRT);
-	}
-
-	for(auto& other : origin_vertex->neighbors())
-	{
-		if(other->particleType() == vertex->particleType())
-		{
-			continue;
-		}
-
-		recipe.removeEdge(origin_vertex, other);
-		recipe.addEdge(*vertex, *other);
-
-		auto pos = top.particleForVertex(other).pos();
-		pos += parent_pos;
-		recipe.changeParticlePosition(other, pos);
-	}
 }
 
 void configure_fusion_reaction(
@@ -1012,30 +961,9 @@ void construct_fusion_reaction(readdy::Simulation& sim, aics::agentsim::Reaction
 				}
 			}
 
-			// search origin particle neighbors next
-			auto origin_id = particles.idOf(parent + "_ORIGIN");
-			auto origin_vertex = *std::find_if(
-				vertex->neighbors().begin(),
-				vertex->neighbors().end(),
-				[&origin_id](const auto vert) {
-					return vert->particleType() == origin_id;
-				});
-
-			if(origin_vertex == *vertex->neighbors().end())
-			{
-				std::raise(SIGABRT);
-			}
-
-			for(auto& other : origin_vertex->neighbors())
-			{
-				if(other->particleType() == child_id)
-				{
-					return other;
-				}
-			}
-
+			printf("Failed to find child vertex %s on parent %s\n", child.c_str(), parent.c_str());
 			std::raise(SIGABRT);
-			return *origin_vertex->neighbors().end();
+			return vertex->neighbors()[0];
 		};
 
 		bool reposition1 = reactant1.size() == 1 && reactant2.size() != 1;
@@ -1077,37 +1005,47 @@ void construct_fusion_reaction(readdy::Simulation& sim, aics::agentsim::Reaction
 		}
 
 		reposition_location = reposition_location / reposition_divisor;
+		auto current_pos_parent1 = top.particleForVertex(*reactant1[0]).pos();
+		auto current_pos_parent2 = top.particleForVertex(*reactant2[0]).pos();
+
+		auto new_position1 = reposition1 ? reposition_location : current_pos_parent1;
+		auto new_position2 = reposition1 ? reposition_location : current_pos_parent2;
+
+		recipe.changeParticlePosition(*reactant1[0], new_position1);
+		recipe.changeParticlePosition(*reactant2[0], new_position2);
+
 		if(reposition1)
 		{
-			recipe.changeParticlePosition(*reactant1[0], reposition_location);
-			reparent_children(particles, recipe, top,
-				reactant1[0], reaction.complexes[0].parents[0].name,
-				reposition_location
-			);
-		}
-		else if (reposition2)
-		{
-			recipe.changeParticlePosition(*reactant2[0], reposition_location);
-			reparent_children(particles, recipe, top,
-				reactant2[0], reaction.complexes[1].parents[0].name,
-				reposition_location
-			);
+			for(auto child : reactant1[0]->neighbors())
+			{
+				auto name = particles.nameOf(child->particleType());
+				if(name.find("_CHILD") == std::string::npos)
+				{
+					continue;
+				}
+
+				auto current_pos_child = top.particleForVertex(*&child).pos();
+				auto current_pos_parent = top.particleForVertex(*reactant1[0]).pos();
+				auto offset = current_pos_child - current_pos_parent;
+				recipe.changeParticlePosition(child, new_position1 + offset);
+			}
 		}
 
-		for(std::size_t i = 0; !reposition1 && i < reaction.complexes[0].parents.size(); ++i)
+		if(reposition2)
 		{
-			reparent_children(particles, recipe, top,
-				reactant1[i], reaction.complexes[0].parents[i].name,
-				top.particleForVertex(*reactant1[i]).pos()
-			);
-		}
+			for(auto child : reactant2[0]->neighbors())
+			{
+				auto name = particles.nameOf(child->particleType());
+				if(name.find("_CHILD") == std::string::npos)
+				{
+					continue;
+				}
 
-		for(std::size_t i = 0; !reposition2 && i < reaction.complexes[1].parents.size(); ++i)
-		{
-			reparent_children(particles, recipe, top,
-				reactant2[i], reaction.complexes[1].parents[i].name,
-				top.particleForVertex(*reactant2[i]).pos()
-			);
+				auto current_pos_child = top.particleForVertex(*&child).pos();
+				auto current_pos_parent = top.particleForVertex(*reactant2[0]).pos();
+				auto offset = current_pos_child - current_pos_parent;
+				recipe.changeParticlePosition(child, new_position2 + offset);
+			}
 		}
 
 		std::string delimiter = "_";
@@ -1252,30 +1190,9 @@ void construct_fission_reaction(
 				}
 			}
 
-			// search origin particle neighbors next
-			auto origin_id = particles.idOf(parent + "_ORIGIN");
-			auto origin_vertex = *std::find_if(
-				vertex->neighbors().begin(),
-				vertex->neighbors().end(),
-				[&origin_id](const auto vert) {
-					return vert->particleType() == origin_id;
-				});
-
-			if(origin_vertex == *vertex->neighbors().end())
-			{
-				std::raise(SIGABRT);
-			}
-
-			for(auto& other : origin_vertex->neighbors())
-			{
-				if(other->particleType() == child_id)
-				{
-					return other;
-				}
-			}
-
+			printf("Failed to find child vertex %s on parent %s\n", child.c_str(), parent.c_str());
 			std::raise(SIGABRT);
-			return *origin_vertex->neighbors().end();
+			return vertex->neighbors()[0];
 		};
 
 		for(auto center : reaction.centers)
@@ -1349,8 +1266,7 @@ void construct_fission_reaction(
 			for(auto vert = vertices.begin(), end = vertices.end(); vert != end; ++vert)
 			{
 					auto name = particles.nameOf(vert->particleType());
-					if(name.find("_CHILD") != std::string::npos
-						|| name.find("_ORIGIN") != std::string::npos)
+					if(name.find("_CHILD") != std::string::npos)
 					{
 						continue;
 					}
@@ -1369,43 +1285,6 @@ void construct_fission_reaction(
 		};
 
 		count_agents(agent_counts, total_count);
-
-		if(total_count == 1)
-		{
-			std::vector<readdy::model::top::graph::Vertex*> children, origin, base;
-
-			for(auto vert = vertices.begin(), end = vertices.end(); vert != end; ++vert)
-			{
-					auto name = particles.nameOf(vert->particleType());
-
-					if(name.find("_CHILD") != std::string::npos)
-					{
-						children.push_back(&*vert);
-					}
-					else if(name.find("_BOUND") != std::string::npos)
-					{
-						base.push_back(&*vert);
-
-						name.erase(name.begin() + name.find("_BOUND"), name.end());
-						recipe.changeParticleType(*base[0], name);
-					}
-					else if(name.find("_ORIGIN") != std::string::npos)
-					{
-						origin.push_back(&*vert);
-					}
-
-			}
-
-			for(std::size_t i = 0; i < children.size(); ++i)
-			{
-				auto pos = top.particleForVertex(*children[i]).pos()
-				 - top.particleForVertex(*base[0]).pos();
-
-				recipe.changeParticlePosition(*children[i], pos);
-				recipe.removeEdge(*base[0], *children[i]);
-				recipe.addEdge(*origin[0], *children[i]);
-			}
-		}
 
 		for(auto entry : Reaction_Complexes)
 		{

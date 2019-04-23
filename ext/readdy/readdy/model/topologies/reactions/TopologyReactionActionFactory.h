@@ -40,7 +40,7 @@
  * @brief << brief description >>
  * @author clonker
  * @date 05.04.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 #pragma once
 
@@ -83,6 +83,9 @@ public:
                                                 const ParticleTypeId &type_to) const = 0;
 
     virtual action_ref createChangeParticlePosition(GraphTopology *topology, const vertex &v, Vec3 position) const = 0;
+
+    virtual action_ref createAppendParticle(GraphTopology *topology, const std::vector<vertex> &neighbors,
+                                            ParticleTypeId type, const Vec3 &position) const = 0;
 
     /**
      * creates an action that adds an edge in the topology

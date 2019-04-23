@@ -154,6 +154,19 @@ target_link_libraries(${TEST_PROGRAM}
   "${READDY_DLLS}"
 )
 
+add_executable("TestReaDDyFileIO.test" ${SOURCE_DIRECTORY}/TestReaDDyFileIO.cpp)
+target_include_directories("TestReaDDyFileIO.test" PUBLIC
+${INTERNAL_INCLUDES}
+${EXTERNAL_INCLUDES}
+)
+target_link_libraries("TestReaDDyFileIO.test"
+  "${AGENTSIM_DLL}"
+  "${CYTOSIM_DLLS}"
+  Threads::Threads
+  "${HDF5_DLLS}"
+  "${READDY_DLLS}"
+)
+
 add_custom_target(do_always ALL
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                  ${CMAKE_SOURCE_DIR}/data ${CMAKE_BINARY_DIR}/data)

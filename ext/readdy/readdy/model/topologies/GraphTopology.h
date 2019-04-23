@@ -40,7 +40,7 @@
  * @brief << brief description >>
  * @author clonker
  * @date 21.03.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -147,6 +147,9 @@ public:
 
     void appendParticle(particle_index newParticle, ParticleTypeId newParticleType,
                         particle_index counterPart, ParticleTypeId counterPartType);
+
+    void appendParticle(particle_index newParticle, ParticleTypeId newParticleType,
+            topology_graph::vertex_ref counterPart, ParticleTypeId counterPartType);
 
     void appendTopology(GraphTopology &other, particle_index otherParticle, ParticleTypeId otherNewParticleType,
                         particle_index thisParticle, ParticleTypeId thisNewParticleType, TopologyTypeId newType);
