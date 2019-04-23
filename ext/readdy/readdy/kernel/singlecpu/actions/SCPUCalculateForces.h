@@ -33,10 +33,8 @@
  ********************************************************************/
 
 /**
- * << detailed description >>
- *
  * @file SCPUCalculateForces.h
- * @brief << brief description >>
+ * @brief Single CPU implementation of action that calculates forces and energies (and optionally the virial)
  * @author clonker
  * @date 20.06.16
  */
@@ -68,12 +66,12 @@ class SCPUCalculateForces : public readdy::model::actions::CalculateForces {
 public:
     explicit SCPUCalculateForces(SCPUKernel *kernel) : kernel(kernel) {};
 
-    void perform(const util::PerformanceNode &node) override {
+    void perform() override {
         const auto &context = kernel->context();
         if(context.recordVirial()) {
-            performImpl<true>(node);
+            performImpl<true>();
         } else {
-            performImpl<false>(node);
+            performImpl<false>();
         }
 
     };
@@ -81,8 +79,7 @@ public:
 private:
 
     template<bool COMPUTE_VIRIAL>
-    void performImpl(const util::PerformanceNode &node) {
-        auto t = node.timeit();
+    void performImpl() {
 
         const auto &context = kernel->context();
 
@@ -96,7 +93,6 @@ private:
         const auto &potentials = context.potentials();
         auto &topologies = stateModel.topologies();
         if (!potentials.potentialsOrder1().empty() || !potentials.potentialsOrder2().empty() || !topologies.empty()) {
-            auto tClear = node.subnode("clear").timeit();
             std::for_each(data.begin(), data.end(), [](auto &entry) {
                 entry.force = {0, 0, 0};
             });
@@ -145,7 +141,7 @@ private:
             }
         };
 
-        readdy::algo::evaluateOnContainers(data, order1eval, neighborList, order2eval, topologies, topologyEval, node);
+        readdy::algo::evaluateOnContainers(data, order1eval, neighborList, order2eval, topologies, topologyEval);
     }
     SCPUKernel *kernel;
 };

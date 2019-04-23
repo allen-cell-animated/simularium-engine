@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <time.h>
+#include <csignal>
+#include <math.h>
 
 
 void add_oriented_species(
@@ -99,7 +101,7 @@ void toggle_end_marker(
     bool end);
 
 /**
-*	Unscoped variables
+*	Unscoped variables#include <math.h>
 **/
 
 	// helix
@@ -122,6 +124,8 @@ void toggle_end_marker(
 
     bool log_events = false;
 
+#include "readdypkg_fileio.cc"
+
 
 /**
 *	Simulation API
@@ -129,7 +133,18 @@ void toggle_end_marker(
 namespace aics {
 namespace agentsim {
 
-void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model) { }
+void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)
+{
+  for(std::size_t i = 0; i < 1000; ++i)
+  {
+    std::shared_ptr<Agent> agent;
+    agent.reset(new Agent());
+    agent->SetVisibility(false);
+    agent->SetCollisionRadius(mol_radius);
+    agents.push_back(agent);
+  }
+}
+
 void ReaDDyPkg::InitReactions(Model& model) { }
 
 void ReaDDyPkg::Setup()

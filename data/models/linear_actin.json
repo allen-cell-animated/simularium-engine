@@ -5,10 +5,10 @@
 		"min-timestep" : 0.001,
 		"max-timestep" : 0.010,
 		"timestep-edit-exponent" : 2,
-		"fusion-bond-force-constant" : 10,
-		"fusion-angle-force-constant" : 50,
-		"parent-child-bond-force-constant" : 10,
-		"parent-child-angle-force-constant" : 50,
+		"fusion-bond-force-constant" : 70,
+		"fusion-angle-force-constant" : 70,
+		"parent-child-bond-force-constant" : 70,
+		"parent-child-angle-force-constant" : 70,
 		"child-diffusion-coefficient" : 1
 	},
 
@@ -114,7 +114,7 @@
 	"seed-concentrations" : {
 		"0" : {
 			"name" : "Actin",
-			"concentration" : 5e-7
+			"concentration" : 5e-6
 		}
 	},
 

@@ -34,13 +34,11 @@
 
 
 /**
- * << detailed description >>
- *
  * @file CellLinkedList.h
  * @brief << brief description >>
  * @author clonker
  * @date 12.09.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -48,7 +46,6 @@
 #include <cstddef>
 #include <readdy/common/Index.h>
 #include <readdy/model/Context.h>
-#include <readdy/common/Timer.h>
 #include <readdy/common/thread/atomic.h>
 #include <readdy/kernel/cpu/data/DefaultDataContainer.h>
 
@@ -65,9 +62,9 @@ public:
     CellLinkedList(data_type &data, const readdy::model::Context &context,
                    thread_pool &pool);
 
-    void setUp(scalar skin, cell_radius_type radius, const util::PerformanceNode &node);
+    void setUp(scalar cutoff, cell_radius_type radius);
 
-    virtual void update(const util::PerformanceNode &node) = 0;
+    virtual void update() = 0;
 
     virtual void clear() = 0;
 
@@ -113,10 +110,6 @@ public:
         return _data.get();
     };
 
-    scalar maxCutoff() const {
-        return _max_cutoff;
-    };
-
     std::size_t cellOfParticle(std::size_t index) const {
         const auto &entry = data().entry_at(index);
         if (entry.deactivated) {
@@ -139,12 +132,11 @@ public:
     };
 
 protected:
-    virtual void setUpBins(const util::PerformanceNode &node) = 0;
+    virtual void setUpBins() = 0;
 
-    bool _is_set_up{false};
+    bool _isSetUp{false};
 
-    scalar _skin{0};
-    scalar _max_cutoff{0};
+    scalar _cutoff{0};
     std::uint8_t _radius;
 
     Vec3 _cellSize{0, 0, 0};
@@ -172,17 +164,16 @@ public:
 
     using iterator_bounds = std::tuple<std::size_t, std::size_t>;
 
-    CompactCellLinkedList(data_type &data, const readdy::model::Context &context,
-                          thread_pool &pool);
+    CompactCellLinkedList(data_type &data, const readdy::model::Context &context, thread_pool &pool);
 
-    void update(const util::PerformanceNode &node) override {
-        auto t = node.timeit();
-        setUpBins(node.subnode("setUpBins"));
+    void update() override {
+        setUpBins();
     };
 
     void clear() override {
         _head.resize(0);
         _list.resize(0);
+        _isSetUp = false;
     };
 
     BoxIterator particlesBegin(std::size_t cellIndex);
@@ -221,10 +212,10 @@ public:
         return (*_head.at(index)).load() == 0;
     };
 protected:
-    void setUpBins(const util::PerformanceNode &node) override;
+    void setUpBins() override;
 
     template<bool serial>
-    void fillBins(const util::PerformanceNode &node);
+    void fillBins();
 
     HEAD _head;
     // particles, 1-indexed

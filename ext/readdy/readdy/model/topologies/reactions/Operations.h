@@ -44,7 +44,7 @@
  * @brief Definitions for various operations that can be performed on graph topologies.
  * @author clonker
  * @date 13.04.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -123,6 +123,22 @@ public:
 private:
     vertex_ref _vertex;
     ParticleTypeId _type_to;
+};
+
+class AppendParticle : public Operation {
+public:
+
+    AppendParticle(std::vector<vertex_ref> neighbors, ParticleTypeId type, const Vec3 &pos)
+        : neighbors(std::move(neighbors)), type(type), pos(pos) {};
+
+    action_ptr create_action(topology_ref topology, factory_ref factory) const override {
+        return factory->createAppendParticle(topology, neighbors, type, pos);
+    }
+
+private:
+    std::vector<vertex_ref> neighbors;
+    ParticleTypeId type;
+    Vec3 pos;
 };
 
 class ChangeParticlePosition : public Operation {

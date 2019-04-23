@@ -22,6 +22,7 @@ std::vector<std::string> net_messages;
 std::vector<websocketpp::connection_hdl> net_connections;
 std::vector<int> missed_net_heartbeats;
 
+std::mutex net_msg_mtx;
 std::atomic<bool> has_simulation_model { false };
 std::atomic<bool> has_unhandled_new_connection { false };
 std::string most_recent_model = "";
@@ -43,7 +44,8 @@ enum {
   id_update_rate_param,
   id_model_definition,
   id_heartbeat_ping,
-  id_heartbeat_pong
+  id_heartbeat_pong,
+  id_play_cache
 };
 
 template <typename T, typename U>
@@ -157,6 +159,7 @@ int main() {
 
       if(net_messages.size() > 0)
       {
+        net_msg_mtx.lock();
         for(std::size_t i = 0; i < net_messages.size(); ++i)
         {
           std::string msg_str = net_messages[i];
@@ -286,6 +289,13 @@ int main() {
 
               missed_net_heartbeats[conn_id] = 0;
             } break;
+            case id_play_cache:
+            {
+              std::cout << "request to play cached arrived\n";
+              simulation.PlayCacheFromFrame(0);
+              isRunningSimulation = true;
+              isSimulationPaused = false;
+            } break;
             default:
             {
               std::cout << "Received unrecognized message of type " << msg_type << "\n";
@@ -294,6 +304,7 @@ int main() {
         }
 
         net_messages.clear();
+        net_msg_mtx.unlock();
       }
 
       if(!isRunningSimulation || isSimulationPaused)
@@ -328,8 +339,8 @@ int main() {
         {
           if(simulation.HasLoadedAllFrames())
           {
-            std::cout << "Starting cached play" << std::endl;
-            simulation.PlayCacheFromFrame(0);
+            std::cout << "Simulation Finished" << std::endl;
+            isRunningSimulation = false;
           }
           else
           {
@@ -397,6 +408,7 @@ int main() {
       {
         if(net_messages.size() > 0)
         {
+          net_msg_mtx.lock();
           for(std::size_t i = 0; i < net_messages.size(); ++i)
           {
             std::string msg_str = net_messages[i];
@@ -418,6 +430,7 @@ int main() {
                 std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
 
                 missed_net_heartbeats[conn_id] = 0;
+                net_messages.erase(net_messages.begin() + i);
               } break;
               default:
               {
@@ -425,6 +438,7 @@ int main() {
               } break;
             }
           }
+          net_msg_mtx.unlock();
         }
 
         start = now;

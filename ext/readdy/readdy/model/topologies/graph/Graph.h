@@ -40,7 +40,7 @@
  * @brief << brief description >>
  * @author clonker
  * @date 16.03.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -211,6 +211,14 @@ public:
         });
         return result;
     };
+
+    bool hasEdge(const std::tuple<vertex_ref, vertex_ref> &edge) const {
+        const auto &v1 = std::get<0>(edge);
+        const auto &v2 = std::get<1>(edge);
+        auto it1 = std::find(v1->neighbors().begin(), v1->neighbors().end(), v2);
+        auto it2 = std::find(v2->neighbors().begin(), v2->neighbors().end(), v1);
+        return it1 != v1->neighbors().end() && it2 != v2->neighbors().end();
+    }
 
     void findEdges(const edge_callback &edgeCallback);
     

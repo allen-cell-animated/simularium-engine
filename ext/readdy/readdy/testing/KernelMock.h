@@ -34,19 +34,15 @@
 
 
 /**
- * << detailed description >>
- *
  * @file KernelMock.h
- * @brief << brief description >>
+ * @brief Header for an impostor Kernel
  * @author clonker
  * @date 13.07.16
  */
 
-#ifndef READDY_MAIN_KERNELMOCK_H
-#define READDY_MAIN_KERNELMOCK_H
+#pragma once
 
 #include <readdy/model/Kernel.h>
-#include <gmock/gmock.h>
 
 namespace readdy {
 namespace testing {
@@ -62,12 +58,19 @@ public:
         return nullptr;
     }
 
-    std::unique_ptr<model::actions::CalculateForces> calculateForces() const override {
+    std::unique_ptr<readdy::model::actions::CalculateForces> calculateForces() const override {
         return nullptr;
     }
 
-    std::unique_ptr<model::actions::UpdateNeighborList>
-    updateNeighborList(model::actions::UpdateNeighborList::Operation operation, scalar skinSize) const override {
+    std::unique_ptr<model::actions::CreateNeighborList> createNeighborList(scalar interactionDistance) const override {
+        return nullptr;
+    }
+
+    std::unique_ptr<model::actions::UpdateNeighborList> updateNeighborList() const override {
+        return nullptr;
+    }
+
+    std::unique_ptr<model::actions::ClearNeighborList> clearNeighborList() const override {
         return nullptr;
     }
 
@@ -80,7 +83,8 @@ public:
         return nullptr;
     }
 
-    std::unique_ptr<model::actions::reactions::Gillespie> gillespie(scalar timeStep) const override {
+    std::unique_ptr<model::actions::reactions::Gillespie>
+    gillespie(scalar timeStep) const override {
         return nullptr;
     }
 
@@ -90,25 +94,5 @@ public:
     }
 };
 
-class KernelMock : public readdy::model::Kernel {
-
-public:
-    explicit KernelMock(const std::string &name) : Kernel(name) {}
-
-    MOCK_METHOD0(actions, readdy::model::actions::ActionFactory & (void));
-
-    MOCK_CONST_METHOD0(actions, const readdy::model::actions::ActionFactory & (
-            void));
-
-    MOCK_METHOD0(stateModel, readdy::model::StateModel &(void));
-    MOCK_CONST_METHOD0(stateModel, const readdy::model::StateModel & (void));
-
-    MOCK_METHOD0(observe, readdy::model::observables::ObservableFactory &(void));
-    MOCK_CONST_METHOD0(observe, const readdy::model::observables::ObservableFactory & (void));
-
-    MOCK_METHOD0(getTopologyActionFactory, readdy::model::top::TopologyActionFactory*const (void));
-    MOCK_CONST_METHOD0(getTopologyActionFactory, const readdy::model::top::TopologyActionFactory*const (void));
-};
 }
 }
-#endif //READDY_MAIN_KERNELMOCK_H

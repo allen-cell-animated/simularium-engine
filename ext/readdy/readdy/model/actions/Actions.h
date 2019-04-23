@@ -78,7 +78,9 @@ class AddParticles : public Action {
 public:
     AddParticles(Kernel *kernel, const std::vector<Particle> &particles);
 
-    void perform(const util::PerformanceNode &node) override;
+    ~AddParticles() override = default;
+
+    void perform() override;
 
 protected:
     std::vector<Particle> particles;
@@ -88,29 +90,45 @@ protected:
 class EulerBDIntegrator : public TimeStepDependentAction {
 public:
     explicit EulerBDIntegrator(scalar timeStep);
+
+    ~EulerBDIntegrator() override = default;
 };
 
+class MdgfrdIntegrator : public TimeStepDependentAction {
+public:
+    explicit MdgfrdIntegrator(scalar timeStep);
+
+    ~MdgfrdIntegrator() override = default;
+};
+
+/**
+ * Calculates all forces and energies resulting from potentials (external, pair-potentials, bonded).
+ * Optionally calculate the virial which is required if the pressure in the system shall be measured.
+ */
 class CalculateForces : public Action {
 public:
     CalculateForces();
+
+    ~CalculateForces() override = default;
 };
 
-class UpdateNeighborList : public Action {
+class CreateNeighborList : public Action {
 public:
-    enum Operation {
-        init, update, clear
-    };
+    explicit CreateNeighborList(scalar cutoffDistance);
 
-    explicit UpdateNeighborList(Operation operation = Operation::init, scalar skinSize = 0);
+    ~CreateNeighborList() override = default;
 
-    scalar &skin() { return skinSize; }
+    scalar &cutoffDistance() { return _cutoffDistance; }
 
-    const scalar &skin() const { return skinSize; }
+    const scalar &cutoffDistance() const { return _cutoffDistance; }
 
 protected:
-    Operation operation;
-    scalar skinSize;
+    scalar _cutoffDistance;
 };
+
+class UpdateNeighborList : public Action {};
+
+class ClearNeighborList : public Action {};
 
 NAMESPACE_BEGIN(reactions)
 
@@ -118,11 +136,15 @@ class UncontrolledApproximation : public TimeStepDependentAction {
 
 public:
     explicit UncontrolledApproximation(scalar timeStep);
+
+    ~UncontrolledApproximation() override = default;
 };
 
 class Gillespie : public TimeStepDependentAction {
 public:
     explicit Gillespie(scalar timeStep);
+
+    ~Gillespie() override = default;
 };
 
 
@@ -130,6 +152,7 @@ class DetailedBalance : public TimeStepDependentAction {
 public:
     explicit DetailedBalance(scalar timeStep);
 
+    ~DetailedBalance() override = default;
     const std::vector<std::shared_ptr<const ReversibleReactionConfig>> &reversibleReactions() const {
         return _reversibleReactionsContainer;
     }
@@ -153,13 +176,24 @@ NAMESPACE_BEGIN(top)
 class EvaluateTopologyReactions : public TimeStepDependentAction {
 public:
     explicit EvaluateTopologyReactions(scalar timeStep);
+
+    ~EvaluateTopologyReactions() override = default;
 };
 
 NAMESPACE_END(top)
 
+/**
+ * The Compartments feature defines compartments via characteristic functions that map from Vec3 to bool.
+ * For every compartment one can then define conversions that should take place as soon as a particle
+ * enters the compartment. Note that the user is responsible for keeping the compartments disjoint.
+ *
+ * The EvaluateCompartments action performs these conversions.
+ */
 class EvaluateCompartments : public Action {
 public:
     explicit EvaluateCompartments() : Action() {}
+
+    ~EvaluateCompartments() override = default;
 };
 
 template<typename T>
@@ -173,13 +207,28 @@ const std::string getActionName(typename std::enable_if<std::is_base_of<EulerBDI
 }
 
 template<typename T>
+const std::string getActionName(typename std::enable_if<std::is_base_of<MdgfrdIntegrator, T>::value>::type * = 0) {
+    return "MdgfrdIntegrator";
+}
+
+template<typename T>
 const std::string getActionName(typename std::enable_if<std::is_base_of<CalculateForces, T>::value>::type * = 0) {
     return "Calculate forces";
 }
 
 template<typename T>
+const std::string getActionName(typename std::enable_if<std::is_base_of<CreateNeighborList, T>::value>::type * = 0) {
+    return "Create neighbor list";
+}
+
+template<typename T>
 const std::string getActionName(typename std::enable_if<std::is_base_of<UpdateNeighborList, T>::value>::type * = 0) {
     return "Update neighbor list";
+}
+
+template<typename T>
+const std::string getActionName(typename std::enable_if<std::is_base_of<ClearNeighborList, T>::value>::type * = 0) {
+    return "Clear neighbor list";
 }
 
 template<typename T>

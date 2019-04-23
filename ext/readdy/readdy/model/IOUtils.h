@@ -43,7 +43,7 @@
  * @brief Definitions for ReactionInfo, ParticleTypeInfo and hdf5 helper methods.
  * @author clonker
  * @date 10.03.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -75,15 +75,22 @@ struct ParticleTypeInfo {
     const char* name;
     std::size_t type_id;
     scalar diffusion_constant;
+    const char* flavor;
+};
+struct TopologyTypeInfo {
+    const char* name;
+    std::size_t type_id;
 };
 
 std::tuple<h5rd::NativeCompoundType, h5rd::STDCompoundType> getReactionInfoMemoryType(h5rd::Object::ParentFileRef ref);
 std::tuple<h5rd::NativeCompoundType, h5rd::STDCompoundType> getParticleTypeInfoType(h5rd::Object::ParentFileRef ref);
+std::tuple<h5rd::NativeCompoundType, h5rd::STDCompoundType> getTopologyTypeInfoType(h5rd::Object::ParentFileRef ref);
 
 void writeGeneralContextInformation(h5rd::Group &group, const Context &context);
 void writeSimulationSetup(h5rd::Group &group, const Context &context);
 void writeReactionInformation(h5rd::Group &group, const Context &context);
 void writeParticleTypeInformation(h5rd::Group &group, const Context &context);
+void writeTopologyTypeInformation(h5rd::Group &group, const Context &context);
 
 NAMESPACE_END(ioutils)
 NAMESPACE_END(model)

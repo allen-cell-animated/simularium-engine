@@ -50,7 +50,7 @@
 #include <readdy/model/Kernel.h>
 #include <readdy/api/SimulationLoop.h>
 #include <readdy/model/topologies/reactions/StructuralTopologyReaction.h>
-#include "ObservableHandle.h"
+#include <readdy/api/ObservableHandle.h>
 
 NAMESPACE_BEGIN(readdy)
 /**
@@ -123,6 +123,10 @@ public:
         return _kernel->stateModel().getTopologies();
     }
 
+    auto currentParticles() const {
+        return _kernel->stateModel().getParticles();
+    }
+
     /**
      * Method yielding a collection of particles that corresponds to the particles currently contained in the given
      * topology instance.
@@ -160,6 +164,16 @@ public:
     template<typename T>
     ObservableHandle registerObservable(std::unique_ptr<T> observable, const observable_callback<T> &callback,
                                         detail::is_observable_type<T> * = 0) {
+        if (observable->type() == "Reactions") {
+            _kernel->context().recordReactionsWithPositions() = true;
+        } else if (observable->type() == "ReactionCounts") {
+            _kernel->context().recordReactionCounts() = true;
+        } else if (observable->type() == "Virial") {
+            _kernel->context().recordVirial() = true;
+        } else {
+            /* no action required */
+        }
+
         auto connection = _kernel->connectObservable(observable.get());
         observable->callback() = callback;
         _observables.push_back(std::move(observable));
@@ -247,7 +261,7 @@ public:
     }
 
     api::SimulationLoop createLoop(scalar timeStep) {
-        return api::SimulationLoop(_kernel.get(), timeStep, _performanceRoot);
+        return api::SimulationLoop(_kernel.get(), timeStep);
     }
 
     /**
@@ -264,14 +278,6 @@ public:
      */
     bool doublePrecision() const {
         return _kernel->doublePrecision();
-    }
-
-    /**
-     * Access the root node of the performance measurement tree.
-     * @return reference to root node of performance measurement
-     */
-    const util::PerformanceNode &performanceRoot() {
-        return _performanceRoot;
     }
 
     /**
@@ -294,7 +300,6 @@ private:
     plugin::KernelProvider::kernel_ptr _kernel;
     std::vector<std::unique_ptr<readdy::model::observables::ObservableBase>> _observables{};
     std::vector<readdy::signals::scoped_connection> _observableConnections{};
-    util::PerformanceNode _performanceRoot{"simulation", true};
 };
 
 NAMESPACE_END(readdy)

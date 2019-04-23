@@ -184,10 +184,48 @@ int main(int argc, char* argv[])
 		{
 			Json::Value json_msg;
 			json_msg["msg_type"] = id_vis_data_request;
-			std::string out_msg = Json::writeString(json_stream_writer, json_msg);
 
+      if(tokens.size() == 1)
+      {
+        std::cout << "'start' command requires second parameter: 'live' or 'precache'" << std::endl;
+        continue;
+      }
+      else if(tokens[1] == "live")
+      {
+        json_msg["live"] = true;
+      }
+      else if(tokens[1] == "precache")
+      {
+        json_msg["live"] = false;
+      }
+      else
+      {
+        std::cout << "Unrecognized second parameter for command 'start'" << std::endl;
+        continue;
+      }
+
+      std::string out_msg = Json::writeString(json_stream_writer, json_msg);
 			sim_client.send(server_connection, out_msg, websocketpp::frame::opcode::text);
 		}
+    else if (tokens[0] == "set")
+    {
+      if(tokens.size() != 3)
+      {
+        std::cout << "Expected three tokens for command 'set': set param_name param_value" << std::endl;
+      }
+      else
+      {
+        Json::Value json_msg;
+  			json_msg["msg_type"] = id_update_rate_param;
+  			json_msg["param_name"] = tokens[1];
+        std::string::size_type sz;
+  			json_msg["param_value"] = std::stof(tokens[2].substr(sz));
+
+  			std::string out_msg = Json::writeString(json_stream_writer, json_msg);
+
+  			sim_client.send(server_connection, out_msg, websocketpp::frame::opcode::text);
+      }
+    }
     else if (tokens[0] == "stop")
 		{
 			Json::Value json_msg;

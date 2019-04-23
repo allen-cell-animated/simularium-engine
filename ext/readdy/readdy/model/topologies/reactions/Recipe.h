@@ -39,7 +39,7 @@
  * @brief << brief description >>
  * @author clonker
  * @date 13.04.17
- * @copyright GPL-3
+ * @copyright BSD-3
  */
 
 #pragma once
@@ -90,6 +90,10 @@ public:
         _steps.push_back(std::make_shared<op::ChangeParticleType>(ref, to));
         return *this;
     }
+
+    Recipe &appendNewParticle(const std::vector<Vertex> &neighbors, const std::string &type, const Vec3 &position);
+
+    Recipe &appendNewParticle(const std::vector<vertex_ref> &neighbors, const std::string &type, const Vec3 &position);
 
     Recipe &changeParticlePosition(const Vertex &v, Vec3 pos);
 

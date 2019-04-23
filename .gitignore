@@ -4,6 +4,9 @@ obj/
 lib/linux/agentsim.a
 lib/mac/agentsim.a
 
+# SUBMODULES #
+dep/readdy/*
+
 # EMACS #
 # -*- mode: gitignore; -*-
 *~
