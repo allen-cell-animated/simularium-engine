@@ -159,8 +159,6 @@ void Simulation::CacheCurrentAgents()
 
 void Simulation::LoadTrajectoryFile(std::string file_path)
 {
-	this->Reset();
-
 	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
 	{
 		this->m_SimPkgs[i]->LoadTrajectoryFile(file_path);
