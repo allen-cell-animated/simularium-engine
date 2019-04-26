@@ -28,9 +28,9 @@ std::atomic<bool> has_unhandled_new_connection { false };
 std::string most_recent_model = "";
 std::vector<std::string> param_cache;
 
-bool use_readdy = false;
+bool use_readdy = true;
 bool use_cytosim = !use_readdy;
-bool run_live = true;
+int run_mode = 0; // live simulation
 
 enum {
   id_undefined_web_request = 0,
@@ -46,6 +46,12 @@ enum {
   id_heartbeat_ping,
   id_heartbeat_pong,
   id_play_cache
+};
+
+enum {
+  id_live_simulation = 0,
+  id_pre_run_simulation = 1,
+  id_traj_file_playback = 2
 };
 
 template <typename T, typename U>
@@ -105,6 +111,8 @@ int main() {
     auto start = std::chrono::steady_clock::now();
 
     float time_step = 1e-12; // seconds
+    std::size_t n_time_steps = 1;
+    std::string traj_file_name = "";
 
     // Json cpp setup
     Json::StreamWriterBuilder json_stream_writer;
@@ -186,8 +194,26 @@ int main() {
               isRunningSimulation = true;
               isSimulationPaused = false;
 
-              run_live = json_msg["live"].asBool();
-              std::cout << (run_live ? "running live" : "running pre-cached") << std::endl;
+              run_mode = json_msg["mode"].asInt();
+              time_step = json_msg["time-step"].asFloat();
+              n_time_steps = json_msg["num-time-steps"].asInt();
+              traj_file_name = json_msg["file-name"].asString();
+
+              switch(run_mode)
+              {
+                case id_live_simulation:
+                {
+                  std::cout << "Running live simulation" << std::endl;
+                } break;
+                case id_pre_run_simulation:
+                {
+                  std::cout << "Running pre-run simulation" << std::endl;
+                } break;
+                case id_traj_file_playback:
+                {
+                  std::cout << "Playing back trajectory file" << std::endl;
+                } break;
+              }
 
               simulation.Reset();
             } break;
@@ -316,9 +342,14 @@ int main() {
       auto now = std::chrono::steady_clock::now();
       auto diff = now - start;
 
-      if(!run_live)
+      if(run_mode == id_pre_run_simulation)
       {
-        simulation.RunAndSaveFrames();
+        simulation.RunAndSaveFrames(time_step, n_time_steps);
+      }
+
+      if(run_mode == id_traj_file_playback)
+      {
+        simulation.LoadTrajectoryFile("./data/traj/" + traj_file_name);
       }
 
       if(diff >= std::chrono::milliseconds(66))
@@ -331,11 +362,12 @@ int main() {
         {
           simulation.IncrementCacheFrame();
         }
-        else if(run_live)
+        else if(run_mode == id_live_simulation)
         {
           simulation.RunTimeStep(time_step);
         }
-        else if(!run_live)
+        else if(run_mode == id_pre_run_simulation
+          || run_mode == id_traj_file_playback)
         {
           if(simulation.HasLoadedAllFrames())
           {
