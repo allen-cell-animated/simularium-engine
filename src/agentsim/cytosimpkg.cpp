@@ -126,7 +126,7 @@ void CytosimPkg::UpdateParameter(std::string param_name, float param_value)
 
 }
 
-void CytosimPkg::Run()
+void CytosimPkg::Run(float timeStep, std::size_t nTimeStep)
 {
 	if(this->m_hasAlreadyRun)
 		return;

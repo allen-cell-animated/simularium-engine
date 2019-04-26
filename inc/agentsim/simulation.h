@@ -83,7 +83,10 @@ public:
 	* Intended to run and save a simulation in some way
 	*	GetNextFrame() should be used to retrieve results frame by frame
 	*/
-	void RunAndSaveFrames();
+	void RunAndSaveFrames(
+		float timeStep,
+		std::size_t n_time_steps
+	);
 
 	/**
 	*	HasLoadedAllFrames
@@ -130,6 +133,8 @@ public:
 	*	Is this simulation object currently streaming from cached visualization information?
 	*/
 	bool IsPlayingFromCache() { return this->m_isPlayingFromCache; }
+
+	void LoadTrajectoryFile(std::string file_path);
 
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;

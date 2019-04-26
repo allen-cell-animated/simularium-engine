@@ -52,10 +52,18 @@ public:
 	/**
 	*	Run
 	*
-	* Executes a simulation in its entirety
+	* @param timeStep		the time to advance simulation each frame
+	* @param nTimeSteps	the number of frames to calculate
+	*
+	* Executes a simulation in its entirety, and saves the results to disk
 	*/
-	virtual void Run() = 0;
+	virtual void Run(float timeStep, std::size_t nTimeStep) = 0;
 
+	/**
+	* GetNextFrame
+	*
+	*	Updates agent positions using the next frame of a trajectory file
+	*/
 	virtual void GetNextFrame(std::vector<std::shared_ptr<Agent>>& agents) = 0;
 
 	/**
@@ -66,6 +74,8 @@ public:
 	*	return false in every case
 	*/
 	virtual bool IsFinished() = 0;
+
+	virtual void LoadTrajectoryFile(std::string file_path) = 0;
 };
 
 } // namespace agentsim

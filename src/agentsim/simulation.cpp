@@ -93,11 +93,13 @@ void Simulation::SetModel(Model simModel)
 	this->Reset();
 }
 
-void Simulation::RunAndSaveFrames()
+void Simulation::RunAndSaveFrames(
+	float timeStep,
+	std::size_t n_time_steps)
 {
 	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
 	{
-		this->m_SimPkgs[i]->Run();
+		this->m_SimPkgs[i]->Run(timeStep, n_time_steps);
 	}
 }
 
@@ -153,6 +155,16 @@ void Simulation::CacheCurrentAgents()
 	}
 
 	this->m_cache.AddFrame(newFrame);
+}
+
+void Simulation::LoadTrajectoryFile(std::string file_path)
+{
+	this->Reset();
+
+	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+	{
+		this->m_SimPkgs[i]->LoadTrajectoryFile(file_path);
+	}
 }
 
 void AppendAgentData(

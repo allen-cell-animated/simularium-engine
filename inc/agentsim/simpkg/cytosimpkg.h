@@ -27,11 +27,12 @@ public:
 		std::string param_name, float param_value
 	) override;
 
-	virtual void Run() override;
+	virtual void Run(float timeStep, std::size_t nTimeStep) override;
 	virtual void GetNextFrame(
 		std::vector<std::shared_ptr<Agent>>& agents) override;
 
 	virtual bool IsFinished() override;
+	virtual void LoadTrajectoryFile(std::string file_path) override { };
 
 private:
 	bool m_hasAlreadyRun = false;
