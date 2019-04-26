@@ -31,11 +31,6 @@ void ReaDDyPkg::GetNextFrame(
   if(this->m_hasFinishedStreaming)
 		return;
 
-	if(!this->m_agents_initialized)
-	{
-		this->m_agents_initialized = true;
-	}
-
 	if(agents.size() == 0)
 	{
 		for(std::size_t i = 0; i < 5000; ++i)

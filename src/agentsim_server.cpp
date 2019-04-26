@@ -212,6 +212,7 @@ int main() {
                 case id_traj_file_playback:
                 {
                   std::cout << "Playing back trajectory file" << std::endl;
+                  simulation.Reset();
                 } break;
               }
 
