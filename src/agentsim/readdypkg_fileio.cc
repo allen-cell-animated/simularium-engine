@@ -25,6 +25,12 @@ namespace agentsim {
 std::vector<std::vector<ParticleData>> results;
 std::size_t frame_no = 0;
 
+void ResetFileIO()
+{
+	//results.clear();
+	frame_no = 0;
+}
+
 void ReaDDyPkg::GetNextFrame(
 	std::vector<std::shared_ptr<Agent>>& agents)
 {
@@ -73,8 +79,14 @@ void ReaDDyPkg::Run(float timeStep, std::size_t nTimeStep)
 	this->m_hasAlreadyRun = true;
 }
 
+std::string last_loaded_file = "";
 void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
 {
+	if(last_loaded_file != file_path)
+	{
+		this->m_hasLoadedRunFile = false;
+	}
+
 	if(!this->m_hasLoadedRunFile)
 	{
 		std::cout << "Loading trajectory file " << file_path << std::endl;
@@ -82,6 +94,7 @@ void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
 		results.clear();
 		read_h5file(file_path, results);
 		this->m_hasLoadedRunFile = true;
+		last_loaded_file = file_path;
 	}
 }
 

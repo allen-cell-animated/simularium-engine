@@ -28,7 +28,7 @@ std::atomic<bool> has_unhandled_new_connection { false };
 std::string most_recent_model = "";
 std::vector<std::string> param_cache;
 
-bool use_readdy = true;
+bool use_readdy = false;
 bool use_cytosim = !use_readdy;
 int run_mode = 0; // live simulation
 
@@ -195,24 +195,26 @@ int main() {
               isSimulationPaused = false;
 
               run_mode = json_msg["mode"].asInt();
-              time_step = json_msg["time-step"].asFloat();
-              n_time_steps = json_msg["num-time-steps"].asInt();
-              traj_file_name = json_msg["file-name"].asString();
 
               switch(run_mode)
               {
                 case id_live_simulation:
                 {
                   std::cout << "Running live simulation" << std::endl;
+                  simulation.SetPlaybackMode(id_live_simulation);
                 } break;
                 case id_pre_run_simulation:
                 {
+                  time_step = json_msg["time-step"].asFloat();
+                  n_time_steps = json_msg["num-time-steps"].asInt();
                   std::cout << "Running pre-run simulation" << std::endl;
+                  simulation.SetPlaybackMode(id_pre_run_simulation);
                 } break;
                 case id_traj_file_playback:
                 {
+                  traj_file_name = json_msg["file-name"].asString();
                   std::cout << "Playing back trajectory file" << std::endl;
-                  simulation.Reset();
+                  simulation.SetPlaybackMode(id_traj_file_playback);
                 } break;
               }
 
