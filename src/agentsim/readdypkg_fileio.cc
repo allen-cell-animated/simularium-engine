@@ -77,6 +77,7 @@ void ReaDDyPkg::Run(float timeStep, std::size_t nTimeStep)
 
 	run_and_save_h5file(this->m_simulation, "test.h5", timeStep, nTimeStep, 10);
 	this->m_hasAlreadyRun = true;
+	this->m_hasLoadedRunFile = false;
 }
 
 std::string last_loaded_file = "";
