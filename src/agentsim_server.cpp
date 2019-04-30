@@ -28,7 +28,7 @@ std::atomic<bool> has_unhandled_new_connection { false };
 std::string most_recent_model = "";
 std::vector<std::string> param_cache;
 
-bool use_readdy = false;
+bool use_readdy = true;
 bool use_cytosim = !use_readdy;
 int run_mode = 0; // live simulation
 
