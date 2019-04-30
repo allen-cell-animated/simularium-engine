@@ -91,7 +91,7 @@ public:
 	/**
 	*	HasLoadedAllFrames
 	*
-	*	returns true if every SimPKG has finished retrieving/saving data
+	*	returns true if every SimPKG has finished retrieving/sid_live_simulationaving data
 	* returns false if there is more to retrieve using GetNextFrame()
 	*/
 	bool HasLoadedAllFrames();
@@ -134,7 +134,17 @@ public:
 	*/
 	bool IsPlayingFromCache() { return this->m_isPlayingFromCache; }
 
+	/**
+	*	LoadTrajectoryFile
+	*
+	*	@param	file_path		The location of the trajectory file to load
+	*											Currently, there is no validation for file <-> simPKG correctness
+	*
+	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
+	*/
 	void LoadTrajectoryFile(std::string file_path);
+
+	void SetPlaybackMode(std::size_t playback_mode);
 
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
@@ -142,6 +152,7 @@ private:
 	Model m_model;
 	SimulationCache m_cache;
 	bool m_isPlayingFromCache = false;
+	std::size_t m_playbackMode = 0; // live simulation
 };
 
 }

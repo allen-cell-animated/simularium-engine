@@ -251,6 +251,8 @@ void ReaDDyPkg::Shutdown()
 {
 	this->m_simulation.stateModel().clear();
 	this->m_timeStepCount = 0;
+  this->m_hasFinishedStreaming = false;
+  ResetFileIO();
 }
 
 void ReaDDyPkg::RunTimeStep(

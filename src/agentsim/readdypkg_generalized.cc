@@ -119,8 +119,10 @@ void ReaDDyPkg::Shutdown()
 	this->m_agents_initialized = false;
 	this->m_reactions_initialized = false;
 	this->m_hasAlreadyRun = false;
+	this->m_hasFinishedStreaming = false;
 
 	ResetStaticVariables();
+	ResetFileIO();
 }
 
 void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)

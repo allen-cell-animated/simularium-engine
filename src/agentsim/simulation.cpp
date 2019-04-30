@@ -70,12 +70,15 @@ void Simulation::Reset()
 	}
 
 	this->m_agents.clear();
-	InitAgents(this->m_agents, this->m_model);
-
-	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+	if(this->m_playbackMode == 0 || this->m_playbackMode == 1)
 	{
-		this->m_SimPkgs[i]->InitAgents(this->m_agents, this->m_model);
-		this->m_SimPkgs[i]->InitReactions(this->m_model);
+		InitAgents(this->m_agents, this->m_model);
+
+		for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)
+		{
+			this->m_SimPkgs[i]->InitAgents(this->m_agents, this->m_model);
+			this->m_SimPkgs[i]->InitReactions(this->m_model);
+		}
 	}
 }
 
@@ -163,6 +166,11 @@ void Simulation::LoadTrajectoryFile(std::string file_path)
 	{
 		this->m_SimPkgs[i]->LoadTrajectoryFile(file_path);
 	}
+}
+
+void Simulation::SetPlaybackMode(std::size_t playback_mode)
+{
+	this->m_playbackMode = playback_mode;
 }
 
 void AppendAgentData(
