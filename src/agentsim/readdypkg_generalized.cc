@@ -1288,6 +1288,19 @@ void construct_fission_reaction(
 
 		count_agents(agent_counts, total_count);
 
+		if(total_count == 1)
+		{
+			for(auto vert = vertices.begin(), end = vertices.end(); vert != end; ++vert)
+			{
+					auto name = particles.nameOf(vert->particleType());
+					if(name.find("_BOUND") != std::string::npos)
+					{
+						name.erase(name.begin() + name.find("_BOUND"), name.end());
+						recipe.changeParticleType(*(&*vert), name);
+					}
+			}
+		}
+
 		for(auto entry : Reaction_Complexes)
 		{
 				auto complex = entry.second;
