@@ -16,11 +16,15 @@ namespace agentsim {
 class ReaDDyPkg : public SimPkg
 {
 public:
-	ReaDDyPkg() : m_simulation("SingleCPU")
+	ReaDDyPkg()
 	{
+		this->m_simulation = new readdy::Simulation("SingleCPU");
 		this->m_bloscFilter.registerFilter();
 	}
-	virtual ~ReaDDyPkg() { }
+	virtual ~ReaDDyPkg() {
+		delete this->m_simulation;
+		this->m_simulation = nullptr;
+	}
 
 	virtual void Setup() override;
 	virtual void Shutdown() override;
@@ -43,13 +47,12 @@ public:
 
 	virtual void LoadTrajectoryFile(std::string file_path) override;
 private:
-	readdy::Simulation m_simulation;
+	readdy::Simulation* m_simulation;
 	bool m_agents_initialized = false;
 	bool m_reactions_initialized = false;
 	int m_timeStepCount = 0;
 
 	bool m_hasAlreadyRun = false;
-	bool m_realTimeInitialized = false;
 	bool m_hasLoadedRunFile = false;
 	bool m_hasFinishedStreaming = false;
 	readdy::io::BloscFilter m_bloscFilter;

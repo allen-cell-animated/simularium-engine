@@ -22,7 +22,7 @@ Eigen::Matrix3d get_rotation_matrix(
 *	BNGL Data Spatial constraints
 */
 void add_spatial_constraints(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	std::vector<Eigen::Vector3d>& positions,
 	std::vector<std::string>& names,
 	std::vector<float> radii,
@@ -45,7 +45,7 @@ bool find_reactant(
 	std::vector<readdy::model::top::graph::Vertex*>& ignore_list);
 
 void configure_fusion_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx,
 	aics::agentsim::Model& model,
 	std::vector<std::string>& added,
@@ -53,16 +53,16 @@ void configure_fusion_reaction(
 	float angle_force_constant);
 
 void construct_fusion_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx);
 
 void configure_fission_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx,
 	std::vector<std::string>& added);
 
 void construct_fission_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx);
 
 /**
@@ -105,16 +105,10 @@ void ReaDDyPkg::Setup()
 
 void ReaDDyPkg::Shutdown()
 {
-	readdy::model::ParticleTypeRegistry empty_pr;
-	this->m_simulation.context().particleTypes() = empty_pr;
+	delete this->m_simulation;
+	this->m_simulation = nullptr;
+	this->m_simulation = new readdy::Simulation("SingleCPU");
 
-	readdy::model::top::TopologyRegistry empty_tr(this->m_simulation.context().particleTypes());
-	this->m_simulation.context().topologyRegistry() = empty_tr;
-
-	readdy::model::reactions::ReactionRegistry empty_rr(this->m_simulation.context().particleTypes());
-	this->m_simulation.context().reactions() = empty_rr;
-
-	this->m_simulation.stateModel().clear();
 	this->m_timeStepCount = 0;
 	this->m_agents_initialized = false;
 	this->m_reactions_initialized = false;
@@ -130,13 +124,13 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 	int boxSize = pow(model.volume, 1.0/3.0);
 	if(!this->m_agents_initialized)
 	{
-		this->m_simulation.context().boxSize()[0] = boxSize;
-		this->m_simulation.context().boxSize()[1] = boxSize;
-		this->m_simulation.context().boxSize()[2] = boxSize;
+		this->m_simulation->context().boxSize()[0] = boxSize;
+		this->m_simulation->context().boxSize()[1] = boxSize;
+		this->m_simulation->context().boxSize()[2] = boxSize;
 
-		auto &topologies = this->m_simulation.context().topologyRegistry();
-		auto &particles = this->m_simulation.context().particleTypes();
-		auto &potentials = this->m_simulation.context().potentials();
+		auto &topologies = this->m_simulation->context().topologyRegistry();
+		auto &particles = this->m_simulation->context().particleTypes();
+		auto &potentials = this->m_simulation->context().potentials();
 
 		for(auto entry : model.agents)
 		{
@@ -259,7 +253,7 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 
 		// create the parent particles
 		Eigen::Vector3d v = parent->GetLocation();
-		tp.push_back(this->m_simulation.createTopologyParticle(
+		tp.push_back(this->m_simulation->createTopologyParticle(
 			parent->GetName(), readdy::Vec3(v[0], v[1], v[2])));
 
 		// create the child particles
@@ -267,12 +261,12 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 		{
 			auto child = parent->GetChildAgent(j);
 			v += child->GetLocation();
-			tp.push_back(this->m_simulation.createTopologyParticle(
+			tp.push_back(this->m_simulation->createTopologyParticle(
 				child->GetName() + "_CHILD", readdy::Vec3(v[0], v[1], v[2])));
 		}
 
 		// connect the parent-child particles
-		auto tp_inst = this->m_simulation.addTopology(parent->GetName(), tp);
+		auto tp_inst = this->m_simulation->addTopology(parent->GetName(), tp);
 		for(std::size_t j = 0; j < parent->GetNumChildAgents(); ++j)
 		{
 			tp_inst->graph().addEdgeBetweenParticles(0, j+1);
@@ -297,13 +291,17 @@ void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& m
 			parent->SetInverseChildRotationMatrix(rm.inverse());
 		}
 	}
+
+	auto loop = this->m_simulation->createLoop(1);
+	loop.runInitialize();
+	loop.runInitializeNeighborList();
 }
 
 void ReaDDyPkg::InitReactions(Model& model)
 {
-	auto &topologies = this->m_simulation.context().topologyRegistry();
-	auto &particles = this->m_simulation.context().particleTypes();
-	auto &reactions = this->m_simulation.context().reactions();
+	auto &topologies = this->m_simulation->context().topologyRegistry();
+	auto &particles = this->m_simulation->context().particleTypes();
+	auto &reactions = this->m_simulation->context().reactions();
 	Reaction_Complexes = model.complexes;
 
 	if(!this->m_reactions_initialized)
@@ -360,14 +358,6 @@ void ReaDDyPkg::InitReactions(Model& model)
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	if(!this->m_realTimeInitialized)
-	{
-		auto loop = this->m_simulation.createLoop(1);
-		loop.runInitialize();
-		loop.runInitializeNeighborList();
-		this->m_realTimeInitialized = true;
-	}
-
 	if(agents.size() == 0)
 	{
 		return;
@@ -377,7 +367,7 @@ void ReaDDyPkg::RunTimeStep(
 
 	if(timeStep > max_time_step)
 	{
-		auto loop = this->m_simulation.createLoop(max_time_step);
+		auto loop = this->m_simulation->createLoop(max_time_step);
 		unsigned n_iterations = timeStep / max_time_step;
 
 		for(unsigned i = 0; i < n_iterations; ++i)
@@ -395,7 +385,7 @@ void ReaDDyPkg::RunTimeStep(
 	}
 	else
 	{
-		auto loop = this->m_simulation.createLoop(timeStep);
+		auto loop = this->m_simulation->createLoop(timeStep);
 
 		this->m_timeStepCount++;
 		loop.runIntegrator(); // propagate particles
@@ -409,9 +399,9 @@ void ReaDDyPkg::RunTimeStep(
 
   auto unused_agents = agents;
 
-  const auto &topology_list = this->m_simulation.stateModel().getTopologies();
-  auto &particles = this->m_simulation.context().particleTypes();
-	auto &topologies = this->m_simulation.context().topologyRegistry();
+  const auto &topology_list = this->m_simulation->stateModel().getTopologies();
+  auto &particles = this->m_simulation->context().particleTypes();
+	auto &topologies = this->m_simulation->context().topologyRegistry();
 
   for(auto& top : topology_list)
   {
@@ -531,7 +521,7 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 
 	if(Fusion_Reactions[param_name])
 	{
-		auto &topologies = this->m_simulation.context().topologyRegistry();
+		auto &topologies = this->m_simulation->context().topologyRegistry();
 		auto &rx = topologies.spatialReactionByName(param_name).rate() = param_value;
 	}
 
@@ -540,8 +530,8 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 		printf("Reaction Rate Adjustment %s : %f\n", param_name.c_str(), param_value);
 		srx_Fission_Modifier[param_name] = param_value;
 
-		auto &topologies = this->m_simulation.context().topologyRegistry();
-		auto tops = this->m_simulation.currentTopologies();
+		auto &topologies = this->m_simulation->context().topologyRegistry();
+		auto tops = this->m_simulation->currentTopologies();
 		for(auto&& top : tops)
 		{
 			top->updateReactionRates(topologies.structuralReactionsOf(top->type()));
@@ -588,7 +578,7 @@ Eigen::Matrix3d get_rotation_matrix(
 *	BNGL Spatial Constraints
 */
 void add_spatial_constraints(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	std::vector<Eigen::Vector3d>& positions,
 	std::vector<std::string>& names,
 	std::vector<float> radii,
@@ -602,8 +592,8 @@ void add_spatial_constraints(
 	angle.forceConstant = angle_force_constant;
 	angle.equilibriumAngle = M_PI_2;
 
-	auto &topologies = sim.context().topologyRegistry();
-	auto &potentials = sim.context().potentials();
+	auto &topologies = sim->context().topologyRegistry();
+	auto &potentials = sim->context().potentials();
 	for(std::size_t i = 1; i < positions.size(); ++i)
 	{
 		float parent_repel_dist = fmin(
@@ -774,16 +764,16 @@ bool find_reactant(
 }
 
 void configure_fusion_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx,
 	aics::agentsim::Model& model,
 	std::vector<std::string>& added,
 	float bond_force_constant,
 	float angle_force_constant)
 {
-	auto &topologies = sim.context().topologyRegistry();
-	auto &particles = sim.context().particleTypes();
-	auto &potentials = sim.context().potentials();
+	auto &topologies = sim->context().topologyRegistry();
+	auto &particles = sim->context().particleTypes();
+	auto &potentials = sim->context().potentials();
 
 	std::string tf =
 		rx.name + "_" +
@@ -837,10 +827,10 @@ void configure_fusion_reaction(
 	}
 }
 
-void construct_fusion_reaction(readdy::Simulation& sim, aics::agentsim::Reaction& rx)
+void construct_fusion_reaction(readdy::Simulation* sim, aics::agentsim::Reaction& rx)
 {
-	auto &topologies = sim.context().topologyRegistry();
-	auto &particles = sim.context().particleTypes();
+	auto &topologies = sim->context().topologyRegistry();
+	auto &particles = sim->context().particleTypes();
 
 	auto complex1_parent1 = rx.complexes[0].parents[0];
 	auto complex2_parent1 = rx.complexes[1].parents[0];
@@ -1100,11 +1090,11 @@ void construct_fusion_reaction(readdy::Simulation& sim, aics::agentsim::Reaction
 }
 
 void configure_fission_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx,
 	std::vector<std::string>& added)
 {
-	auto &topologies = sim.context().topologyRegistry();
+	auto &topologies = sim->context().topologyRegistry();
 
 	std::string product =  rx.complexes[0].name + "_FISSION_FLAGGED";
 	if(std::find(added.begin(), added.end(), product) == added.end())
@@ -1116,10 +1106,10 @@ void configure_fission_reaction(
 }
 
 void construct_fission_reaction(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	aics::agentsim::Reaction& rx)
 {
-	auto &topologies = sim.context().topologyRegistry();
+	auto &topologies = sim->context().topologyRegistry();
 
 	Registered_Reactions[rx.name] = true;
 	Fission_Reactions[rx.name] = true;

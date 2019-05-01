@@ -1,7 +1,7 @@
 struct ParticleData;
 
 void run_and_save_h5file(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	std::string file_name,
 	float time_step,
 	float n_time_steps,
@@ -14,7 +14,7 @@ void read_h5file(
 );
 
 void copy_frame(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
   std::vector<ParticleData>& particle_data,
   std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents
 );
@@ -118,7 +118,7 @@ struct ParticleData {
 };
 
 void run_and_save_h5file(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
 	std::string file_name,
 	float time_step,
 	float n_time_steps,
@@ -127,12 +127,12 @@ void run_and_save_h5file(
 {
 	auto file = readdy::File::create(file_name, h5rd::File::Flag::OVERWRITE);
 
-	auto traj_ptr = sim.observe().flatTrajectory(1);
+	auto traj_ptr = sim->observe().flatTrajectory(1);
 	traj_ptr->enableWriteToFile(*file.get(), "", write_stride);
-	auto traj_handle = sim.registerObservable(std::move(traj_ptr));
+	auto traj_handle = sim->registerObservable(std::move(traj_ptr));
 
 	try{
-		auto loop = sim.createLoop(time_step);
+		auto loop = sim->createLoop(time_step);
 		loop.writeConfigToFile(*file);
 		loop.run(n_time_steps);
 	}
@@ -220,7 +220,7 @@ void read_h5file(
 }
 
 void copy_frame(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
   std::vector<ParticleData>& particle_data,
   std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents
 )
@@ -230,7 +230,7 @@ void copy_frame(
   std::size_t bad_topology_count = 0;
   std::size_t good_topology_count = 0;
 
-	auto &particles = sim.context().particleTypes();
+	auto &particles = sim->context().particleTypes();
 
   for(auto& p : particle_data)
   {

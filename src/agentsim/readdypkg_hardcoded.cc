@@ -8,29 +8,29 @@
 
 
 void add_oriented_species(
-    readdy::Simulation& sim,
+    readdy::Simulation* sim,
 	std::string name, float diff_coeff,
 	std::vector<std::string>& out_types,
 	std::vector<float>& out_radii);
 
 void add_oriented_particle(
-    readdy::Simulation& sim,
+    readdy::Simulation* sim,
 	std::string name,
     std::string topology_name,
     Eigen::Vector3d pos);
 
 void add_filament_constraints(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
     std::string base_name);
 
 void create_dimerize_rxn(
-	readdy::Simulation& sim);
+	readdy::Simulation* sim);
 
 void create_nucleate_rxn(
-	readdy::Simulation& sim);
+	readdy::Simulation* sim);
 
 void create_polymerize_rxn(
-	readdy::Simulation& sim);
+	readdy::Simulation* sim);
 
 readdy::model::top::graph::Vertex* get_orientation_vertex(
     readdy::model::top::GraphTopology& top);
@@ -151,12 +151,12 @@ void ReaDDyPkg::Setup()
 {
 	if(!this->m_agents_initialized)
 	{
-		this->m_simulation.context().boxSize()[0] = boxSize;
-		this->m_simulation.context().boxSize()[1] = boxSize;
-		this->m_simulation.context().boxSize()[2] = boxSize;
+		this->m_simulation->context().boxSize()[0] = boxSize;
+		this->m_simulation->context().boxSize()[1] = boxSize;
+		this->m_simulation->context().boxSize()[2] = boxSize;
 
         //define particles
-		auto &particles = this->m_simulation.context().particleTypes();
+		auto &particles = this->m_simulation->context().particleTypes();
 
         add_oriented_species(this->m_simulation, mol_name + "0", diffusion_constant_monomer, particle_types, particle_radii);
 
@@ -185,10 +185,10 @@ void ReaDDyPkg::Setup()
 
         //for decay of basis particles when a monomer joins a filament
         particles.add("basis", diffusion_constant);
-        this->m_simulation.context().reactions().addDecay("Basis_decay", "basis", 1e30);
+        this->m_simulation->context().reactions().addDecay("Basis_decay", "basis", 1e30);
 
         //define topologies
-		auto &topologies = this->m_simulation.context().topologyRegistry();
+		auto &topologies = this->m_simulation->context().topologyRegistry();
 		topologies.addType("Monomer");
         topologies.addType("Dimer_binding");
         topologies.addType("Dimer");
@@ -217,7 +217,7 @@ void ReaDDyPkg::Setup()
         create_polymerize_rxn(this->m_simulation);
 
         //define repulsions
-		auto &potentials = this->m_simulation.context().potentials();
+		auto &potentials = this->m_simulation->context().potentials();
 		this->m_agents_initialized = true;
         for(std::size_t i = 0; i <= n_helix_types; ++i)
 		{
@@ -242,23 +242,29 @@ void ReaDDyPkg::Setup()
         add_oriented_particle(this->m_simulation, mol_name + "0", "Monomer", Eigen::Vector3d(x,y,z));
 	}
 
-	auto loop = this->m_simulation.createLoop(1);
+	auto loop = this->m_simulation->createLoop(1);
 	loop.runInitialize();
 	loop.runInitializeNeighborList();
 }
 
 void ReaDDyPkg::Shutdown()
 {
-	this->m_simulation.stateModel().clear();
-	this->m_timeStepCount = 0;
-  this->m_hasFinishedStreaming = false;
+  delete this->m_simulation;
+  this->m_simulation = nullptr;
+	this->m_simulation = new readdy::Simulation("SingleCPU");
+
+  this->m_timeStepCount = 0;
+	this->m_agents_initialized = false;
+	this->m_reactions_initialized = false;
+	this->m_hasAlreadyRun = false;
+	this->m_hasFinishedStreaming = false;
   ResetFileIO();
 }
 
 void ReaDDyPkg::RunTimeStep(
 	float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
 {
-	auto loop = this->m_simulation.createLoop(timeStep);
+	auto loop = this->m_simulation->createLoop(timeStep);
 
 	this->m_timeStepCount++;
 	loop.runIntegrator(); // propagate particles
@@ -281,7 +287,7 @@ void ReaDDyPkg::RunTimeStep(
 			continue;
 		}
 
-		std::vector<readdy::Vec3> positions = this->m_simulation.getParticlePositions(pTypes[i]);
+		std::vector<readdy::Vec3> positions = this->m_simulation->getParticlePositions(pTypes[i]);
 		std::vector<readdy::Vec3> xpositions;
 		std::vector<readdy::Vec3> ypositions;
 		std::vector<readdy::Vec3> zpositions;
@@ -290,9 +296,9 @@ void ReaDDyPkg::RunTimeStep(
 		if(std::find(pTypes.begin(), pTypes.end(), pTypes[i] + "_x") != pTypes.end())
 		{
 			has_orientation = true;
-			xpositions = this->m_simulation.getParticlePositions(pTypes[i] + "_x");
-			ypositions = this->m_simulation.getParticlePositions(pTypes[i] + "_y");
-			zpositions = this->m_simulation.getParticlePositions(pTypes[i] + "_z");
+			xpositions = this->m_simulation->getParticlePositions(pTypes[i] + "_x");
+			ypositions = this->m_simulation->getParticlePositions(pTypes[i] + "_y");
+			zpositions = this->m_simulation->getParticlePositions(pTypes[i] + "_z");
 		}
 
 		for(std::size_t j = 0; j < positions.size(); ++j)
@@ -380,7 +386,7 @@ void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
 *	Helper function implementations
 **/
 void add_oriented_species(
-    readdy::Simulation& sim,
+    readdy::Simulation* sim,
 	std::string name,
     float diff_coeff,
 	std::vector<std::string>& out_types,
@@ -393,7 +399,7 @@ void add_oriented_species(
 //	}
 
 	std::string cxn, cyn, czn;
-    auto &particles = sim.context().particleTypes();
+    auto &particles = sim->context().particleTypes();
     float component_radii = 0.1f;
 
 	particles.addTopologyType(name, diff_coeff);
@@ -418,7 +424,7 @@ void add_oriented_species(
     //bond constraints
 	readdy::api::Bond bond;
 	bond.forceConstant = force_constant;
-    auto &topologies = sim.context().topologyRegistry();
+    auto &topologies = sim->context().topologyRegistry();
 
 	bond.length = 1;
 	topologies.configureBondPotential(name, cxn, bond);
@@ -444,7 +450,7 @@ void add_oriented_species(
 }
 
 void add_oriented_particle(
-    readdy::Simulation& sim,
+    readdy::Simulation* sim,
 	std::string name,
     std::string topology_name,
     Eigen::Vector3d pos)
@@ -457,16 +463,16 @@ void add_oriented_particle(
 	auto rpos = readdy::Vec3(pos[0], pos[1], pos[2]);
 
 	std::vector<readdy::model::TopologyParticle> tp;
-	tp.push_back(sim.createTopologyParticle(
+	tp.push_back(sim->createTopologyParticle(
 		name, rpos));
-	tp.push_back(sim.createTopologyParticle(
+	tp.push_back(sim->createTopologyParticle(
 		cxn , readdy::Vec3(1,0,0) + rpos));
-	tp.push_back(sim.createTopologyParticle(
+	tp.push_back(sim->createTopologyParticle(
 		cyn, readdy::Vec3(0,1,0) + rpos));
-	tp.push_back(sim.createTopologyParticle(
+	tp.push_back(sim->createTopologyParticle(
 		czn, readdy::Vec3(0,0,1) + rpos));
 
-	auto tp_inst = sim.addTopology(topology_name, tp);
+	auto tp_inst = sim->addTopology(topology_name, tp);
 	tp_inst->graph().addEdgeBetweenParticles(0,1);
 	tp_inst->graph().addEdgeBetweenParticles(0,2);
 	tp_inst->graph().addEdgeBetweenParticles(0,3);
@@ -477,10 +483,10 @@ void add_oriented_particle(
 }
 
 void add_filament_constraints(
-	readdy::Simulation& sim,
+	readdy::Simulation* sim,
     std::string base_name)
 {
-	auto &topologies = sim.context().topologyRegistry();
+	auto &topologies = sim->context().topologyRegistry();
 
     readdy::api::Bond bond1;
     bond1.forceConstant = force_constant;
@@ -570,7 +576,7 @@ void add_filament_constraints(
 }
 
 void create_dimerize_rxn(
-	readdy::Simulation& sim)
+	readdy::Simulation* sim)
 {
     auto dimerize = [&](readdy::model::top::GraphTopology &top)
     {
@@ -597,12 +603,12 @@ void create_dimerize_rxn(
     readdy::model::top::reactions::StructuralTopologyReaction dimerize_rxn(
         dimerize, 1e30
     );
-	sim.context().topologyRegistry().addStructuralReaction(
+	sim->context().topologyRegistry().addStructuralReaction(
 		"Dimer_binding", dimerize_rxn);
 }
 
 void create_nucleate_rxn(
-	readdy::Simulation& sim)
+	readdy::Simulation* sim)
 {
     auto nucleate = [&](readdy::model::top::GraphTopology &top)
     {
@@ -628,12 +634,12 @@ void create_nucleate_rxn(
     readdy::model::top::reactions::StructuralTopologyReaction nucleate_rxn(
         nucleate, 1e30
     );
-	sim.context().topologyRegistry().addStructuralReaction(
+	sim->context().topologyRegistry().addStructuralReaction(
 		"Polymer_nucleating", nucleate_rxn);
 }
 
 void create_polymerize_rxn(
-	readdy::Simulation& sim)
+	readdy::Simulation* sim)
 {
     auto polymerize = [&](readdy::model::top::GraphTopology &top)
     {
@@ -669,7 +675,7 @@ void create_polymerize_rxn(
     readdy::model::top::reactions::StructuralTopologyReaction polymerize_rxn(
         polymerize, 1e30
     );
-	sim.context().topologyRegistry().addStructuralReaction(
+	sim->context().topologyRegistry().addStructuralReaction(
 		"Polymer_growing", polymerize_rxn);
 }
 
