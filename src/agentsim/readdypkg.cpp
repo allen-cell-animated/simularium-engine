@@ -1,4 +1,4 @@
-#define USE_HARDCODED 0
+#define USE_HARDCODED 1
 
 #if USE_HARDCODED == 1
 #include "readdypkg_hardcoded.cc"

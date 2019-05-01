@@ -114,7 +114,7 @@
 	"seed-concentrations" : {
 		"0" : {
 			"name" : "Actin",
-			"concentration" : 5e-7
+			"concentration" : 5e-6
 		}
 	},
 
