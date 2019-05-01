@@ -28,7 +28,14 @@ enum {
   id_update_rate_param,
   id_model_definition,
   id_heartbeat_ping,
-  id_heartbeat_pong
+  id_heartbeat_pong,
+  id_play_cache
+};
+
+enum {
+  id_live_simulation = 0,
+  id_pre_run_simulation = 1,
+  id_traj_file_playback = 2
 };
 
 inline bool file_exists (const std::string& name) {
@@ -192,11 +199,13 @@ int main(int argc, char* argv[])
       }
       else if(tokens[1] == "live")
       {
-        json_msg["live"] = true;
+        json_msg["mode"] = id_live_simulation;
       }
       else if(tokens[1] == "precache")
       {
-        json_msg["live"] = false;
+        json_msg["mode"] = id_pre_run_simulation;
+        json_msg["time-step"] = 1e-9f;
+        json_msg["num-time-steps"] = 200;
       }
       else
       {
