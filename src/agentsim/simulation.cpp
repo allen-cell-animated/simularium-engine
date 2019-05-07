@@ -28,7 +28,6 @@ Simulation::Simulation(
 	}
 
 	this->m_agents = agents;
-	this->m_cache.SetCacheSize(100);
 }
 
 Simulation::~Simulation()
@@ -80,6 +79,8 @@ void Simulation::Reset()
 			this->m_SimPkgs[i]->InitReactions(this->m_model);
 		}
 	}
+
+	this->m_cache.ClearCache();
 }
 
 void Simulation::UpdateParameter(std::string name, float value)
@@ -144,6 +145,7 @@ void Simulation::IncrementCacheFrame()
 
 	if(this->m_cache.CurrentIsLatestFrame())
 	{
+		std::cout << "Ending cache play" << std::endl;
 		this->m_isPlayingFromCache = false;
 	}
 }
