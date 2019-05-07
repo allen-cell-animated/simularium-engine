@@ -1,50 +1,216 @@
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstdio>
+#include <csignal>
 #include "agentsim/simulation_cache.h"
 
+/**
+*	File Serialization Functions
+*/
+bool goto_frameno(std::ifstream& is, std::size_t fno, std::string& line);
 
+void serialize(
+	std::ofstream& os,
+	std::size_t frame_number,
+	aics::agentsim::AgentDataFrame& adf);
+void deserialize(
+	std::ifstream& is,
+	std::size_t frame_number,
+	aics::agentsim::AgentDataFrame& adf);
+
+void serialize(std::ofstream& os, aics::agentsim::AgentData& ad);
+void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad);
+
+std::ofstream tmp_cache_file;
+std::string delimiter = "/";
+
+
+/**
+*	Simulation API
+*/
 namespace aics {
 namespace agentsim {
 
-void SimulationCache::AddFrame(AgentDataFrame data) {
-	this->m_frames.push_back(data);
-	if(this->m_frames.size() > this->m_cacheSize)
+SimulationCache::SimulationCache()
+{
+	std::remove(this->m_cacheFileName.c_str());
+	tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
+}
+
+SimulationCache::~SimulationCache()
+{
+	tmp_cache_file.close();
+	std::remove(this->m_cacheFileName.c_str());
+}
+
+void SimulationCache::AddFrame(AgentDataFrame data)
+{
+	serialize(tmp_cache_file, this->m_frameCounter, data);
+	this->m_frameCounter++;
+}
+
+void SimulationCache::SetCurrentFrame(std::size_t index)
+{
+	this->m_current = std::min(index, this->m_frameCounter);
+}
+
+AgentDataFrame SimulationCache::GetCurrentFrame()
+{
+	std::ifstream is(this->m_cacheFileName);
+	if(is)
 	{
-		this->m_frames.erase(this->m_frames.begin());
+		AgentDataFrame adf;
+		deserialize(is, this->m_current, adf);
+		return adf;
 	}
-}
 
-void SimulationCache::SetCurrentFrame(std::size_t index) { this->m_current = index; }
-AgentDataFrame SimulationCache::GetCurrentFrame() {
-	return this->m_frames[this->m_current];
+	std::cout << "Failed to load frame " << this->m_frameCounter << " from cache" << std::endl;
+	return AgentDataFrame();
  }
 
-bool SimulationCache::CurrentIsLatestFrame() {
-	return this->m_current >= this->m_frames.size();
+bool SimulationCache::CurrentIsLatestFrame()
+{
+	return this->m_current >= this->m_frameCounter;
 }
 
-void SimulationCache::IncrementCurrentFrame() {
+void SimulationCache::IncrementCurrentFrame()
+{
 	this->m_current++;
-	this->m_current = std::min(this->m_current, this->m_cacheSize);
-	this->m_current = std::min(this->m_current, this->m_frames.size());
+	this->m_current = std::min(this->m_current, this->m_frameCounter);
  }
 
-AgentDataFrame SimulationCache::GetLatestFrame() {
-	return this->m_frames[this->m_frames.size() - 1];
+AgentDataFrame SimulationCache::GetLatestFrame()
+{
+	std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
+	if(is)
+	{
+		AgentDataFrame adf;
+		deserialize(is, this->m_frameCounter - 1, adf);
+		is.close();
+		return adf;
+	}
+
+	is.close();
+	std::cout << "Failed to load latest frame from cache" << std::endl;
+	return AgentDataFrame();
 }
 
-std::size_t SimulationCache::GetNumFrame() { return m_frames.size(); }
-
-void SimulationCache::SetCacheSize(std::size_t size) {
-	this->m_cacheSize = size;
-	this->m_frames.clear();
-	this->m_frames.reserve(size);
+std::size_t SimulationCache::GetNumFrame()
+{
+	return this->m_frameCounter;
 }
 
-std::size_t SimulationCache::GetCacheSize() { return m_cacheSize; }
+void SimulationCache::ClearCache()
+{
+	tmp_cache_file.close();
+	std::remove(this->m_cacheFileName.c_str());
+	tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
+
+	this->m_current = 0;
+	this->m_frameCounter = 0;
+}
 
 } // namespace agentsim
 } // namespace aics
+
+/**
+*	File Serialization Functions
+*/
+bool goto_frameno(
+	std::ifstream& is,
+	std::size_t fno,
+	std::string& line)
+{
+	for(std::size_t i = 0; i < fno; ++i)
+	{
+		std::getline(is, line);
+		line = "";
+	}
+
+	std::getline(is, line, delimiter[0]);
+	return true;
+}
+
+void serialize(
+	std::ofstream& os,
+	std::size_t frame_number,
+	aics::agentsim::AgentDataFrame& adf)
+{
+	os << "F" << frame_number << delimiter
+	<< adf.size() << delimiter;
+	for(aics::agentsim::AgentData ad : adf)
+	{
+		serialize(os, ad);
+	}
+	os << std::endl;
+}
+
+void deserialize(
+	std::ifstream& is,
+	std::size_t frame_number,
+	aics::agentsim::AgentDataFrame& adf)
+{
+	std::string line;
+	goto_frameno(is, frame_number, line);
+
+	// Get the number of agents in this data frame
+	std::getline(is, line, delimiter[0]);
+	std::size_t num_agents = std::stoi(line);
+
+	for(std::size_t i = 0; i < num_agents; ++i)
+	{
+		aics::agentsim::AgentData ad;
+		deserialize(is, ad);
+		adf.push_back(ad);
+	}
+}
+
+void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
+{
+	os << ad.x << delimiter
+	<< ad.y << delimiter
+	<< ad.z << delimiter
+	<< ad.xrot << delimiter
+	<< ad.yrot << delimiter
+	<< ad.zrot << delimiter
+	<< ad.collision_radius << delimiter
+	<< ad.vis_type << delimiter
+	<< ad.subpoints.size() << delimiter;
+
+	for(auto val : ad.subpoints)
+	{
+		os << ad.vis_type << delimiter;
+	}
+}
+
+void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
+{
+	std::string line;
+	std::vector<float> vals;
+	for(std::size_t i = 0; i < 9; ++i)
+	{
+		std::getline(is, line, delimiter[0]);
+		vals.push_back(std::atof(line.c_str()));
+	}
+
+	ad.x = vals[0];
+	ad.y = vals[1];
+	ad.z = vals[2];
+	ad.xrot = vals[3];
+	ad.yrot = vals[4];
+	ad.zrot = vals[5];
+	ad.collision_radius = vals[6];
+	ad.vis_type = vals[7];
+
+	std::size_t num_sp = vals[8];
+	for(std::size_t i = 0; i < num_sp; ++i)
+	{
+		std::getline(is, line, delimiter[0]);
+		ad.subpoints.push_back(std::atof(line.c_str()));
+	}
+
+}

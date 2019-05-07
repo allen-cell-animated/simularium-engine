@@ -320,8 +320,11 @@ int main() {
             } break;
             case id_play_cache:
             {
-              std::cout << "request to play cached arrived\n";
-              simulation.PlayCacheFromFrame(0);
+              auto frame_no = json_msg["frame-num"].asInt();
+              std::cout << "request to play cached from frame "
+                << frame_no << " arrived" << std::endl;
+
+              simulation.PlayCacheFromFrame(frame_no);
               isRunningSimulation = true;
               isSimulationPaused = false;
             } break;

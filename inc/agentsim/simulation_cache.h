@@ -17,6 +17,9 @@ typedef std::vector<AgentDataFrame> FrameList;
 class SimulationCache
 {
 public:
+	SimulationCache();
+	~SimulationCache();
+
 	void AddFrame(AgentDataFrame data);
 
 	void SetCurrentFrame(std::size_t index);
@@ -30,14 +33,12 @@ public:
 
 	std::size_t GetNumFrame();
 
-	void SetCacheSize(std::size_t size);
-
-	std::size_t GetCacheSize();
+	void ClearCache();
 
 private:
-	std::size_t m_cacheSize = 0;
 	std::size_t m_current = 0;
-	FrameList m_frames;
+	std::size_t m_frameCounter = 0;
+	std::string m_cacheFileName = "runtime_cache.bin";
 };
 
 }
