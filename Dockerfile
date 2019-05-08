@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:19.04
 
 # install dependencies
 RUN mkdir /agentsim-dev && \
@@ -9,7 +9,8 @@ RUN mkdir /agentsim-dev && \
 	cmake build-essential git \
 	libhdf5-dev \
 	libblas-dev \
-	liblapack-dev
+	liblapack-dev \
+	python-dev
 
 
 # copy agent sim project
@@ -25,4 +26,10 @@ EXPOSE 9002
 
 #move the server to the root dir
 RUN cp /agentsim-dev/build/agentsim_server.exe /usr/bin/agentsim_server.exe
-RUN cp -r /agentsim-dev/build/. /
+RUN cp -r /agentsim-dev/build/bin/. /bin/
+RUN cp -r /agentsim-dev/build/lib/. /lib/
+RUN cp -r /agentsim-dev/build/src/. /src/
+RUN cp -r /agentsim-dev/build/data/. /data/
+RUN cp -r /agentsim-dev/build/readdy/. /readdy/
+RUN cp -r /agentsim-dev/build/dep/. /dep/
+RUN cp -r /agentsim-dev/build/CMakeFiles/. /CMakeFiles/
