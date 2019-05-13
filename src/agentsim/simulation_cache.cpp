@@ -179,6 +179,7 @@ void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
 	<< ad.zrot << delimiter
 	<< ad.collision_radius << delimiter
 	<< ad.vis_type << delimiter
+	<< ad.type << delimiter
 	<< ad.subpoints.size() << delimiter;
 
 	for(auto val : ad.subpoints)
@@ -191,7 +192,7 @@ void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
 {
 	std::string line;
 	std::vector<float> vals;
-	for(std::size_t i = 0; i < 9; ++i)
+	for(std::size_t i = 0; i < 10; ++i)
 	{
 		std::getline(is, line, delimiter[0]);
 		vals.push_back(std::atof(line.c_str()));
@@ -205,8 +206,9 @@ void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
 	ad.zrot = vals[5];
 	ad.collision_radius = vals[6];
 	ad.vis_type = vals[7];
+	ad.type = vals[8];
 
-	std::size_t num_sp = vals[8];
+	std::size_t num_sp = vals[9];
 	for(std::size_t i = 0; i < num_sp; ++i)
 	{
 		std::getline(is, line, delimiter[0]);
