@@ -108,6 +108,7 @@ int main() {
     // Simulation thread/timing variables
     bool isRunningSimulation = false;
     bool isSimulationPaused = false;
+    bool isSimulationSetup = false;
     auto start = std::chrono::steady_clock::now();
 
     float time_step = 1e-12; // seconds
@@ -191,6 +192,15 @@ int main() {
             case id_vis_data_request:
             {
               std::cout << "data request received\n";
+
+              /**
+              * If the simulation is already running, no need to resetup for a new client
+              */
+              if(!isRunningSimulation)
+              {
+                isSimulationSetup = false;
+              }
+
               isRunningSimulation = true;
               isSimulationPaused = false;
 
@@ -345,18 +355,34 @@ int main() {
         continue;
       }
 
+      /**
+      * Run simulation setup
+      *
+      * Either run the simulation to completion, load a trajectory file,
+      * or do nothing in the case of 'live' simulation
+      *
+      */
+
+      if(!isSimulationSetup)
+      {
+        if(run_mode == id_pre_run_simulation)
+        {
+          simulation.RunAndSaveFrames(time_step, n_time_steps);
+        }
+
+        if(run_mode == id_traj_file_playback)
+        {
+          simulation.LoadTrajectoryFile("./data/traj/" + traj_file_name);
+        }
+
+        isSimulationSetup = true;
+      }
+
+      /**
+      * Run simulation timestep
+      */
       auto now = std::chrono::steady_clock::now();
       auto diff = now - start;
-
-      if(run_mode == id_pre_run_simulation)
-      {
-        simulation.RunAndSaveFrames(time_step, n_time_steps);
-      }
-
-      if(run_mode == id_traj_file_playback)
-      {
-        simulation.LoadTrajectoryFile("./data/traj/" + traj_file_name);
-      }
 
       if(diff >= std::chrono::milliseconds(66))
       {

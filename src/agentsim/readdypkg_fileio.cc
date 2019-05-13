@@ -87,6 +87,11 @@ void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
 	{
 		this->m_hasLoadedRunFile = false;
 	}
+	else
+	{
+		std::cout << "Using loaded file:  " << file_path << std::endl;
+		return;
+	}
 
 	if(!this->m_hasLoadedRunFile)
 	{
@@ -96,6 +101,7 @@ void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
 		read_h5file(file_path, results);
 		this->m_hasLoadedRunFile = true;
 		last_loaded_file = file_path;
+		std::cout << "Finished loading trajectory file: " << file_path << std::endl;
 	}
 }
 
@@ -107,13 +113,14 @@ void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
 **/
 struct ParticleData {
 	ParticleData(std::string type, std::string flavor, const std::array<readdy::scalar, 3> &pos,
-		readdy::model::Particle::id_type id, readdy::time_step_type t)
-		: type(std::move(type)), flavor(std::move(flavor)), position(pos), id(id), t(t) {}
+		readdy::model::Particle::id_type id, std::size_t type_id, readdy::time_step_type t)
+		: type(std::move(type)), flavor(std::move(flavor)), position(pos), id(id), type_id(type_id), t(t) {}
 
 		std::string type;
 		std::string flavor;
 		std::array<readdy::scalar, 3> position;
 		readdy::model::Particle::id_type id;
+		std::size_t type_id;
 		readdy::time_step_type t;
 };
 
@@ -212,7 +219,7 @@ void read_h5file(
 			currentFrame.emplace_back(
 				typeMapping[it->typeId],
 				readdy::model::particleflavor::particleFlavorToString(it->flavor),
-				it->pos.data, it->id, *timeIt);
+				it->pos.data, it->id, it->typeId, *timeIt);
 		}
 	}
 
@@ -263,8 +270,7 @@ void copy_frame(
 			// copy the position of the particle to an AgentViz agent
 			auto currentAgent = agents[agent_index].get();
       currentAgent->SetLocation(Eigen::Vector3d(pos[0],pos[1],pos[2]));
-			try { currentAgent->SetTypeID(particles.idOf(p.type)); }
-			catch(...) { /* ignore */ }
+			currentAgent->SetTypeID(p.type_id);
       currentAgent->SetName(p.type);
       currentAgent->SetVisibility(true);
       agent_index++;
