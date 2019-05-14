@@ -12,8 +12,8 @@
 
 #include "agentsim/agentsim.h"
 
-#define HEART_BEAT_INTERVAL_SECONDS 8
-#define MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT 2
+#define HEART_BEAT_INTERVAL_SECONDS 15
+#define MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT 4
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 using namespace aics::agentsim;
