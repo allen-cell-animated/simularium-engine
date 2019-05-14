@@ -49,6 +49,15 @@ SimulationCache::~SimulationCache()
 
 void SimulationCache::AddFrame(AgentDataFrame data)
 {
+	if(this->m_runtimeCache.size() == 0)
+	{
+		this->m_runtimeCache.push_back(data);
+	}
+	else
+	{
+		this->m_runtimeCache[0] = data;
+	}
+
 	serialize(tmp_cache_file, this->m_frameCounter, data);
 	this->m_frameCounter++;
 }
@@ -85,6 +94,11 @@ void SimulationCache::IncrementCurrentFrame()
 
 AgentDataFrame SimulationCache::GetLatestFrame()
 {
+	if(this->m_runtimeCache.size() > 0)
+	{
+		return this->m_runtimeCache[0];
+	}
+
 	std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
 	if(is)
 	{
@@ -110,6 +124,7 @@ void SimulationCache::ClearCache()
 	std::remove(this->m_cacheFileName.c_str());
 	tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
 
+	this->m_runtimeCache.clear();
 	this->m_current = 0;
 	this->m_frameCounter = 0;
 }
