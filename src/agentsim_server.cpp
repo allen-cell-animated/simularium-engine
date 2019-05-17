@@ -379,16 +379,17 @@ int main() {
       }
 
       /**
-      * Run simulation timestep
+      * Run simulation timestep ever 66 milliseconds
       */
       auto now = std::chrono::steady_clock::now();
       auto diff = now - start;
 
       if(diff >= std::chrono::milliseconds(66))
       {
+        /**
+        * Run simulation timestep
+        */
         start = now;
-        Json::Value agents;
-        agents["msg_type"] = id_vis_data_arrive;
 
         if(simulation.IsPlayingFromCache())
         {
@@ -412,37 +413,53 @@ int main() {
           }
         }
 
+        /**
+        * JSON Net Serialization
+        */
         auto simData = simulation.GetData();
 
+        Json::Value net_agent_data_frame;
+        std::vector<float> vals;
+
+        net_agent_data_frame["msg_type"] = id_vis_data_arrive;
         for(std::size_t i = 0; i < simData.size(); ++i)
         {
           auto agentData = simData[i];
 
           Json::Value agent;
-          agent["type"] = agentData.type;
-          agent["vis-type"] = agentData.vis_type;
-          agent["x"] = agentData.x;
-          agent["y"] = agentData.y;
-          agent["z"] = agentData.z;
+          vals.push_back(agentData.vis_type);
+          vals.push_back(agentData.type);
+          vals.push_back(agentData.x);
+          vals.push_back(agentData.y);
+          vals.push_back(agentData.z);
+          vals.push_back(agentData.xrot);
+          vals.push_back(agentData.yrot);
+          vals.push_back(agentData.zrot);
+          vals.push_back(agentData.collision_radius);
+          vals.push_back(agentData.subpoints.size());
 
-          agent["xrot"] = agentData.xrot;
-          agent["yrot"] = agentData.yrot;
-          agent["zrot"] = agentData.zrot;
-
-          agent["collision-radius"] = agentData.collision_radius;
-
-          auto subpointsData = Json::Value(Json::arrayValue);
           for(std::size_t j = 0; j < agentData.subpoints.size(); ++j)
           {
-            int sp_index = static_cast<int>(j);
-            subpointsData[sp_index] = agentData.subpoints[sp_index];
+            vals.push_back(agentData.subpoints[j]);
           }
-
-          agent["subpoints"] = subpointsData;
-          agents[std::to_string(i)] = agent;
         }
 
-        std::string msg = Json::writeString(json_stream_writer, agents);
+        /**
+        * Copy values to json data array
+        */
+        auto json_data_arr = Json::Value(Json::arrayValue);
+        for(std::size_t j = 0; j < vals.size(); ++j)
+        {
+          int nd_index = static_cast<int>(j);
+          json_data_arr[nd_index] = vals[nd_index];
+        }
+
+        net_agent_data_frame["data"] = json_data_arr;
+
+        /**
+        * Send data over the network
+        */
+        std::string msg = Json::writeString(json_stream_writer, net_agent_data_frame);
         for(std::size_t i = 0; i < net_connections.size(); ++i)
         {
           auto sptr = net_connections[i].lock();
