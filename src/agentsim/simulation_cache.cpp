@@ -17,13 +17,13 @@ void serialize(
 	std::ofstream& os,
 	std::size_t frame_number,
 	aics::agentsim::AgentDataFrame& adf);
-void deserialize(
+bool deserialize(
 	std::ifstream& is,
 	std::size_t frame_number,
 	aics::agentsim::AgentDataFrame& adf);
 
 void serialize(std::ofstream& os, aics::agentsim::AgentData& ad);
-void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad);
+bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad);
 
 std::ofstream tmp_cache_file;
 std::string delimiter = "/";
@@ -73,8 +73,10 @@ AgentDataFrame SimulationCache::GetCurrentFrame()
 	if(is)
 	{
 		AgentDataFrame adf;
-		deserialize(is, this->m_current, adf);
-		return adf;
+		if(deserialize(is, this->m_current, adf))
+		{
+			return adf;
+		}
 	}
 
 	std::cout << "Failed to load frame " << this->m_frameCounter << " from cache" << std::endl;
@@ -142,8 +144,14 @@ bool goto_frameno(
 {
 	for(std::size_t i = 0; i < fno; ++i)
 	{
-		std::getline(is, line);
-		line = "";
+		if(std::getline(is, line))
+		{
+			line = "";
+		}
+		else
+		{
+			return false;
+		}
 	}
 
 	std::getline(is, line, delimiter[0]);
@@ -164,13 +172,16 @@ void serialize(
 	os << std::endl;
 }
 
-void deserialize(
+bool deserialize(
 	std::ifstream& is,
 	std::size_t frame_number,
 	aics::agentsim::AgentDataFrame& adf)
 {
 	std::string line;
-	goto_frameno(is, frame_number, line);
+	if(!goto_frameno(is, frame_number, line))
+	{
+		return false;
+	}
 
 	// Get the number of agents in this data frame
 	std::getline(is, line, delimiter[0]);
@@ -179,9 +190,13 @@ void deserialize(
 	for(std::size_t i = 0; i < num_agents; ++i)
 	{
 		aics::agentsim::AgentData ad;
-		deserialize(is, ad);
-		adf.push_back(ad);
+		if(deserialize(is, ad))
+		{
+			adf.push_back(ad);
+		}
 	}
+
+	return true;
 }
 
 void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
@@ -203,14 +218,20 @@ void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
 	}
 }
 
-void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
+bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
 {
 	std::string line;
 	std::vector<float> vals;
 	for(std::size_t i = 0; i < 10; ++i)
 	{
-		std::getline(is, line, delimiter[0]);
-		vals.push_back(std::atof(line.c_str()));
+		if(std::getline(is, line, delimiter[0]))
+		{
+			vals.push_back(std::atof(line.c_str()));
+		}
+		else
+		{
+			return false;
+		}
 	}
 
 	ad.x = vals[0];
@@ -226,8 +247,15 @@ void deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
 	std::size_t num_sp = vals[9];
 	for(std::size_t i = 0; i < num_sp; ++i)
 	{
-		std::getline(is, line, delimiter[0]);
-		ad.subpoints.push_back(std::atof(line.c_str()));
+		if(std::getline(is, line, delimiter[0]))
+		{
+			ad.subpoints.push_back(std::atof(line.c_str()));
+		}
+		else
+		{
+			return false;
+		}
 	}
 
+	return true;
 }
