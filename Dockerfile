@@ -30,11 +30,9 @@ FROM ubuntu:19.04
 # install dependencies
 RUN apt-get update && apt-get -y \
 	install curl \
-	cmake build-essential \
 	libhdf5-dev \
 	libblas-dev \
-	liblapack-dev \
-	python-dev
+	liblapack-dev
 
 # create non-root user
 RUN groupadd -r app && useradd -r -g app app
