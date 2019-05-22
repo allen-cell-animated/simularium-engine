@@ -5,11 +5,13 @@ FROM ubuntu:19.04 as build
 RUN mkdir /agentsim-dev && \
 	mkdir /agentsim-dev/build && \
 	mkdir /agentsim-dev/agentsim && \
-	apt-get update && apt-get -y \
-	install curl \
-	cmake build-essential git \
-	libhdf5-dev \
+	apt-get update && apt-get install -y \
+	build-essential \
+	cmake \
+	curl \
+	git \
 	libblas-dev \
+	libhdf5-dev \
 	liblapack-dev \
 	python-dev
 
@@ -28,10 +30,10 @@ RUN cd ../build && \
 FROM ubuntu:19.04
 
 # install dependencies
-RUN apt-get update && apt-get -y \
-	install curl \
-	libhdf5-dev \
+RUN apt-get update && apt-get install -y \
+	curl \
 	libblas-dev \
+	libhdf5-dev \
 	liblapack-dev
 
 # create non-root user
