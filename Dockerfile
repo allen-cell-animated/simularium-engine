@@ -34,7 +34,8 @@ RUN apt-get update && apt-get install -y \
 	curl \
 	libblas-dev \
 	libhdf5-dev \
-	liblapack-dev
+	liblapack-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
 # create non-root user
 RUN groupadd -r app && useradd -r -g app app
