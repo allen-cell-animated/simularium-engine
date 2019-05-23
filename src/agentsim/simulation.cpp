@@ -60,6 +60,11 @@ std::vector<AgentData> Simulation::GetData()
 	}
 }
 
+std::vector<AgentData> Simulation::GetDataFrame(std::size_t frame_no)
+{
+	return this->m_cache.GetFrame(frame_no);
+}
+
 void Simulation::Reset()
 {
 	for(std::size_t i = 0; i < this->m_SimPkgs.size(); ++i)

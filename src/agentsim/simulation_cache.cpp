@@ -67,20 +67,30 @@ void SimulationCache::SetCurrentFrame(std::size_t index)
 	this->m_current = std::min(index, this->m_frameCounter);
 }
 
-AgentDataFrame SimulationCache::GetCurrentFrame()
+AgentDataFrame SimulationCache::GetFrame(std::size_t frame_no)
 {
-	std::ifstream is(this->m_cacheFileName);
+	if(frame_no > this->m_frameCounter || this->m_frameCounter == 0)
+	{
+		return AgentDataFrame();
+	}
+
+	std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
 	if(is)
 	{
 		AgentDataFrame adf;
-		if(deserialize(is, this->m_current, adf))
-		{
-			return adf;
-		}
+		deserialize(is, frame_no, adf);
+		is.close();
+		return adf;
 	}
 
-	std::cout << "Failed to load frame " << this->m_frameCounter << " from cache" << std::endl;
+	is.close();
+	std::cout << "Failed to load frame" << frame_no << " from cache" << std::endl;
 	return AgentDataFrame();
+}
+
+AgentDataFrame SimulationCache::GetCurrentFrame()
+{
+	return this->GetFrame(this->m_current);
  }
 
 bool SimulationCache::CurrentIsLatestFrame()
@@ -101,21 +111,10 @@ AgentDataFrame SimulationCache::GetLatestFrame()
 		return this->m_runtimeCache[0];
 	}
 
-	std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
-	if(is)
-	{
-		AgentDataFrame adf;
-		deserialize(is, this->m_frameCounter - 1, adf);
-		is.close();
-		return adf;
-	}
-
-	is.close();
-	std::cout << "Failed to load latest frame from cache" << std::endl;
-	return AgentDataFrame();
+	return this->GetFrame(this->m_frameCounter - 1);
 }
 
-std::size_t SimulationCache::GetNumFrame()
+std::size_t SimulationCache::GetNumFrames()
 {
 	return this->m_frameCounter;
 }

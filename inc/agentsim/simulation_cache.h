@@ -23,6 +23,8 @@ public:
 	void AddFrame(AgentDataFrame data);
 
 	void SetCurrentFrame(std::size_t index);
+
+	AgentDataFrame GetFrame(std::size_t frame_no);
 	AgentDataFrame GetCurrentFrame();
 
 	bool CurrentIsLatestFrame();
@@ -31,7 +33,7 @@ public:
 
 	AgentDataFrame GetLatestFrame();
 
-	std::size_t GetNumFrame();
+	std::size_t GetNumFrames();
 
 	void ClearCache();
 

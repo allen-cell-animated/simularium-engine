@@ -24,11 +24,13 @@ namespace agentsim {
 
 std::vector<std::vector<ParticleData>> results;
 std::size_t frame_no = 0;
+std::string last_loaded_file = "";
 
 void ResetFileIO()
 {
 	//results.clear();
 	frame_no = 0;
+	last_loaded_file = "";
 }
 
 void ReaDDyPkg::GetNextFrame(
@@ -80,7 +82,6 @@ void ReaDDyPkg::Run(float timeStep, std::size_t nTimeStep)
 	this->m_hasLoadedRunFile = false;
 }
 
-std::string last_loaded_file = "";
 void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
 {
 	if(last_loaded_file != file_path)

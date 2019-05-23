@@ -51,6 +51,17 @@ public:
 	std::vector<AgentData> GetData();
 
 	/**
+	*	GetDataFrame
+	*
+	*	@param	frame_no	the frame-number/index of the agent data frame to load
+	*
+	*	Get a list of data corresponding to the agents owned by this simulation object
+	*	Includes information regarding position, type, and other relevant visualization
+	* information to be streamed to a front-end
+	*/
+	std::vector<AgentData> GetDataFrame(std::size_t frame_no);
+
+	/**
 	*	Reset
 	*
 	*	Reset the simulation to an 'un-run' state
@@ -145,6 +156,8 @@ public:
 	void LoadTrajectoryFile(std::string file_path);
 
 	void SetPlaybackMode(std::size_t playback_mode);
+
+	std::size_t GetNumFrames() { return m_cache.GetNumFrames(); }
 
 private:
 	std::vector<std::shared_ptr<Agent>> m_agents;
