@@ -3,6 +3,7 @@
 
 #include "simulation.h"
 #include "agents/agent.h"
+#include "aws/aws_util.h"
 
 #include "model/model.h"
 

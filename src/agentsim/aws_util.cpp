@@ -1,5 +1,3 @@
-#include "gtest/gtest.h"
-#include "agentsim/aws/aws_util.h"
 #include <aws/core/Aws.h>
 #include <aws/s3/S3Client.h>
 #include <aws/core/utils/threading/Executor.h>
@@ -8,41 +6,15 @@
 #include <aws/core/utils/threading/Executor.h>
 #include <iostream>
 
+static const Aws::String bucket_name = "aics-agentviz-data";
+
 namespace aics {
 namespace agentsim {
-namespace test {
+namespace aws_util {
 
-class AwsSdkTest : public ::testing::Test
+bool Download(Aws::String object_name)
 {
-	protected:
-	// You can remove any or all of the following functions if its body
-	// is empty.
-
-	AwsSdkTest() {
-		// You can do set-up work for each test here.
-	}
-
-	virtual ~AwsSdkTest() {
-		// You can do clean-up work that doesn't throw exceptions here.
-	}
-
-	// If the constructor and destructor are not enough for setting up
-	// and cleaning up each test, you can define the following methods:
-
-	virtual void SetUp() {
-		// Code here will be called immediately after the constructor (right
-		// before each test).
-	}
-
-	virtual void TearDown() {
-		// Code here will be called immediately after each test (right
-		// before the destructor).
-	}
-
-	// Objects declared here can be used by all tests in the test case for Foo.
-};
-
-TEST_F(AwsSdkTest, SanityCheck) {
+	bool success = true;
 	Aws::SDKOptions options;
   options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info;
 
@@ -50,8 +22,6 @@ TEST_F(AwsSdkTest, SanityCheck) {
   {
     // snippet-start:[s3.cpp.get_object.code]
     // Assign these values before running the program
-    const Aws::String bucket_name = "aics-agentviz-data";
-    const Aws::String object_name = "trajectory/actin5-1.h5";  // For demo, set to a text file
 
     Aws::Client::ClientConfiguration config;
     config.region = "us-east-2";
@@ -70,19 +40,14 @@ TEST_F(AwsSdkTest, SanityCheck) {
 			status == Aws::Transfer::TransferStatus::CANCELED)
     {
       std::cerr << downloadHandle->GetLastError() << std::endl;
+			success = false;
     }
-
-		EXPECT_EQ(status, Aws::Transfer::TransferStatus::COMPLETED);
   }
 
   Aws::ShutdownAPI(options);
+	return success;
 }
 
-TEST_F(AwsSdkTest, AwsUtilDownload)
-{
-	aics::agentsim::aws_util::Download("trajectory/microtubules15.h5");
-}
-
-} // namespace test
+} // namespace aws_util
 } // namespace agentsim
 } // namespace aics

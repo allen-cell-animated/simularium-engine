@@ -1,4 +1,11 @@
+#include "agentsim/aws/aws_util.h"
+
 struct ParticleData;
+
+inline bool file_exists (const std::string& name) {
+  struct stat buffer;
+  return (stat (name.c_str(), &buffer) == 0);
+}
 
 void run_and_save_h5file(
 	readdy::Simulation* sim,
@@ -157,6 +164,15 @@ void read_h5file(
 	std::vector<std::vector<ParticleData>>& results
 )
 {
+	if(!file_exists(file_name))
+	{
+		std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
+		if(!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size())))
+		{
+			std::cout << file_name << " not found on AWS S3" << std::endl;
+		}
+	}
+
 	// open the output file
 	auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
 

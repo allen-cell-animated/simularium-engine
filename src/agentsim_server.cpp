@@ -73,6 +73,8 @@ bool use_readdy = true;
 bool use_cytosim = !use_readdy;
 int run_mode = 0; // live simulation
 
+std::string trajectory_file_directory = "trajectory/";
+
 enum {
   id_undefined_web_request = 0,
   id_vis_data_arrive = 1,
@@ -493,7 +495,7 @@ int main() {
 
         if(run_mode == id_traj_file_playback)
         {
-          simulation.LoadTrajectoryFile("./data/traj/" + traj_file_name);
+          simulation.LoadTrajectoryFile(trajectory_file_directory + traj_file_name);
         }
 
 				if(run_mode == id_pre_run_simulation
