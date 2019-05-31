@@ -1,3 +1,6 @@
 [submodule "dep/readdy"]
 	path = dep/readdy
 	url = https://github.com/EricJIsaac/readdy.git
+[submodule "dep/aws-sdk-cpp"]
+	path = dep/aws-sdk-cpp
+	url = /home/eric/Documents/git/agentsim/aws-sdk-cpp/
