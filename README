@@ -13,7 +13,8 @@ Dependencies
 Building:
 1. git clone --recursive [agentsim_repo_address]
 1. Alternatively, after cloning the repository, run "git submodule update --init --recursive" to download dependencies.
-2. Create a new directory for the build, navigate to it, and run "cmake [path to repository]"
+2. Create a new directory for the build, navigate to it, and run
+	"cmake [path to repository] -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release "
 3. Run "make"
 
 To create the docker image:

@@ -31,7 +31,6 @@ add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 add_executable(${CLIENT_PROGRAM} ${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp)
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
-
 find_package(HDF5 COMPONENTS HL REQUIRED)
 set(HDF5_INCLUDES
 "${HDF5_INCLUDE_DIRS}"
@@ -63,6 +62,7 @@ set(EXTERNAL_INCLUDES
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
+"${EXTERNAL_DIRECTORY}/aws-sdk-cpp"
 "${HDF5_INCLUDES}"
 )
 
@@ -129,6 +129,13 @@ set(GTEST_DLLS
   "gtest"
 )
 
+set(AWS_DLLS
+  "aws-cpp-sdk-s3"
+  "aws-cpp-sdk-awstransfer"
+  "aws-cpp-sdk-transfer"
+  "aws-cpp-sdk-core"
+)
+
 target_link_libraries(${SERVER_PROGRAM}
   "${AGENTSIM_DLL}"
   "${CYTOSIM_DLLS}"
@@ -152,8 +159,5 @@ target_link_libraries(${TEST_PROGRAM}
   "${GTEST_DLLS}"
   "${HDF5_DLLS}"
   "${READDY_DLLS}"
+  ${AWS_DLLS}
 )
-
-add_custom_target(do_always ALL
-                   COMMAND ${CMAKE_COMMAND} -E copy_directory
-                 ${CMAKE_SOURCE_DIR}/data ${CMAKE_BINARY_DIR}/data)
