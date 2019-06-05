@@ -26,6 +26,9 @@ set(INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/inc")
 set(EXTERNAL_DIRECTORY "${CMAKE_SOURCE_DIR}/ext")
 set(DEPENDENCY_DIRECTORY "${CMAKE_SOURCE_DIR}/dep")
 
+SET(CMAKE_EXE_LINKER_FLAGS
+"${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath /usr/local/lib -Wl,-rpath /usr/lib")
+
 project(${TARGET})
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 add_executable(${CLIENT_PROGRAM} ${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp)
@@ -162,3 +165,5 @@ target_link_libraries(${TEST_PROGRAM}
   "${READDY_DLLS}"
   ${AWS_DLLS}
 )
+
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/trajectory")

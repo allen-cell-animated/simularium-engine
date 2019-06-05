@@ -170,6 +170,7 @@ void read_h5file(
 		if(!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size())))
 		{
 			std::cout << file_name << " not found on AWS S3" << std::endl;
+      return;
 		}
 	}
 
