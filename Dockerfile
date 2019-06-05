@@ -38,7 +38,7 @@ WORKDIR /
 # install dependencies
 RUN apt-get update && apt-get install -y \
 	build-essential \
-	aws-cli \
+	awscli \
 	curl \
 	libblas-dev \
 	libhdf5-dev \
