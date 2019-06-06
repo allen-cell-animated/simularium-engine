@@ -58,7 +58,7 @@ RUN echo " "
 COPY --from=build --chown=app:app /usr/. /usr/
 RUN echo " "
 
-RUN mkdir /trajectory
+RUN mkdir /trajectory && chown -R app /trajectory
 USER app
 
 #expose port 9002 for server

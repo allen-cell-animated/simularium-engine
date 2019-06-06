@@ -40,7 +40,7 @@ public:
 private:
 	std::size_t m_current = 0;
 	std::size_t m_frameCounter = 0;
-	std::string m_cacheFileName = "runtime_cache.bin";
+	std::string m_cacheFileName = "/tmp/agentviz_runtime_cache.bin";
 	std::vector<AgentDataFrame> m_runtimeCache;
 };
 

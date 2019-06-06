@@ -174,6 +174,18 @@ void read_h5file(
 		}
 	}
 
+  if(file_exists("/" + file_name))
+  {
+      file_name = "/" + file_name;
+      std::cout << "file name modified to " << file_name << std::endl;
+  }
+  else if(file_exists("./" + file_name))
+  {
+      file_name = "./" + file_name;
+      std::cout << "file name modified to " << file_name << std::endl;
+  }
+
+
 	// open the output file
 	auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
 
