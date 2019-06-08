@@ -32,6 +32,7 @@ void GenerateLocalUUID(std::string& uuid)
 #define HEART_BEAT_INTERVAL_SECONDS 15
 #define MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT 4
 #define MAX_NUM_FRAMES std::numeric_limits<std::size_t>::max()
+#define NO_CLIENT_TIMEOUT_SECONDS 30
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 using namespace aics::agentsim;
@@ -213,6 +214,7 @@ int main() {
     // Runtime loop
     while(isServerRunning)
     {
+
       /**
       * Remove expired network connections
       */
@@ -684,6 +686,7 @@ int main() {
     auto start = std::chrono::steady_clock::now();
     auto now = start;
     auto diff = now - start;
+		auto no_client_timer = std::chrono::steady_clock::now();
 
     Json::StreamWriterBuilder json_stream_writer;
 
@@ -694,6 +697,22 @@ int main() {
     {
       now = std::chrono::steady_clock::now();
       diff = now - start;
+
+			if(net_connections.size() == 0)
+			{
+				auto now = std::chrono::steady_clock::now();
+	      auto diff = now - no_client_timer;
+
+	      if(diff >= std::chrono::seconds(NO_CLIENT_TIMEOUT_SECONDS)) {
+					std::cout << "No clients connected for " << NO_CLIENT_TIMEOUT_SECONDS << " seconds, exiting server ... " << std::endl;
+					std::raise(SIGINT);
+				}
+			}
+			else
+			{
+				no_client_timer = std::chrono::steady_clock::now();
+			}
+
       if(diff >= std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS))
       {
         if(net_messages.size() > 0)
