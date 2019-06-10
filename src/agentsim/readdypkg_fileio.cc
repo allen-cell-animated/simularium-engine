@@ -60,7 +60,7 @@ void ReaDDyPkg::GetNextFrame(
 
 	if(!this->m_hasLoadedRunFile)
 	{
-		this->LoadTrajectoryFile("test.h5");
+		this->LoadTrajectoryFile("/tmp/test.h5");
 	}
 
   if(frame_no >= results.size())
@@ -84,7 +84,7 @@ void ReaDDyPkg::Run(float timeStep, std::size_t nTimeStep)
 	if(this->m_hasAlreadyRun)
 	 return;
 
-	run_and_save_h5file(this->m_simulation, "test.h5", timeStep, nTimeStep, 10);
+	run_and_save_h5file(this->m_simulation, "/tmp/test.h5", timeStep, nTimeStep, 10);
 	this->m_hasAlreadyRun = true;
 	this->m_hasLoadedRunFile = false;
 }
