@@ -705,7 +705,8 @@ int main() {
 
 	      if(diff >= std::chrono::seconds(NO_CLIENT_TIMEOUT_SECONDS)) {
 					std::cout << "No clients connected for " << NO_CLIENT_TIMEOUT_SECONDS << " seconds, exiting server ... " << std::endl;
-					std::raise(SIGINT);
+					isServerRunning = false;
+					std::raise(SIGKILL);
 				}
 			}
 			else
@@ -793,22 +794,30 @@ int main() {
     }
   });
 
-  std::string input;
-  std::cout << "Enter 'quit' to exit\n";
-  while(isServerRunning && std::getline(std::cin, input, '\n'))
-  {
-    if(input == "quit")
-    {
-      isServerRunning = false;
-    }
-    else
-    {
-      input = "";
-    }
-  }
+	auto io_thread = std::thread([&] {
+		  std::string input;
+		  std::cout << "Enter 'quit' to exit\n";
+		  while(isServerRunning && std::getline(std::cin, input, '\n'))
+		  {
+		    if(input == "quit")
+		    {
+		      isServerRunning = false;
+		    }
+		    else
+		    {
+		      input = "";
+		    }
+		  }
+	});
+
+	while(isServerRunning)
+	{
+
+	}
 
   std::cout << "Exiting Server...\n";
   sim_thread.join();
   heartbeat_thread.join();
+	io_thread.detach();
   ws_thread.detach();
 }
