@@ -33,6 +33,7 @@ void GenerateLocalUUID(std::string& uuid)
 #define MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT 4
 #define MAX_NUM_FRAMES std::numeric_limits<std::size_t>::max()
 #define NO_CLIENT_TIMEOUT_SECONDS 30
+#define SERVER_TICK_INTERVAL_MILLISECONDS 200
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 using namespace aics::agentsim;
@@ -178,7 +179,6 @@ int main() {
   auto sim_thread = std::thread([&] {
     // Simulation thread/timing variables
     bool isSimulationSetup = false;
-    auto start = std::chrono::steady_clock::now();
 
     float time_step = 1e-12; // seconds
     std::size_t n_time_steps = 1;
@@ -214,6 +214,7 @@ int main() {
     // Runtime loop
     while(isServerRunning)
     {
+			std::this_thread::sleep_for(std::chrono::milliseconds(SERVER_TICK_INTERVAL_MILLISECONDS));
 
       /**
       * Remove expired network connections
@@ -476,7 +477,6 @@ int main() {
 			*/
 			if(!isRunningSimulation || isSimulationPaused)
 			{
-				start = std::chrono::steady_clock::now();
 				continue;
 			}
 
@@ -520,173 +520,161 @@ int main() {
       /**
       * Run simulation timestep ever 66 milliseconds
       */
-      auto now = std::chrono::steady_clock::now();
-      auto diff = now - start;
 
-      if(diff >= std::chrono::milliseconds(66))
+      /**
+      * Run simulation timestep
+      */
+			auto nframes = simulation.GetNumFrames();
+
+      // Cache playback
+      bool all_clients_playing_from_cache = true;
+      for(auto& entry : net_states)
       {
-        /**
-        * Run simulation timestep
-        */
-        start = now;
-				auto nframes = simulation.GetNumFrames();
+        auto& net_id = entry.first;
+        auto& net_state = entry.second;
 
-        // Cache playback
-        bool all_clients_playing_from_cache = true;
-        for(auto& entry : net_states)
+				if(net_state.play_state != ClientPlayState::Playing)
+				{
+					continue;
+				}
+
+        if(net_state.is_finished)
         {
-          auto& net_id = entry.first;
-          auto& net_state = entry.second;
-
-					if(net_state.play_state != ClientPlayState::Playing)
-					{
-						continue;
-					}
-
-          if(net_state.is_finished)
-          {
-            continue;
-          }
-
-          if(net_state.frame_no >= nframes - 1)
-          {
-            if(net_state.frame_no != MAX_NUM_FRAMES)
-            {
-              std::cout << "End of simulation cache reached for client " << net_id << std::endl;
-              net_state.frame_no = MAX_NUM_FRAMES;
-            }
-
-            if(simulation.HasLoadedAllFrames())
-            {
-              std::cout << "Simulation finished for client " << net_id << std::endl;
-              net_state.is_finished = true;
-            }
-            else
-            {
-              all_clients_playing_from_cache = false;
-            }
-          }
-
-					if(nframes == 0)
-					{
-						all_clients_playing_from_cache = false;
-					}
+          continue;
         }
 
-        if(all_clients_playing_from_cache)
+        if(net_state.frame_no >= nframes - 1)
         {
-          // nothing to do at the moment
-        }
-        else if(run_mode == id_live_simulation)
-        {
-          simulation.RunTimeStep(time_step);
-        }
-        else if(run_mode == id_pre_run_simulation
-          || run_mode == id_traj_file_playback)
-        {
-          if(!simulation.HasLoadedAllFrames())
+          if(net_state.frame_no != MAX_NUM_FRAMES)
           {
-						simulation.LoadNextFrame();
-          }
-        }
-
-        /**
-        * JSON Net Serialization
-        */
-        for(auto& entry : net_states)
-        {
-          auto& net_id = entry.first;
-          auto& net_state = entry.second;
-
-					if(net_state.play_state != ClientPlayState::Playing)
-					{
-						continue;
-					}
-
-          if(net_state.is_finished)
-          {
-            continue;
+            std::cout << "End of simulation cache reached for client " << net_id << std::endl;
+            net_state.frame_no = MAX_NUM_FRAMES;
           }
 
-          AgentDataFrame simData;
-
-          // This state is currently being used to demark the 'latest' frame
-          if(net_state.frame_no == MAX_NUM_FRAMES)
+          if(simulation.HasLoadedAllFrames())
           {
-            simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
+            std::cout << "Simulation finished for client " << net_id << std::endl;
+            net_state.is_finished = true;
           }
           else
           {
-            simData = simulation.GetDataFrame(net_state.frame_no++);
-          }
-
-
-          Json::Value net_agent_data_frame;
-          std::vector<float> vals;
-
-          net_agent_data_frame["msg_type"] = id_vis_data_arrive;
-          for(std::size_t i = 0; i < simData.size(); ++i)
-          {
-            auto agentData = simData[i];
-
-            Json::Value agent;
-            vals.push_back(agentData.vis_type);
-            vals.push_back(agentData.type);
-            vals.push_back(agentData.x);
-            vals.push_back(agentData.y);
-            vals.push_back(agentData.z);
-            vals.push_back(agentData.xrot);
-            vals.push_back(agentData.yrot);
-            vals.push_back(agentData.zrot);
-            vals.push_back(agentData.collision_radius);
-            vals.push_back(agentData.subpoints.size());
-
-            for(std::size_t j = 0; j < agentData.subpoints.size(); ++j)
-            {
-              vals.push_back(agentData.subpoints[j]);
-            }
-          }
-
-          /**
-          * Copy values to json data array
-          */
-          auto json_data_arr = Json::Value(Json::arrayValue);
-          for(std::size_t j = 0; j < vals.size(); ++j)
-          {
-            int nd_index = static_cast<int>(j);
-            json_data_arr[nd_index] = vals[nd_index];
-          }
-
-          net_agent_data_frame["data"] = json_data_arr;
-
-          /**
-          * Send data over the network
-          */
-          std::string msg = Json::writeString(json_stream_writer, net_agent_data_frame);
-
-          // validate net connection
-          auto sptr = net_connections[net_id].lock();
-          if(sptr.get() == nullptr) { continue; }
-
-          // try to send, failure to send is harmless, and likely a result of threading
-          try {
-            sim_server.send(net_connections[net_id], msg, websocketpp::frame::opcode::text);
-          }
-          catch(...)
-          {
-            std::cout << "Ignoring failed websocket send" << std::endl;
+            all_clients_playing_from_cache = false;
           }
         }
 
+				if(nframes == 0)
+				{
+					all_clients_playing_from_cache = false;
+				}
+      }
+
+      if(all_clients_playing_from_cache)
+      {
+        // nothing to do at the moment
+      }
+      else if(run_mode == id_live_simulation)
+      {
+        simulation.RunTimeStep(time_step);
+      }
+      else if(run_mode == id_pre_run_simulation
+        || run_mode == id_traj_file_playback)
+      {
+        if(!simulation.HasLoadedAllFrames())
+        {
+					simulation.LoadNextFrame();
+        }
+      }
+
+      /**
+      * JSON Net Serialization
+      */
+      for(auto& entry : net_states)
+      {
+        auto& net_id = entry.first;
+        auto& net_state = entry.second;
+
+				if(net_state.play_state != ClientPlayState::Playing)
+				{
+					continue;
+				}
+
+        if(net_state.is_finished)
+        {
+          continue;
+        }
+
+        AgentDataFrame simData;
+
+        // This state is currently being used to demark the 'latest' frame
+        if(net_state.frame_no == MAX_NUM_FRAMES)
+        {
+          simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
+        }
+        else
+        {
+          simData = simulation.GetDataFrame(net_state.frame_no++);
+        }
+
+
+        Json::Value net_agent_data_frame;
+        std::vector<float> vals;
+
+        net_agent_data_frame["msg_type"] = id_vis_data_arrive;
+        for(std::size_t i = 0; i < simData.size(); ++i)
+        {
+          auto agentData = simData[i];
+          vals.push_back(agentData.vis_type);
+          vals.push_back(agentData.type);
+          vals.push_back(agentData.x);
+          vals.push_back(agentData.y);
+          vals.push_back(agentData.z);
+          vals.push_back(agentData.xrot);
+          vals.push_back(agentData.yrot);
+          vals.push_back(agentData.zrot);
+          vals.push_back(agentData.collision_radius);
+          vals.push_back(agentData.subpoints.size());
+
+          for(std::size_t j = 0; j < agentData.subpoints.size(); ++j)
+          {
+            vals.push_back(agentData.subpoints[j]);
+          }
+        }
+
+        /**
+        * Copy values to json data array
+        */
+        auto json_data_arr = Json::Value(Json::arrayValue);
+        for(std::size_t j = 0; j < vals.size(); ++j)
+        {
+          int nd_index = static_cast<int>(j);
+          json_data_arr[nd_index] = vals[nd_index];
+        }
+
+        net_agent_data_frame["data"] = json_data_arr;
+
+        /**
+        * Send data over the network
+        */
+        std::string msg = Json::writeString(json_stream_writer, net_agent_data_frame);
+
+        // validate net connection
+        auto sptr = net_connections[net_id].lock();
+        if(sptr.get() == nullptr) { continue; }
+
+        // try to send, failure to send is harmless, and likely a result of threading
+        try {
+          sim_server.send(net_connections[net_id], msg, websocketpp::frame::opcode::text);
+        }
+        catch(...)
+        {
+          std::cout << "Ignoring failed websocket send" << std::endl;
+        }
       }
     }
   });
 
   auto heartbeat_thread = std::thread([&] {
-    auto start = std::chrono::steady_clock::now();
-    auto now = start;
-    auto diff = now - start;
-		auto no_client_timer = std::chrono::steady_clock::now();
+		auto no_client_timer = std::chrono::system_clock::now();
 
     Json::StreamWriterBuilder json_stream_writer;
 
@@ -695,12 +683,11 @@ int main() {
 
     while(isServerRunning)
     {
-      now = std::chrono::steady_clock::now();
-      diff = now - start;
+			std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
 
 			if(net_connections.size() == 0)
 			{
-				auto now = std::chrono::steady_clock::now();
+				auto now = std::chrono::system_clock::now();
 	      auto diff = now - no_client_timer;
 
 	      if(diff >= std::chrono::seconds(NO_CLIENT_TIMEOUT_SECONDS)) {
@@ -708,86 +695,84 @@ int main() {
 					isServerRunning = false;
 					std::raise(SIGKILL);
 				}
+
+				// If there are no clients, no need to continue
+				continue;
 			}
 			else
 			{
-				no_client_timer = std::chrono::steady_clock::now();
+				no_client_timer = std::chrono::system_clock::now();
 			}
 
-      if(diff >= std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS))
+      if(net_messages.size() > 0)
       {
-        if(net_messages.size() > 0)
+        net_msg_mtx.lock();
+        for(std::size_t i = 0; i < net_messages.size(); ++i)
         {
-          net_msg_mtx.lock();
-          for(std::size_t i = 0; i < net_messages.size(); ++i)
+          std::string msg_str = net_messages[i].msg_str;
+          std::string errs;
+          Json::Value json_msg;
+          json_reader->parse(msg_str.c_str(), msg_str.c_str() + msg_str.length(),
+                              &json_msg, &errs);
+
+          int msg_type = json_msg["msg_type"].asInt();
+          switch(msg_type)
           {
-            std::string msg_str = net_messages[i].msg_str;
-            std::string errs;
-            Json::Value json_msg;
-            json_reader->parse(msg_str.c_str(), msg_str.c_str() + msg_str.length(),
-                                &json_msg, &errs);
-
-            int msg_type = json_msg["msg_type"].asInt();
-            switch(msg_type)
+            case id_heartbeat_ping:
             {
-              case id_heartbeat_ping:
-              {
-                std::cout << "heartbeat ping arrived\n";
-              } break;
-              case id_heartbeat_pong:
-              {
-                auto conn_id = json_msg["conn_id"].asString();
-                std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
+              std::cout << "heartbeat ping arrived\n";
+            } break;
+            case id_heartbeat_pong:
+            {
+              auto conn_id = json_msg["conn_id"].asString();
+              std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
 
-                missed_net_heartbeats[conn_id] = 0;
-                net_messages.erase(net_messages.begin() + i);
-              } break;
-              default:
-              {
-                // Don't care in this thread
-              } break;
-            }
+              missed_net_heartbeats[conn_id] = 0;
+              net_messages.erase(net_messages.begin() + i);
+            } break;
+            default:
+            {
+              // Don't care in this thread
+            } break;
           }
-          net_msg_mtx.unlock();
         }
+        net_msg_mtx.unlock();
+      }
 
-        start = now;
+      Json::Value ping_data;
+      ping_data["msg_type"] = id_heartbeat_ping;
 
-        Json::Value ping_data;
-        ping_data["msg_type"] = id_heartbeat_ping;
+      for(auto& entry : net_connections)
+      {
+        auto& current_uid = entry.first;
+        auto conn = entry.second;
 
-        for(auto& entry : net_connections)
+        missed_net_heartbeats[current_uid]++;
+
+        auto sptr = net_connections[current_uid].lock();
+        if(sptr.get() == nullptr) { continue; }
+
+        if(missed_net_heartbeats[current_uid] > MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT)
         {
-          auto& current_uid = entry.first;
-          auto conn = entry.second;
+          std::cout << "Removing unresponsive network connection.\n";
+          sim_server.pause_reading(conn);
+          sim_server.close(conn, 0, "");
 
-          missed_net_heartbeats[current_uid]++;
+          net_connections.erase(current_uid);
+          missed_net_heartbeats.erase(current_uid);
+        }
+        else
+        {
+          std::cout << "Sending ping heartbeat to connection " << current_uid << ".\n";
+          ping_data["conn_id"] = current_uid;
+          std::string msg = Json::writeString(json_stream_writer, ping_data);
 
-          auto sptr = net_connections[current_uid].lock();
-          if(sptr.get() == nullptr) { continue; }
-
-          if(missed_net_heartbeats[current_uid] > MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT)
-          {
-            std::cout << "Removing unresponsive network connection.\n";
-            sim_server.pause_reading(conn);
-            sim_server.close(conn, 0, "");
-
-            net_connections.erase(current_uid);
-            missed_net_heartbeats.erase(current_uid);
+          try {
+            sim_server.send(conn, msg, websocketpp::frame::opcode::text);
           }
-          else
+          catch(...)
           {
-            std::cout << "Sending ping heartbeat to connection " << current_uid << ".\n";
-            ping_data["conn_id"] = current_uid;
-            std::string msg = Json::writeString(json_stream_writer, ping_data);
-
-            try {
-              sim_server.send(conn, msg, websocketpp::frame::opcode::text);
-            }
-            catch(...)
-            {
-              std::cout << "Ignoring failed websocket send" << std::endl;
-            }
+            std::cout << "Ignoring failed websocket send" << std::endl;
           }
         }
       }
@@ -812,7 +797,7 @@ int main() {
 
 	while(isServerRunning)
 	{
-
+		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
 
   std::cout << "Exiting Server...\n";
