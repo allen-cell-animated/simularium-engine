@@ -1,5 +1,9 @@
 #!/bin/bash -ex
 
+function get_aws_profile_name {
+    /usr/bin/jq -e --raw-output '.aws_profile_name' build.json
+}
+
 function get_branch_name {
     # BRANCH_NAME contains the branch on Jenkins, unset elsewhere:
     if [[ ${BRANCH_NAME+x} != 'x' ]] ; then
@@ -58,6 +62,7 @@ function promote {
     image_name=$(get_image_name)
     stage_registry=$(get_stage_registry)
     image=${stage_registry}/${image_name}:${git_tag_to_promote}
+    aws_profile_name=$(get_aws_profile_name)
     set +e
     /usr/bin/docker pull ${image}
     [[ $? != 0 ]] && echo "Could not pull ${image} - continuing." && continue
@@ -65,7 +70,7 @@ function promote {
     for promo_reg in $(/usr/bin/jq -e --raw-output '.push_promote_registries[]' build.json); do
         promo_image=${promo_reg}/${image_name}:${git_tag_to_promote}
         /usr/bin/docker tag ${image} ${promo_image}
-        /usr/bin/docker push ${promo_image}
+        AWS_PROFILE=${aws_profile_name} /usr/bin/docker push ${promo_image}
     done
     for art_reg in $(/usr/bin/jq -e --raw-output '.artifactory_promote_registries[]' build.json); do
         # Read API key - should be assigned to $art_api_key in this file by AICS convention:
