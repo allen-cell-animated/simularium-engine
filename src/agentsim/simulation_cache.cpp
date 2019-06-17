@@ -213,7 +213,7 @@ void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
 
 	for(auto val : ad.subpoints)
 	{
-		os << ad.vis_type << delimiter;
+		os << val << delimiter;
 	}
 }
 
