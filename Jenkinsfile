@@ -11,9 +11,6 @@ pipeline {
             }
         }
         stage ("build") {
-            when {
-                expression { params.promote_artifact == null }
-            }
             steps {
                 sh "/usr/bin/git fetch --tags"
                 sh "./build.sh -r"
@@ -21,7 +18,6 @@ pipeline {
         }
         stage ("git-tag-and-push") {
             when {
-                expression { params.promote_artifact == null }
                 branch "master"
             }
             steps {
@@ -36,10 +32,10 @@ pipeline {
         }
         stage ("promote") {
             when {
-                expression { return params.promote_artifact }
+                branch "master"
             }
             steps {
-                sh "./build.sh -p ${params.git_tag}"
+                sh "./build.sh -p ${tag}"
             }
         }
     }

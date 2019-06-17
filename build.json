@@ -4,9 +4,9 @@
     ],
     "artifactory_stage_promote_url": "https://artifactory.corp.alleninstitute.org/artifactory/api/docker/docker-staging-local/v2/promote",
     "base_aics_version": "1.0.0",
-    "image_name": "aics_agentsim",
+    "image_name": "aics_agentviz",
     "push_promote_registries": [
-        "239877123246.dkr.ecr.us-west-2.amazonaws.com"
+        "769425812337.dkr.ecr.us-east-2.amazonaws.com"
     ],
     "stage_registry": "docker-staging-local.artifactory.corp.alleninstitute.org"
 }
