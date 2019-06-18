@@ -3,6 +3,7 @@
         "docker-production-local.corp.alleninstitute.org"
     ],
     "artifactory_stage_promote_url": "https://artifactory.corp.alleninstitute.org/artifactory/api/docker/docker-staging-local/v2/promote",
+    "aws_profile_name": "animated_cell",
     "base_aics_version": "1.0.0",
     "image_name": "aics_agentviz",
     "push_promote_registries": [
