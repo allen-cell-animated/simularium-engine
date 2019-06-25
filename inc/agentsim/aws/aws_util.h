@@ -5,11 +5,11 @@
 
 namespace aics {
 namespace agentsim {
-namespace aws_util {
+    namespace aws_util {
 
-bool Download(Aws::String object_name);
+        bool Download(Aws::String object_name);
 
-} // namespace aws_util
+    } // namespace aws_util
 } // namespace agentsim
 } // namespace aics
 

@@ -1,48 +1,47 @@
 #ifndef AICS_SIMULATION_CACHE_H
 #define AICS_SIMULATION_CACHE_H
 
+#include "agentsim/agent_data.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
-#include "agentsim/agent_data.h"
 
 namespace aics {
 namespace agentsim {
 
-typedef std::vector<AgentData> AgentDataFrame;
-typedef std::vector<AgentDataFrame> FrameList;
+    typedef std::vector<AgentData> AgentDataFrame;
+    typedef std::vector<AgentDataFrame> FrameList;
 
-class SimulationCache
-{
-public:
-	SimulationCache();
-	~SimulationCache();
+    class SimulationCache {
+    public:
+        SimulationCache();
+        ~SimulationCache();
 
-	void AddFrame(AgentDataFrame data);
+        void AddFrame(AgentDataFrame data);
 
-	void SetCurrentFrame(std::size_t index);
+        void SetCurrentFrame(std::size_t index);
 
-	AgentDataFrame GetFrame(std::size_t frame_no);
-	AgentDataFrame GetCurrentFrame();
+        AgentDataFrame GetFrame(std::size_t frame_no);
+        AgentDataFrame GetCurrentFrame();
 
-	bool CurrentIsLatestFrame();
+        bool CurrentIsLatestFrame();
 
-	void IncrementCurrentFrame();
+        void IncrementCurrentFrame();
 
-	AgentDataFrame GetLatestFrame();
+        AgentDataFrame GetLatestFrame();
 
-	std::size_t GetNumFrames();
+        std::size_t GetNumFrames();
 
-	void ClearCache();
+        void ClearCache();
 
-private:
-	std::size_t m_current = 0;
-	std::size_t m_frameCounter = 0;
-	std::string m_cacheFileName = "/tmp/agentviz_runtime_cache.bin";
-	std::vector<AgentDataFrame> m_runtimeCache;
-};
+    private:
+        std::size_t m_current = 0;
+        std::size_t m_frameCounter = 0;
+        std::string m_cacheFileName = "/tmp/agentviz_runtime_cache.bin";
+        std::vector<AgentDataFrame> m_runtimeCache;
+    };
 
 }
 }
