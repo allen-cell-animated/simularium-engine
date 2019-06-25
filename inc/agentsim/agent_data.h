@@ -1,6 +1,8 @@
 #ifndef AICS_AGENT_DATA_H
 #define AICS_AGENT_DATA_H
 
+#include <vector>
+
 namespace aics {
 namespace agentsim {
 

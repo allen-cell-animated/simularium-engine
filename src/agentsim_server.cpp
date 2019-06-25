@@ -152,8 +152,16 @@ void on_open(websocketpp::connection_hdl hd1)
     latest_conn_uid = uid;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    bool argNoTimeout = false;
+    for (int i = 0; i < argc; i++) {
+        std::string arg(argv[i]);
+        if (arg.compare("--no-exit") == 0) {
+            argNoTimeout = true;
+        }
+    }
+
     server sim_server;
     sim_server.set_reuse_addr(true);
     std::atomic<bool> isServerRunning { true };
@@ -615,20 +623,22 @@ int main()
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
 
-            if (net_connections.size() == 0) {
-                auto now = std::chrono::system_clock::now();
-                auto diff = now - no_client_timer;
+            if (!argNoTimeout) {
+                if (net_connections.size() == 0) {
+                    auto now = std::chrono::system_clock::now();
+                    auto diff = now - no_client_timer;
 
-                if (diff >= std::chrono::seconds(NO_CLIENT_TIMEOUT_SECONDS)) {
-                    std::cout << "No clients connected for " << NO_CLIENT_TIMEOUT_SECONDS << " seconds, exiting server ... " << std::endl;
-                    isServerRunning = false;
-                    std::raise(SIGKILL);
+                    if (diff >= std::chrono::seconds(NO_CLIENT_TIMEOUT_SECONDS)) {
+                        std::cout << "No clients connected for " << NO_CLIENT_TIMEOUT_SECONDS << " seconds, exiting server ... " << std::endl;
+                        isServerRunning = false;
+                        std::raise(SIGKILL);
+                    }
+
+                    // If there are no clients, no need to continue
+                    continue;
+                } else {
+                    no_client_timer = std::chrono::system_clock::now();
                 }
-
-                // If there are no clients, no need to continue
-                continue;
-            } else {
-                no_client_timer = std::chrono::system_clock::now();
             }
 
             if (net_messages.size() > 0) {
