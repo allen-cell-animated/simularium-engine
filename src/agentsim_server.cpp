@@ -152,6 +152,23 @@ void on_open(websocketpp::connection_hdl hd1)
     latest_conn_uid = uid;
 }
 
+void sendWebsocketMessage(server* webSocketServer, std::string connectionUUID, std::string message)
+{
+    if(webSocketServer == nullptr)
+    {
+        std::cout << "Trying to send a messge with a null/invalid server" << std::endl;
+        return;
+    }
+
+    try {
+        webSocketServer->send(net_connections[connectionUUID], message, websocketpp::frame::opcode::text);
+    }
+    catch(...)
+    {
+        std::cout << "Ignoring failed websocket send" << std::endl;
+    }
+}
+
 int main(int argc, char* argv[])
 {
     bool argNoTimeout = false;
@@ -235,19 +252,8 @@ int main(int argc, char* argv[])
 			*/
             if (has_unhandled_new_connection && has_simulation_model) {
                 std::cout << "Sending current model to most recent client.\n";
-                try {
-                    sim_server.send(net_connections[latest_conn_uid],
-                        most_recent_model, websocketpp::frame::opcode::text);
-
-                    has_unhandled_new_connection = false;
-
-                    for (std::size_t i = 0; i < param_cache.size(); ++i) {
-                        sim_server.send(net_connections[latest_conn_uid],
-                            param_cache[i], websocketpp::frame::opcode::text);
-                    }
-                } catch (...) {
-                    std::cout << "Ignoring failed websocket send" << std::endl;
-                }
+                sendWebsocketMessage(&sim_server, latest_conn_uid, most_recent_model);
+                has_unhandled_new_connection = false;
             }
 
             /**
@@ -339,6 +345,7 @@ int main(int argc, char* argv[])
                         std::cout << "time step updated to " << time_step << "\n";
 
                         for (auto& entry : net_connections) {
+                            auto uid = entry.first;
                             auto conn = entry.second;
 
                             auto sptr = conn.lock();
@@ -347,12 +354,7 @@ int main(int argc, char* argv[])
                             }
 
                             std::cout << "Sending timestep update to client " << i << "\n";
-
-                            try {
-                                sim_server.send(conn, msg_str, websocketpp::frame::opcode::text);
-                            } catch (...) {
-                                std::cout << "Ignoring failed websocket send" << std::endl;
-                            }
+                            sendWebsocketMessage(&sim_server, uid, msg_str);
                         }
                     } break;
                     case id_update_rate_param: {
@@ -366,6 +368,7 @@ int main(int argc, char* argv[])
 
                         // Update all listening client front-ends
                         for (auto& entry : net_connections) {
+                            auto uid = entry.first;
                             auto conn = entry.second;
 
                             auto sptr = conn.lock();
@@ -374,12 +377,7 @@ int main(int argc, char* argv[])
                             }
 
                             std::cout << "Sending param update to client " << i << "\n";
-
-                            try {
-                                sim_server.send(conn, msg_str, websocketpp::frame::opcode::text);
-                            } catch (...) {
-                                std::cout << "Ignoring failed websocket send" << std::endl;
-                            }
+                            sendWebsocketMessage(&sim_server, uid, msg_str);
                         }
                     } break;
                     case id_model_definition: {
@@ -399,6 +397,7 @@ int main(int argc, char* argv[])
 
                         // Update all listening client front-ends
                         for (auto& entry : net_connections) {
+                            auto uid = entry.first;
                             auto conn = entry.second;
 
                             auto sptr = conn.lock();
@@ -407,12 +406,7 @@ int main(int argc, char* argv[])
                             }
 
                             std::cout << "Sending model update to client " << i << "\n";
-
-                            try {
-                                sim_server.send(conn, msg_str, websocketpp::frame::opcode::text);
-                            } catch (...) {
-                                std::cout << "Ignoring failed websocket send" << std::endl;
-                            }
+                            sendWebsocketMessage(&sim_server, uid, msg_str);
                         }
                     } break;
                     case id_heartbeat_ping: {
@@ -580,9 +574,7 @@ int main(int argc, char* argv[])
                     }
                 }
 
-                /**
-        * Copy values to json data array
-        */
+                // Copy values to json data array
                 auto json_data_arr = Json::Value(Json::arrayValue);
                 for (std::size_t j = 0; j < vals.size(); ++j) {
                     int nd_index = static_cast<int>(j);
@@ -591,10 +583,8 @@ int main(int argc, char* argv[])
 
                 net_agent_data_frame["data"] = json_data_arr;
 
-                /**
-        * Send data over the network
-        */
-                std::string msg = Json::writeString(json_stream_writer, net_agent_data_frame);
+                // Send data over the network
+                std::string msg_str = Json::writeString(json_stream_writer, net_agent_data_frame);
 
                 // validate net connection
                 auto sptr = net_connections[net_id].lock();
@@ -602,12 +592,7 @@ int main(int argc, char* argv[])
                     continue;
                 }
 
-                // try to send, failure to send is harmless, and likely a result of threading
-                try {
-                    sim_server.send(net_connections[net_id], msg, websocketpp::frame::opcode::text);
-                } catch (...) {
-                    std::cout << "Ignoring failed websocket send" << std::endl;
-                }
+                sendWebsocketMessage(&sim_server, net_id, msg_str);
             }
         }
     });
@@ -695,12 +680,7 @@ int main(int argc, char* argv[])
                     std::cout << "Sending ping heartbeat to connection " << current_uid << ".\n";
                     ping_data["conn_id"] = current_uid;
                     std::string msg = Json::writeString(json_stream_writer, ping_data);
-
-                    try {
-                        sim_server.send(conn, msg, websocketpp::frame::opcode::text);
-                    } catch (...) {
-                        std::cout << "Ignoring failed websocket send" << std::endl;
-                    }
+                    sendWebsocketMessage(&sim_server, current_uid, msg);
                 }
             }
         }
