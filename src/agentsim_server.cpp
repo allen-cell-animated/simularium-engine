@@ -93,6 +93,22 @@ enum {
     id_play_cache
 };
 
+std::vector<std::string> webRequestNames {
+    "Undefined",
+    "stream data",
+    "stream request",
+    "stream finish",
+    "pause",
+    "resume",
+    "abort",
+    "update time step",
+    "update rate param",
+    "model definition",
+    "heartbeat ping",
+    "heartbeat pong",
+    "play cache"
+};
+
 enum {
     id_live_simulation = 0,
     id_pre_run_simulation = 1,
@@ -231,6 +247,31 @@ void removeUnresponsiveClients(server* webSocketServer) {
 
 std::size_t numberOfClients() { return net_connections.size(); }
 
+void registerHeartBeat(std::string connectionUID) {
+    missed_net_heartbeats[connectionUID] = 0;
+}
+
+bool hasActiveClient() {
+    for (auto& entry : net_states) {
+        auto& net_state = entry.second;
+        if (net_state.play_state == ClientPlayState::Playing) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void setClientState(std::string connectionUID, ClientPlayState state)
+{
+    net_states[connectionUID].play_state = state;
+}
+
+void setClientFrame(std::string connectionUID, std::size_t frameNumber)
+{
+    net_states[connectionUID].frame_no = 0;
+}
+
 int main(int argc, char* argv[])
 {
     bool argNoTimeout = false;
@@ -318,12 +359,10 @@ int main(int argc, char* argv[])
             bool isRunningSimulation = false;
             bool isSimulationPaused = true;
 
-            for (auto& entry : net_states) {
-                auto& net_state = entry.second;
-                if (net_state.play_state == ClientPlayState::Playing) {
-                    isRunningSimulation = true;
-                    isSimulationPaused = false;
-                }
+            if(hasActiveClient())
+            {
+                isRunningSimulation = true;
+                isSimulationPaused = false;
             }
 
             /**
@@ -378,23 +417,23 @@ int main(int argc, char* argv[])
                             simulation.Reset();
                         }
 
-                        net_states[sender_uid].play_state = ClientPlayState::Playing;
-                        net_states[sender_uid].frame_no = 0;
+                        setClientState(sender_uid, ClientPlayState::Playing);
+                        setClientFrame(sender_uid, 0);
                     } break;
                     case id_vis_data_finish: {
                         std::cout << "data finish received\n";
                     } break;
                     case id_vis_data_pause: {
                         std::cout << "pause command received\n";
-                        net_states[sender_uid].play_state = ClientPlayState::Paused;
+                        setClientState(sender_uid, ClientPlayState::Paused);
                     } break;
                     case id_vis_data_resume: {
                         std::cout << "resume command received\n";
-                        net_states[sender_uid].play_state = ClientPlayState::Playing;
+                        setClientState(sender_uid, ClientPlayState::Playing);
                     } break;
                     case id_vis_data_abort: {
                         std::cout << "abort command received\n";
-                        net_states[sender_uid].play_state = ClientPlayState::Stopped;
+                        setClientState(sender_uid, ClientPlayState::Stopped);
                     } break;
                     case id_update_time_step: {
                         time_step = json_msg["time_step"].asFloat();
@@ -434,16 +473,15 @@ int main(int argc, char* argv[])
                     case id_heartbeat_pong: {
                         auto conn_id = json_msg["conn_id"].asString();
                         std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
-
-                        missed_net_heartbeats[conn_id] = 0;
+                        registerHeartBeat(conn_id);
                     } break;
                     case id_play_cache: {
                         auto frame_no = json_msg["frame-num"].asInt();
                         std::cout << "request to play cached from frame "
                                   << frame_no << " arrived from client " << sender_uid << std::endl;
 
-                        net_states[sender_uid].frame_no = frame_no;
-                        net_states[sender_uid].play_state = ClientPlayState::Playing;
+                        setClientFrame(sender_uid, frame_no);
+                        setClientState(sender_uid, ClientPlayState::Playing);
                     } break;
                     default: {
                         std::cout << "Received unrecognized message of type " << msg_type << "\n";
@@ -651,7 +689,7 @@ int main(int argc, char* argv[])
                         auto conn_id = json_msg["conn_id"].asString();
                         std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
 
-                        missed_net_heartbeats[conn_id] = 0;
+                        registerHeartBeat(conn_id);
                         net_messages.erase(net_messages.begin() + i);
                     } break;
                     default: {
