@@ -40,7 +40,7 @@ using namespace aics::agentsim;
 
 struct NetMessage {
     std::string sender_uid;
-    std::string msg_str;
+    Json::Value jsonMessage;
 };
 
 std::vector<NetMessage> net_messages;
@@ -49,12 +49,12 @@ std::string latest_conn_uid = "";
 enum ClientPlayState {
     Playing = 0,
     Paused = 1,
-    Stopped
+    Stopped,
+    Finished
 };
 
 struct NetState {
     std::size_t frame_no = 0;
-    bool is_finished = false;
     ClientPlayState play_state = ClientPlayState::Stopped;
 };
 
@@ -67,15 +67,16 @@ std::mutex net_msg_mtx;
 std::atomic<bool> has_simulation_model { false };
 std::atomic<bool> has_unhandled_new_connection { false };
 Json::Value most_recent_model = "";
-std::vector<std::string> param_cache;
+std::vector<Json::Value> param_cache;
 
 bool use_readdy = true;
 bool use_cytosim = !use_readdy;
-int run_mode = 0; // live simulation
 
 std::string trajectory_file_directory = "trajectory/";
 
 Json::StreamWriterBuilder jsonStreamWriter;
+Json::CharReaderBuilder json_read_builder;
+std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
 
 enum {
     id_undefined_web_request = 0,
@@ -124,7 +125,8 @@ inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
 void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
 {
     NetMessage nm;
-    nm.msg_str = msg->get_payload();
+    std::string message = msg->get_payload();
+    std::string errs;
 
     //@TODO: Not every message needs the uid of the sender
     //	verify if this does not have a significant impact on perf
@@ -138,6 +140,11 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
         }
     }
 
+    json_reader->parse(message.c_str(), message.c_str() + message.length(),
+        &(nm.jsonMessage), &errs);
+
+    auto msgType = nm.jsonMessage["msg_type"].asInt();
+    std::cout << "Web socket message arrived: " << webRequestNames[msgType] << std::endl;
     net_messages.push_back(nm);
 }
 
@@ -303,14 +310,11 @@ int main(int argc, char* argv[])
     auto sim_thread = std::thread([&] {
         // Simulation thread/timing variables
         bool isSimulationSetup = false;
+        int run_mode = 0; // live simulation
 
         float time_step = 1e-12; // seconds
         std::size_t n_time_steps = 1;
         std::string traj_file_name = "";
-
-        // Json cpp setup
-        Json::CharReaderBuilder json_read_builder;
-        std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
 
         // Simulation setup
         std::vector<std::shared_ptr<SimPkg>> simulators;
@@ -372,18 +376,10 @@ int main(int argc, char* argv[])
                 net_msg_mtx.lock();
                 for (std::size_t i = 0; i < net_messages.size(); ++i) {
                     std::string sender_uid = net_messages[i].sender_uid;
-                    std::string msg_str = net_messages[i].msg_str;
-                    std::string errs;
-                    Json::Value json_msg;
-                    json_reader->parse(msg_str.c_str(), msg_str.c_str() + msg_str.length(),
-                        &json_msg, &errs);
+                    Json::Value json_msg = net_messages[i].jsonMessage;
 
                     int msg_type = json_msg["msg_type"].asInt();
                     switch (msg_type) {
-                    case id_undefined_web_request: {
-                        std::cout << "undefined web request received."
-                                  << " There may be a typo in the js client. \n";
-                    } break;
                     case id_vis_data_arrive: {
                         std::cout << "vis data received\n";
                     } break;
@@ -448,7 +444,7 @@ int main(int argc, char* argv[])
 
                         std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
 
-                        param_cache.push_back(msg_str);
+                        param_cache.push_back(json_msg);
                         sendWebsocketMessageToAll(&sim_server, json_msg, "rate-parameter update");
                     } break;
                     case id_model_definition: {
@@ -551,10 +547,6 @@ int main(int argc, char* argv[])
                     continue;
                 }
 
-                if (net_state.is_finished) {
-                    continue;
-                }
-
                 if (net_state.frame_no >= nframes - 1) {
                     if (net_state.frame_no != MAX_NUM_FRAMES) {
                         std::cout << "End of simulation cache reached for client " << net_id << std::endl;
@@ -563,7 +555,7 @@ int main(int argc, char* argv[])
 
                     if (simulation.HasLoadedAllFrames()) {
                         std::cout << "Simulation finished for client " << net_id << std::endl;
-                        net_state.is_finished = true;
+                        setClientState(net_id, ClientPlayState::Finished);
                     } else {
                         all_clients_playing_from_cache = false;
                     }
@@ -593,10 +585,6 @@ int main(int argc, char* argv[])
                 auto& net_state = entry.second;
 
                 if (net_state.play_state != ClientPlayState::Playing) {
-                    continue;
-                }
-
-                if (net_state.is_finished) {
                     continue;
                 }
 
@@ -647,9 +635,6 @@ int main(int argc, char* argv[])
     auto heartbeat_thread = std::thread([&] {
         auto no_client_timer = std::chrono::system_clock::now();
 
-        Json::CharReaderBuilder json_read_builder;
-        std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
-
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
 
@@ -674,11 +659,7 @@ int main(int argc, char* argv[])
             if (net_messages.size() > 0) {
                 net_msg_mtx.lock();
                 for (std::size_t i = 0; i < net_messages.size(); ++i) {
-                    std::string msg_str = net_messages[i].msg_str;
-                    std::string errs;
-                    Json::Value json_msg;
-                    json_reader->parse(msg_str.c_str(), msg_str.c_str() + msg_str.length(),
-                        &json_msg, &errs);
+                    Json::Value json_msg = net_messages[i].jsonMessage;
 
                     int msg_type = json_msg["msg_type"].asInt();
                     switch (msg_type) {
