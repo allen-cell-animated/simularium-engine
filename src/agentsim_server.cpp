@@ -43,7 +43,8 @@ struct NetMessage {
     Json::Value jsonMessage;
 };
 
-std::vector<NetMessage> net_messages;
+std::vector<NetMessage> simThreadMessages;
+std::vector<NetMessage> heartBeatMessages;
 std::string latest_conn_uid = "";
 
 enum ClientPlayState {
@@ -95,7 +96,7 @@ enum {
 };
 
 std::vector<std::string> webRequestNames {
-    "Undefined",
+    "undefined",
     "stream data",
     "stream request",
     "stream finish",
@@ -144,8 +145,18 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
         &(nm.jsonMessage), &errs);
 
     auto msgType = nm.jsonMessage["msg_type"].asInt();
-    std::cout << "Web socket message arrived: " << webRequestNames[msgType] << std::endl;
-    net_messages.push_back(nm);
+
+    if(msgType >= 0 && msgType <= webRequestNames.size())
+    {
+        std::cout << "[" << nm.sender_uid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
+
+        if(msgType == id_heartbeat_pong) { heartBeatMessages.push_back(nm); }
+        else { simThreadMessages.push_back(nm); }
+    }
+    else
+    {
+        std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
+    }
 }
 
 std::vector<std::string> uids_to_delete;
@@ -276,7 +287,40 @@ void setClientState(std::string connectionUID, ClientPlayState state)
 
 void setClientFrame(std::string connectionUID, std::size_t frameNumber)
 {
-    net_states[connectionUID].frame_no = 0;
+    net_states[connectionUID].frame_no = frameNumber;
+}
+
+bool allClientsArePlayingFromCache(std::size_t numberOfFrames, bool allFramesLoaded)
+{
+    bool returnValue = true;
+    for (auto& entry : net_states) {
+        auto& connectionUID = entry.first;
+        auto& netState = entry.second;
+
+        if (netState.play_state != ClientPlayState::Playing) {
+            continue;
+        }
+
+        if (netState.frame_no >= numberOfFrames - 1) {
+            if (netState.frame_no != MAX_NUM_FRAMES) {
+                std::cout << "End of simulation cache reached for client " << connectionUID << std::endl;
+                netState.frame_no = MAX_NUM_FRAMES;
+            }
+
+            if (allFramesLoaded) {
+                std::cout << "Simulation finished for client " << connectionUID << std::endl;
+                setClientState(connectionUID, ClientPlayState::Finished);
+            } else {
+                returnValue = false;
+            }
+        }
+
+        if (numberOfFrames == 0) {
+            returnValue = false;
+        }
+    }
+
+    return returnValue;
 }
 
 int main(int argc, char* argv[])
@@ -369,23 +413,15 @@ int main(int argc, char* argv[])
                 isSimulationPaused = false;
             }
 
-            /**
-      * Handle net messages
-      */
-            if (net_messages.size() > 0) {
-                net_msg_mtx.lock();
-                for (std::size_t i = 0; i < net_messages.size(); ++i) {
-                    std::string sender_uid = net_messages[i].sender_uid;
-                    Json::Value json_msg = net_messages[i].jsonMessage;
+            // handle net messages
+            if (simThreadMessages.size() > 0) {
+                for (std::size_t i = 0; i < simThreadMessages.size(); ++i) {
+                    std::string sender_uid = simThreadMessages[i].sender_uid;
+                    Json::Value json_msg = simThreadMessages[i].jsonMessage;
 
                     int msg_type = json_msg["msg_type"].asInt();
                     switch (msg_type) {
-                    case id_vis_data_arrive: {
-                        std::cout << "vis data received\n";
-                    } break;
                     case id_vis_data_request: {
-                        std::cout << "data request received\n";
-
                         // If a simulation is already in progress, don't allow a new client to
                         //	change the simulation, unless there is only one client connected
                         if (!isRunningSimulation || numberOfClients() == 1) {
@@ -416,25 +452,12 @@ int main(int argc, char* argv[])
                         setClientState(sender_uid, ClientPlayState::Playing);
                         setClientFrame(sender_uid, 0);
                     } break;
-                    case id_vis_data_finish: {
-                        std::cout << "data finish received\n";
-                    } break;
-                    case id_vis_data_pause: {
-                        std::cout << "pause command received\n";
-                        setClientState(sender_uid, ClientPlayState::Paused);
-                    } break;
-                    case id_vis_data_resume: {
-                        std::cout << "resume command received\n";
-                        setClientState(sender_uid, ClientPlayState::Playing);
-                    } break;
-                    case id_vis_data_abort: {
-                        std::cout << "abort command received\n";
-                        setClientState(sender_uid, ClientPlayState::Stopped);
-                    } break;
+                    case id_vis_data_pause: { setClientState(sender_uid, ClientPlayState::Paused); } break;
+                    case id_vis_data_resume: { setClientState(sender_uid, ClientPlayState::Playing); } break;
+                    case id_vis_data_abort: { setClientState(sender_uid, ClientPlayState::Stopped); } break;
                     case id_update_time_step: {
                         time_step = json_msg["time_step"].asFloat();
                         std::cout << "time step updated to " << time_step << "\n";
-
                         sendWebsocketMessageToAll(&sim_server, json_msg, "time-step update");
                     } break;
                     case id_update_rate_param: {
@@ -443,12 +466,10 @@ int main(int argc, char* argv[])
                         simulation.UpdateParameter(param_name, param_value);
 
                         std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
-
                         param_cache.push_back(json_msg);
                         sendWebsocketMessageToAll(&sim_server, json_msg, "rate-parameter update");
                     } break;
                     case id_model_definition: {
-                        std::cout << "model definition arrived\n";
                         aics::agentsim::Model sim_model;
                         parse_model(json_msg, sim_model);
                         print_model(sim_model);
@@ -463,14 +484,6 @@ int main(int argc, char* argv[])
                         param_cache.clear();
                         sendWebsocketMessageToAll(&sim_server, json_msg, "model definition");
                     } break;
-                    case id_heartbeat_ping: {
-                        std::cout << "heartbeat ping arrived\n";
-                    } break;
-                    case id_heartbeat_pong: {
-                        auto conn_id = json_msg["conn_id"].asString();
-                        std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
-                        registerHeartBeat(conn_id);
-                    } break;
                     case id_play_cache: {
                         auto frame_no = json_msg["frame-num"].asInt();
                         std::cout << "request to play cached from frame "
@@ -479,14 +492,11 @@ int main(int argc, char* argv[])
                         setClientFrame(sender_uid, frame_no);
                         setClientState(sender_uid, ClientPlayState::Playing);
                     } break;
-                    default: {
-                        std::cout << "Received unrecognized message of type " << msg_type << "\n";
-                    } break;
+                    default: { } break;
                     }
                 }
 
-                net_messages.clear();
-                net_msg_mtx.unlock();
+                simThreadMessages.clear();
             }
 
             /**
@@ -528,52 +538,17 @@ int main(int argc, char* argv[])
                 isSimulationSetup = true;
             }
 
-            /**
-      * Run simulation timestep ever 66 milliseconds
-      */
+            // Run simulation timestep every 66 milliseconds
 
-            /**
-      * Run simulation timestep
-      */
-            auto nframes = simulation.GetNumFrames();
-
-            // Cache playback
-            bool all_clients_playing_from_cache = true;
-            for (auto& entry : net_states) {
-                auto& net_id = entry.first;
-                auto& net_state = entry.second;
-
-                if (net_state.play_state != ClientPlayState::Playing) {
-                    continue;
+            // Run simulation time-step
+            if (!allClientsArePlayingFromCache(simulation.GetNumFrames(), simulation.HasLoadedAllFrames())) {
+                if (run_mode == id_live_simulation) {
+                    simulation.RunTimeStep(time_step);
                 }
-
-                if (net_state.frame_no >= nframes - 1) {
-                    if (net_state.frame_no != MAX_NUM_FRAMES) {
-                        std::cout << "End of simulation cache reached for client " << net_id << std::endl;
-                        net_state.frame_no = MAX_NUM_FRAMES;
+                else if (run_mode == id_pre_run_simulation || run_mode == id_traj_file_playback) {
+                    if (!simulation.HasLoadedAllFrames()) {
+                        simulation.LoadNextFrame();
                     }
-
-                    if (simulation.HasLoadedAllFrames()) {
-                        std::cout << "Simulation finished for client " << net_id << std::endl;
-                        setClientState(net_id, ClientPlayState::Finished);
-                    } else {
-                        all_clients_playing_from_cache = false;
-                    }
-                }
-
-                if (nframes == 0) {
-                    all_clients_playing_from_cache = false;
-                }
-            }
-
-            if (all_clients_playing_from_cache) {
-                // nothing to do at the moment
-            } else if (run_mode == id_live_simulation) {
-                simulation.RunTimeStep(time_step);
-            } else if (run_mode == id_pre_run_simulation
-                || run_mode == id_traj_file_playback) {
-                if (!simulation.HasLoadedAllFrames()) {
-                    simulation.LoadNextFrame();
                 }
             }
 
@@ -656,29 +631,19 @@ int main(int argc, char* argv[])
                 }
             }
 
-            if (net_messages.size() > 0) {
-                net_msg_mtx.lock();
-                for (std::size_t i = 0; i < net_messages.size(); ++i) {
-                    Json::Value json_msg = net_messages[i].jsonMessage;
+            if (heartBeatMessages.size() > 0) {
+                for (std::size_t i = 0; i < heartBeatMessages.size(); ++i) {
+                    Json::Value json_msg = heartBeatMessages[i].jsonMessage;
 
                     int msg_type = json_msg["msg_type"].asInt();
-                    switch (msg_type) {
-                    case id_heartbeat_ping: {
-                        std::cout << "heartbeat ping arrived\n";
-                    } break;
-                    case id_heartbeat_pong: {
+                    if(msg_type == id_heartbeat_pong)
+                    {
                         auto conn_id = json_msg["conn_id"].asString();
-                        std::cout << "heartbeat pong arrived from client " << conn_id << "\n";
-
                         registerHeartBeat(conn_id);
-                        net_messages.erase(net_messages.begin() + i);
-                    } break;
-                    default: {
-                        // Don't care in this thread
-                    } break;
                     }
                 }
-                net_msg_mtx.unlock();
+
+                heartBeatMessages.clear();
             }
 
             Json::Value pingJsonMessage;
