@@ -66,7 +66,7 @@ std::unordered_map<std::string, int> missed_net_heartbeats;
 std::mutex net_msg_mtx;
 std::atomic<bool> has_simulation_model { false };
 std::atomic<bool> has_unhandled_new_connection { false };
-std::string most_recent_model = "";
+Json::Value most_recent_model = "";
 std::vector<std::string> param_cache;
 
 bool use_readdy = true;
@@ -74,6 +74,8 @@ bool use_cytosim = !use_readdy;
 int run_mode = 0; // live simulation
 
 std::string trajectory_file_directory = "trajectory/";
+
+Json::StreamWriterBuilder jsonStreamWriter;
 
 enum {
     id_undefined_web_request = 0,
@@ -152,7 +154,7 @@ void on_open(websocketpp::connection_hdl hd1)
     latest_conn_uid = uid;
 }
 
-void sendWebsocketMessage(server* webSocketServer, std::string connectionUUID, std::string message)
+void sendWebsocketMessage(server* webSocketServer, std::string connectionUID, Json::Value jsonMessage)
 {
     if(webSocketServer == nullptr)
     {
@@ -160,14 +162,74 @@ void sendWebsocketMessage(server* webSocketServer, std::string connectionUUID, s
         return;
     }
 
+    jsonMessage["conn_id"] = connectionUID;
+    std::string message = Json::writeString(jsonStreamWriter, jsonMessage);
+
     try {
-        webSocketServer->send(net_connections[connectionUUID], message, websocketpp::frame::opcode::text);
+        webSocketServer->send(net_connections[connectionUID], message, websocketpp::frame::opcode::text);
     }
     catch(...)
     {
         std::cout << "Ignoring failed websocket send" << std::endl;
     }
 }
+
+void sendWebsocketMessageToAll(server* webSocketServer, Json::Value jsonMessage, std::string description)
+{
+    if(webSocketServer == nullptr)
+    {
+        std::cout << "Trying to send a messge with a null/invalid server" << std::endl;
+        return;
+    }
+
+    std::cout << "Sending message to all clients: " << description << std::endl;
+    for(auto& entry : net_connections)
+    {
+        auto uid = entry.first;
+        sendWebsocketMessage(webSocketServer, uid, jsonMessage);
+    }
+}
+
+// Unresponsive Clients
+
+// Does not close connection, removes it from data structures
+void removeConnection(std::string connectionUID) {
+    std::cout << "Removing closed network connection.\n";
+    net_connections.erase(connectionUID);
+    missed_net_heartbeats.erase(connectionUID);
+    net_states.erase(connectionUID);
+}
+
+// Close a connection and remove it from data structures
+void closeConnection(server* webSocketServer, std::string connectionUID) {
+    if(webSocketServer == nullptr)
+    {
+        std::cout << "Trying to send a messge with a null/invalid server" << std::endl;
+        return;
+    }
+
+    auto& conn = net_connections[connectionUID];
+    webSocketServer->pause_reading(conn);
+    webSocketServer->close(conn, 0, "");
+
+    removeConnection(connectionUID);
+}
+
+void removeUnresponsiveClients(server* webSocketServer) {
+    if(webSocketServer == nullptr) { return; }
+
+    for (auto& entry : net_connections) {
+        auto& current_uid = entry.first;
+        missed_net_heartbeats[current_uid]++;
+
+        if (missed_net_heartbeats[current_uid] > MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT) {
+            std::cout << "Removing unresponsive network connection.\n";
+            closeConnection(webSocketServer, current_uid);
+        }
+    }
+}
+
+std::size_t numberOfClients() { return net_connections.size(); }
 
 int main(int argc, char* argv[])
 {
@@ -206,8 +268,6 @@ int main(int argc, char* argv[])
         std::string traj_file_name = "";
 
         // Json cpp setup
-        Json::StreamWriterBuilder json_stream_writer;
-
         Json::CharReaderBuilder json_read_builder;
         std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
 
@@ -236,14 +296,10 @@ int main(int argc, char* argv[])
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::milliseconds(SERVER_TICK_INTERVAL_MILLISECONDS));
 
-            /**
-      * Remove expired network connections
-      */
+            // Remove expired network connections
             for (std::size_t i = 0; i < uids_to_delete.size(); ++i) {
-                std::cout << "Removing closed network connection.\n";
-                net_connections.erase(uids_to_delete[i]);
-                missed_net_heartbeats.erase(uids_to_delete[i]);
-                net_states.erase(uids_to_delete[i]);
+                auto uid = uids_to_delete[i];
+                removeConnection(uid);
             }
             uids_to_delete.clear();
 
@@ -297,7 +353,7 @@ int main(int argc, char* argv[])
 
                         // If a simulation is already in progress, don't allow a new client to
                         //	change the simulation, unless there is only one client connected
-                        if (!isRunningSimulation || net_connections.size() == 1) {
+                        if (!isRunningSimulation || numberOfClients() == 1) {
                             isSimulationSetup = false;
                             run_mode = json_msg["mode"].asInt();
 
@@ -344,18 +400,7 @@ int main(int argc, char* argv[])
                         time_step = json_msg["time_step"].asFloat();
                         std::cout << "time step updated to " << time_step << "\n";
 
-                        for (auto& entry : net_connections) {
-                            auto uid = entry.first;
-                            auto conn = entry.second;
-
-                            auto sptr = conn.lock();
-                            if (sptr.get() == nullptr) {
-                                continue;
-                            }
-
-                            std::cout << "Sending timestep update to client " << i << "\n";
-                            sendWebsocketMessage(&sim_server, uid, msg_str);
-                        }
+                        sendWebsocketMessageToAll(&sim_server, json_msg, "time-step update");
                     } break;
                     case id_update_rate_param: {
                         std::string param_name = json_msg["param_name"].asString();
@@ -365,20 +410,7 @@ int main(int argc, char* argv[])
                         std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
 
                         param_cache.push_back(msg_str);
-
-                        // Update all listening client front-ends
-                        for (auto& entry : net_connections) {
-                            auto uid = entry.first;
-                            auto conn = entry.second;
-
-                            auto sptr = conn.lock();
-                            if (sptr.get() == nullptr) {
-                                continue;
-                            }
-
-                            std::cout << "Sending param update to client " << i << "\n";
-                            sendWebsocketMessage(&sim_server, uid, msg_str);
-                        }
+                        sendWebsocketMessageToAll(&sim_server, json_msg, "rate-parameter update");
                     } break;
                     case id_model_definition: {
                         std::cout << "model definition arrived\n";
@@ -388,26 +420,13 @@ int main(int argc, char* argv[])
                         simulation.SetModel(sim_model);
 
                         has_simulation_model = true;
-                        most_recent_model = msg_str;
+                        most_recent_model = json_msg;
 
                         time_step = sim_model.max_time_step;
                         std::cout << "Set timestep to " << time_step << "\n";
 
                         param_cache.clear();
-
-                        // Update all listening client front-ends
-                        for (auto& entry : net_connections) {
-                            auto uid = entry.first;
-                            auto conn = entry.second;
-
-                            auto sptr = conn.lock();
-                            if (sptr.get() == nullptr) {
-                                continue;
-                            }
-
-                            std::cout << "Sending model update to client " << i << "\n";
-                            sendWebsocketMessage(&sim_server, uid, msg_str);
-                        }
+                        sendWebsocketMessageToAll(&sim_server, json_msg, "model definition");
                     } break;
                     case id_heartbeat_ping: {
                         std::cout << "heartbeat ping arrived\n";
@@ -582,25 +601,13 @@ int main(int argc, char* argv[])
                 }
 
                 net_agent_data_frame["data"] = json_data_arr;
-
-                // Send data over the network
-                std::string msg_str = Json::writeString(json_stream_writer, net_agent_data_frame);
-
-                // validate net connection
-                auto sptr = net_connections[net_id].lock();
-                if (sptr.get() == nullptr) {
-                    continue;
-                }
-
-                sendWebsocketMessage(&sim_server, net_id, msg_str);
+                sendWebsocketMessage(&sim_server, net_id, net_agent_data_frame);
             }
         }
     });
 
     auto heartbeat_thread = std::thread([&] {
         auto no_client_timer = std::chrono::system_clock::now();
-
-        Json::StreamWriterBuilder json_stream_writer;
 
         Json::CharReaderBuilder json_read_builder;
         std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
@@ -609,7 +616,7 @@ int main(int argc, char* argv[])
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
 
             if (!argNoTimeout) {
-                if (net_connections.size() == 0) {
+                if (numberOfClients() == 0) {
                     auto now = std::chrono::system_clock::now();
                     auto diff = now - no_client_timer;
 
@@ -655,34 +662,11 @@ int main(int argc, char* argv[])
                 net_msg_mtx.unlock();
             }
 
-            Json::Value ping_data;
-            ping_data["msg_type"] = id_heartbeat_ping;
+            Json::Value pingJsonMessage;
+            pingJsonMessage["msg_type"] = id_heartbeat_ping;
 
-            for (auto& entry : net_connections) {
-                auto& current_uid = entry.first;
-                auto conn = entry.second;
-
-                missed_net_heartbeats[current_uid]++;
-
-                auto sptr = net_connections[current_uid].lock();
-                if (sptr.get() == nullptr) {
-                    continue;
-                }
-
-                if (missed_net_heartbeats[current_uid] > MAX_MISSED_HEARTBEATS_BEFORE_TIMEOUT) {
-                    std::cout << "Removing unresponsive network connection.\n";
-                    sim_server.pause_reading(conn);
-                    sim_server.close(conn, 0, "");
-
-                    net_connections.erase(current_uid);
-                    missed_net_heartbeats.erase(current_uid);
-                } else {
-                    std::cout << "Sending ping heartbeat to connection " << current_uid << ".\n";
-                    ping_data["conn_id"] = current_uid;
-                    std::string msg = Json::writeString(json_stream_writer, ping_data);
-                    sendWebsocketMessage(&sim_server, current_uid, msg);
-                }
-            }
+            removeUnresponsiveClients(&sim_server);
+            sendWebsocketMessageToAll(&sim_server, pingJsonMessage, "Heartbeat ping");
         }
     });
 
