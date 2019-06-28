@@ -13,7 +13,6 @@
 #include "agentsim/agentsim.h"
 
 #define HEART_BEAT_INTERVAL_SECONDS 15
-#define NO_CLIENT_TIMEOUT_SECONDS 30
 #define SERVER_TICK_INTERVAL_MILLISECONDS 200
 
 using namespace aics::agentsim;
@@ -102,8 +101,6 @@ int main(int argc, char* argv[])
     });
 
     auto sim_thread = std::thread([&] {
-        // Simulation thread/timing variables
-        bool isSimulationSetup = false;
         int run_mode = 0; // live simulation
 
         float time_step = 1e-12; // seconds
@@ -150,28 +147,43 @@ int main(int argc, char* argv[])
                         //	change the simulation, unless there is only one client connected
                         if (!connectionManager.hasActiveClient()
                             || connectionManager.numberOfClients() == 1) {
-                            isSimulationSetup = false;
-                            run_mode = json_msg["mode"].asInt();
+                            auto runMode = json_msg["mode"].asInt();
 
-                            switch (run_mode) {
+                            switch (runMode) {
                             case id_live_simulation: {
                                 std::cout << "Running live simulation" << std::endl;
-                                simulation.SetPlaybackMode(id_live_simulation);
+                                simulation.SetPlaybackMode(runMode);
+                                simulation.Reset();
                             } break;
                             case id_pre_run_simulation: {
                                 time_step = json_msg["time-step"].asFloat();
                                 n_time_steps = json_msg["num-time-steps"].asInt();
                                 std::cout << "Running pre-run simulation" << std::endl;
-                                simulation.SetPlaybackMode(id_pre_run_simulation);
+
+                                simulation.SetPlaybackMode(runMode);
+                                simulation.Reset();
+                                simulation.RunAndSaveFrames(time_step, n_time_steps);
                             } break;
                             case id_traj_file_playback: {
                                 traj_file_name = json_msg["file-name"].asString();
                                 std::cout << "Playing back trajectory file" << std::endl;
-                                simulation.SetPlaybackMode(id_traj_file_playback);
+                                simulation.SetPlaybackMode(runMode);
+                                simulation.Reset();
+                                simulation.LoadTrajectoryFile(trajectory_file_directory + traj_file_name);
                             } break;
                             }
 
-                            simulation.Reset();
+                            if (runMode == id_pre_run_simulation
+                                || runMode == id_traj_file_playback) {
+                                // Load the first hundred simulation frames into a runtime cache
+                                std::cout << "Loading trajectory file into runtime cache" << std::endl;
+                                std::size_t fn = 0;
+                                while (!simulation.HasLoadedAllFrames() && fn < 100) {
+                                    std::cout << "Loading frame " << ++fn << std::endl;
+                                    simulation.LoadNextFrame();
+                                }
+                                std::cout << "Finished loading trajectory for now" << std::endl;
+                            }
                         }
 
                         connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
@@ -227,49 +239,19 @@ int main(int argc, char* argv[])
                 continue;
             }
 
-            // Simulation setup
-            if (!isSimulationSetup) {
-                if (run_mode == id_pre_run_simulation) {
-                    simulation.RunAndSaveFrames(time_step, n_time_steps);
-                }
-
-                if (run_mode == id_traj_file_playback) {
-                    simulation.LoadTrajectoryFile(trajectory_file_directory + traj_file_name);
-                }
-
-                if (run_mode == id_pre_run_simulation
-                    || run_mode == id_traj_file_playback) {
-                    // Load the first hundred simulation frames into a runtime cache
-                    std::cout << "Loading trajectory file into runtime cache" << std::endl;
-                    std::size_t fn = 0;
-                    while (!simulation.HasLoadedAllFrames() && fn < 100) {
-                        std::cout << "Loading frame " << ++fn << std::endl;
-                        simulation.LoadNextFrame();
-                    }
-                    std::cout << "Finished loading trajectory for now" << std::endl;
-                }
-
-                isSimulationSetup = true;
-            }
-
             // Run simulation time-step
-            auto numberOfFrames = simulation.GetNumFrames();
-            auto finishedLoadingFrames = simulation.HasLoadedAllFrames();
-            auto needsToRunTimestep =
-                !connectionManager.allClientsArePlayingFromCache(numberOfFrames, finishedLoadingFrames);
-
-            if (needsToRunTimestep) {
-                if (run_mode == id_live_simulation) {
-                    simulation.RunTimeStep(time_step);
-                }
-                else if (run_mode == id_pre_run_simulation || run_mode == id_traj_file_playback) {
-                    if (!simulation.HasLoadedAllFrames()) {
-                        simulation.LoadNextFrame();
-                    }
+            if (simulation.IsRunningLive()) {
+                simulation.RunTimeStep(time_step);
+            }
+            else {
+                if(!simulation.HasLoadedAllFrames()) {
+                    simulation.LoadNextFrame();
                 }
             }
 
             connectionManager.sendDataToClients(simulation);
+            connectionManager.advanceClients(
+                simulation.GetNumFrames(),simulation.HasLoadedAllFrames());
         }
     });
 

@@ -20,7 +20,7 @@ enum {
     id_play_cache
 };
 
-std::vector<std::string> webRequestNames {
+static std::vector<std::string> webRequestNames {
     "undefined",
     "stream data",
     "stream request",

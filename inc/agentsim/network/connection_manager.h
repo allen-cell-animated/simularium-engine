@@ -127,9 +127,8 @@ namespace agentsim {
             this->m_netStates[connectionUID].frame_no = frameNumber;
         }
 
-        bool allClientsArePlayingFromCache(std::size_t numberOfFrames, bool allFramesLoaded)
+        void checkForFinishedClients(std::size_t numberOfFrames, bool allFramesLoaded)
         {
-            bool returnValue = true;
             for (auto& entry : this->m_netStates) {
                 auto& connectionUID = entry.first;
                 auto& netState = entry.second;
@@ -147,18 +146,11 @@ namespace agentsim {
                     if (allFramesLoaded) {
                         std::cout << "Simulation finished for client " << connectionUID << std::endl;
                         this->setClientState(connectionUID, ClientPlayState::Finished);
-                    } else {
-                        returnValue = false;
                     }
                 }
-
-                if (numberOfFrames == 0) {
-                    returnValue = false;
-                }
             }
-
-            return returnValue;
         }
+
 
         void markConnectionExpired(websocketpp::connection_hdl hd1)
         {
@@ -214,6 +206,33 @@ namespace agentsim {
             this->m_missedHeartbeats[connectionUID] = 0;
         }
 
+        void advanceClients(std::size_t numberOfFrames, bool allFramesLoaded) {
+            for (auto& entry : this->m_netStates) {
+                auto& uid = entry.first;
+                auto& netState = entry.second;
+
+                if (netState.play_state != ClientPlayState::Playing) {
+                    continue;
+                }
+
+                if (netState.frame_no >= numberOfFrames - 1) {
+                    if (netState.frame_no != this->kLatestFrameValue) {
+                        std::cout << "End of simulation cache reached for client " << uid << std::endl;
+                        netState.frame_no = this->kLatestFrameValue;
+                    }
+
+                    if (allFramesLoaded) {
+                        std::cout << "Simulation finished for client " << uid << std::endl;
+                        this->setClientState(uid, ClientPlayState::Finished);
+                        continue;
+                    }
+                }
+                else {
+                    netState.frame_no++;
+                }
+            }
+        }
+
         void sendDataToClients(Simulation& simulation) {
             for (auto& entry : this->m_netStates) {
                 auto& uid = entry.first;
@@ -229,7 +248,7 @@ namespace agentsim {
                 if (netState.frame_no == this->kLatestFrameValue) {
                     simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
                 } else {
-                    simData = simulation.GetDataFrame(netState.frame_no++);
+                    simData = simulation.GetDataFrame(netState.frame_no);
                 }
 
                 Json::Value net_agent_data_frame;

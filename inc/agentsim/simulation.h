@@ -156,6 +156,8 @@ namespace agentsim {
 
         std::size_t GetNumFrames() { return m_cache.GetNumFrames(); }
 
+        bool IsRunningLive();
+
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;

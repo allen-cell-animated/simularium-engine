@@ -5,6 +5,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
+#include "agentsim/network/net_message_ids.h"
 
 namespace aics {
 namespace agentsim {
@@ -160,6 +161,10 @@ namespace agentsim {
     void Simulation::SetPlaybackMode(std::size_t playback_mode)
     {
         this->m_playbackMode = playback_mode;
+    }
+
+    bool Simulation::IsRunningLive() {
+        return this->m_playbackMode == id_live_simulation;
     }
 
     void AppendAgentData(
