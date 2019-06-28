@@ -25,7 +25,6 @@ struct NetMessage {
 };
 
 std::vector<NetMessage> simThreadMessages;
-std::vector<NetMessage> heartBeatMessages;
 
 bool use_readdy = true;
 bool use_cytosim = !use_readdy;
@@ -48,11 +47,11 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
 
     auto msgType = nm.jsonMessage["msg_type"].asInt();
 
-    if (msgType >= 0 && msgType <= webRequestNames.size()) {
+    if (msgType >= 0 && msgType < webRequestNames.size()) {
         std::cout << "[" << nm.sender_uid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
 
         if (msgType == id_heartbeat_pong) {
-            heartBeatMessages.push_back(nm);
+            connectionManager.registerHeartBeat(nm.sender_uid);
         } else {
             simThreadMessages.push_back(nm);
         }
@@ -82,7 +81,7 @@ int main(int argc, char* argv[])
 
     std::atomic<bool> isServerRunning { true };
 
-    auto ws_thread = std::thread([&] {
+    auto websocketThread = std::thread([&] {
         auto server = connectionManager.getServer();
         if (server != nullptr) {
             server->set_message_handler(on_message);
@@ -99,7 +98,7 @@ int main(int argc, char* argv[])
         }
     });
 
-    auto sim_thread = std::thread([&] {
+    auto simulationThread = std::thread([&] {
         int run_mode = 0; // live simulation
 
         float time_step = 1e-12; // seconds
@@ -259,28 +258,12 @@ int main(int argc, char* argv[])
         }
     });
 
-    auto heartbeat_thread = std::thread([&] {
-        auto no_client_timer = std::chrono::system_clock::now();
-
+    auto heartbeatThread = std::thread([&] {
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
             if (connectionManager.checkNoClientTimeout()) {
                 isServerRunning = false;
                 std::raise(SIGKILL);
-            }
-
-            if (heartBeatMessages.size() > 0) {
-                for (std::size_t i = 0; i < heartBeatMessages.size(); ++i) {
-                    Json::Value json_msg = heartBeatMessages[i].jsonMessage;
-
-                    int msg_type = json_msg["msg_type"].asInt();
-                    if (msg_type == id_heartbeat_pong) {
-                        auto conn_id = json_msg["conn_id"].asString();
-                        connectionManager.registerHeartBeat(conn_id);
-                    }
-                }
-
-                heartBeatMessages.clear();
             }
 
             if (connectionManager.numberOfClients() > 0) {
@@ -290,7 +273,7 @@ int main(int argc, char* argv[])
         }
     });
 
-    auto io_thread = std::thread([&] {
+    auto ioThread = std::thread([&] {
         std::string input;
         std::cout << "Enter 'quit' to exit\n";
         while (isServerRunning && std::getline(std::cin, input, '\n')) {
@@ -307,8 +290,8 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "Exiting Server...\n";
-    sim_thread.join();
-    heartbeat_thread.join();
-    io_thread.detach();
-    ws_thread.detach();
+    simulationThread.join();
+    heartbeatThread.join();
+    ioThread.detach();
+    websocketThread.detach();
 }
