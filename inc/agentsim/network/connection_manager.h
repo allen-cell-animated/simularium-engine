@@ -50,12 +50,15 @@ namespace agentsim {
             return &(this->m_server);
         }
 
-        void addConnection(websocketpp::connection_hdl hd1, std::string& newUid)
+        void addConnection(websocketpp::connection_hdl hd1)
         {
+            std::string newUid;
             this->GenerateLocalUUID(newUid);
             this->m_netStates[newUid] = NetState();
             this->m_missedHeartbeats[newUid] = 0;
             this->m_netConnections[newUid] = hd1;
+            this->m_latestConnectionUid = newUid;
+            this->m_hasNewConnection = true;
             std::cout << "Incoming connection accepted." << std::endl;
         }
 
@@ -72,7 +75,7 @@ namespace agentsim {
             this->m_server.pause_reading(conn);
             this->m_server.close(conn, 0, "");
 
-            removeConnection(connectionUID);
+            this->removeConnection(connectionUID);
         }
 
         void removeUnresponsiveClients() {
@@ -293,6 +296,33 @@ namespace agentsim {
             this->sendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
         }
 
+        void broadcastParameterUpdate(Json::Value updateMessage)
+        {
+            this->m_paramCache.push_back(updateMessage);
+            this->sendWebsocketMessageToAll(updateMessage, "rate-parameter update");
+        }
+
+        void broadcastModelDefinition(Json::Value modelDefinition)
+        {
+            this->m_hasModel = true;
+            this->m_mostRecentModel = modelDefinition;
+            this->m_paramCache.clear();
+            this->sendWebsocketMessageToAll(modelDefinition, "model definition");
+        }
+
+        void updateNewConections()
+        {
+            if (this->m_hasNewConnection && this->m_hasModel) {
+                this->sendWebsocketMessage(this->m_latestConnectionUid, this->m_mostRecentModel);
+                this->m_hasNewConnection = false;
+
+                for(auto& update : this->m_paramCache)
+                {
+                    this->sendWebsocketMessage(this->m_latestConnectionUid, update);
+                }
+            }
+        }
+
     private:
         void GenerateLocalUUID(std::string& uuid)
         {
@@ -324,6 +354,12 @@ namespace agentsim {
 
         std::chrono::time_point<std::chrono::system_clock>
             m_noClientTimer = std::chrono::system_clock::now();
+
+        std::vector<Json::Value> m_paramCache;
+        bool m_hasNewConnection = false;
+        Json::Value m_mostRecentModel;
+        std::string m_latestConnectionUid;
+        bool m_hasModel = false;
     };
 
 } // namespace agentsim

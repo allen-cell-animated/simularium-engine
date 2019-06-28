@@ -27,12 +27,6 @@ struct NetMessage {
 
 std::vector<NetMessage> simThreadMessages;
 std::vector<NetMessage> heartBeatMessages;
-std::string latest_conn_uid = "";
-
-std::atomic<bool> has_simulation_model { false };
-std::atomic<bool> has_unhandled_new_connection { false };
-Json::Value most_recent_model = "";
-std::vector<Json::Value> param_cache;
 
 bool use_readdy = true;
 bool use_cytosim = !use_readdy;
@@ -75,8 +69,7 @@ void on_close(websocketpp::connection_hdl hd1)
 
 void on_open(websocketpp::connection_hdl hd1)
 {
-    has_unhandled_new_connection = true;
-    connectionManager.addConnection(hd1, latest_conn_uid);
+    connectionManager.addConnection(hd1);
 }
 
 int main(int argc, char* argv[])
@@ -136,34 +129,13 @@ int main(int argc, char* argv[])
 
         std::vector<std::shared_ptr<Agent>> agents;
         Simulation simulation(simulators, agents);
-        //simulation.Reset();
 
         // Runtime loop
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::milliseconds(SERVER_TICK_INTERVAL_MILLISECONDS));
 
             connectionManager.removeExpiredConnections();
-
-            /**
-			* Send data to new connections
-			*/
-            if (has_unhandled_new_connection && has_simulation_model) {
-                std::cout << "Sending current model to most recent client.\n";
-                connectionManager.sendWebsocketMessage(latest_conn_uid, most_recent_model);
-                has_unhandled_new_connection = false;
-            }
-
-            /**
-			*	Check current state of the simulation
-			*/
-            bool isRunningSimulation = false;
-            bool isSimulationPaused = true;
-
-            if(connectionManager.hasActiveClient())
-            {
-                isRunningSimulation = true;
-                isSimulationPaused = false;
-            }
+            connectionManager.updateNewConections();
 
             // handle net messages
             if (simThreadMessages.size() > 0) {
@@ -176,7 +148,8 @@ int main(int argc, char* argv[])
                     case id_vis_data_request: {
                         // If a simulation is already in progress, don't allow a new client to
                         //	change the simulation, unless there is only one client connected
-                        if (!isRunningSimulation || connectionManager.numberOfClients() == 1) {
+                        if (!connectionManager.hasActiveClient()
+                            || connectionManager.numberOfClients() == 1) {
                             isSimulationSetup = false;
                             run_mode = json_msg["mode"].asInt();
 
@@ -215,11 +188,10 @@ int main(int argc, char* argv[])
                     case id_update_rate_param: {
                         std::string param_name = json_msg["param_name"].asString();
                         float param_value = json_msg["param_value"].asFloat();
-                        simulation.UpdateParameter(param_name, param_value);
-
                         std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
-                        param_cache.push_back(json_msg);
-                        connectionManager.sendWebsocketMessageToAll(json_msg, "rate-parameter update");
+
+                        simulation.UpdateParameter(param_name, param_value);
+                        connectionManager.broadcastParameterUpdate(json_msg);
                     } break;
                     case id_model_definition: {
                         aics::agentsim::Model sim_model;
@@ -227,14 +199,10 @@ int main(int argc, char* argv[])
                         print_model(sim_model);
                         simulation.SetModel(sim_model);
 
-                        has_simulation_model = true;
-                        most_recent_model = json_msg;
-
                         time_step = sim_model.max_time_step;
                         std::cout << "Set timestep to " << time_step << "\n";
 
-                        param_cache.clear();
-                        connectionManager.sendWebsocketMessageToAll(json_msg, "model definition");
+                        connectionManager.broadcastModelDefinition(json_msg);
                     } break;
                     case id_play_cache: {
                         auto frame_no = json_msg["frame-num"].asInt();
@@ -254,7 +222,8 @@ int main(int argc, char* argv[])
             /**
 			*	If simulation isn't running, no need to continue
 			*/
-            if (!isRunningSimulation || isSimulationPaused) {
+            if(!connectionManager.hasActiveClient())
+            {
                 continue;
             }
 
