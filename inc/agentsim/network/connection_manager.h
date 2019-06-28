@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <unordered_map>
+#include <chrono>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -178,7 +179,6 @@ namespace agentsim {
             this->m_uidsToDelete.clear();
         }
 
-        // Web socket message sends
         void sendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage)
         {
             jsonMessage["conn_id"] = connectionUID;
@@ -263,6 +263,36 @@ namespace agentsim {
             }
         }
 
+        void setNoTimeoutArg(bool val) { this->m_argNoTimeout = val; }
+
+        bool checkNoClientTimeout() {
+            if(this->m_argNoTimeout) { return false; }
+
+            if(this->numberOfClients() == 0)
+            {
+                auto now = std::chrono::system_clock::now();
+                auto diff = now - this->m_noClientTimer;
+
+                if (diff >= std::chrono::seconds(this->kNoClientTimeoutSeconds)) {
+                    std::cout << "No clients connected for " << this->kNoClientTimeoutSeconds
+                        << " seconds, server timeout ... " << std::endl;
+                    return true;
+                }
+            }
+            else {
+                this->m_noClientTimer = std::chrono::system_clock::now();
+            }
+
+            return false;
+        }
+
+        void pingAllClients() {
+            Json::Value pingJsonMessage;
+            pingJsonMessage["msg_type"] = id_heartbeat_ping;
+
+            this->sendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
+        }
+
     private:
         void GenerateLocalUUID(std::string& uuid)
         {
@@ -288,6 +318,12 @@ namespace agentsim {
         Json::StreamWriterBuilder m_jsonStreamWriter;
         const std::size_t kLatestFrameValue = std::numeric_limits<std::size_t>::max();
         const std::size_t kMaxMissedHeartBeats = 4;
+        const std::size_t kNoClientTimeoutSeconds = 30;
+
+        bool m_argNoTimeout = false;
+
+        std::chrono::time_point<std::chrono::system_clock>
+            m_noClientTimer = std::chrono::system_clock::now();
     };
 
 } // namespace agentsim

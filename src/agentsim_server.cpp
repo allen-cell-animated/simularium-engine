@@ -81,11 +81,10 @@ void on_open(websocketpp::connection_hdl hd1)
 
 int main(int argc, char* argv[])
 {
-    bool argNoTimeout = false;
     for (int i = 0; i < argc; i++) {
         std::string arg(argv[i]);
         if (arg.compare("--no-exit") == 0) {
-            argNoTimeout = true;
+            connectionManager.setNoTimeoutArg(true);
         }
     }
 
@@ -285,9 +284,12 @@ int main(int argc, char* argv[])
             }
 
             // Run simulation time-step
-            if (!connectionManager.allClientsArePlayingFromCache(
-                simulation.GetNumFrames(), simulation.HasLoadedAllFrames()
-            )) {
+            auto numberOfFrames = simulation.GetNumFrames();
+            auto finishedLoadingFrames = simulation.HasLoadedAllFrames();
+            auto needsToRunTimestep =
+                !connectionManager.allClientsArePlayingFromCache(numberOfFrames, finishedLoadingFrames);
+
+            if (needsToRunTimestep) {
                 if (run_mode == id_live_simulation) {
                     simulation.RunTimeStep(time_step);
                 }
@@ -307,23 +309,10 @@ int main(int argc, char* argv[])
 
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
-
-            if (!argNoTimeout) {
-                if (connectionManager.numberOfClients() == 0) {
-                    auto now = std::chrono::system_clock::now();
-                    auto diff = now - no_client_timer;
-
-                    if (diff >= std::chrono::seconds(NO_CLIENT_TIMEOUT_SECONDS)) {
-                        std::cout << "No clients connected for " << NO_CLIENT_TIMEOUT_SECONDS << " seconds, exiting server ... " << std::endl;
-                        isServerRunning = false;
-                        std::raise(SIGKILL);
-                    }
-
-                    // If there are no clients, no need to continue
-                    continue;
-                } else {
-                    no_client_timer = std::chrono::system_clock::now();
-                }
+            if(connectionManager.checkNoClientTimeout())
+            {
+                isServerRunning = false;
+                std::raise(SIGKILL);
             }
 
             if (heartBeatMessages.size() > 0) {
@@ -341,11 +330,8 @@ int main(int argc, char* argv[])
                 heartBeatMessages.clear();
             }
 
-            Json::Value pingJsonMessage;
-            pingJsonMessage["msg_type"] = id_heartbeat_ping;
-
             connectionManager.removeUnresponsiveClients();
-            connectionManager.sendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
+            connectionManager.pingAllClients();
         }
     });
 
