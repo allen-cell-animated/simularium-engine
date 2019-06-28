@@ -48,15 +48,15 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
 
     auto msgType = nm.jsonMessage["msg_type"].asInt();
 
-    if(msgType >= 0 && msgType <= webRequestNames.size())
-    {
+    if (msgType >= 0 && msgType <= webRequestNames.size()) {
         std::cout << "[" << nm.sender_uid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
 
-        if(msgType == id_heartbeat_pong) { heartBeatMessages.push_back(nm); }
-        else { simThreadMessages.push_back(nm); }
-    }
-    else
-    {
+        if (msgType == id_heartbeat_pong) {
+            heartBeatMessages.push_back(nm);
+        } else {
+            simThreadMessages.push_back(nm);
+        }
+    } else {
         std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
     }
 }
@@ -84,8 +84,7 @@ int main(int argc, char* argv[])
 
     auto ws_thread = std::thread([&] {
         auto server = connectionManager.getServer();
-        if(server != nullptr)
-        {
+        if (server != nullptr) {
             server->set_message_handler(on_message);
             server->set_close_handler(on_close);
             server->set_open_handler(on_open);
@@ -189,9 +188,15 @@ int main(int argc, char* argv[])
                         connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
                         connectionManager.setClientFrame(sender_uid, 0);
                     } break;
-                    case id_vis_data_pause: { connectionManager.setClientState(sender_uid, ClientPlayState::Paused); } break;
-                    case id_vis_data_resume: { connectionManager.setClientState(sender_uid, ClientPlayState::Playing); } break;
-                    case id_vis_data_abort: { connectionManager.setClientState(sender_uid, ClientPlayState::Stopped); } break;
+                    case id_vis_data_pause: {
+                        connectionManager.setClientState(sender_uid, ClientPlayState::Paused);
+                    } break;
+                    case id_vis_data_resume: {
+                        connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
+                    } break;
+                    case id_vis_data_abort: {
+                        connectionManager.setClientState(sender_uid, ClientPlayState::Stopped);
+                    } break;
                     case id_update_time_step: {
                         time_step = json_msg["time_step"].asFloat();
                         std::cout << "time step updated to " << time_step << "\n";
@@ -224,7 +229,8 @@ int main(int argc, char* argv[])
                         connectionManager.setClientFrame(sender_uid, frame_no);
                         connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
                     } break;
-                    default: { } break;
+                    default: {
+                    } break;
                     }
                 }
 
@@ -234,24 +240,22 @@ int main(int argc, char* argv[])
             /**
 			*	If simulation isn't running, no need to continue
 			*/
-            if(!connectionManager.hasActiveClient())
-            {
+            if (!connectionManager.hasActiveClient()) {
                 continue;
             }
 
             // Run simulation time-step
             if (simulation.IsRunningLive()) {
                 simulation.RunTimeStep(time_step);
-            }
-            else {
-                if(!simulation.HasLoadedAllFrames()) {
+            } else {
+                if (!simulation.HasLoadedAllFrames()) {
                     simulation.LoadNextFrame();
                 }
             }
 
             connectionManager.sendDataToClients(simulation);
             connectionManager.advanceClients(
-                simulation.GetNumFrames(),simulation.HasLoadedAllFrames());
+                simulation.GetNumFrames(), simulation.HasLoadedAllFrames());
         }
     });
 
@@ -260,8 +264,7 @@ int main(int argc, char* argv[])
 
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
-            if(connectionManager.checkNoClientTimeout())
-            {
+            if (connectionManager.checkNoClientTimeout()) {
                 isServerRunning = false;
                 std::raise(SIGKILL);
             }
@@ -271,8 +274,7 @@ int main(int argc, char* argv[])
                     Json::Value json_msg = heartBeatMessages[i].jsonMessage;
 
                     int msg_type = json_msg["msg_type"].asInt();
-                    if(msg_type == id_heartbeat_pong)
-                    {
+                    if (msg_type == id_heartbeat_pong) {
                         auto conn_id = json_msg["conn_id"].asString();
                         connectionManager.registerHeartBeat(conn_id);
                     }
@@ -281,8 +283,7 @@ int main(int argc, char* argv[])
                 heartBeatMessages.clear();
             }
 
-            if(connectionManager.numberOfClients() > 0)
-            {
+            if (connectionManager.numberOfClients() > 0) {
                 connectionManager.removeUnresponsiveClients();
                 connectionManager.pingAllClients();
             }

@@ -1,11 +1,11 @@
 #ifndef AICS_CONNECTION_MANAGER_H
 #define AICS_CONNECTION_MANAGER_H
 
-#include <string>
-#include <vector>
-#include <iostream>
-#include <unordered_map>
 #include <chrono>
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -13,8 +13,8 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
-#include "agentsim/simulation.h"
 #include "agentsim/network/net_message_ids.h"
+#include "agentsim/simulation.h"
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 
@@ -34,7 +34,6 @@ namespace agentsim {
         Finished
     };
 
-
     struct NetState {
         std::size_t frame_no = 0;
         ClientPlayState play_state = ClientPlayState::Stopped;
@@ -42,11 +41,13 @@ namespace agentsim {
 
     class ConnectionManager {
     public:
-        ConnectionManager() {
+        ConnectionManager()
+        {
             this->m_server.set_reuse_addr(true);
         }
 
-        server* getServer () {
+        server* getServer()
+        {
             return &(this->m_server);
         }
 
@@ -70,7 +71,8 @@ namespace agentsim {
             this->m_netStates.erase(connectionUID);
         }
 
-        void closeConnection(std::string connectionUID) {
+        void closeConnection(std::string connectionUID)
+        {
             auto& conn = this->m_netConnections[connectionUID];
             this->m_server.pause_reading(conn);
             this->m_server.close(conn, 0, "");
@@ -78,7 +80,8 @@ namespace agentsim {
             this->removeConnection(connectionUID);
         }
 
-        void removeUnresponsiveClients() {
+        void removeUnresponsiveClients()
+        {
             for (auto& entry : this->m_netConnections) {
                 auto& current_uid = entry.first;
                 this->m_missedHeartbeats[current_uid]++;
@@ -106,7 +109,8 @@ namespace agentsim {
             return "";
         }
 
-        bool hasActiveClient() {
+        bool hasActiveClient()
+        {
             for (auto& entry : this->m_netStates) {
                 auto& netState = entry.second;
                 if (netState.play_state == ClientPlayState::Playing) {
@@ -151,7 +155,6 @@ namespace agentsim {
             }
         }
 
-
         void markConnectionExpired(websocketpp::connection_hdl hd1)
         {
             for (auto& entry : this->m_netConnections) {
@@ -160,14 +163,14 @@ namespace agentsim {
 
                 if (conn.expired()
                     || equals<void, void>(conn, hd1)) {
-                        this->m_uidsToDelete.push_back(uid);
+                    this->m_uidsToDelete.push_back(uid);
                 }
             }
         }
 
-        void removeExpiredConnections() {
-            for(auto& uid : this->m_uidsToDelete)
-            {
+        void removeExpiredConnections()
+        {
+            for (auto& uid : this->m_uidsToDelete) {
                 this->removeConnection(uid);
             }
 
@@ -183,9 +186,7 @@ namespace agentsim {
                 this->m_server.send(
                     this->m_netConnections[connectionUID],
                     message, websocketpp::frame::opcode::text);
-            }
-            catch(...)
-            {
+            } catch (...) {
                 std::cout << "Ignoring failed websocket send" << std::endl;
             }
         }
@@ -193,8 +194,7 @@ namespace agentsim {
         void sendWebsocketMessageToAll(Json::Value jsonMessage, std::string description)
         {
             std::cout << "Sending message to all clients: " << description << std::endl;
-            for(auto& entry : this->m_netConnections)
-            {
+            for (auto& entry : this->m_netConnections) {
                 auto uid = entry.first;
                 sendWebsocketMessage(uid, jsonMessage);
             }
@@ -202,11 +202,13 @@ namespace agentsim {
 
         std::size_t numberOfClients() { return this->m_netConnections.size(); }
 
-        void registerHeartBeat(std::string connectionUID) {
+        void registerHeartBeat(std::string connectionUID)
+        {
             this->m_missedHeartbeats[connectionUID] = 0;
         }
 
-        void advanceClients(std::size_t numberOfFrames, bool allFramesLoaded) {
+        void advanceClients(std::size_t numberOfFrames, bool allFramesLoaded)
+        {
             for (auto& entry : this->m_netStates) {
                 auto& uid = entry.first;
                 auto& netState = entry.second;
@@ -226,14 +228,14 @@ namespace agentsim {
                         this->setClientState(uid, ClientPlayState::Finished);
                         continue;
                     }
-                }
-                else {
+                } else {
                     netState.frame_no++;
                 }
             }
         }
 
-        void sendDataToClients(Simulation& simulation) {
+        void sendDataToClients(Simulation& simulation)
+        {
             for (auto& entry : this->m_netStates) {
                 auto& uid = entry.first;
                 auto& netState = entry.second;
@@ -287,28 +289,30 @@ namespace agentsim {
 
         void setNoTimeoutArg(bool val) { this->m_argNoTimeout = val; }
 
-        bool checkNoClientTimeout() {
-            if(this->m_argNoTimeout) { return false; }
+        bool checkNoClientTimeout()
+        {
+            if (this->m_argNoTimeout) {
+                return false;
+            }
 
-            if(this->numberOfClients() == 0)
-            {
+            if (this->numberOfClients() == 0) {
                 auto now = std::chrono::system_clock::now();
                 auto diff = now - this->m_noClientTimer;
 
                 if (diff >= std::chrono::seconds(this->kNoClientTimeoutSeconds)) {
                     std::cout << "No clients connected for " << this->kNoClientTimeoutSeconds
-                        << " seconds, server timeout ... " << std::endl;
+                              << " seconds, server timeout ... " << std::endl;
                     return true;
                 }
-            }
-            else {
+            } else {
                 this->m_noClientTimer = std::chrono::system_clock::now();
             }
 
             return false;
         }
 
-        void pingAllClients() {
+        void pingAllClients()
+        {
             Json::Value pingJsonMessage;
             pingJsonMessage["msg_type"] = id_heartbeat_ping;
 
@@ -335,8 +339,7 @@ namespace agentsim {
                 this->sendWebsocketMessage(this->m_latestConnectionUid, this->m_mostRecentModel);
                 this->m_hasNewConnection = false;
 
-                for(auto& update : this->m_paramCache)
-                {
+                for (auto& update : this->m_paramCache) {
                     this->sendWebsocketMessage(this->m_latestConnectionUid, update);
                 }
             }

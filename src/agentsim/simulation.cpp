@@ -1,11 +1,11 @@
 #include "agentsim/simulation.h"
 #include "agentsim/agents/agent.h"
+#include "agentsim/network/net_message_ids.h"
 #include "agentsim/simpkg/simpkg.h"
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
-#include "agentsim/network/net_message_ids.h"
 
 namespace aics {
 namespace agentsim {
@@ -163,7 +163,8 @@ namespace agentsim {
         this->m_playbackMode = playback_mode;
     }
 
-    bool Simulation::IsRunningLive() {
+    bool Simulation::IsRunningLive()
+    {
         return this->m_playbackMode == id_live_simulation;
     }
 

@@ -1,8 +1,8 @@
 #ifndef AICS_NET_MESSAGE_IDS
 #define AICS_NET_MESSAGE_IDS
 
-#include <vector>
 #include <string>
+#include <vector>
 
 enum {
     id_undefined_web_request = 0,
@@ -35,7 +35,6 @@ static std::vector<std::string> webRequestNames {
     "heartbeat pong",
     "play cache"
 };
-
 
 enum {
     id_live_simulation = 0,
