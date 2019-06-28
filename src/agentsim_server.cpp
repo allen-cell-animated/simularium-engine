@@ -281,8 +281,11 @@ int main(int argc, char* argv[])
                 heartBeatMessages.clear();
             }
 
-            connectionManager.removeUnresponsiveClients();
-            connectionManager.pingAllClients();
+            if(connectionManager.numberOfClients() > 0)
+            {
+                connectionManager.removeUnresponsiveClients();
+                connectionManager.pingAllClients();
+            }
         }
     });
 
