@@ -20,7 +20,7 @@ using namespace aics::agentsim;
 aics::agentsim::ConnectionManager connectionManager;
 
 struct NetMessage {
-    std::string sender_uid;
+    std::string senderUid;
     Json::Value jsonMessage;
 };
 
@@ -32,9 +32,9 @@ bool use_cytosim = !use_readdy;
 std::string trajectory_file_directory = "trajectory/";
 
 // Web Socket handlers
-void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg);
-void on_close(websocketpp::connection_hdl hd1);
-void on_open(websocketpp::connection_hdl hd1);
+void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg);
+void OnClose(websocketpp::connection_hdl hd1);
+void OnOpen(websocketpp::connection_hdl hd1);
 
 // Arg List:
 //  --no-exit  don't use the no client timeout
@@ -42,7 +42,7 @@ void ParseArguments(int argc, char* argv[]);
 
 // Enacts web-socket commands in the sim thread
 // e.g. changing parameters, time-step, starting, stopping, etc.
-void HandleNetMessages(Simulation& simulation, float& time_step);
+void HandleNetMessages(Simulation& simulation, float& timeStep);
 
 int main(int argc, char* argv[])
 {
@@ -52,11 +52,11 @@ int main(int argc, char* argv[])
     std::atomic<bool> isServerRunning { true };
 
     auto websocketThread = std::thread([&] {
-        auto server = connectionManager.getServer();
+        auto server = connectionManager.GetServer();
         if (server != nullptr) {
-            server->set_message_handler(on_message);
-            server->set_close_handler(on_close);
-            server->set_open_handler(on_open);
+            server->set_message_handler(OnMessage);
+            server->set_close_handler(OnClose);
+            server->set_open_handler(OnOpen);
             server->set_access_channels(websocketpp::log::alevel::none);
             server->set_error_channels(websocketpp::log::elevel::none);
 
@@ -65,8 +65,7 @@ int main(int argc, char* argv[])
             server->start_accept();
 
             server->run();
-        }
-        else {
+        } else {
             std::cout << "Connection Manager has no server!" << std::endl;
             isServerRunning = false;
         }
@@ -99,12 +98,12 @@ int main(int argc, char* argv[])
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::milliseconds(SERVER_TICK_INTERVAL_MILLISECONDS));
 
-            connectionManager.removeExpiredConnections();
-            connectionManager.updateNewConections();
+            connectionManager.RemoveExpiredConnections();
+            connectionManager.UpdateNewConections();
 
             HandleNetMessages(simulation, timeStep);
 
-            if (!connectionManager.hasActiveClient()) {
+            if (!connectionManager.HasActiveClient()) {
                 continue;
             }
 
@@ -117,9 +116,12 @@ int main(int argc, char* argv[])
                 }
             }
 
-            connectionManager.sendDataToClients(simulation);
-            connectionManager.advanceClients(
-                simulation.GetNumFrames(), simulation.HasLoadedAllFrames());
+            std::size_t numberOfFrames = simulation.GetNumFrames();
+            bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+
+            connectionManager.CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
+            connectionManager.SendDataToClients(simulation);
+            connectionManager.AdvanceClients(numberOfFrames, hasFinishedLoading);
         }
     });
 
@@ -130,9 +132,9 @@ int main(int argc, char* argv[])
                 isServerRunning = false;
             }
 
-            if (connectionManager.numberOfClients() > 0) {
-                connectionManager.removeUnresponsiveClients();
-                connectionManager.pingAllClients();
+            if (connectionManager.NumberOfClients() > 0) {
+                connectionManager.RemoveUnresponsiveClients();
+                connectionManager.PingAllClients();
             }
         }
     });
@@ -164,13 +166,13 @@ int main(int argc, char* argv[])
     websocketThread.detach();
 }
 
-void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
+void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg)
 {
     Json::CharReaderBuilder jsonReadBuilder;
     std::unique_ptr<Json::CharReader> const jsonReader(jsonReadBuilder.newCharReader());
 
     NetMessage nm;
-    nm.sender_uid = connectionManager.getUid(hd1);
+    nm.senderUid = connectionManager.GetUid(hd1);
     std::string message = msg->get_payload();
     std::string errs;
 
@@ -180,10 +182,10 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
     auto msgType = nm.jsonMessage["msg_type"].asInt();
 
     if (msgType >= 0 && msgType < webRequestNames.size()) {
-        std::cout << "[" << nm.sender_uid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
+        std::cout << "[" << nm.senderUid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
 
         if (msgType == id_heartbeat_pong) {
-            connectionManager.registerHeartBeat(nm.sender_uid);
+            connectionManager.RegisterHeartBeat(nm.senderUid);
         } else {
             simThreadMessages.push_back(nm);
         }
@@ -192,45 +194,46 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
     }
 }
 
-void on_close(websocketpp::connection_hdl hd1)
+void OnClose(websocketpp::connection_hdl hd1)
 {
-    connectionManager.markConnectionExpired(hd1);
+    connectionManager.MarkConnectionExpired(hd1);
 }
 
-void on_open(websocketpp::connection_hdl hd1)
+void OnOpen(websocketpp::connection_hdl hd1)
 {
-    connectionManager.addConnection(hd1);
+    connectionManager.AddConnection(hd1);
 }
 
 void ParseArguments(int argc, char* argv[])
 {
-    for (int i = 0; i < argc; i++) {
+    // The first argument is the program running
+    for (int i = 1; i < argc; i++) {
         std::string arg(argv[i]);
         if (arg.compare("--no-exit") == 0) {
             std::cout << "Argument : --no-exit; ignoring no-client timeout" << std::endl;
-            connectionManager.setNoTimeoutArg(true);
-        }
-        else {
+            connectionManager.SetNoTimeoutArg(true);
+        } else {
             std::cout << "Unrecognized argument " << arg << " ignored" << std::endl;
         }
     }
 }
 
-void HandleNetMessages(Simulation& simulation, float& time_step) {
+void HandleNetMessages(Simulation& simulation, float& timeStep)
+{
     // handle net messages
     if (simThreadMessages.size() > 0) {
         for (std::size_t i = 0; i < simThreadMessages.size(); ++i) {
-            std::string sender_uid = simThreadMessages[i].sender_uid;
-            Json::Value json_msg = simThreadMessages[i].jsonMessage;
+            std::string senderUid = simThreadMessages[i].senderUid;
+            Json::Value jsonMsg = simThreadMessages[i].jsonMessage;
 
-            int msg_type = json_msg["msg_type"].asInt();
+            int msg_type = jsonMsg["msg_type"].asInt();
             switch (msg_type) {
             case id_vis_data_request: {
                 // If a simulation is already in progress, don't allow a new client to
                 //	change the simulation, unless there is only one client connected
-                if (!connectionManager.hasActiveClient()
-                    || connectionManager.numberOfClients() == 1) {
-                    auto runMode = json_msg["mode"].asInt();
+                if (!connectionManager.HasActiveClient()
+                    || connectionManager.NumberOfClients() == 1) {
+                    auto runMode = jsonMsg["mode"].asInt();
 
                     switch (runMode) {
                     case id_live_simulation: {
@@ -239,16 +242,16 @@ void HandleNetMessages(Simulation& simulation, float& time_step) {
                         simulation.Reset();
                     } break;
                     case id_pre_run_simulation: {
-                        time_step = json_msg["time-step"].asFloat();
-                        auto n_time_steps = json_msg["num-time-steps"].asInt();
+                        timeStep = jsonMsg["time-step"].asFloat();
+                        auto n_time_steps = jsonMsg["num-time-steps"].asInt();
                         std::cout << "Running pre-run simulation" << std::endl;
 
                         simulation.SetPlaybackMode(runMode);
                         simulation.Reset();
-                        simulation.RunAndSaveFrames(time_step, n_time_steps);
+                        simulation.RunAndSaveFrames(timeStep, n_time_steps);
                     } break;
                     case id_traj_file_playback: {
-                        auto traj_file_name = json_msg["file-name"].asString();
+                        auto traj_file_name = jsonMsg["file-name"].asString();
                         std::cout << "Playing back trajectory file" << std::endl;
                         simulation.SetPlaybackMode(runMode);
                         simulation.Reset();
@@ -269,49 +272,49 @@ void HandleNetMessages(Simulation& simulation, float& time_step) {
                     }
                 }
 
-                connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
-                connectionManager.setClientFrame(sender_uid, 0);
+                connectionManager.SetClientState(senderUid, ClientPlayState::Playing);
+                connectionManager.SetClientFrame(senderUid, 0);
             } break;
             case id_vis_data_pause: {
-                connectionManager.setClientState(sender_uid, ClientPlayState::Paused);
+                connectionManager.SetClientState(senderUid, ClientPlayState::Paused);
             } break;
             case id_vis_data_resume: {
-                connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
+                connectionManager.SetClientState(senderUid, ClientPlayState::Playing);
             } break;
             case id_vis_data_abort: {
-                connectionManager.setClientState(sender_uid, ClientPlayState::Stopped);
+                connectionManager.SetClientState(senderUid, ClientPlayState::Stopped);
             } break;
             case id_update_time_step: {
-                time_step = json_msg["time_step"].asFloat();
-                std::cout << "time step updated to " << time_step << "\n";
-                connectionManager.sendWebsocketMessageToAll(json_msg, "time-step update");
+                timeStep = jsonMsg["time_step"].asFloat();
+                std::cout << "time step updated to " << timeStep << "\n";
+                connectionManager.SendWebsocketMessageToAll(jsonMsg, "time-step update");
             } break;
             case id_update_rate_param: {
-                std::string param_name = json_msg["param_name"].asString();
-                float param_value = json_msg["param_value"].asFloat();
-                std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
+                std::string paramName = jsonMsg["param_name"].asString();
+                float paramValue = jsonMsg["param_value"].asFloat();
+                std::cout << "rate param " << paramName << " updated to " << paramValue << "\n";
 
-                simulation.UpdateParameter(param_name, param_value);
-                connectionManager.broadcastParameterUpdate(json_msg);
+                simulation.UpdateParameter(paramName, paramValue);
+                connectionManager.BroadcastParameterUpdate(jsonMsg);
             } break;
             case id_model_definition: {
                 aics::agentsim::Model sim_model;
-                parse_model(json_msg, sim_model);
+                parse_model(jsonMsg, sim_model);
                 print_model(sim_model);
                 simulation.SetModel(sim_model);
 
-                time_step = sim_model.max_time_step;
-                std::cout << "Set timestep to " << time_step << "\n";
+                timeStep = sim_model.max_time_step;
+                std::cout << "Set timestep to " << timeStep << "\n";
 
-                connectionManager.broadcastModelDefinition(json_msg);
+                connectionManager.BroadcastModelDefinition(jsonMsg);
             } break;
             case id_play_cache: {
-                auto frame_no = json_msg["frame-num"].asInt();
+                auto frameNumber = jsonMsg["frame-num"].asInt();
                 std::cout << "request to play cached from frame "
-                          << frame_no << " arrived from client " << sender_uid << std::endl;
+                          << frameNumber << " arrived from client " << senderUid << std::endl;
 
-                connectionManager.setClientFrame(sender_uid, frame_no);
-                connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
+                connectionManager.SetClientFrame(senderUid, frameNumber);
+                connectionManager.SetClientState(senderUid, ClientPlayState::Playing);
             } break;
             default: {
             } break;

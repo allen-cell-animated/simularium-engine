@@ -46,12 +46,12 @@ namespace agentsim {
             this->m_server.set_reuse_addr(true);
         }
 
-        server* getServer()
+        server* GetServer()
         {
             return &(this->m_server);
         }
 
-        void addConnection(websocketpp::connection_hdl hd1)
+        void AddConnection(websocketpp::connection_hdl hd1)
         {
             std::string newUid;
             this->GenerateLocalUUID(newUid);
@@ -63,7 +63,7 @@ namespace agentsim {
             std::cout << "Incoming connection accepted." << std::endl;
         }
 
-        void removeConnection(std::string connectionUID)
+        void RemoveConnection(std::string connectionUID)
         {
             std::cout << "Removing closed network connection.\n";
             this->m_netConnections.erase(connectionUID);
@@ -71,16 +71,16 @@ namespace agentsim {
             this->m_netStates.erase(connectionUID);
         }
 
-        void closeConnection(std::string connectionUID)
+        void CloseConnection(std::string connectionUID)
         {
             auto& conn = this->m_netConnections[connectionUID];
             this->m_server.pause_reading(conn);
             this->m_server.close(conn, 0, "");
 
-            this->removeConnection(connectionUID);
+            this->RemoveConnection(connectionUID);
         }
 
-        void removeUnresponsiveClients()
+        void RemoveUnresponsiveClients()
         {
             for (auto& entry : this->m_netConnections) {
                 auto& current_uid = entry.first;
@@ -88,12 +88,12 @@ namespace agentsim {
 
                 if (this->m_missedHeartbeats[current_uid] > this->kMaxMissedHeartBeats) {
                     std::cout << "Removing unresponsive network connection.\n";
-                    this->closeConnection(current_uid);
+                    this->CloseConnection(current_uid);
                 }
             }
         }
 
-        std::string getUid(websocketpp::connection_hdl hd1)
+        std::string GetUid(websocketpp::connection_hdl hd1)
         {
             //@TODO: Not every message needs the uid of the sender
             //	verify if this does not have a significant impact on perf
@@ -109,7 +109,7 @@ namespace agentsim {
             return "";
         }
 
-        bool hasActiveClient()
+        bool HasActiveClient()
         {
             for (auto& entry : this->m_netStates) {
                 auto& netState = entry.second;
@@ -121,17 +121,17 @@ namespace agentsim {
             return false;
         }
 
-        void setClientState(std::string connectionUID, ClientPlayState state)
+        void SetClientState(std::string connectionUID, ClientPlayState state)
         {
             this->m_netStates[connectionUID].play_state = state;
         }
 
-        void setClientFrame(std::string connectionUID, std::size_t frameNumber)
+        void SetClientFrame(std::string connectionUID, std::size_t frameNumber)
         {
             this->m_netStates[connectionUID].frame_no = frameNumber;
         }
 
-        void checkForFinishedClients(std::size_t numberOfFrames, bool allFramesLoaded)
+        void CheckForFinishedClients(std::size_t numberOfFrames, bool allFramesLoaded)
         {
             for (auto& entry : this->m_netStates) {
                 auto& connectionUID = entry.first;
@@ -149,13 +149,13 @@ namespace agentsim {
 
                     if (allFramesLoaded) {
                         std::cout << "Simulation finished for client " << connectionUID << std::endl;
-                        this->setClientState(connectionUID, ClientPlayState::Finished);
+                        this->SetClientState(connectionUID, ClientPlayState::Finished);
                     }
                 }
             }
         }
 
-        void markConnectionExpired(websocketpp::connection_hdl hd1)
+        void MarkConnectionExpired(websocketpp::connection_hdl hd1)
         {
             for (auto& entry : this->m_netConnections) {
                 auto& uid = entry.first;
@@ -168,16 +168,16 @@ namespace agentsim {
             }
         }
 
-        void removeExpiredConnections()
+        void RemoveExpiredConnections()
         {
             for (auto& uid : this->m_uidsToDelete) {
-                this->removeConnection(uid);
+                this->RemoveConnection(uid);
             }
 
             this->m_uidsToDelete.clear();
         }
 
-        void sendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage)
+        void SendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage)
         {
             jsonMessage["conn_id"] = connectionUID;
             std::string message = Json::writeString(this->m_jsonStreamWriter, jsonMessage);
@@ -191,23 +191,23 @@ namespace agentsim {
             }
         }
 
-        void sendWebsocketMessageToAll(Json::Value jsonMessage, std::string description)
+        void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description)
         {
             std::cout << "Sending message to all clients: " << description << std::endl;
             for (auto& entry : this->m_netConnections) {
                 auto uid = entry.first;
-                sendWebsocketMessage(uid, jsonMessage);
+                SendWebsocketMessage(uid, jsonMessage);
             }
         }
 
-        std::size_t numberOfClients() { return this->m_netConnections.size(); }
+        std::size_t NumberOfClients() { return this->m_netConnections.size(); }
 
-        void registerHeartBeat(std::string connectionUID)
+        void RegisterHeartBeat(std::string connectionUID)
         {
             this->m_missedHeartbeats[connectionUID] = 0;
         }
 
-        void advanceClients(std::size_t numberOfFrames, bool allFramesLoaded)
+        void AdvanceClients(std::size_t numberOfFrames, bool allFramesLoaded)
         {
             for (auto& entry : this->m_netStates) {
                 auto& uid = entry.first;
@@ -225,7 +225,7 @@ namespace agentsim {
 
                     if (allFramesLoaded) {
                         std::cout << "Simulation finished for client " << uid << std::endl;
-                        this->setClientState(uid, ClientPlayState::Finished);
+                        this->SetClientState(uid, ClientPlayState::Finished);
                         continue;
                     }
                 } else {
@@ -234,7 +234,7 @@ namespace agentsim {
             }
         }
 
-        void sendDataToClients(Simulation& simulation)
+        void SendDataToClients(Simulation& simulation)
         {
             for (auto& entry : this->m_netStates) {
                 auto& uid = entry.first;
@@ -283,11 +283,11 @@ namespace agentsim {
                 }
 
                 net_agent_data_frame["data"] = json_data_arr;
-                this->sendWebsocketMessage(uid, net_agent_data_frame);
+                this->SendWebsocketMessage(uid, net_agent_data_frame);
             }
         }
 
-        void setNoTimeoutArg(bool val) { this->m_argNoTimeout = val; }
+        void SetNoTimeoutArg(bool val) { this->m_argNoTimeout = val; }
 
         bool checkNoClientTimeout()
         {
@@ -295,7 +295,7 @@ namespace agentsim {
                 return false;
             }
 
-            if (this->numberOfClients() == 0) {
+            if (this->NumberOfClients() == 0) {
                 auto now = std::chrono::system_clock::now();
                 auto diff = now - this->m_noClientTimer;
 
@@ -311,36 +311,36 @@ namespace agentsim {
             return false;
         }
 
-        void pingAllClients()
+        void PingAllClients()
         {
             Json::Value pingJsonMessage;
             pingJsonMessage["msg_type"] = id_heartbeat_ping;
 
-            this->sendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
+            this->SendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
         }
 
-        void broadcastParameterUpdate(Json::Value updateMessage)
+        void BroadcastParameterUpdate(Json::Value updateMessage)
         {
             this->m_paramCache.push_back(updateMessage);
-            this->sendWebsocketMessageToAll(updateMessage, "rate-parameter update");
+            this->SendWebsocketMessageToAll(updateMessage, "rate-parameter update");
         }
 
-        void broadcastModelDefinition(Json::Value modelDefinition)
+        void BroadcastModelDefinition(Json::Value modelDefinition)
         {
             this->m_hasModel = true;
             this->m_mostRecentModel = modelDefinition;
             this->m_paramCache.clear();
-            this->sendWebsocketMessageToAll(modelDefinition, "model definition");
+            this->SendWebsocketMessageToAll(modelDefinition, "model definition");
         }
 
-        void updateNewConections()
+        void UpdateNewConections()
         {
             if (this->m_hasNewConnection && this->m_hasModel) {
-                this->sendWebsocketMessage(this->m_latestConnectionUid, this->m_mostRecentModel);
+                this->SendWebsocketMessage(this->m_latestConnectionUid, this->m_mostRecentModel);
                 this->m_hasNewConnection = false;
 
                 for (auto& update : this->m_paramCache) {
-                    this->sendWebsocketMessage(this->m_latestConnectionUid, update);
+                    this->SendWebsocketMessage(this->m_latestConnectionUid, update);
                 }
             }
         }
