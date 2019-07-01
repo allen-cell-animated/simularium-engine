@@ -36,19 +36,19 @@ void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg);
 void on_close(websocketpp::connection_hdl hd1);
 void on_open(websocketpp::connection_hdl hd1);
 
+// Arg List:
+//  --no-exit  don't use the no client timeout
+void ParseArguments(int argc, char* argv[]);
+
 // Enacts web-socket commands in the sim thread
 // e.g. changing parameters, time-step, starting, stopping, etc.
 void HandleNetMessages(Simulation& simulation, float& time_step);
 
 int main(int argc, char* argv[])
 {
-    for (int i = 0; i < argc; i++) {
-        std::string arg(argv[i]);
-        if (arg.compare("--no-exit") == 0) {
-            connectionManager.setNoTimeoutArg(true);
-        }
-    }
+    ParseArguments(argc, argv);
 
+    // A synchronized variable that tells all the threads to exit
     std::atomic<bool> isServerRunning { true };
 
     auto websocketThread = std::thread([&] {
@@ -65,6 +65,10 @@ int main(int argc, char* argv[])
             server->start_accept();
 
             server->run();
+        }
+        else {
+            std::cout << "Connection Manager has no server!" << std::endl;
+            isServerRunning = false;
         }
     });
 
@@ -124,7 +128,6 @@ int main(int argc, char* argv[])
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
             if (connectionManager.checkNoClientTimeout()) {
                 isServerRunning = false;
-                std::raise(SIGKILL);
             }
 
             if (connectionManager.numberOfClients() > 0) {
@@ -197,6 +200,20 @@ void on_close(websocketpp::connection_hdl hd1)
 void on_open(websocketpp::connection_hdl hd1)
 {
     connectionManager.addConnection(hd1);
+}
+
+void ParseArguments(int argc, char* argv[])
+{
+    for (int i = 0; i < argc; i++) {
+        std::string arg(argv[i]);
+        if (arg.compare("--no-exit") == 0) {
+            std::cout << "Argument : --no-exit; ignoring no-client timeout" << std::endl;
+            connectionManager.setNoTimeoutArg(true);
+        }
+        else {
+            std::cout << "Unrecognized argument " << arg << " ignored" << std::endl;
+        }
+    }
 }
 
 void HandleNetMessages(Simulation& simulation, float& time_step) {
