@@ -251,11 +251,17 @@ void HandleNetMessages(Simulation& simulation, float& timeStep)
                         simulation.RunAndSaveFrames(timeStep, n_time_steps);
                     } break;
                     case id_traj_file_playback: {
-                        auto traj_file_name = jsonMsg["file-name"].asString();
+                        auto trajectoryFileName = jsonMsg["file-name"].asString();
                         std::cout << "Playing back trajectory file" << std::endl;
+
+                        if (trajectoryFileName.empty()) {
+                            std::cout << "Trajectory file not specified, ignoring request" << std::endl;
+                            continue;
+                        }
+
                         simulation.SetPlaybackMode(runMode);
                         simulation.Reset();
-                        simulation.LoadTrajectoryFile(trajectory_file_directory + traj_file_name);
+                        simulation.LoadTrajectoryFile(trajectory_file_directory + trajectoryFileName);
                     } break;
                     }
 
