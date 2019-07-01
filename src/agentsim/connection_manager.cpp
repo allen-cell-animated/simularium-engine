@@ -185,31 +185,17 @@ namespace agentsim {
         this->m_missedHeartbeats[connectionUID] = 0;
     }
 
-    void ConnectionManager::AdvanceClients(
-        std::size_t numberOfFrames, bool allFramesLoaded)
+    void ConnectionManager::AdvanceClients()
     {
         for (auto& entry : this->m_netStates) {
-            auto& uid = entry.first;
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing) {
+            if (netState.play_state != ClientPlayState::Playing
+                || netState.frame_no == this->kLatestFrameValue) {
                 continue;
             }
 
-            if (netState.frame_no >= numberOfFrames - 1) {
-                if (netState.frame_no != this->kLatestFrameValue) {
-                    std::cout << "End of simulation cache reached for client " << uid << std::endl;
-                    netState.frame_no = this->kLatestFrameValue;
-                }
-
-                if (allFramesLoaded) {
-                    std::cout << "Simulation finished for client " << uid << std::endl;
-                    this->SetClientState(uid, ClientPlayState::Finished);
-                    continue;
-                }
-            } else {
-                netState.frame_no++;
-            }
+            netState.frame_no++;
         }
     }
 

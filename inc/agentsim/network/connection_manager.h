@@ -56,7 +56,7 @@ namespace agentsim {
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
 
         void CheckForFinishedClients(std::size_t numberOfFrames, bool allFramesLoaded);
-        void AdvanceClients(std::size_t numberOfFrames, bool allFramesLoaded);
+        void AdvanceClients();
         void SendDataToClients(Simulation& simulation);
 
         void SetNoTimeoutArg(bool val);

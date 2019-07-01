@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
 
             connectionManager.CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
             connectionManager.SendDataToClients(simulation);
-            connectionManager.AdvanceClients(numberOfFrames, hasFinishedLoading);
+            connectionManager.AdvanceClients();
         }
     });
 
