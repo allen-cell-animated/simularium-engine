@@ -31,44 +31,14 @@ bool use_cytosim = !use_readdy;
 
 std::string trajectory_file_directory = "trajectory/";
 
-Json::CharReaderBuilder json_read_builder;
-std::unique_ptr<Json::CharReader> const json_reader(json_read_builder.newCharReader());
-
 // Web Socket handlers
-void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
-{
-    NetMessage nm;
-    nm.sender_uid = connectionManager.getUid(hd1);
-    std::string message = msg->get_payload();
-    std::string errs;
+void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg);
+void on_close(websocketpp::connection_hdl hd1);
+void on_open(websocketpp::connection_hdl hd1);
 
-    json_reader->parse(message.c_str(), message.c_str() + message.length(),
-        &(nm.jsonMessage), &errs);
-
-    auto msgType = nm.jsonMessage["msg_type"].asInt();
-
-    if (msgType >= 0 && msgType < webRequestNames.size()) {
-        std::cout << "[" << nm.sender_uid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
-
-        if (msgType == id_heartbeat_pong) {
-            connectionManager.registerHeartBeat(nm.sender_uid);
-        } else {
-            simThreadMessages.push_back(nm);
-        }
-    } else {
-        std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
-    }
-}
-
-void on_close(websocketpp::connection_hdl hd1)
-{
-    connectionManager.markConnectionExpired(hd1);
-}
-
-void on_open(websocketpp::connection_hdl hd1)
-{
-    connectionManager.addConnection(hd1);
-}
+// Enacts web-socket commands in the sim thread
+// e.g. changing parameters, time-step, starting, stopping, etc.
+void HandleNetMessages(Simulation& simulation, float& time_step);
 
 int main(int argc, char* argv[])
 {
@@ -99,11 +69,7 @@ int main(int argc, char* argv[])
     });
 
     auto simulationThread = std::thread([&] {
-        int run_mode = 0; // live simulation
-
-        float time_step = 1e-12; // seconds
-        std::size_t n_time_steps = 1;
-        std::string traj_file_name = "";
+        float timeStep = 1e-12; // seconds
 
         // Simulation setup
         std::vector<std::shared_ptr<SimPkg>> simulators;
@@ -132,120 +98,15 @@ int main(int argc, char* argv[])
             connectionManager.removeExpiredConnections();
             connectionManager.updateNewConections();
 
-            // handle net messages
-            if (simThreadMessages.size() > 0) {
-                for (std::size_t i = 0; i < simThreadMessages.size(); ++i) {
-                    std::string sender_uid = simThreadMessages[i].sender_uid;
-                    Json::Value json_msg = simThreadMessages[i].jsonMessage;
+            HandleNetMessages(simulation, timeStep);
 
-                    int msg_type = json_msg["msg_type"].asInt();
-                    switch (msg_type) {
-                    case id_vis_data_request: {
-                        // If a simulation is already in progress, don't allow a new client to
-                        //	change the simulation, unless there is only one client connected
-                        if (!connectionManager.hasActiveClient()
-                            || connectionManager.numberOfClients() == 1) {
-                            auto runMode = json_msg["mode"].asInt();
-
-                            switch (runMode) {
-                            case id_live_simulation: {
-                                std::cout << "Running live simulation" << std::endl;
-                                simulation.SetPlaybackMode(runMode);
-                                simulation.Reset();
-                            } break;
-                            case id_pre_run_simulation: {
-                                time_step = json_msg["time-step"].asFloat();
-                                n_time_steps = json_msg["num-time-steps"].asInt();
-                                std::cout << "Running pre-run simulation" << std::endl;
-
-                                simulation.SetPlaybackMode(runMode);
-                                simulation.Reset();
-                                simulation.RunAndSaveFrames(time_step, n_time_steps);
-                            } break;
-                            case id_traj_file_playback: {
-                                traj_file_name = json_msg["file-name"].asString();
-                                std::cout << "Playing back trajectory file" << std::endl;
-                                simulation.SetPlaybackMode(runMode);
-                                simulation.Reset();
-                                simulation.LoadTrajectoryFile(trajectory_file_directory + traj_file_name);
-                            } break;
-                            }
-
-                            if (runMode == id_pre_run_simulation
-                                || runMode == id_traj_file_playback) {
-                                // Load the first hundred simulation frames into a runtime cache
-                                std::cout << "Loading trajectory file into runtime cache" << std::endl;
-                                std::size_t fn = 0;
-                                while (!simulation.HasLoadedAllFrames() && fn < 100) {
-                                    std::cout << "Loading frame " << ++fn << std::endl;
-                                    simulation.LoadNextFrame();
-                                }
-                                std::cout << "Finished loading trajectory for now" << std::endl;
-                            }
-                        }
-
-                        connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
-                        connectionManager.setClientFrame(sender_uid, 0);
-                    } break;
-                    case id_vis_data_pause: {
-                        connectionManager.setClientState(sender_uid, ClientPlayState::Paused);
-                    } break;
-                    case id_vis_data_resume: {
-                        connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
-                    } break;
-                    case id_vis_data_abort: {
-                        connectionManager.setClientState(sender_uid, ClientPlayState::Stopped);
-                    } break;
-                    case id_update_time_step: {
-                        time_step = json_msg["time_step"].asFloat();
-                        std::cout << "time step updated to " << time_step << "\n";
-                        connectionManager.sendWebsocketMessageToAll(json_msg, "time-step update");
-                    } break;
-                    case id_update_rate_param: {
-                        std::string param_name = json_msg["param_name"].asString();
-                        float param_value = json_msg["param_value"].asFloat();
-                        std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
-
-                        simulation.UpdateParameter(param_name, param_value);
-                        connectionManager.broadcastParameterUpdate(json_msg);
-                    } break;
-                    case id_model_definition: {
-                        aics::agentsim::Model sim_model;
-                        parse_model(json_msg, sim_model);
-                        print_model(sim_model);
-                        simulation.SetModel(sim_model);
-
-                        time_step = sim_model.max_time_step;
-                        std::cout << "Set timestep to " << time_step << "\n";
-
-                        connectionManager.broadcastModelDefinition(json_msg);
-                    } break;
-                    case id_play_cache: {
-                        auto frame_no = json_msg["frame-num"].asInt();
-                        std::cout << "request to play cached from frame "
-                                  << frame_no << " arrived from client " << sender_uid << std::endl;
-
-                        connectionManager.setClientFrame(sender_uid, frame_no);
-                        connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
-                    } break;
-                    default: {
-                    } break;
-                    }
-                }
-
-                simThreadMessages.clear();
-            }
-
-            /**
-			*	If simulation isn't running, no need to continue
-			*/
             if (!connectionManager.hasActiveClient()) {
                 continue;
             }
 
             // Run simulation time-step
             if (simulation.IsRunningLive()) {
-                simulation.RunTimeStep(time_step);
+                simulation.RunTimeStep(timeStep);
             } else {
                 if (!simulation.HasLoadedAllFrames()) {
                     simulation.LoadNextFrame();
@@ -292,6 +153,154 @@ int main(int argc, char* argv[])
     std::cout << "Exiting Server...\n";
     simulationThread.join();
     heartbeatThread.join();
+
+    // These threads are detached since they block for IO
+    //  under the assumption that these threads will be terminated
+    //  when the process terminates
     ioThread.detach();
     websocketThread.detach();
+}
+
+void on_message(websocketpp::connection_hdl hd1, server::message_ptr msg)
+{
+    Json::CharReaderBuilder jsonReadBuilder;
+    std::unique_ptr<Json::CharReader> const jsonReader(jsonReadBuilder.newCharReader());
+
+    NetMessage nm;
+    nm.sender_uid = connectionManager.getUid(hd1);
+    std::string message = msg->get_payload();
+    std::string errs;
+
+    jsonReader->parse(message.c_str(), message.c_str() + message.length(),
+        &(nm.jsonMessage), &errs);
+
+    auto msgType = nm.jsonMessage["msg_type"].asInt();
+
+    if (msgType >= 0 && msgType < webRequestNames.size()) {
+        std::cout << "[" << nm.sender_uid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
+
+        if (msgType == id_heartbeat_pong) {
+            connectionManager.registerHeartBeat(nm.sender_uid);
+        } else {
+            simThreadMessages.push_back(nm);
+        }
+    } else {
+        std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
+    }
+}
+
+void on_close(websocketpp::connection_hdl hd1)
+{
+    connectionManager.markConnectionExpired(hd1);
+}
+
+void on_open(websocketpp::connection_hdl hd1)
+{
+    connectionManager.addConnection(hd1);
+}
+
+void HandleNetMessages(Simulation& simulation, float& time_step) {
+    // handle net messages
+    if (simThreadMessages.size() > 0) {
+        for (std::size_t i = 0; i < simThreadMessages.size(); ++i) {
+            std::string sender_uid = simThreadMessages[i].sender_uid;
+            Json::Value json_msg = simThreadMessages[i].jsonMessage;
+
+            int msg_type = json_msg["msg_type"].asInt();
+            switch (msg_type) {
+            case id_vis_data_request: {
+                // If a simulation is already in progress, don't allow a new client to
+                //	change the simulation, unless there is only one client connected
+                if (!connectionManager.hasActiveClient()
+                    || connectionManager.numberOfClients() == 1) {
+                    auto runMode = json_msg["mode"].asInt();
+
+                    switch (runMode) {
+                    case id_live_simulation: {
+                        std::cout << "Running live simulation" << std::endl;
+                        simulation.SetPlaybackMode(runMode);
+                        simulation.Reset();
+                    } break;
+                    case id_pre_run_simulation: {
+                        time_step = json_msg["time-step"].asFloat();
+                        auto n_time_steps = json_msg["num-time-steps"].asInt();
+                        std::cout << "Running pre-run simulation" << std::endl;
+
+                        simulation.SetPlaybackMode(runMode);
+                        simulation.Reset();
+                        simulation.RunAndSaveFrames(time_step, n_time_steps);
+                    } break;
+                    case id_traj_file_playback: {
+                        auto traj_file_name = json_msg["file-name"].asString();
+                        std::cout << "Playing back trajectory file" << std::endl;
+                        simulation.SetPlaybackMode(runMode);
+                        simulation.Reset();
+                        simulation.LoadTrajectoryFile(trajectory_file_directory + traj_file_name);
+                    } break;
+                    }
+
+                    if (runMode == id_pre_run_simulation
+                        || runMode == id_traj_file_playback) {
+                        // Load the first hundred simulation frames into a runtime cache
+                        std::cout << "Loading trajectory file into runtime cache" << std::endl;
+                        std::size_t fn = 0;
+                        while (!simulation.HasLoadedAllFrames() && fn < 100) {
+                            std::cout << "Loading frame " << ++fn << std::endl;
+                            simulation.LoadNextFrame();
+                        }
+                        std::cout << "Finished loading trajectory for now" << std::endl;
+                    }
+                }
+
+                connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
+                connectionManager.setClientFrame(sender_uid, 0);
+            } break;
+            case id_vis_data_pause: {
+                connectionManager.setClientState(sender_uid, ClientPlayState::Paused);
+            } break;
+            case id_vis_data_resume: {
+                connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
+            } break;
+            case id_vis_data_abort: {
+                connectionManager.setClientState(sender_uid, ClientPlayState::Stopped);
+            } break;
+            case id_update_time_step: {
+                time_step = json_msg["time_step"].asFloat();
+                std::cout << "time step updated to " << time_step << "\n";
+                connectionManager.sendWebsocketMessageToAll(json_msg, "time-step update");
+            } break;
+            case id_update_rate_param: {
+                std::string param_name = json_msg["param_name"].asString();
+                float param_value = json_msg["param_value"].asFloat();
+                std::cout << "rate param " << param_name << " updated to " << param_value << "\n";
+
+                simulation.UpdateParameter(param_name, param_value);
+                connectionManager.broadcastParameterUpdate(json_msg);
+            } break;
+            case id_model_definition: {
+                aics::agentsim::Model sim_model;
+                parse_model(json_msg, sim_model);
+                print_model(sim_model);
+                simulation.SetModel(sim_model);
+
+                time_step = sim_model.max_time_step;
+                std::cout << "Set timestep to " << time_step << "\n";
+
+                connectionManager.broadcastModelDefinition(json_msg);
+            } break;
+            case id_play_cache: {
+                auto frame_no = json_msg["frame-num"].asInt();
+                std::cout << "request to play cached from frame "
+                          << frame_no << " arrived from client " << sender_uid << std::endl;
+
+                connectionManager.setClientFrame(sender_uid, frame_no);
+                connectionManager.setClientState(sender_uid, ClientPlayState::Playing);
+            } break;
+            default: {
+            } break;
+            }
+        }
+
+        simThreadMessages.clear();
+    }
 }
