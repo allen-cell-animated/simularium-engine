@@ -8,6 +8,7 @@ set(SOURCES
 "cytosimpkg.cpp"
 "simulation_cache.cpp"
 "simulation.cpp"
+"connection_manager.cpp"
 )
 
 find_library(LAPACK_LIB lapack REQUIRED)

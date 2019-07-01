@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
     auto heartbeatThread = std::thread([&] {
         while (isServerRunning) {
             std::this_thread::sleep_for(std::chrono::seconds(HEART_BEAT_INTERVAL_SECONDS));
-            if (connectionManager.checkNoClientTimeout()) {
+            if (connectionManager.CheckNoClientTimeout()) {
                 isServerRunning = false;
             }
 
