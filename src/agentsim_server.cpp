@@ -16,8 +16,6 @@ using namespace aics::agentsim;
 
 // Web Socket handlers
 void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg);
-void OnClose(websocketpp::connection_hdl hd1);
-void OnOpen(websocketpp::connection_hdl hd1);
 
 // Arg List:
 //  --no-exit  don't use the no client timeout
@@ -45,8 +43,18 @@ int main(int argc, char* argv[])
         auto server = ConnectionManager::Get().GetServer();
         if (server != nullptr) {
             server->set_message_handler(OnMessage);
-            server->set_close_handler(OnClose);
-            server->set_open_handler(OnOpen);
+            server->set_close_handler(
+                std::bind(
+                    &ConnectionManager::MarkConnectionExpired,
+                    &connectionManager,
+                    std::placeholders::_1)
+            );
+            server->set_open_handler(
+                std::bind(
+                    &ConnectionManager::AddConnection,
+                    &connectionManager,
+                    std::placeholders::_1)
+            );
             server->set_access_channels(websocketpp::log::alevel::none);
             server->set_error_channels(websocketpp::log::elevel::none);
 
@@ -178,16 +186,6 @@ void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg)
         &(nm.jsonMessage), &errs);
 
     connectionManager.HandleMessage(nm);
-}
-
-void OnClose(websocketpp::connection_hdl hd1)
-{
-    ConnectionManager::Get().MarkConnectionExpired(hd1);
-}
-
-void OnOpen(websocketpp::connection_hdl hd1)
-{
-    ConnectionManager::Get().AddConnection(hd1);
 }
 
 void ParseArguments(int argc, char* argv[], ConnectionManager& connectionManager)
