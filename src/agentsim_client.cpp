@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 
 #include "agentsim/agentsim.h"
+using namespace aics::agentsim;
 
 typedef websocketpp::client<websocketpp::config::asio_client> client;
 
