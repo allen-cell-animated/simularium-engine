@@ -35,8 +35,6 @@ namespace agentsim {
 
     class ConnectionManager {
     public:
-        ConnectionManager();
-
         server* GetServer();
 
         void AddConnection(websocketpp::connection_hdl hd1);
@@ -70,7 +68,13 @@ namespace agentsim {
 
         void UpdateNewConections();
 
+        static ConnectionManager& Get() {
+            static ConnectionManager connManager;
+            return connManager;
+        }
+
     private:
+        ConnectionManager();
         void GenerateLocalUUID(std::string& uuid);
 
         std::unordered_map<std::string, NetState> m_netStates;
