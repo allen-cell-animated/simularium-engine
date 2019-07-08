@@ -14,9 +14,6 @@
 
 using namespace aics::agentsim;
 
-// Web Socket handlers
-void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg);
-
 // Arg List:
 //  --no-exit  don't use the no client timeout
 void ParseArguments(
@@ -40,15 +37,6 @@ int main(int argc, char* argv[])
     std::atomic<bool> isServerRunning { true };
 
     auto websocketThread = std::thread([&] {
-        auto server = ConnectionManager::Get().GetServer();
-        if (server != nullptr) {
-            server->set_message_handler(OnMessage);
-
-        } else {
-            std::cout << "Connection Manager has no server!" << std::endl;
-            isServerRunning = false;
-        }
-        
         connectionManager.Listen();
     });
 
@@ -152,23 +140,6 @@ int main(int argc, char* argv[])
     //  when the process terminates
     ioThread.detach();
     websocketThread.detach();
-}
-
-void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg)
-{
-    auto& connectionManager = ConnectionManager::Get();
-    Json::CharReaderBuilder jsonReadBuilder;
-    std::unique_ptr<Json::CharReader> const jsonReader(jsonReadBuilder.newCharReader());
-
-    NetMessage nm;
-    nm.senderUid = connectionManager.GetUid(hd1);
-    std::string message = msg->get_payload();
-    std::string errs;
-
-    jsonReader->parse(message.c_str(), message.c_str() + message.length(),
-        &(nm.jsonMessage), &errs);
-
-    connectionManager.HandleMessage(nm);
 }
 
 void ParseArguments(int argc, char* argv[], ConnectionManager& connectionManager)

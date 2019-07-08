@@ -12,7 +12,19 @@ namespace agentsim {
 
     ConnectionManager::ConnectionManager()
     {
+
+    }
+
+    void ConnectionManager::Listen()
+    {
         this->m_server.set_reuse_addr(true);
+        this->m_server.set_message_handler(
+            std::bind(
+                &ConnectionManager::OnMessage,
+                this,
+                std::placeholders::_1,
+                std::placeholders::_2)
+        );
         this->m_server.set_close_handler(
             std::bind(
                 &ConnectionManager::MarkConnectionExpired,
@@ -27,20 +39,12 @@ namespace agentsim {
         );
         this->m_server.set_access_channels(websocketpp::log::alevel::none);
         this->m_server.set_error_channels(websocketpp::log::elevel::none);
-    }
 
-    void ConnectionManager::Listen()
-    {
         this->m_server.init_asio();
         this->m_server.listen(9002);
         this->m_server.start_accept();
 
         this->m_server.run();
-    }
-
-    server* ConnectionManager::GetServer()
-    {
-        return &(this->m_server);
     }
 
     void ConnectionManager::AddConnection(websocketpp::connection_hdl hd1)
@@ -368,6 +372,23 @@ namespace agentsim {
             std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
         }
     }
+
+    void ConnectionManager::OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg)
+    {
+        Json::CharReaderBuilder jsonReadBuilder;
+        std::unique_ptr<Json::CharReader> const jsonReader(jsonReadBuilder.newCharReader());
+
+        NetMessage nm;
+        nm.senderUid = this->GetUid(hd1);
+        std::string message = msg->get_payload();
+        std::string errs;
+
+        jsonReader->parse(message.c_str(), message.c_str() + message.length(),
+            &(nm.jsonMessage), &errs);
+
+        this->HandleMessage(nm);
+    }
+
 
 } // namespace agentsim
 } // namespace aics

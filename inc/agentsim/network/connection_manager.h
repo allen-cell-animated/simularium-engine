@@ -40,7 +40,6 @@ namespace agentsim {
 
     class ConnectionManager {
     public:
-        server* GetServer();
         void Listen();
 
         void AddConnection(websocketpp::connection_hdl hd1);
@@ -73,6 +72,7 @@ namespace agentsim {
         void BroadcastModelDefinition(Json::Value modelDefinition);
 
         void UpdateNewConections();
+        void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg);
 
         static ConnectionManager& Get() {
             static ConnectionManager connManager;
