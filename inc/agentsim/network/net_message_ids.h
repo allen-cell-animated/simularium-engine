@@ -3,8 +3,9 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 
-enum {
+enum WebRequestTypes {
     id_undefined_web_request = 0,
     id_vis_data_arrive = 1,
     id_vis_data_request,
@@ -20,20 +21,21 @@ enum {
     id_play_cache
 };
 
-static std::vector<std::string> webRequestNames {
-    "undefined",
-    "stream data",
-    "stream request",
-    "stream finish",
-    "pause",
-    "resume",
-    "abort",
-    "update time step",
-    "update rate param",
-    "model definition",
-    "heartbeat ping",
-    "heartbeat pong",
-    "play cache"
+//
+static std::unordered_map<std::size_t, std::string> WebRequestNames {
+    {id_undefined_web_request, "undefined"},
+    {id_vis_data_arrive, "stream data"},
+    {id_vis_data_request, "stream request"},
+    {id_vis_data_finish, "stream finish"},
+    {id_vis_data_pause, "pause"},
+    {id_vis_data_resume, "resume"},
+    {id_vis_data_abort, "abort"},
+    {id_update_time_step, "update time step"},
+    {id_update_rate_param, "update rate param"},
+    {id_model_definition, "model definition"},
+    {id_heartbeat_ping, "heartbeat ping"},
+    {id_heartbeat_pong, "heartbeat pong"},
+    {id_play_cache, "play cache"}
 };
 
 enum {

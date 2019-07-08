@@ -181,10 +181,10 @@ void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg)
 
     auto msgType = nm.jsonMessage["msg_type"].asInt();
 
-    if (msgType >= 0 && msgType < webRequestNames.size()) {
-        std::cout << "[" << nm.senderUid << "] Web socket message arrived: " << webRequestNames[msgType] << std::endl;
+    if (msgType >= 0 && msgType < WebRequestNames.size()) {
+        std::cout << "[" << nm.senderUid << "] Web socket message arrived: " << WebRequestNames[msgType] << std::endl;
 
-        if (msgType == id_heartbeat_pong) {
+        if (msgType == WebRequestTypes::id_heartbeat_pong) {
             connectionManager.RegisterHeartBeat(nm.senderUid);
         } else {
             simThreadMessages.push_back(nm);
@@ -228,7 +228,7 @@ void HandleNetMessages(Simulation& simulation, float& timeStep)
 
             int msg_type = jsonMsg["msg_type"].asInt();
             switch (msg_type) {
-            case id_vis_data_request: {
+            case WebRequestTypes::id_vis_data_request: {
                 // If a simulation is already in progress, don't allow a new client to
                 //	change the simulation, unless there is only one client connected
                 if (!connectionManager.HasActiveClient()
@@ -281,21 +281,21 @@ void HandleNetMessages(Simulation& simulation, float& timeStep)
                 connectionManager.SetClientState(senderUid, ClientPlayState::Playing);
                 connectionManager.SetClientFrame(senderUid, 0);
             } break;
-            case id_vis_data_pause: {
+            case WebRequestTypes::id_vis_data_pause: {
                 connectionManager.SetClientState(senderUid, ClientPlayState::Paused);
             } break;
-            case id_vis_data_resume: {
+            case WebRequestTypes::id_vis_data_resume: {
                 connectionManager.SetClientState(senderUid, ClientPlayState::Playing);
             } break;
-            case id_vis_data_abort: {
+            case WebRequestTypes::id_vis_data_abort: {
                 connectionManager.SetClientState(senderUid, ClientPlayState::Stopped);
             } break;
-            case id_update_time_step: {
+            case WebRequestTypes::id_update_time_step: {
                 timeStep = jsonMsg["time_step"].asFloat();
                 std::cout << "time step updated to " << timeStep << "\n";
                 connectionManager.SendWebsocketMessageToAll(jsonMsg, "time-step update");
             } break;
-            case id_update_rate_param: {
+            case WebRequestTypes::id_update_rate_param: {
                 std::string paramName = jsonMsg["param_name"].asString();
                 float paramValue = jsonMsg["param_value"].asFloat();
                 std::cout << "rate param " << paramName << " updated to " << paramValue << "\n";
@@ -303,7 +303,7 @@ void HandleNetMessages(Simulation& simulation, float& timeStep)
                 simulation.UpdateParameter(paramName, paramValue);
                 connectionManager.BroadcastParameterUpdate(jsonMsg);
             } break;
-            case id_model_definition: {
+            case WebRequestTypes::id_model_definition: {
                 aics::agentsim::Model sim_model;
                 parse_model(jsonMsg, sim_model);
                 print_model(sim_model);
@@ -314,7 +314,7 @@ void HandleNetMessages(Simulation& simulation, float& timeStep)
 
                 connectionManager.BroadcastModelDefinition(jsonMsg);
             } break;
-            case id_play_cache: {
+            case WebRequestTypes::id_play_cache: {
                 auto frameNumber = jsonMsg["frame-num"].asInt();
                 std::cout << "request to play cached from frame "
                           << frameNumber << " arrived from client " << senderUid << std::endl;
