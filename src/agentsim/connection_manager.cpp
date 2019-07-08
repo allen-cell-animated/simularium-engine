@@ -13,6 +13,29 @@ namespace agentsim {
     ConnectionManager::ConnectionManager()
     {
         this->m_server.set_reuse_addr(true);
+        this->m_server.set_close_handler(
+            std::bind(
+                &ConnectionManager::MarkConnectionExpired,
+                this,
+                std::placeholders::_1)
+        );
+        this->m_server.set_open_handler(
+            std::bind(
+                &ConnectionManager::AddConnection,
+                this,
+                std::placeholders::_1)
+        );
+        this->m_server.set_access_channels(websocketpp::log::alevel::none);
+        this->m_server.set_error_channels(websocketpp::log::elevel::none);
+    }
+
+    void ConnectionManager::Listen()
+    {
+        this->m_server.init_asio();
+        this->m_server.listen(9002);
+        this->m_server.start_accept();
+
+        this->m_server.run();
     }
 
     server* ConnectionManager::GetServer()

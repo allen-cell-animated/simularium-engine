@@ -43,30 +43,13 @@ int main(int argc, char* argv[])
         auto server = ConnectionManager::Get().GetServer();
         if (server != nullptr) {
             server->set_message_handler(OnMessage);
-            server->set_close_handler(
-                std::bind(
-                    &ConnectionManager::MarkConnectionExpired,
-                    &connectionManager,
-                    std::placeholders::_1)
-            );
-            server->set_open_handler(
-                std::bind(
-                    &ConnectionManager::AddConnection,
-                    &connectionManager,
-                    std::placeholders::_1)
-            );
-            server->set_access_channels(websocketpp::log::alevel::none);
-            server->set_error_channels(websocketpp::log::elevel::none);
 
-            server->init_asio();
-            server->listen(9002);
-            server->start_accept();
-
-            server->run();
         } else {
             std::cout << "Connection Manager has no server!" << std::endl;
             isServerRunning = false;
         }
+        
+        connectionManager.Listen();
     });
 
     auto simulationThread = std::thread([&] {

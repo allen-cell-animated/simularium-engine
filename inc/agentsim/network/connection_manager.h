@@ -41,6 +41,7 @@ namespace agentsim {
     class ConnectionManager {
     public:
         server* GetServer();
+        void Listen();
 
         void AddConnection(websocketpp::connection_hdl hd1);
         void RemoveConnection(std::string connectionUID);
