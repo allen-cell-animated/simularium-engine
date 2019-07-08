@@ -30,7 +30,7 @@ void HandleNetMessages(
 
 int main(int argc, char* argv[])
 {
-    auto& connectionManager = ConnectionManager::Get();
+    ConnectionManager connectionManager;
     ParseArguments(argc, argv, connectionManager);
 
     // A synchronized variable that tells all the threads to exit
