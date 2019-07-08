@@ -33,6 +33,11 @@ namespace agentsim {
         ClientPlayState play_state = ClientPlayState::Stopped;
     };
 
+    struct NetMessage {
+        std::string senderUid;
+        Json::Value jsonMessage;
+    };
+
     class ConnectionManager {
     public:
         server* GetServer();
@@ -73,6 +78,9 @@ namespace agentsim {
             return connManager;
         }
 
+        std::vector<NetMessage>& GetMessages() { return this->m_simThreadMessages; }
+        void HandleMessage(NetMessage nm);
+
     private:
         ConnectionManager();
         void GenerateLocalUUID(std::string& uuid);
@@ -98,6 +106,8 @@ namespace agentsim {
         Json::Value m_mostRecentModel;
         std::string m_latestConnectionUid;
         bool m_hasModel = false;
+
+        std::vector<NetMessage> m_simThreadMessages;
     };
 
 } // namespace agentsim

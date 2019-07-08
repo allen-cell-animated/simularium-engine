@@ -328,5 +328,23 @@ namespace agentsim {
         uuid = strUuid;
     }
 
+    void ConnectionManager::HandleMessage(NetMessage nm)
+    {
+        auto msgType = nm.jsonMessage["msg_type"].asInt();
+
+        if (msgType >= 0 && msgType < WebRequestNames.size()) {
+            std::cout << "[" << nm.senderUid << "] Web socket message arrived: "
+                << WebRequestNames[msgType] << std::endl;
+
+            if (msgType == WebRequestTypes::id_heartbeat_pong) {
+                this->RegisterHeartBeat(nm.senderUid);
+            } else {
+                this->m_simThreadMessages.push_back(nm);
+            }
+        } else {
+            std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
+        }
+    }
+
 } // namespace agentsim
 } // namespace aics

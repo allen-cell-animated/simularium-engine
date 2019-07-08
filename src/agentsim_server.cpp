@@ -17,13 +17,6 @@
 
 using namespace aics::agentsim;
 
-struct NetMessage {
-    std::string senderUid;
-    Json::Value jsonMessage;
-};
-
-std::vector<NetMessage> simThreadMessages;
-
 // Web Socket handlers
 void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg);
 void OnClose(websocketpp::connection_hdl hd1);
@@ -176,19 +169,7 @@ void OnMessage(websocketpp::connection_hdl hd1, server::message_ptr msg)
     jsonReader->parse(message.c_str(), message.c_str() + message.length(),
         &(nm.jsonMessage), &errs);
 
-    auto msgType = nm.jsonMessage["msg_type"].asInt();
-
-    if (msgType >= 0 && msgType < WebRequestNames.size()) {
-        std::cout << "[" << nm.senderUid << "] Web socket message arrived: " << WebRequestNames[msgType] << std::endl;
-
-        if (msgType == WebRequestTypes::id_heartbeat_pong) {
-            ConnectionManager::Get().RegisterHeartBeat(nm.senderUid);
-        } else {
-            simThreadMessages.push_back(nm);
-        }
-    } else {
-        std::cout << "Websocket message arrived: UNRECOGNIZED of type " << msgType << std::endl;
-    }
+    ConnectionManager::Get().HandleMessage(nm);
 }
 
 void OnClose(websocketpp::connection_hdl hd1)
@@ -215,17 +196,18 @@ void ParseArguments(int argc, char* argv[])
     }
 }
 
-void HandleNetMessages(Simulation& simulation, float& timeStep)
+void HandleNetMessages(Simulation& simulation,  float& timeStep)
 {
     // the relative directory for trajectory files on S3
     //  local downloads mirror the S3 directory structure
     std::string trajectory_file_directory = "trajectory/";
+    auto& messages = ConnectionManager::Get().GetMessages();
 
     // handle net messages
-    if (simThreadMessages.size() > 0) {
-        for (std::size_t i = 0; i < simThreadMessages.size(); ++i) {
-            std::string senderUid = simThreadMessages[i].senderUid;
-            Json::Value jsonMsg = simThreadMessages[i].jsonMessage;
+    if (messages.size() > 0) {
+        for (std::size_t i = 0; i < messages.size(); ++i) {
+            std::string senderUid = messages[i].senderUid;
+            Json::Value jsonMsg = messages[i].jsonMessage;
 
             int msg_type = jsonMsg["msg_type"].asInt();
             switch (msg_type) {
@@ -328,6 +310,6 @@ void HandleNetMessages(Simulation& simulation, float& timeStep)
             }
         }
 
-        simThreadMessages.clear();
+        messages.clear();
     }
 }
