@@ -92,7 +92,6 @@ int main(int argc, char* argv[])
         while (isServerRunning) {
             static const std::size_t kServerTickIntervalMilliSeconds = 200;
             std::this_thread::sleep_for(std::chrono::milliseconds(kServerTickIntervalMilliSeconds));
-            auto& connectionManager = ConnectionManager::Get();
 
             connectionManager.RemoveExpiredConnections();
             connectionManager.UpdateNewConections();
@@ -126,7 +125,6 @@ int main(int argc, char* argv[])
             static const std::size_t kHeartBeatIntervalSeconds = 15;
             std::this_thread::sleep_for(std::chrono::seconds(kHeartBeatIntervalSeconds));
 
-            auto& connectionManager = ConnectionManager::Get();
             if (connectionManager.CheckNoClientTimeout()) {
                 isServerRunning = false;
             }
