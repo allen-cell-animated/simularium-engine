@@ -31,7 +31,16 @@ SET(CMAKE_EXE_LINKER_FLAGS
 
 project(${TARGET})
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
-add_executable(${CLIENT_PROGRAM} ${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp)
+
+set(CLIENT_PROGRAM_SOURCES
+    "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/jsoncpp.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/network/cli_client.cpp"
+)
+add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
+target_include_directories(${CLIENT_PROGRAM} PRIVATE ${INTERNAL_INCLUDES})
+target_link_libraries(${CLIENT_PROGRAM} Threads::Threads)
+
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
 find_package(HDF5 COMPONENTS HL REQUIRED)
@@ -97,9 +106,6 @@ add_dependencies(${TARGET} readdy)
 add_dependencies(${TARGET} gtest)
 add_dependencies(${TARGET} gtest_main)
 
-find_library(LAPACK_LIB lapack REQUIRED)
-find_library(BLAS_LIB blas REQUIRED)
-
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
@@ -148,18 +154,8 @@ target_link_libraries(${SERVER_PROGRAM}
   "${AWS_DLLS}"
 )
 
-target_link_libraries(${CLIENT_PROGRAM}
-  "${AGENTSIM_DLL}"
-  "${CYTOSIM_DLLS}"
-  Threads::Threads
-  "${HDF5_DLLS}"
-  "${READDY_DLLS}"
-  ${AWS_DLLS}
-)
-
 target_link_libraries(${TEST_PROGRAM}
   "${AGENTSIM_DLL}"
-  "${CYTOSIM_DLLS}"
   Threads::Threads
   "${GTEST_DLLS}"
   "${HDF5_DLLS}"

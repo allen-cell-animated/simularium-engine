@@ -11,9 +11,6 @@ set(SOURCES
 "connection_manager.cpp"
 )
 
-find_library(LAPACK_LIB lapack REQUIRED)
-find_library(BLAS_LIB blas REQUIRED)
-
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
