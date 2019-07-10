@@ -9,6 +9,7 @@
 #include <json/json.h>
 #include <unordered_map>
 #include <string>
+#include <thread>
 
 typedef websocketpp::client<websocketpp::config::asio_client> client;
 
@@ -19,12 +20,16 @@ namespace agentsim {
 //  can issue commands to the agentsim server
 class CliClient {
 public:
-    CliClient();
+    CliClient(std::string uri);
     void Parse(std::string);
 
     void Help();
     void Connect(std::string uri);
+    void Disconnect();
+    bool IsConnected();
+    void Listen();
 
+    void Resume();
     void Pause();
     void Stop();
     void StartLive();
@@ -38,12 +43,16 @@ public:
     void OnOpen(websocketpp::connection_hdl hdl);
     void OnClose(websocketpp::connection_hdl hdl);
 
+    void SendMessage(Json::Value message);
+    void OnFail();
+
 private:
     std::unordered_map<std::string, std::string> m_commandList = {
         {"load", "send request to load a trajectory json file"},
         {"start", "run a remote simluation"},
         {"stop", "end the remote simulation"},
         {"pause", "pause the remote simulation"},
+        {"resume", "sets the client state to playing"},
         {"set", "set a parameter value"},
         {"quit", "disconnect and exit client"}
     };
@@ -51,6 +60,8 @@ private:
     client m_webSocketClient;
     websocketpp::connection_hdl m_serverConnection;
     Json::StreamWriterBuilder m_jsonStreamWriter;
+
+    std::thread m_listeningThread;
 };
 
 } // namespace agentsim
