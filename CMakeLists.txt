@@ -35,7 +35,7 @@ add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
 set(CLIENT_PROGRAM_SOURCES
     "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
     "${SOURCE_DIRECTORY}/${TARGET}/jsoncpp.cpp"
-    "${SOURCE_DIRECTORY}/${TARGET}/network/cli_client.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/cli_client.cpp"
 )
 add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
 target_include_directories(${CLIENT_PROGRAM} PRIVATE ${INTERNAL_INCLUDES})
