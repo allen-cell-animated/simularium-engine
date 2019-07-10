@@ -78,14 +78,20 @@ namespace agentsim {
 
     void ConnectionManager::RemoveUnresponsiveClients()
     {
+        std::vector<std::string> toRemove;
         for (auto& entry : this->m_netConnections) {
             auto& current_uid = entry.first;
             this->m_missedHeartbeats[current_uid]++;
 
             if (this->m_missedHeartbeats[current_uid] > this->kMaxMissedHeartBeats) {
-                std::cout << "Removing unresponsive network connection.\n";
-                this->CloseConnection(current_uid);
+                toRemove.push_back(current_uid);
             }
+        }
+
+        for(auto& uid : toRemove)
+        {
+            std::cout << "Removing unresponsive network connection.\n";
+            this->CloseConnection(uid);
         }
     }
 
