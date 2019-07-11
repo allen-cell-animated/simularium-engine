@@ -19,10 +19,13 @@ namespace agentsim {
     {
         this->m_server.stop_listening();
         this->m_server.stop();
+
+        this->m_heartbeatThread.join();
+        this->m_simThread.join();
         this->m_listeningThread.detach();
     }
 
-    void ConnectionManager::Listen()
+    void ConnectionManager::ListenAsync()
     {
         this->m_listeningThread = std::thread([&] {
             this->m_server.set_reuse_addr(true);
@@ -53,6 +56,62 @@ namespace agentsim {
                         this->m_server.start_accept();
 
                         this->m_server.run();
+        });
+    }
+
+    void ConnectionManager::StartSimAsync(
+        std::atomic<bool>& isRunning,
+         Simulation& simulation,
+         float& timeStep)
+    {
+        this->m_simThread = std::thread([&isRunning, &simulation, &timeStep, this] {
+            while(isRunning)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(this->kServerTickIntervalMilliSeconds));
+
+                this->RemoveExpiredConnections();
+                this->UpdateNewConections();
+
+                this->HandleNetMessages(simulation, timeStep);
+
+                if (!this->HasActiveClient()) {
+                    continue;
+                }
+
+                // Run simulation time-step
+                if (simulation.IsRunningLive()) {
+                    simulation.RunTimeStep(timeStep);
+                } else {
+                    if (!simulation.HasLoadedAllFrames()) {
+                        simulation.LoadNextFrame();
+                    }
+                }
+
+                std::size_t numberOfFrames = simulation.GetNumFrames();
+                bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+
+                this->CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
+                this->SendDataToClients(simulation);
+                this->AdvanceClients();
+            }
+        });
+    }
+
+    void ConnectionManager::StartHeartbeatAsync(std::atomic<bool>& isRunning)
+    {
+        this->m_heartbeatThread = std::thread([&isRunning, this] {
+            while (isRunning) {
+                std::this_thread::sleep_for(std::chrono::seconds(this->kHeartBeatIntervalSeconds));
+
+                if (this->CheckNoClientTimeout()) {
+                    isRunning = false;
+                }
+
+                if (this->NumberOfClients() > 0) {
+                    this->RemoveUnresponsiveClients();
+                    this->PingAllClients();
+                }
+            }
         });
     }
 

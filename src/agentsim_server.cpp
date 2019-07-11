@@ -29,82 +29,35 @@ int main(int argc, char* argv[])
     // A synchronized variable that tells all the threads to exit
     std::atomic<bool> isServerRunning { true };
 
-    connectionManager.Listen();
+    float timeStep = 1e-12; // seconds
 
-    auto simulationThread = std::thread([&] {
-        float timeStep = 1e-12; // seconds
+    // @TODO: A more robust way to select simulation packages
+    bool use_readdy = true;
+    bool use_cytosim = !use_readdy;
 
-        // @TODO: A more robust way to select simulation packages
-        bool use_readdy = true;
-        bool use_cytosim = !use_readdy;
+    // Simulation setup
+    std::vector<std::shared_ptr<SimPkg>> simulators;
 
-        // Simulation setup
-        std::vector<std::shared_ptr<SimPkg>> simulators;
+    if (use_readdy) {
+        ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
+        std::shared_ptr<SimPkg> readdyPkg;
+        readdyPkg.reset(readdySimPkg);
+        simulators.push_back(readdyPkg);
+    }
 
-        if (use_readdy) {
-            ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
-            std::shared_ptr<SimPkg> readdyPkg;
-            readdyPkg.reset(readdySimPkg);
-            simulators.push_back(readdyPkg);
-        }
+    if (use_cytosim) {
+        CytosimPkg* cytosimSimPkg = new CytosimPkg();
+        std::shared_ptr<SimPkg> cytosimPkg;
+        cytosimPkg.reset(cytosimSimPkg);
+        simulators.push_back(cytosimPkg);
+    }
 
-        if (use_cytosim) {
-            CytosimPkg* cytosimSimPkg = new CytosimPkg();
-            std::shared_ptr<SimPkg> cytosimPkg;
-            cytosimPkg.reset(cytosimSimPkg);
-            simulators.push_back(cytosimPkg);
-        }
+    std::vector<std::shared_ptr<Agent>> agents;
+    Simulation simulation(simulators, agents);
 
-        std::vector<std::shared_ptr<Agent>> agents;
-        Simulation simulation(simulators, agents);
-
-        // Runtime loop
-        while (isServerRunning) {
-            static const std::size_t kServerTickIntervalMilliSeconds = 200;
-            std::this_thread::sleep_for(std::chrono::milliseconds(kServerTickIntervalMilliSeconds));
-
-            connectionManager.RemoveExpiredConnections();
-            connectionManager.UpdateNewConections();
-
-            connectionManager.HandleNetMessages(simulation, timeStep);
-
-            if (!connectionManager.HasActiveClient()) {
-                continue;
-            }
-
-            // Run simulation time-step
-            if (simulation.IsRunningLive()) {
-                simulation.RunTimeStep(timeStep);
-            } else {
-                if (!simulation.HasLoadedAllFrames()) {
-                    simulation.LoadNextFrame();
-                }
-            }
-
-            std::size_t numberOfFrames = simulation.GetNumFrames();
-            bool hasFinishedLoading = simulation.HasLoadedAllFrames();
-
-            connectionManager.CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
-            connectionManager.SendDataToClients(simulation);
-            connectionManager.AdvanceClients();
-        }
-    });
-
-    auto heartbeatThread = std::thread([&] {
-        while (isServerRunning) {
-            static const std::size_t kHeartBeatIntervalSeconds = 15;
-            std::this_thread::sleep_for(std::chrono::seconds(kHeartBeatIntervalSeconds));
-
-            if (connectionManager.CheckNoClientTimeout()) {
-                isServerRunning = false;
-            }
-
-            if (connectionManager.NumberOfClients() > 0) {
-                connectionManager.RemoveUnresponsiveClients();
-                connectionManager.PingAllClients();
-            }
-        }
-    });
+    connectionManager.ListenAsync();
+    connectionManager.StartSimAsync(isServerRunning, simulation, timeStep);
+    connectionManager.StartHeartbeatAsync(isServerRunning);
 
     auto ioThread = std::thread([&] {
         std::string input;
@@ -123,14 +76,12 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "Exiting Server...\n";
-    simulationThread.join();
-    heartbeatThread.join();
+    connectionManager.CloseServer();
 
     // The following thread(s) are detached since they block for IO
     //  under the assumption that these threads will be terminated
     //  when the process terminates
     ioThread.detach();
-    connectionManager.CloseServer();
 }
 
 void ParseArguments(int argc, char* argv[], ConnectionManager& connectionManager)

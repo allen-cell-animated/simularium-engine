@@ -42,7 +42,12 @@ namespace agentsim {
     class ConnectionManager {
     public:
         ConnectionManager();
-        void Listen();
+        void ListenAsync();
+        void StartHeartbeatAsync(std::atomic<bool>& isRunning);
+        void StartSimAsync(
+            std::atomic<bool>& isRunning,
+            Simulation& simulation,
+            float& timeStep);
 
         void AddConnection(websocketpp::connection_hdl hd1);
         void RemoveConnection(std::string connectionUID);
@@ -96,7 +101,9 @@ namespace agentsim {
         Json::StreamWriterBuilder m_jsonStreamWriter;
         const std::size_t kLatestFrameValue = std::numeric_limits<std::size_t>::max();
         const std::size_t kMaxMissedHeartBeats = 4;
+        const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
+        const std::size_t kServerTickIntervalMilliSeconds = 200;
 
         bool m_argNoTimeout = false;
 
@@ -111,6 +118,8 @@ namespace agentsim {
 
         std::vector<NetMessage> m_simThreadMessages;
         std::thread m_listeningThread;
+        std::thread m_heartbeatThread;
+        std::thread m_simThread;
     };
 
 } // namespace agentsim
