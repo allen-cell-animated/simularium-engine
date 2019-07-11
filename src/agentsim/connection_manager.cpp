@@ -12,23 +12,19 @@ namespace agentsim {
 
     ConnectionManager::ConnectionManager()
     {
-
     }
 
     void ConnectionManager::CloseServer()
     {
-        if(this->m_heartbeatThread.joinable())
-        {
+        if (this->m_heartbeatThread.joinable()) {
             this->m_heartbeatThread.join();
         }
 
-        if(this->m_simThread.joinable())
-        {
+        if (this->m_simThread.joinable()) {
             this->m_simThread.join();
         }
 
-        if(this->m_listeningThread.joinable())
-        {
+        if (this->m_listeningThread.joinable()) {
             this->m_server.stop();
             this->m_listeningThread.join();
         }
@@ -43,39 +39,35 @@ namespace agentsim {
                     &ConnectionManager::OnMessage,
                     this,
                     std::placeholders::_1,
-                    std::placeholders::_2)
-                );
-                this->m_server.set_close_handler(
-                    std::bind(
-                        &ConnectionManager::MarkConnectionExpired,
-                        this,
-                        std::placeholders::_1)
-                    );
-                    this->m_server.set_open_handler(
-                        std::bind(
-                            &ConnectionManager::AddConnection,
-                            this,
-                            std::placeholders::_1)
-                        );
-                        this->m_server.set_access_channels(websocketpp::log::alevel::none);
-                        this->m_server.set_error_channels(websocketpp::log::elevel::none);
+                    std::placeholders::_2));
+            this->m_server.set_close_handler(
+                std::bind(
+                    &ConnectionManager::MarkConnectionExpired,
+                    this,
+                    std::placeholders::_1));
+            this->m_server.set_open_handler(
+                std::bind(
+                    &ConnectionManager::AddConnection,
+                    this,
+                    std::placeholders::_1));
+            this->m_server.set_access_channels(websocketpp::log::alevel::none);
+            this->m_server.set_error_channels(websocketpp::log::elevel::none);
 
-                        this->m_server.init_asio();
-                        this->m_server.listen(9002);
-                        this->m_server.start_accept();
+            this->m_server.init_asio();
+            this->m_server.listen(9002);
+            this->m_server.start_accept();
 
-                        this->m_server.run();
+            this->m_server.run();
         });
     }
 
     void ConnectionManager::StartSimAsync(
         std::atomic<bool>& isRunning,
-         Simulation& simulation,
-         float& timeStep)
+        Simulation& simulation,
+        float& timeStep)
     {
         this->m_simThread = std::thread([&isRunning, &simulation, &timeStep, this] {
-            while(isRunning)
-            {
+            while (isRunning) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(this->kServerTickIntervalMilliSeconds));
 
                 this->RemoveExpiredConnections();
@@ -165,8 +157,7 @@ namespace agentsim {
             }
         }
 
-        for(auto& uid : toRemove)
-        {
+        for (auto& uid : toRemove) {
             std::cout << "Removing unresponsive network connection.\n";
             this->CloseConnection(uid);
         }
@@ -444,7 +435,7 @@ namespace agentsim {
 
         if (msgType >= 0 && msgType < WebRequestNames.size()) {
             std::cout << "[" << nm.senderUid << "] Web socket message arrived: "
-                << WebRequestNames[msgType] << std::endl;
+                      << WebRequestNames[msgType] << std::endl;
 
             if (msgType == WebRequestTypes::id_heartbeat_pong) {
                 this->RegisterHeartBeat(nm.senderUid);
@@ -591,7 +582,6 @@ namespace agentsim {
             messages.clear();
         }
     }
-
 
 } // namespace agentsim
 } // namespace aics

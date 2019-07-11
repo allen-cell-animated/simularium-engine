@@ -1,5 +1,5 @@
-#include "agentsim/network/net_message_ids.h"
 #include "agentsim/network/cli_client.h"
+#include "agentsim/network/net_message_ids.h"
 using namespace aics::agentsim;
 
 int main(int argc, char* argv[])
