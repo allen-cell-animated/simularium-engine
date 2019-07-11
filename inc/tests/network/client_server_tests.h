@@ -1,7 +1,7 @@
-#include "gtest/gtest.h"
+#include "agentsim/agentsim.h"
 #include "agentsim/network/cli_client.h"
 #include "agentsim/network/net_message_ids.h"
-#include "agentsim/agentsim.h"
+#include "gtest/gtest.h"
 #include <memory>
 
 namespace aics {
@@ -43,13 +43,16 @@ namespace agentsim {
 
         TEST_F(ClientServerTests, SingleClient)
         {
+            // Disabling STD OUT until a logging library is setup
+            //  otherwise, the cli clients would be noisy for this test
+            std::cout.setstate(std::ios_base::failbit);
+
             std::atomic<bool> isRunning = true;
             float timeStep = 1e-12;
 
             std::vector<std::shared_ptr<SimPkg>> simulators;
             std::vector<std::shared_ptr<Agent>> agents;
-            for(std::size_t i = 0; i < 100; ++i)
-            {
+            for (std::size_t i = 0; i < 100; ++i) {
                 std::shared_ptr<Agent> agent(new Agent());
                 agents.push_back(agent);
             }
@@ -60,28 +63,27 @@ namespace agentsim {
             connectionManager.ListenAsync();
             connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
-            /*std::vector<std::shared_ptr<CliClient>> clients;
-            for(std::size_t i = 0; i < 1; ++i)
-            {
+            std::vector<std::shared_ptr<CliClient>> clients;
+            for (std::size_t i = 0; i < 1; ++i) {
                 std::shared_ptr<CliClient> cliClient(new CliClient("ws://localhost:9002"));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 cliClient->Parse("resume");
                 clients.push_back(cliClient);
             }
 
             std::this_thread::sleep_for(std::chrono::seconds(1));
 
-            for(std::size_t i = 0; i < 1; ++i)
-            {
+            for (std::size_t i = 0; i < 1; ++i) {
                 clients[0]->Parse("quit");
-            }*/
+            }
 
             isRunning = false;
             connectionManager.CloseServer();
+            std::cout.clear();
         }
 
         TEST_F(ClientServerTests, HundredClient)
         {
-
         }
 
     } // namespace test
