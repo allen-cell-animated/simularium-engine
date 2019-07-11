@@ -17,12 +17,21 @@ namespace agentsim {
 
     void ConnectionManager::CloseServer()
     {
-        this->m_server.stop_listening();
-        this->m_server.stop();
+        if(this->m_heartbeatThread.joinable())
+        {
+            this->m_heartbeatThread.join();
+        }
 
-        this->m_heartbeatThread.join();
-        this->m_simThread.join();
-        this->m_listeningThread.detach();
+        if(this->m_simThread.joinable())
+        {
+            this->m_simThread.join();
+        }
+
+        if(this->m_listeningThread.joinable())
+        {
+            this->m_server.stop();
+            this->m_listeningThread.join();
+        }
     }
 
     void ConnectionManager::ListenAsync()

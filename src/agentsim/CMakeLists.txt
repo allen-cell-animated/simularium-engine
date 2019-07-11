@@ -9,6 +9,7 @@ set(SOURCES
 "simulation_cache.cpp"
 "simulation.cpp"
 "connection_manager.cpp"
+"cli_client.cpp"
 )
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
