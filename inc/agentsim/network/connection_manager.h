@@ -78,6 +78,10 @@ namespace agentsim {
         std::vector<NetMessage>& GetMessages() { return this->m_simThreadMessages; }
         void HandleMessage(NetMessage nm);
 
+        // Enacts web-socket commands in the sim thread
+        // e.g. changing parameters, time-step, starting, stopping, etc.
+        void HandleNetMessages(Simulation& simulation, float& timeStep);
+
     private:
         void GenerateLocalUUID(std::string& uuid);
 
