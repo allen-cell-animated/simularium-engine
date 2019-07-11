@@ -63,23 +63,24 @@ namespace agentsim {
             connectionManager.ListenAsync();
             connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
+            std::size_t numberOfClients = 5;
             std::vector<std::shared_ptr<CliClient>> clients;
-            for (std::size_t i = 0; i < 1; ++i) {
+            for (std::size_t i = 0; i < numberOfClients; ++i) {
                 std::shared_ptr<CliClient> cliClient(new CliClient("ws://localhost:9002"));
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1)); // give time to connect
                 cliClient->Parse("resume");
                 clients.push_back(cliClient);
             }
 
             std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::cout.clear();
 
-            for (std::size_t i = 0; i < 1; ++i) {
-                clients[0]->Parse("quit");
+            for (std::size_t i = 0; i < numberOfClients; ++i) {
+                clients[i]->Parse("quit");
             }
 
             isRunning = false;
             connectionManager.CloseServer();
-            std::cout.clear();
         }
 
         TEST_F(ClientServerTests, HundredClient)

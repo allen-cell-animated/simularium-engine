@@ -164,16 +164,10 @@ namespace agentsim {
 
     void CliClient::Disconnect()
     {
-        try {
-            this->m_webSocketClient.pause_reading(this->m_serverConnection);
-            this->m_webSocketClient.close(
-                this->m_serverConnection,
-                websocketpp::close::status::normal,
-                "Sucess");
-
+        if(this->m_listeningThread.joinable())
+        {
+            this->m_webSocketClient.stop();
             this->m_listeningThread.detach();
-        } catch (websocketpp::exception const& e) {
-            std::cout << e.what() << std::endl;
         }
     }
 
