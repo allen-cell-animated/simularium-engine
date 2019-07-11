@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <thread>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -81,6 +82,7 @@ namespace agentsim {
         // Enacts web-socket commands in the sim thread
         // e.g. changing parameters, time-step, starting, stopping, etc.
         void HandleNetMessages(Simulation& simulation, float& timeStep);
+        void CloseServer();
 
     private:
         void GenerateLocalUUID(std::string& uuid);
@@ -108,6 +110,7 @@ namespace agentsim {
         bool m_hasModel = false;
 
         std::vector<NetMessage> m_simThreadMessages;
+        std::thread m_listeningThread;
     };
 
 } // namespace agentsim

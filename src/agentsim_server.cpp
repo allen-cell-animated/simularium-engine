@@ -29,9 +29,7 @@ int main(int argc, char* argv[])
     // A synchronized variable that tells all the threads to exit
     std::atomic<bool> isServerRunning { true };
 
-    auto websocketThread = std::thread([&] {
-        connectionManager.Listen();
-    });
+    connectionManager.Listen();
 
     auto simulationThread = std::thread([&] {
         float timeStep = 1e-12; // seconds
@@ -128,11 +126,11 @@ int main(int argc, char* argv[])
     simulationThread.join();
     heartbeatThread.join();
 
-    // These threads are detached since they block for IO
+    // The following thread(s) are detached since they block for IO
     //  under the assumption that these threads will be terminated
     //  when the process terminates
     ioThread.detach();
-    websocketThread.detach();
+    connectionManager.CloseServer();
 }
 
 void ParseArguments(int argc, char* argv[], ConnectionManager& connectionManager)
