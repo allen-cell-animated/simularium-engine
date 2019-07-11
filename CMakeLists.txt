@@ -154,6 +154,7 @@ target_link_libraries(${CLIENT_PROGRAM}
   Threads::Threads
   "${HDF5_DLLS}"
   "${READDY_DLLS}"
+  ${AWS_DLLS}
 )
 
 target_link_libraries(${TEST_PROGRAM}

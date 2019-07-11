@@ -1,5 +1,6 @@
 #include "agentsim/simulation.h"
 #include "agentsim/agents/agent.h"
+#include "agentsim/network/net_message_ids.h"
 #include "agentsim/simpkg/simpkg.h"
 #include <cmath>
 #include <iostream>
@@ -160,6 +161,11 @@ namespace agentsim {
     void Simulation::SetPlaybackMode(std::size_t playback_mode)
     {
         this->m_playbackMode = playback_mode;
+    }
+
+    bool Simulation::IsRunningLive()
+    {
+        return this->m_playbackMode == id_live_simulation;
     }
 
     void AppendAgentData(

@@ -10,33 +10,12 @@
 #include <sys/stat.h>
 
 #include "agentsim/agentsim.h"
+using namespace aics::agentsim;
 
 typedef websocketpp::client<websocketpp::config::asio_client> client;
 
 std::vector<std::string> net_messages;
 websocketpp::connection_hdl server_connection;
-
-enum {
-    id_undefined_web_request = 0,
-    id_vis_data_arrive = 1,
-    id_vis_data_request,
-    id_vis_data_finish,
-    id_vis_data_pause,
-    id_vis_data_resume,
-    id_vis_data_abort,
-    id_update_time_step,
-    id_update_rate_param,
-    id_model_definition,
-    id_heartbeat_ping,
-    id_heartbeat_pong,
-    id_play_cache
-};
-
-enum {
-    id_live_simulation = 0,
-    id_pre_run_simulation = 1,
-    id_traj_file_playback = 2
-};
 
 inline bool file_exists(const std::string& name)
 {
@@ -109,9 +88,9 @@ int main(int argc, char* argv[])
 
                     int msg_type = json_msg["msg_type"].asInt();
                     switch (msg_type) {
-                    case id_heartbeat_ping: {
+                    case WebRequestTypes::id_heartbeat_ping: {
                         //std::cout << "heartbeat ping arrived\n";
-                        json_msg["msg_type"] = id_heartbeat_pong;
+                        json_msg["msg_type"] = WebRequestTypes::id_heartbeat_pong;
 
                         std::string out_msg = Json::writeString(json_stream_writer, json_msg);
                         sim_client.send(server_connection, out_msg, websocketpp::frame::opcode::text);
@@ -163,7 +142,7 @@ int main(int argc, char* argv[])
                 std::ifstream file(file_path);
                 file >> json_msg;
 
-                json_msg["msg_type"] = id_model_definition;
+                json_msg["msg_type"] = WebRequestTypes::id_model_definition;
                 std::string out_msg = Json::writeString(json_stream_writer, json_msg);
                 sim_client.send(server_connection, out_msg, websocketpp::frame::opcode::text);
             } else if (tokens.size() == 1) {
@@ -173,7 +152,7 @@ int main(int argc, char* argv[])
             }
         } else if (tokens[0] == "start") {
             Json::Value json_msg;
-            json_msg["msg_type"] = id_vis_data_request;
+            json_msg["msg_type"] = WebRequestTypes::id_vis_data_request;
 
             if (tokens.size() == 1) {
                 std::cout << "'start' command requires second parameter: 'live' or 'precache'" << std::endl;
@@ -196,7 +175,7 @@ int main(int argc, char* argv[])
                 std::cout << "Expected three tokens for command 'set': set param_name param_value" << std::endl;
             } else {
                 Json::Value json_msg;
-                json_msg["msg_type"] = id_update_rate_param;
+                json_msg["msg_type"] = WebRequestTypes::id_update_rate_param;
                 json_msg["param_name"] = tokens[1];
                 std::string::size_type sz;
                 json_msg["param_value"] = std::stof(tokens[2].substr(sz));
@@ -207,7 +186,7 @@ int main(int argc, char* argv[])
             }
         } else if (tokens[0] == "stop") {
             Json::Value json_msg;
-            json_msg["msg_type"] = id_vis_data_abort;
+            json_msg["msg_type"] = WebRequestTypes::id_vis_data_abort;
             std::string out_msg = Json::writeString(json_stream_writer, json_msg);
 
             sim_client.send(server_connection, out_msg, websocketpp::frame::opcode::text);
