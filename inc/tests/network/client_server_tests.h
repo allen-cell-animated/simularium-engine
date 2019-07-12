@@ -52,12 +52,8 @@ namespace agentsim {
 
             std::vector<std::shared_ptr<SimPkg>> simulators;
             std::vector<std::shared_ptr<Agent>> agents;
-            for (std::size_t i = 0; i < 100; ++i) {
-                std::shared_ptr<Agent> agent(new Agent());
-                agents.push_back(agent);
-            }
-
             Simulation simulation(simulators, agents);
+            simulation.LoadTrajectoryFile("trajectory/actin5-1.h5");
 
             ConnectionManager connectionManager;
             connectionManager.ListenAsync();
