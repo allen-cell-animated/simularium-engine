@@ -80,10 +80,6 @@ namespace agentsim {
             connectionManager.CloseServer();
         }
 
-        TEST_F(ClientServerTests, HundredClient)
-        {
-        }
-
     } // namespace test
 } // namespace agentsim
 } // namespace aics
