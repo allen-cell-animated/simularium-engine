@@ -49,6 +49,7 @@ namespace agentsim {
 
             std::atomic<bool> isRunning = true;
             float timeStep = 1e-12;
+            std::string uri = "ws://localhost:9002";
 
             std::vector<std::shared_ptr<SimPkg>> simulators;
             std::vector<std::shared_ptr<Agent>> agents;
@@ -58,7 +59,7 @@ namespace agentsim {
             connectionManager.ListenAsync();
             connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
-            CliClient controller("ws://localhost:9002");
+            CliClient controller(uri);
             controller.Parse("start trajectory actin5-1.h5");
 
             std::cout << "Waiting for simulation to load ..." << std::endl;
@@ -67,7 +68,7 @@ namespace agentsim {
             std::size_t numberOfClients = 1000;
             std::vector<std::shared_ptr<CliClient>> clients;
             for (std::size_t i = 0; i < numberOfClients; ++i) {
-                std::shared_ptr<CliClient> cliClient(new CliClient("ws://localhost:9002"));
+                std::shared_ptr<CliClient> cliClient(new CliClient(uri));
                 std::this_thread::sleep_for(std::chrono::milliseconds(5)); // give time to connect
                 cliClient->Parse("resume");
                 clients.push_back(cliClient);
