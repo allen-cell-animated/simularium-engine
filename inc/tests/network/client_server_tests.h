@@ -41,7 +41,7 @@ namespace agentsim {
             // Objects declared here can be used by all tests in the test case for Foo.
         };
 
-        TEST_F(ClientServerTests, SingleClient)
+        TEST_F(ClientServerTests, ThousandClient)
         {
             // Disabling STD OUT until a logging library is setup
             //  otherwise, the cli clients would be noisy for this test
@@ -63,7 +63,7 @@ namespace agentsim {
             connectionManager.ListenAsync();
             connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
-            std::size_t numberOfClients = 5;
+            std::size_t numberOfClients = 1000;
             std::vector<std::shared_ptr<CliClient>> clients;
             for (std::size_t i = 0; i < numberOfClients; ++i) {
                 std::shared_ptr<CliClient> cliClient(new CliClient("ws://localhost:9002"));
@@ -71,9 +71,10 @@ namespace agentsim {
                 cliClient->Parse("resume");
                 clients.push_back(cliClient);
             }
-
-            std::this_thread::sleep_for(std::chrono::seconds(1));
             std::cout.clear();
+
+            std::cout << "Running server for 5 seconds" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(5));
 
             for (std::size_t i = 0; i < numberOfClients; ++i) {
                 clients[i]->Parse("quit");
