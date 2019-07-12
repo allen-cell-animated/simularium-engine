@@ -87,6 +87,52 @@ namespace agentsim {
             connectionManager.CloseServer();
         }
 
+        TEST_F(ClientServerTests, DockerConnect)
+        {
+            // Disabling STD OUT until a logging library is setup
+            //  otherwise, the cli clients would be noisy for this test
+            std::cout.setstate(std::ios_base::failbit);
+
+            std::atomic<bool> isRunning = true;
+            float timeStep = 1e-12;
+            std::string uri = "ws://3.15.8.65:9002";
+
+            std::vector<std::shared_ptr<SimPkg>> simulators;
+            std::vector<std::shared_ptr<Agent>> agents;
+            Simulation simulation(simulators, agents);
+
+            ConnectionManager connectionManager;
+            connectionManager.ListenAsync();
+            connectionManager.StartSimAsync(isRunning, simulation, timeStep);
+
+            CliClient controller(uri);
+            controller.Parse("start trajectory actin5-1.h5");
+
+            std::cout << "Waiting for simulation to load ..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+
+            std::size_t numberOfClients = 1000;
+            std::vector<std::shared_ptr<CliClient>> clients;
+            for (std::size_t i = 0; i < numberOfClients; ++i) {
+                std::shared_ptr<CliClient> cliClient(new CliClient(uri));
+                std::this_thread::sleep_for(std::chrono::milliseconds(5)); // give time to connect
+                cliClient->Parse("resume");
+                clients.push_back(cliClient);
+            }
+            std::cout.clear();
+
+            std::cout << "Running server for 30 seconds" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(30));
+
+            for (std::size_t i = 0; i < numberOfClients; ++i) {
+                clients[i]->Parse("quit");
+            }
+
+            controller.Parse("quit");
+            isRunning = false;
+            connectionManager.CloseServer();
+        }
+
     } // namespace test
 } // namespace agentsim
 } // namespace aics
