@@ -53,29 +53,35 @@ namespace agentsim {
             std::vector<std::shared_ptr<SimPkg>> simulators;
             std::vector<std::shared_ptr<Agent>> agents;
             Simulation simulation(simulators, agents);
-            simulation.LoadTrajectoryFile("trajectory/actin5-1.h5");
 
             ConnectionManager connectionManager;
             connectionManager.ListenAsync();
             connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
+            CliClient controller("ws://localhost:9002");
+            controller.Parse("start trajectory actin5-1.h5");
+
+            std::cout << "Waiting for simulation to load ..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+
             std::size_t numberOfClients = 1000;
             std::vector<std::shared_ptr<CliClient>> clients;
             for (std::size_t i = 0; i < numberOfClients; ++i) {
                 std::shared_ptr<CliClient> cliClient(new CliClient("ws://localhost:9002"));
-                std::this_thread::sleep_for(std::chrono::milliseconds(1)); // give time to connect
+                std::this_thread::sleep_for(std::chrono::milliseconds(5)); // give time to connect
                 cliClient->Parse("resume");
                 clients.push_back(cliClient);
             }
             std::cout.clear();
 
-            std::cout << "Running server for 5 seconds" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            std::cout << "Running server for 30 seconds" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(30));
 
             for (std::size_t i = 0; i < numberOfClients; ++i) {
                 clients[i]->Parse("quit");
             }
 
+            controller.Parse("quit");
             isRunning = false;
             connectionManager.CloseServer();
         }

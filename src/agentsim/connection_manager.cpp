@@ -125,7 +125,7 @@ namespace agentsim {
         this->m_netConnections[newUid] = hd1;
         this->m_latestConnectionUid = newUid;
         this->m_hasNewConnection = true;
-        std::cout << "Incoming connection accepted." << std::endl;
+        std::cout << "Incoming connection accepted: " << newUid << std::endl;
     }
 
     void ConnectionManager::RemoveConnection(std::string connectionUID)
@@ -262,7 +262,7 @@ namespace agentsim {
                 this->m_netConnections[connectionUID],
                 message, websocketpp::frame::opcode::text);
         } catch (...) {
-            std::cout << "Ignoring failed websocket send" << std::endl;
+            std::cout << "Ignoring failed websocket send to " << connectionUID << std::endl;
         }
     }
 

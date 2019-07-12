@@ -34,7 +34,7 @@ namespace agentsim {
         void Stop();
         void StartLive();
         void StartPrecache(std::size_t numberOfSteps, float timeStepSize);
-        void StartTrajectory(std::size_t fileName);
+        void StartTrajectory(std::string fileName);
         void Set(std::string name, float value);
 
         void Load(std::string fileName);
@@ -43,7 +43,7 @@ namespace agentsim {
         void OnOpen(websocketpp::connection_hdl hdl);
         void OnClose(websocketpp::connection_hdl hdl);
 
-        void SendMessage(Json::Value message);
+        void SendMessage(Json::Value message, std::string description);
         void OnFail();
 
     private:

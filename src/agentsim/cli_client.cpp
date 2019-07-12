@@ -66,7 +66,7 @@ namespace agentsim {
                 std::string::size_type sz;
                 this->StartPrecache(std::stoi(tokens[2]), std::stof(tokens[3].substr(sz)));
             } else if (tokens[1] == "trajectory" && tokens.size() == 3) {
-                this->StartLive();
+                this->StartTrajectory(tokens[2]);
             } else {
                 std::cout << "Usage: \
             \n 'start live' \
@@ -185,14 +185,14 @@ namespace agentsim {
         Json::Value jsonMsg;
         jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_resume;
         jsonMsg["mode"] = id_live_simulation;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "resume command");
     }
 
     void CliClient::Pause()
     {
         Json::Value jsonMsg;
         jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_pause;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "pause command");
     }
 
     void CliClient::StartLive()
@@ -200,7 +200,7 @@ namespace agentsim {
         Json::Value jsonMsg;
         jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_request;
         jsonMsg["mode"] = id_live_simulation;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "start command live");
     }
 
     void CliClient::StartPrecache(std::size_t numberOfSteps, float timeStepSize)
@@ -210,23 +210,23 @@ namespace agentsim {
         jsonMsg["mode"] = id_pre_run_simulation;
         jsonMsg["time-step"] = 1e-9f;
         jsonMsg["num-time-steps"] = 200;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "start command precache");
     }
 
-    void CliClient::StartTrajectory(std::size_t fileName)
+    void CliClient::StartTrajectory(std::string fileName)
     {
         Json::Value jsonMsg;
         jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_request;
         jsonMsg["mode"] = id_traj_file_playback;
         jsonMsg["file-name"] = fileName;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "start command trajectory " + fileName);
     }
 
     void CliClient::Stop()
     {
         Json::Value jsonMsg;
         jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_abort;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "stop command");
     }
 
     void CliClient::Set(std::string name, float value)
@@ -235,7 +235,7 @@ namespace agentsim {
         jsonMsg["msg_type"] = WebRequestTypes::id_update_rate_param;
         jsonMsg["param_name"] = name;
         jsonMsg["param_value"] = value;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "set command " + name);
     }
 
     void CliClient::Load(std::string fileName)
@@ -252,7 +252,7 @@ namespace agentsim {
         file >> jsonMsg;
 
         jsonMsg["msg_type"] = WebRequestTypes::id_model_definition;
-        this->SendMessage(jsonMsg);
+        this->SendMessage(jsonMsg, "load command " + fileName);
     }
 
     void CliClient::OnMessage(websocketpp::connection_hdl, client::message_ptr msg)
@@ -271,7 +271,7 @@ namespace agentsim {
         switch (msgType) {
         case WebRequestTypes::id_heartbeat_ping: {
             jsonMsg["msg_type"] = WebRequestTypes::id_heartbeat_pong;
-            this->SendMessage(jsonMsg);
+            this->SendMessage(jsonMsg, "heartbeat ping");
         } break;
         default: {
         } break;
@@ -286,15 +286,16 @@ namespace agentsim {
 
     void CliClient::OnClose(websocketpp::connection_hdl hdl)
     {
+        std::cout << "Closing client" << std::endl;
     }
 
-    void CliClient::SendMessage(Json::Value message)
+    void CliClient::SendMessage(Json::Value message, std::string description)
     {
         try {
             std::string outMsg = Json::writeString(this->m_jsonStreamWriter, message);
             this->m_webSocketClient.send(this->m_serverConnection, outMsg, websocketpp::frame::opcode::text);
         } catch (...) {
-            std::cout << "Websocket send failed" << std::endl;
+            std::cout << "Websocket send failed: " << description << std::endl;
         }
     }
 
