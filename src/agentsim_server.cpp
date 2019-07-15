@@ -56,8 +56,8 @@ int main(int argc, char* argv[])
     Simulation simulation(simulators, agents);
 
     connectionManager.ListenAsync();
-    connectionManager.StartSimAsync(isServerRunning, simulation, timeStep);
-    connectionManager.StartHeartbeatAsync(isServerRunning);
+    connectionManager.StartSimAsync(simulation, timeStep);
+    connectionManager.StartHeartbeatAsync();
 
     auto ioThread = std::thread([&] {
         std::string input;

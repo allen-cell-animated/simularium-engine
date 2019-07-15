@@ -16,6 +16,9 @@ namespace agentsim {
 
     void ConnectionManager::CloseServer()
     {
+        this->StopRunning();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
         if (this->m_heartbeatThread.joinable()) {
             this->m_heartbeatThread.join();
         }
@@ -62,12 +65,13 @@ namespace agentsim {
     }
 
     void ConnectionManager::StartSimAsync(
-        std::atomic<bool>& isRunning,
         Simulation& simulation,
         float& timeStep)
     {
-        this->m_simThread = std::thread([&isRunning, &simulation, &timeStep, this] {
-            while (isRunning) {
+        this->m_isRunning = true;
+
+        this->m_simThread = std::thread([&simulation, &timeStep, this] {
+            while (this->IsRunning()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(this->kServerTickIntervalMilliSeconds));
 
                 this->RemoveExpiredConnections();
@@ -98,14 +102,16 @@ namespace agentsim {
         });
     }
 
-    void ConnectionManager::StartHeartbeatAsync(std::atomic<bool>& isRunning)
+    void ConnectionManager::StartHeartbeatAsync()
     {
-        this->m_heartbeatThread = std::thread([&isRunning, this] {
-            while (isRunning) {
+        this->m_isRunning = true;
+
+        this->m_heartbeatThread = std::thread([this] {
+            while (this->IsRunning()) {
                 std::this_thread::sleep_for(std::chrono::seconds(this->kHeartBeatIntervalSeconds));
 
                 if (this->CheckNoClientTimeout()) {
-                    isRunning = false;
+                    this->StopRunning();
                 }
 
                 if (this->NumberOfClients() > 0) {

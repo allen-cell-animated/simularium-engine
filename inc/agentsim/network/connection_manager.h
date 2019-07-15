@@ -1,6 +1,7 @@
 #ifndef AICS_CONNECTION_MANAGER_H
 #define AICS_CONNECTION_MANAGER_H
 
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -43,9 +44,8 @@ namespace agentsim {
     public:
         ConnectionManager();
         void ListenAsync();
-        void StartHeartbeatAsync(std::atomic<bool>& isRunning);
+        void StartHeartbeatAsync();
         void StartSimAsync(
-            std::atomic<bool>& isRunning,
             Simulation& simulation,
             float& timeStep);
 
@@ -89,6 +89,9 @@ namespace agentsim {
         void HandleNetMessages(Simulation& simulation, float& timeStep);
         void CloseServer();
 
+        const std::atomic<bool>& IsRunning() const { return this->m_isRunning; }
+        void StopRunning() { this->m_isRunning = false; }
+
     private:
         void GenerateLocalUUID(std::string& uuid);
 
@@ -120,6 +123,8 @@ namespace agentsim {
         std::thread m_listeningThread;
         std::thread m_heartbeatThread;
         std::thread m_simThread;
+
+        std::atomic<bool> m_isRunning;
     };
 
 } // namespace agentsim
