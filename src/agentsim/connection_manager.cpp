@@ -12,39 +12,114 @@ namespace agentsim {
 
     ConnectionManager::ConnectionManager()
     {
-
     }
 
-    void ConnectionManager::Listen()
+    void ConnectionManager::CloseServer()
     {
-        this->m_server.set_reuse_addr(true);
-        this->m_server.set_message_handler(
-            std::bind(
-                &ConnectionManager::OnMessage,
-                this,
-                std::placeholders::_1,
-                std::placeholders::_2)
-        );
-        this->m_server.set_close_handler(
-            std::bind(
-                &ConnectionManager::MarkConnectionExpired,
-                this,
-                std::placeholders::_1)
-        );
-        this->m_server.set_open_handler(
-            std::bind(
-                &ConnectionManager::AddConnection,
-                this,
-                std::placeholders::_1)
-        );
-        this->m_server.set_access_channels(websocketpp::log::alevel::none);
-        this->m_server.set_error_channels(websocketpp::log::elevel::none);
+        this->StopRunning();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        this->m_server.init_asio();
-        this->m_server.listen(9002);
-        this->m_server.start_accept();
+        if (this->m_heartbeatThread.joinable()) {
+            this->m_heartbeatThread.join();
+        }
 
-        this->m_server.run();
+        if (this->m_simThread.joinable()) {
+            this->m_simThread.join();
+        }
+
+        if (this->m_listeningThread.joinable()) {
+            this->m_server.stop();
+            this->m_listeningThread.join();
+        }
+    }
+
+    void ConnectionManager::ListenAsync()
+    {
+        this->m_listeningThread = std::thread([&] {
+            this->m_server.set_reuse_addr(true);
+            this->m_server.set_message_handler(
+                std::bind(
+                    &ConnectionManager::OnMessage,
+                    this,
+                    std::placeholders::_1,
+                    std::placeholders::_2));
+            this->m_server.set_close_handler(
+                std::bind(
+                    &ConnectionManager::MarkConnectionExpired,
+                    this,
+                    std::placeholders::_1));
+            this->m_server.set_open_handler(
+                std::bind(
+                    &ConnectionManager::AddConnection,
+                    this,
+                    std::placeholders::_1));
+            this->m_server.set_access_channels(websocketpp::log::alevel::none);
+            this->m_server.set_error_channels(websocketpp::log::elevel::none);
+
+            this->m_server.init_asio();
+            this->m_server.listen(9002);
+            this->m_server.start_accept();
+
+            this->m_server.run();
+        });
+    }
+
+    void ConnectionManager::StartSimAsync(
+        Simulation& simulation,
+        float& timeStep)
+    {
+        this->m_isRunning = true;
+
+        this->m_simThread = std::thread([&simulation, &timeStep, this] {
+            while (this->IsRunning()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(this->kServerTickIntervalMilliSeconds));
+
+                this->RemoveExpiredConnections();
+                this->UpdateNewConections();
+
+                this->HandleNetMessages(simulation, timeStep);
+
+                if (!this->HasActiveClient()) {
+                    continue;
+                }
+
+                // Run simulation time-step
+                if (simulation.IsRunningLive()) {
+                    simulation.RunTimeStep(timeStep);
+                } else {
+                    if (!simulation.HasLoadedAllFrames()) {
+                        simulation.LoadNextFrame();
+                    }
+                }
+
+                std::size_t numberOfFrames = simulation.GetNumFrames();
+                bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+
+                this->CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
+                this->SendDataToClients(simulation);
+                this->AdvanceClients();
+            }
+        });
+    }
+
+    void ConnectionManager::StartHeartbeatAsync()
+    {
+        this->m_isRunning = true;
+
+        this->m_heartbeatThread = std::thread([this] {
+            while (this->IsRunning()) {
+                std::this_thread::sleep_for(std::chrono::seconds(this->kHeartBeatIntervalSeconds));
+
+                if (this->CheckNoClientTimeout()) {
+                    this->StopRunning();
+                }
+
+                if (this->NumberOfClients() > 0) {
+                    this->RemoveUnresponsiveClients();
+                    this->PingAllClients();
+                }
+            }
+        });
     }
 
     void ConnectionManager::AddConnection(websocketpp::connection_hdl hd1)
@@ -56,7 +131,7 @@ namespace agentsim {
         this->m_netConnections[newUid] = hd1;
         this->m_latestConnectionUid = newUid;
         this->m_hasNewConnection = true;
-        std::cout << "Incoming connection accepted." << std::endl;
+        std::cout << "Incoming connection accepted: " << newUid << std::endl;
     }
 
     void ConnectionManager::RemoveConnection(std::string connectionUID)
@@ -88,8 +163,7 @@ namespace agentsim {
             }
         }
 
-        for(auto& uid : toRemove)
-        {
+        for (auto& uid : toRemove) {
             std::cout << "Removing unresponsive network connection.\n";
             this->CloseConnection(uid);
         }
@@ -194,7 +268,7 @@ namespace agentsim {
                 this->m_netConnections[connectionUID],
                 message, websocketpp::frame::opcode::text);
         } catch (...) {
-            std::cout << "Ignoring failed websocket send" << std::endl;
+            std::cout << "Ignoring failed websocket send to " << connectionUID << std::endl;
         }
     }
 
@@ -367,7 +441,7 @@ namespace agentsim {
 
         if (msgType >= 0 && msgType < WebRequestNames.size()) {
             std::cout << "[" << nm.senderUid << "] Web socket message arrived: "
-                << WebRequestNames[msgType] << std::endl;
+                      << WebRequestNames[msgType] << std::endl;
 
             if (msgType == WebRequestTypes::id_heartbeat_pong) {
                 this->RegisterHeartBeat(nm.senderUid);
@@ -395,6 +469,125 @@ namespace agentsim {
         this->HandleMessage(nm);
     }
 
+    void ConnectionManager::HandleNetMessages(
+        Simulation& simulation,
+        float& timeStep)
+    {
+        // the relative directory for trajectory files on S3
+        //  local downloads mirror the S3 directory structure
+        std::string trajectory_file_directory = "trajectory/";
+        auto& messages = this->GetMessages();
+
+        // handle net messages
+        if (messages.size() > 0) {
+            for (std::size_t i = 0; i < messages.size(); ++i) {
+                std::string senderUid = messages[i].senderUid;
+                Json::Value jsonMsg = messages[i].jsonMessage;
+
+                int msg_type = jsonMsg["msg_type"].asInt();
+                switch (msg_type) {
+                case WebRequestTypes::id_vis_data_request: {
+                    // If a simulation is already in progress, don't allow a new client to
+                    //	change the simulation, unless there is only one client connected
+                    if (!this->HasActiveClient()
+                        || this->NumberOfClients() == 1) {
+                        auto runMode = jsonMsg["mode"].asInt();
+
+                        switch (runMode) {
+                        case id_live_simulation: {
+                            std::cout << "Running live simulation" << std::endl;
+                            simulation.SetPlaybackMode(runMode);
+                            simulation.Reset();
+                        } break;
+                        case id_pre_run_simulation: {
+                            timeStep = jsonMsg["time-step"].asFloat();
+                            auto n_time_steps = jsonMsg["num-time-steps"].asInt();
+                            std::cout << "Running pre-run simulation" << std::endl;
+
+                            simulation.SetPlaybackMode(runMode);
+                            simulation.Reset();
+                            simulation.RunAndSaveFrames(timeStep, n_time_steps);
+                        } break;
+                        case id_traj_file_playback: {
+                            auto trajectoryFileName = jsonMsg["file-name"].asString();
+                            std::cout << "Playing back trajectory file" << std::endl;
+
+                            if (trajectoryFileName.empty()) {
+                                std::cout << "Trajectory file not specified, ignoring request" << std::endl;
+                                continue;
+                            }
+
+                            simulation.SetPlaybackMode(runMode);
+                            simulation.Reset();
+                            simulation.LoadTrajectoryFile(trajectory_file_directory + trajectoryFileName);
+                        } break;
+                        }
+
+                        if (runMode == id_pre_run_simulation
+                            || runMode == id_traj_file_playback) {
+                            // Load the first hundred simulation frames into a runtime cache
+                            std::cout << "Loading trajectory file into runtime cache" << std::endl;
+                            std::size_t fn = 0;
+                            while (!simulation.HasLoadedAllFrames() && fn < 100) {
+                                std::cout << "Loading frame " << ++fn << std::endl;
+                                simulation.LoadNextFrame();
+                            }
+                            std::cout << "Finished loading trajectory for now" << std::endl;
+                        }
+                    }
+
+                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                    this->SetClientFrame(senderUid, 0);
+                } break;
+                case WebRequestTypes::id_vis_data_pause: {
+                    this->SetClientState(senderUid, ClientPlayState::Paused);
+                } break;
+                case WebRequestTypes::id_vis_data_resume: {
+                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                } break;
+                case WebRequestTypes::id_vis_data_abort: {
+                    this->SetClientState(senderUid, ClientPlayState::Stopped);
+                } break;
+                case WebRequestTypes::id_update_time_step: {
+                    timeStep = jsonMsg["time_step"].asFloat();
+                    std::cout << "time step updated to " << timeStep << "\n";
+                    this->SendWebsocketMessageToAll(jsonMsg, "time-step update");
+                } break;
+                case WebRequestTypes::id_update_rate_param: {
+                    std::string paramName = jsonMsg["param_name"].asString();
+                    float paramValue = jsonMsg["param_value"].asFloat();
+                    std::cout << "rate param " << paramName << " updated to " << paramValue << "\n";
+
+                    simulation.UpdateParameter(paramName, paramValue);
+                    this->BroadcastParameterUpdate(jsonMsg);
+                } break;
+                case WebRequestTypes::id_model_definition: {
+                    aics::agentsim::Model sim_model;
+                    parse_model(jsonMsg, sim_model);
+                    print_model(sim_model);
+                    simulation.SetModel(sim_model);
+
+                    timeStep = sim_model.max_time_step;
+                    std::cout << "Set timestep to " << timeStep << "\n";
+
+                    this->BroadcastModelDefinition(jsonMsg);
+                } break;
+                case WebRequestTypes::id_play_cache: {
+                    auto frameNumber = jsonMsg["frame-num"].asInt();
+                    std::cout << "request to play cached from frame "
+                              << frameNumber << " arrived from client " << senderUid << std::endl;
+
+                    this->SetClientFrame(senderUid, frameNumber);
+                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                } break;
+                default: {
+                } break;
+                }
+            }
+
+            messages.clear();
+        }
+    }
 
 } // namespace agentsim
 } // namespace aics

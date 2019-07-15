@@ -54,7 +54,7 @@ namespace agentsim {
                 // snippet-start:[s3.cpp.get_object.code]
                 // Assign these values before running the program
                 const Aws::String bucket_name = "aics-agentviz-data";
-                const Aws::String object_name = "trajectory/actin5-1.h5"; // For demo, set to a text file
+                const Aws::String object_name = "trajectory/test.txt"; // For demo, set to a text file
 
                 Aws::Client::ClientConfiguration config;
                 config.region = "us-east-2";
@@ -81,7 +81,7 @@ namespace agentsim {
 
         TEST_F(AwsSdkTest, AwsUtilDownload)
         {
-            aics::agentsim::aws_util::Download("trajectory/microtubules15.h5");
+            aics::agentsim::aws_util::Download("trajectory/test.txt");
         }
 
     } // namespace test

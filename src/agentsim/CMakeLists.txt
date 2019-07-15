@@ -9,10 +9,8 @@ set(SOURCES
 "simulation_cache.cpp"
 "simulation.cpp"
 "connection_manager.cpp"
+"cli_client.cpp"
 )
-
-find_library(LAPACK_LIB lapack REQUIRED)
-find_library(BLAS_LIB blas REQUIRED)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

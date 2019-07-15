@@ -1,9 +1,11 @@
 #ifndef AICS_CONNECTION_MANAGER_H
 #define AICS_CONNECTION_MANAGER_H
 
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -41,7 +43,11 @@ namespace agentsim {
     class ConnectionManager {
     public:
         ConnectionManager();
-        void Listen();
+        void ListenAsync();
+        void StartHeartbeatAsync();
+        void StartSimAsync(
+            Simulation& simulation,
+            float& timeStep);
 
         void AddConnection(websocketpp::connection_hdl hd1);
         void RemoveConnection(std::string connectionUID);
@@ -78,6 +84,14 @@ namespace agentsim {
         std::vector<NetMessage>& GetMessages() { return this->m_simThreadMessages; }
         void HandleMessage(NetMessage nm);
 
+        // Enacts web-socket commands in the sim thread
+        // e.g. changing parameters, time-step, starting, stopping, etc.
+        void HandleNetMessages(Simulation& simulation, float& timeStep);
+        void CloseServer();
+
+        const std::atomic<bool>& IsRunning() const { return this->m_isRunning; }
+        void StopRunning() { this->m_isRunning = false; }
+
     private:
         void GenerateLocalUUID(std::string& uuid);
 
@@ -90,7 +104,9 @@ namespace agentsim {
         Json::StreamWriterBuilder m_jsonStreamWriter;
         const std::size_t kLatestFrameValue = std::numeric_limits<std::size_t>::max();
         const std::size_t kMaxMissedHeartBeats = 4;
+        const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
+        const std::size_t kServerTickIntervalMilliSeconds = 200;
 
         bool m_argNoTimeout = false;
 
@@ -104,6 +120,11 @@ namespace agentsim {
         bool m_hasModel = false;
 
         std::vector<NetMessage> m_simThreadMessages;
+        std::thread m_listeningThread;
+        std::thread m_heartbeatThread;
+        std::thread m_simThread;
+
+        std::atomic<bool> m_isRunning;
     };
 
 } // namespace agentsim

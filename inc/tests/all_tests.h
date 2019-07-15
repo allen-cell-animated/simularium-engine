@@ -6,4 +6,6 @@
 
 #include "extpkg/readdy_test.h"
 
+#include "network/client_server_tests.h"
+
 #endif // ALLTESTS_H
