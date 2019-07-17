@@ -47,6 +47,7 @@ namespace agentsim {
             //  otherwise, the cli clients would be noisy for this test
             std::cout.setstate(std::ios_base::failbit);
 
+            std::atomic<bool> isRunning = true;
             float timeStep = 1e-12;
             std::string uri = "ws://localhost:9002";
 
@@ -56,7 +57,7 @@ namespace agentsim {
 
             ConnectionManager connectionManager;
             connectionManager.ListenAsync();
-            connectionManager.StartSimAsync(simulation, timeStep);
+            connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
             CliClient controller(uri);
             controller.Parse("start trajectory actin5-1.h5");
@@ -82,6 +83,7 @@ namespace agentsim {
             }
 
             controller.Parse("quit");
+            isRunning = false;
             connectionManager.CloseServer();
         }
 
@@ -101,7 +103,7 @@ namespace agentsim {
 
             ConnectionManager connectionManager;
             connectionManager.ListenAsync();
-            connectionManager.StartSimAsync(simulation, timeStep);
+            connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
             CliClient controller(uri);
             controller.Parse("start trajectory actin5-1.h5");
