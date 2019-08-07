@@ -257,7 +257,8 @@ void read_h5file(
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
 
-    std::cout << "Loaded topology for " << topologyInfo.size() << " frames" << std::endl;
+    std::cout << "Loaded trajectory for " << results.size() << " frames" << std::endl;
+    std::cout << "Loaded topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
 
     file->close();
 }
