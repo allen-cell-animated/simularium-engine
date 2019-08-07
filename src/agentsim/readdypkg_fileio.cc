@@ -1,6 +1,11 @@
 #include "agentsim/aws/aws_util.h"
+#include <readdy/model/topologies/TopologyRecord.h>
+#include <limits>
 
 struct ParticleData;
+using TrajectoryH5Info = std::vector<std::vector<ParticleData>>;
+using TopologyRecord = readdy::model::top::TopologyRecord;
+using TopologyH5Info = std::tuple<std::vector<readdy::time_step_type>, std::vector<std::vector<TopologyRecord>>>;
 
 inline bool file_exists(const std::string& name)
 {
@@ -17,17 +22,28 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::vector<std::vector<ParticleData>>& results);
+    TrajectoryH5Info& results,
+    TopologyH5Info& topologyInfo
+);
 
 void copy_frame(
     readdy::Simulation* sim,
     std::vector<ParticleData>& particle_data,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
+TopologyH5Info readTopologies(
+    h5rd::Group& group,
+    std::size_t from,
+    std::size_t to,
+    std::size_t stride
+);
+
 namespace aics {
 namespace agentsim {
 
-    std::vector<std::vector<ParticleData>> results;
+    TrajectoryH5Info results;
+    TopologyH5Info topologyInfo;
+
     std::size_t frame_no = 0;
     std::string last_loaded_file = "";
 
@@ -94,7 +110,7 @@ namespace agentsim {
             std::cout << "Loading trajectory file " << file_path << std::endl;
             frame_no = 0;
             results.clear();
-            read_h5file(file_path, results);
+            read_h5file(file_path, results, topologyInfo);
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
@@ -154,7 +170,9 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::vector<std::vector<ParticleData>>& results)
+    std::vector<std::vector<ParticleData>>& results,
+    TopologyH5Info& topologyInfo
+)
 {
     if (!file_exists(file_name)) {
         std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
@@ -200,7 +218,7 @@ void read_h5file(
     std::vector<std::size_t> limits;
     traj.read("limits", limits);
 
-    // time of length T containing the tiem steps of recording the trajectory
+    // time of length T containing the time steps of recording the trajectory
     std::vector<readdy::time_step_type> time;
     traj.read("time", time);
 
@@ -235,6 +253,11 @@ void read_h5file(
                 it->pos.data, it->id, it->typeId, *timeIt);
         }
     }
+
+    auto topGroup = file->getSubgroup("readdy/observables/topologies");
+    topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
+
+    std::cout << "Loaded topology for " << topologyInfo.size() << " frames" << std::endl;
 
     file->close();
 }
@@ -291,4 +314,145 @@ void copy_frame(
 
         agents[i]->SetVisibility(false);
     }
+}
+
+
+TopologyH5Info readTopologies(
+    h5rd::Group& group,
+    std::size_t from,
+    std::size_t to,
+    std::size_t stride
+)
+{
+    readdy::io::BloscFilter bloscFilter;
+    bloscFilter.registerFilter();
+
+    std::size_t nFrames {0};
+    // limits
+    std::vector<std::size_t> limitsParticles;
+    std::vector<std::size_t> limitsEdges;
+    {
+        if (stride > 1) {
+            group.read("limitsParticles", limitsParticles, {stride, 1});
+        } else {
+            group.read("limitsParticles", limitsParticles);
+        }
+        if (stride > 1) {
+            group.read("limitsEdges", limitsEdges, {stride, 1});
+        } else {
+            group.read("limitsEdges", limitsEdges);
+        }
+
+        if(limitsParticles.size() != limitsEdges.size()) {
+            throw std::logic_error(fmt::format("readTopologies: Incompatible limit sizes, "
+                                               "limitsParticles.size={}, limitsEdges.size={}",
+                                               limitsParticles.size(), limitsEdges.size()));
+        }
+
+        nFrames = limitsParticles.size() / 2;
+        from = std::min(nFrames, from);
+        to = std::min(nFrames, to);
+
+        if (from == to) {
+            throw std::invalid_argument(fmt::format("readTopologies: not enough frames to cover range ({}, {}]",
+                    from, to));
+        } else {
+            limitsParticles = std::vector<std::size_t>(limitsParticles.begin() + 2 * from,
+                                                       limitsParticles.begin() + 2 * to);
+            limitsEdges = std::vector<std::size_t>(limitsEdges.begin() + 2 * from,
+                                                   limitsEdges.begin() + 2 * to);
+        }
+    }
+
+    from = std::min(nFrames, from);
+    to = std::min(nFrames, to);
+
+    // time
+    std::vector<readdy::time_step_type> time;
+    if (stride > 1) {
+        group.readSelection("time", time, {from}, {stride}, {to - from});
+    } else {
+        group.readSelection("time", time, {from}, {1}, {to - from});
+    }
+
+    if (limitsParticles.size() % 2 != 0 || limitsEdges.size() % 2 != 0) {
+        throw std::logic_error(fmt::format(
+                "limitsParticles size was {} and limitsEdges size was {}, they should be divisible by 2; from={}, to={}",
+                limitsParticles.size(), limitsEdges.size(), from, to)
+        );
+    }
+    // now check that nFrames(particles) == nFrames(edges) == nFrames(time)...
+    if (to - from != limitsEdges.size() / 2 || (to - from) != time.size()) {
+        throw std::logic_error(fmt::format(
+                "(to-from) should be equal to limitsEdges/2 and equal to the number of time steps in the recording, "
+                "but was: (to-from) = {}, limitsEdges/2 = {}, nTimeSteps={}; from={}, to={}",
+                to - from, limitsEdges.size() / 2, time.size(), from, to
+        ));
+    }
+
+    std::vector<std::vector<readdy::TopologyTypeId>> types;
+    group.readVLENSelection("types", types, {from}, {stride}, {to - from});
+
+    std::vector<std::vector<TopologyRecord>> result;
+
+    std::size_t ix = 0;
+    for (std::size_t frame = from; frame < to; ++frame, ++ix) {
+        result.emplace_back();
+        // this frame's records
+        auto &records = result.back();
+
+        const auto &particlesLimitBegin = limitsParticles.at(2 * ix);
+        const auto &particlesLimitEnd = limitsParticles.at(2 * ix + 1);
+        // since the edges are flattened, we actually have to multiply this by 2
+        const auto &edgesLimitBegin = limitsEdges.at(2 * ix);
+        const auto &edgesLimitEnd = limitsEdges.at(2 * ix + 1);
+
+        std::vector<std::size_t> flatParticles;
+        group.readSelection("particles", flatParticles, {particlesLimitBegin}, {stride}, {particlesLimitEnd - particlesLimitBegin});
+        std::vector<std::size_t> flatEdges;
+        //readdy::log::critical("edges {} - {}", edgesLimitBegin, edgesLimitEnd);
+        group.readSelection("edges", flatEdges, {edgesLimitBegin, 0}, {stride, 1}, {edgesLimitEnd - edgesLimitBegin, 2});
+
+        const auto &currentTypes = types.at(ix);
+        auto typesIt = currentTypes.begin();
+        for (auto particlesIt = flatParticles.begin();
+             particlesIt != flatParticles.end(); ++particlesIt) {
+
+            records.emplace_back();
+            auto nParticles = *particlesIt;
+            for (std::size_t i = 0; i < nParticles; ++i) {
+                ++particlesIt;
+                records.back().particleIndices.push_back(*particlesIt);
+            }
+            records.back().type = *typesIt;
+            ++typesIt;
+        }
+
+        if (currentTypes.size() != records.size()) {
+            throw std::logic_error(fmt::format("for frame {} had {} topology types but {} topologies",
+                                               frame, currentTypes.size(), records.size()));
+        }
+
+        std::size_t recordIx = 0;
+        for (auto edgesIt = flatEdges.begin();
+             edgesIt != flatEdges.end(); ++recordIx) {
+            auto &currentRecord = records.at(recordIx);
+
+            auto nEdges = *edgesIt;
+            edgesIt += 2;
+
+            for (std::size_t i = 0; i < nEdges; ++i) {
+                currentRecord.edges.emplace_back(*edgesIt, *(edgesIt + 1));
+                edgesIt += 2;
+            }
+
+        }
+
+    }
+
+    if(time.size() != result.size()) {
+        throw std::logic_error(fmt::format("readTopologies: size mismatch, time size is {}, result size is {}",
+                                           time.size(), result.size()));
+    }
+    return std::make_tuple(time, result);
 }
