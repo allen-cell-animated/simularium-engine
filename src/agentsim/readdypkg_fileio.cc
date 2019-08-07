@@ -22,7 +22,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    TrajectoryH5Info& results,
+    TrajectoryH5Info& trajectoryInfo,
     TopologyH5Info& topologyInfo
 );
 
@@ -49,7 +49,6 @@ namespace agentsim {
 
     void ResetFileIO()
     {
-        //results.clear();
         frame_no = 0;
         last_loaded_file = "";
     }
@@ -170,7 +169,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::vector<std::vector<ParticleData>>& results,
+    std::vector<std::vector<ParticleData>>& trajectoryInfo,
     TopologyH5Info& topologyInfo
 )
 {
@@ -234,16 +233,16 @@ void read_h5file(
     auto n_frames = limits.size() / 2;
 
     // mapping the read-back data to the ParticleData struct
-    results.clear();
-    results.reserve(n_frames);
+    trajectoryInfo.clear();
+    trajectoryInfo.reserve(n_frames);
 
     auto timeIt = time.begin();
     for (std::size_t frame = 0; frame < limits.size(); frame += 2, ++timeIt) {
         auto begin = limits[frame];
         auto end = limits[frame + 1];
-        results.emplace_back();
+        trajectoryInfo.emplace_back();
 
-        auto& currentFrame = results.back();
+        auto& currentFrame = trajectoryInfo.back();
         currentFrame.reserve(end - begin);
 
         for (auto it = entries.begin() + begin; it != entries.begin() + end; ++it) {
@@ -257,8 +256,8 @@ void read_h5file(
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
 
-    std::cout << "Loaded trajectory for " << results.size() << " frames" << std::endl;
-    std::cout << "Loaded topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
+    std::cout << "Found trajectory for " << trajectoryInfo.size() << " frames" << std::endl;
+    std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
 
     file->close();
 }
