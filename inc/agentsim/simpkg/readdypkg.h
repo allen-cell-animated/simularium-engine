@@ -5,9 +5,9 @@
 #include "readdy/model/observables/io/TrajectoryEntry.h"
 #include "readdy/model/observables/io/Types.h"
 #include "readdy/readdy.h"
-#include <readdy/model/topologies/TopologyRecord.h>
-#include <limits>
 #include <fstream>
+#include <limits>
+#include <readdy/model/topologies/TopologyRecord.h>
 
 #include <string>
 #include <vector>

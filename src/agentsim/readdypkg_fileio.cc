@@ -18,8 +18,7 @@ void run_and_save_h5file(
 void read_h5file(
     std::string file_name,
     TrajectoryH5Info& trajectoryInfo,
-    TimeTopologyH5Info& topologyInfo
-);
+    TimeTopologyH5Info& topologyInfo);
 
 void copy_frame(
     readdy::Simulation* sim,
@@ -28,15 +27,13 @@ void copy_frame(
 
 TrajectoryH5Info readTrajectory(
     std::shared_ptr<h5rd::File>& file,
-    h5rd::Group& group
-);
+    h5rd::Group& group);
 
 TimeTopologyH5Info readTopologies(
     h5rd::Group& group,
     std::size_t from,
     std::size_t to,
-    std::size_t stride
-);
+    std::size_t stride);
 
 namespace aics {
 namespace agentsim {
@@ -178,10 +175,11 @@ void run_and_save_h5file(
 void read_h5file(
     std::string file_name,
     std::vector<std::vector<ParticleData>>& trajectoryInfo,
-    TimeTopologyH5Info& topologyInfo
-)
+    TimeTopologyH5Info& topologyInfo)
 {
-    if(!get_file_path(file_name)) { return; }
+    if (!get_file_path(file_name)) {
+        return;
+    }
 
     // open the output file
     auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
@@ -255,101 +253,99 @@ void copy_frame(
 
 TrajectoryH5Info readTrajectory(
     std::shared_ptr<h5rd::File>& file,
-    h5rd::Group& group
-)
+    h5rd::Group& group)
 {
-        TrajectoryH5Info results;
+    TrajectoryH5Info results;
 
-        // retrieve the h5 particle type info type
-        auto particleInfoH5Type = readdy::model::ioutils::getParticleTypeInfoType(file->ref());
+    // retrieve the h5 particle type info type
+    auto particleInfoH5Type = readdy::model::ioutils::getParticleTypeInfoType(file->ref());
 
-        // get particle types from config
-        std::vector<readdy::model::ioutils::ParticleTypeInfo> types;
-        {
-            auto config = file->getSubgroup("readdy/config");
-            config.read(
-                "particle_types",
-                types,
-                &std::get<0>(particleInfoH5Type),
-                &std::get<1>(particleInfoH5Type));
+    // get particle types from config
+    std::vector<readdy::model::ioutils::ParticleTypeInfo> types;
+    {
+        auto config = file->getSubgroup("readdy/config");
+        config.read(
+            "particle_types",
+            types,
+            &std::get<0>(particleInfoH5Type),
+            &std::get<1>(particleInfoH5Type));
+    }
+    std::unordered_map<std::size_t, std::string> typeMapping;
+    for (const auto& type : types) {
+        typeMapping[type.type_id] = std::string(type.name);
+    }
+
+    // limits of length 2T containing [start_ix, end_ix] for each time step
+    std::vector<std::size_t> limits;
+    group.read("limits", limits);
+
+    // time of length T containing the time steps of recording the trajectory
+    std::vector<readdy::time_step_type> time;
+    group.read("time", time);
+
+    // records containing all particles for all times, slicing according to limits
+    // yield particles for a particular time step
+    std::vector<readdy::model::observables::TrajectoryEntry> entries;
+    auto trajectoryEntryTypes = readdy::model::observables::util::getTrajectoryEntryTypes(file->ref());
+    group.read(
+        "records", entries,
+        &std::get<0>(trajectoryEntryTypes),
+        &std::get<1>(trajectoryEntryTypes));
+
+    auto n_frames = limits.size() / 2;
+
+    // mapping the read-back data to the ParticleData struct
+    results.reserve(n_frames);
+
+    auto timeIt = time.begin();
+    for (std::size_t frame = 0; frame < limits.size(); frame += 2, ++timeIt) {
+        auto begin = limits[frame];
+        auto end = limits[frame + 1];
+        results.emplace_back();
+
+        auto& currentFrame = results.back();
+        currentFrame.reserve(end - begin);
+
+        for (auto it = entries.begin() + begin; it != entries.begin() + end; ++it) {
+            currentFrame.emplace_back(
+                typeMapping[it->typeId],
+                readdy::model::particleflavor::particleFlavorToString(it->flavor),
+                it->pos.data, it->id, it->typeId, *timeIt);
         }
-        std::unordered_map<std::size_t, std::string> typeMapping;
-        for (const auto& type : types) {
-            typeMapping[type.type_id] = std::string(type.name);
-        }
+    }
 
-        // limits of length 2T containing [start_ix, end_ix] for each time step
-        std::vector<std::size_t> limits;
-        group.read("limits", limits);
-
-        // time of length T containing the time steps of recording the trajectory
-        std::vector<readdy::time_step_type> time;
-        group.read("time", time);
-
-        // records containing all particles for all times, slicing according to limits
-        // yield particles for a particular time step
-        std::vector<readdy::model::observables::TrajectoryEntry> entries;
-        auto trajectoryEntryTypes = readdy::model::observables::util::getTrajectoryEntryTypes(file->ref());
-        group.read(
-            "records", entries,
-            &std::get<0>(trajectoryEntryTypes),
-            &std::get<1>(trajectoryEntryTypes));
-
-        auto n_frames = limits.size() / 2;
-
-        // mapping the read-back data to the ParticleData struct
-        results.reserve(n_frames);
-
-        auto timeIt = time.begin();
-        for (std::size_t frame = 0; frame < limits.size(); frame += 2, ++timeIt) {
-            auto begin = limits[frame];
-            auto end = limits[frame + 1];
-            results.emplace_back();
-
-            auto& currentFrame = results.back();
-            currentFrame.reserve(end - begin);
-
-            for (auto it = entries.begin() + begin; it != entries.begin() + end; ++it) {
-                currentFrame.emplace_back(
-                    typeMapping[it->typeId],
-                    readdy::model::particleflavor::particleFlavorToString(it->flavor),
-                    it->pos.data, it->id, it->typeId, *timeIt);
-            }
-        }
-
-        return results;
+    return results;
 }
 
 TimeTopologyH5Info readTopologies(
     h5rd::Group& group,
     std::size_t from,
     std::size_t to,
-    std::size_t stride
-)
+    std::size_t stride)
 {
     readdy::io::BloscFilter bloscFilter;
     bloscFilter.registerFilter();
 
-    std::size_t nFrames {0};
+    std::size_t nFrames { 0 };
     // limits
     std::vector<std::size_t> limitsParticles;
     std::vector<std::size_t> limitsEdges;
     {
         if (stride > 1) {
-            group.read("limitsParticles", limitsParticles, {stride, 1});
+            group.read("limitsParticles", limitsParticles, { stride, 1 });
         } else {
             group.read("limitsParticles", limitsParticles);
         }
         if (stride > 1) {
-            group.read("limitsEdges", limitsEdges, {stride, 1});
+            group.read("limitsEdges", limitsEdges, { stride, 1 });
         } else {
             group.read("limitsEdges", limitsEdges);
         }
 
-        if(limitsParticles.size() != limitsEdges.size()) {
+        if (limitsParticles.size() != limitsEdges.size()) {
             throw std::logic_error(fmt::format("readTopologies: Incompatible limit sizes, "
                                                "limitsParticles.size={}, limitsEdges.size={}",
-                                               limitsParticles.size(), limitsEdges.size()));
+                limitsParticles.size(), limitsEdges.size()));
         }
 
         nFrames = limitsParticles.size() / 2;
@@ -358,12 +354,12 @@ TimeTopologyH5Info readTopologies(
 
         if (from == to) {
             throw std::invalid_argument(fmt::format("readTopologies: not enough frames to cover range ({}, {}]",
-                    from, to));
+                from, to));
         } else {
             limitsParticles = std::vector<std::size_t>(limitsParticles.begin() + 2 * from,
-                                                       limitsParticles.begin() + 2 * to);
+                limitsParticles.begin() + 2 * to);
             limitsEdges = std::vector<std::size_t>(limitsEdges.begin() + 2 * from,
-                                                   limitsEdges.begin() + 2 * to);
+                limitsEdges.begin() + 2 * to);
         }
     }
 
@@ -373,28 +369,26 @@ TimeTopologyH5Info readTopologies(
     // time
     std::vector<readdy::time_step_type> time;
     if (stride > 1) {
-        group.readSelection("time", time, {from}, {stride}, {to - from});
+        group.readSelection("time", time, { from }, { stride }, { to - from });
     } else {
-        group.readSelection("time", time, {from}, {1}, {to - from});
+        group.readSelection("time", time, { from }, { 1 }, { to - from });
     }
 
     if (limitsParticles.size() % 2 != 0 || limitsEdges.size() % 2 != 0) {
         throw std::logic_error(fmt::format(
-                "limitsParticles size was {} and limitsEdges size was {}, they should be divisible by 2; from={}, to={}",
-                limitsParticles.size(), limitsEdges.size(), from, to)
-        );
+            "limitsParticles size was {} and limitsEdges size was {}, they should be divisible by 2; from={}, to={}",
+            limitsParticles.size(), limitsEdges.size(), from, to));
     }
     // now check that nFrames(particles) == nFrames(edges) == nFrames(time)...
     if (to - from != limitsEdges.size() / 2 || (to - from) != time.size()) {
         throw std::logic_error(fmt::format(
-                "(to-from) should be equal to limitsEdges/2 and equal to the number of time steps in the recording, "
-                "but was: (to-from) = {}, limitsEdges/2 = {}, nTimeSteps={}; from={}, to={}",
-                to - from, limitsEdges.size() / 2, time.size(), from, to
-        ));
+            "(to-from) should be equal to limitsEdges/2 and equal to the number of time steps in the recording, "
+            "but was: (to-from) = {}, limitsEdges/2 = {}, nTimeSteps={}; from={}, to={}",
+            to - from, limitsEdges.size() / 2, time.size(), from, to));
     }
 
     std::vector<std::vector<readdy::TopologyTypeId>> types;
-    group.readVLENSelection("types", types, {from}, {stride}, {to - from});
+    group.readVLENSelection("types", types, { from }, { stride }, { to - from });
 
     std::vector<std::vector<TopologyRecord>> result;
 
@@ -402,21 +396,21 @@ TimeTopologyH5Info readTopologies(
     for (std::size_t frame = from; frame < to; ++frame, ++ix) {
         result.emplace_back();
         // this frame's records
-        auto &records = result.back();
+        auto& records = result.back();
 
-        const auto &particlesLimitBegin = limitsParticles.at(2 * ix);
-        const auto &particlesLimitEnd = limitsParticles.at(2 * ix + 1);
+        const auto& particlesLimitBegin = limitsParticles.at(2 * ix);
+        const auto& particlesLimitEnd = limitsParticles.at(2 * ix + 1);
         // since the edges are flattened, we actually have to multiply this by 2
-        const auto &edgesLimitBegin = limitsEdges.at(2 * ix);
-        const auto &edgesLimitEnd = limitsEdges.at(2 * ix + 1);
+        const auto& edgesLimitBegin = limitsEdges.at(2 * ix);
+        const auto& edgesLimitEnd = limitsEdges.at(2 * ix + 1);
 
         std::vector<std::size_t> flatParticles;
-        group.readSelection("particles", flatParticles, {particlesLimitBegin}, {stride}, {particlesLimitEnd - particlesLimitBegin});
+        group.readSelection("particles", flatParticles, { particlesLimitBegin }, { stride }, { particlesLimitEnd - particlesLimitBegin });
         std::vector<std::size_t> flatEdges;
         //readdy::log::critical("edges {} - {}", edgesLimitBegin, edgesLimitEnd);
-        group.readSelection("edges", flatEdges, {edgesLimitBegin, 0}, {stride, 1}, {edgesLimitEnd - edgesLimitBegin, 2});
+        group.readSelection("edges", flatEdges, { edgesLimitBegin, 0 }, { stride, 1 }, { edgesLimitEnd - edgesLimitBegin, 2 });
 
-        const auto &currentTypes = types.at(ix);
+        const auto& currentTypes = types.at(ix);
         auto typesIt = currentTypes.begin();
         for (auto particlesIt = flatParticles.begin();
              particlesIt != flatParticles.end(); ++particlesIt) {
@@ -433,13 +427,13 @@ TimeTopologyH5Info readTopologies(
 
         if (currentTypes.size() != records.size()) {
             throw std::logic_error(fmt::format("for frame {} had {} topology types but {} topologies",
-                                               frame, currentTypes.size(), records.size()));
+                frame, currentTypes.size(), records.size()));
         }
 
         std::size_t recordIx = 0;
         for (auto edgesIt = flatEdges.begin();
              edgesIt != flatEdges.end(); ++recordIx) {
-            auto &currentRecord = records.at(recordIx);
+            auto& currentRecord = records.at(recordIx);
 
             auto nEdges = *edgesIt;
             edgesIt += 2;
@@ -448,14 +442,12 @@ TimeTopologyH5Info readTopologies(
                 currentRecord.edges.emplace_back(*edgesIt, *(edgesIt + 1));
                 edgesIt += 2;
             }
-
         }
-
     }
 
-    if(time.size() != result.size()) {
+    if (time.size() != result.size()) {
         throw std::logic_error(fmt::format("readTopologies: size mismatch, time size is {}, result size is {}",
-                                           time.size(), result.size()));
+            time.size(), result.size()));
     }
     return std::make_tuple(time, result);
 }
