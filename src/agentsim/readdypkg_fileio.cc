@@ -1,17 +1,12 @@
 #include "agentsim/aws/aws_util.h"
-#include <readdy/model/topologies/TopologyRecord.h>
-#include <limits>
-
-struct ParticleData;
-using TrajectoryH5Info = std::vector<std::vector<ParticleData>>;
-using TopologyRecord = readdy::model::top::TopologyRecord;
-using TopologyH5Info = std::tuple<std::vector<readdy::time_step_type>, std::vector<std::vector<TopologyRecord>>>;
 
 inline bool file_exists(const std::string& name)
 {
     struct stat buffer;
     return (stat(name.c_str(), &buffer) == 0);
 }
+
+bool get_file_path(std::string& name);
 
 void run_and_save_h5file(
     readdy::Simulation* sim,
@@ -23,7 +18,7 @@ void run_and_save_h5file(
 void read_h5file(
     std::string file_name,
     TrajectoryH5Info& trajectoryInfo,
-    TopologyH5Info& topologyInfo
+    TimeTopologyH5Info& topologyInfo
 );
 
 void copy_frame(
@@ -31,7 +26,12 @@ void copy_frame(
     std::vector<ParticleData>& particle_data,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
-TopologyH5Info readTopologies(
+TrajectoryH5Info readTrajectory(
+    std::shared_ptr<h5rd::File>& file,
+    h5rd::Group& group
+);
+
+TimeTopologyH5Info readTopologies(
     h5rd::Group& group,
     std::size_t from,
     std::size_t to,
@@ -40,9 +40,6 @@ TopologyH5Info readTopologies(
 
 namespace aics {
 namespace agentsim {
-
-    TrajectoryH5Info results;
-    TopologyH5Info topologyInfo;
 
     std::size_t frame_no = 0;
     std::string last_loaded_file = "";
@@ -73,10 +70,10 @@ namespace agentsim {
             this->LoadTrajectoryFile("/tmp/test.h5");
         }
 
-        if (frame_no >= results.size()) {
+        if (frame_no >= this->m_trajectoryInfo.size()) {
             this->m_hasFinishedStreaming = true;
         } else {
-            copy_frame(this->m_simulation, results[frame_no], agents);
+            copy_frame(this->m_simulation, this->m_trajectoryInfo[frame_no], agents);
             frame_no++;
         }
     }
@@ -108,12 +105,22 @@ namespace agentsim {
         if (!this->m_hasLoadedRunFile) {
             std::cout << "Loading trajectory file " << file_path << std::endl;
             frame_no = 0;
-            results.clear();
-            read_h5file(file_path, results, topologyInfo);
+            this->m_trajectoryInfo.clear();
+            read_h5file(file_path, this->m_trajectoryInfo, this->m_topologyInfo);
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
         }
+    }
+
+    TopologyH5List& ReaDDyPkg::GetFileTopologies(std::size_t frameNumber)
+    {
+        return std::get<1>(this->m_topologyInfo).at(frameNumber);
+    }
+
+    ParticleH5List& ReaDDyPkg::GetFileParticles(std::size_t frameNumber)
+    {
+        return this->m_trajectoryInfo.at(frameNumber);
     }
 
 } // namespace agentsim
@@ -122,25 +129,26 @@ namespace agentsim {
 /**
 *	File IO Functions
 **/
-struct ParticleData {
-    ParticleData(std::string type, std::string flavor, const std::array<readdy::scalar, 3>& pos,
-        readdy::model::Particle::id_type id, std::size_t type_id, readdy::time_step_type t)
-        : type(std::move(type))
-        , flavor(std::move(flavor))
-        , position(pos)
-        , id(id)
-        , type_id(type_id)
-        , t(t)
-    {
+bool get_file_path(std::string& file_name)
+{
+    if (!file_exists(file_name)) {
+        std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
+        if (!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size()))) {
+            std::cout << file_name << " not found on AWS S3" << std::endl;
+            return false;
+        }
     }
 
-    std::string type;
-    std::string flavor;
-    std::array<readdy::scalar, 3> position;
-    readdy::model::Particle::id_type id;
-    std::size_t type_id;
-    readdy::time_step_type t;
-};
+    if (file_exists("/" + file_name)) {
+        file_name = "/" + file_name;
+        std::cout << "file name modified to " << file_name << std::endl;
+    } else if (file_exists("./" + file_name)) {
+        file_name = "./" + file_name;
+        std::cout << "file name modified to " << file_name << std::endl;
+    }
+
+    return true;
+}
 
 void run_and_save_h5file(
     readdy::Simulation* sim,
@@ -170,88 +178,17 @@ void run_and_save_h5file(
 void read_h5file(
     std::string file_name,
     std::vector<std::vector<ParticleData>>& trajectoryInfo,
-    TopologyH5Info& topologyInfo
+    TimeTopologyH5Info& topologyInfo
 )
 {
-    if (!file_exists(file_name)) {
-        std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
-        if (!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size()))) {
-            std::cout << file_name << " not found on AWS S3" << std::endl;
-            return;
-        }
-    }
-
-    if (file_exists("/" + file_name)) {
-        file_name = "/" + file_name;
-        std::cout << "file name modified to " << file_name << std::endl;
-    } else if (file_exists("./" + file_name)) {
-        file_name = "./" + file_name;
-        std::cout << "file name modified to " << file_name << std::endl;
-    }
+    if(!get_file_path(file_name)) { return; }
 
     // open the output file
     auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
 
-    // retrieve the h5 particle type info type
-    auto particleInfoH5Type = readdy::model::ioutils::getParticleTypeInfoType(file->ref());
-
-    // get particle types from config
-    std::vector<readdy::model::ioutils::ParticleTypeInfo> types;
-    {
-        auto config = file->getSubgroup("readdy/config");
-        config.read(
-            "particle_types",
-            types,
-            &std::get<0>(particleInfoH5Type),
-            &std::get<1>(particleInfoH5Type));
-    }
-    std::unordered_map<std::size_t, std::string> typeMapping;
-    for (const auto& type : types) {
-        typeMapping[type.type_id] = std::string(type.name);
-    }
-
     // read back trajectory
     auto traj = file->getSubgroup("readdy/trajectory");
-
-    // limits of length 2T containing [start_ix, end_ix] for each time step
-    std::vector<std::size_t> limits;
-    traj.read("limits", limits);
-
-    // time of length T containing the time steps of recording the trajectory
-    std::vector<readdy::time_step_type> time;
-    traj.read("time", time);
-
-    // records containing all particles for all times, slicing according to limits
-    // yield particles for a particular time step
-    std::vector<readdy::model::observables::TrajectoryEntry> entries;
-    auto trajectoryEntryTypes = readdy::model::observables::util::getTrajectoryEntryTypes(file->ref());
-    traj.read(
-        "records", entries,
-        &std::get<0>(trajectoryEntryTypes),
-        &std::get<1>(trajectoryEntryTypes));
-
-    auto n_frames = limits.size() / 2;
-
-    // mapping the read-back data to the ParticleData struct
-    trajectoryInfo.clear();
-    trajectoryInfo.reserve(n_frames);
-
-    auto timeIt = time.begin();
-    for (std::size_t frame = 0; frame < limits.size(); frame += 2, ++timeIt) {
-        auto begin = limits[frame];
-        auto end = limits[frame + 1];
-        trajectoryInfo.emplace_back();
-
-        auto& currentFrame = trajectoryInfo.back();
-        currentFrame.reserve(end - begin);
-
-        for (auto it = entries.begin() + begin; it != entries.begin() + end; ++it) {
-            currentFrame.emplace_back(
-                typeMapping[it->typeId],
-                readdy::model::particleflavor::particleFlavorToString(it->flavor),
-                it->pos.data, it->id, it->typeId, *timeIt);
-        }
-    }
+    trajectoryInfo = readTrajectory(file, traj);
 
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
@@ -316,8 +253,74 @@ void copy_frame(
     }
 }
 
+TrajectoryH5Info readTrajectory(
+    std::shared_ptr<h5rd::File>& file,
+    h5rd::Group& group
+)
+{
+        TrajectoryH5Info results;
 
-TopologyH5Info readTopologies(
+        // retrieve the h5 particle type info type
+        auto particleInfoH5Type = readdy::model::ioutils::getParticleTypeInfoType(file->ref());
+
+        // get particle types from config
+        std::vector<readdy::model::ioutils::ParticleTypeInfo> types;
+        {
+            auto config = file->getSubgroup("readdy/config");
+            config.read(
+                "particle_types",
+                types,
+                &std::get<0>(particleInfoH5Type),
+                &std::get<1>(particleInfoH5Type));
+        }
+        std::unordered_map<std::size_t, std::string> typeMapping;
+        for (const auto& type : types) {
+            typeMapping[type.type_id] = std::string(type.name);
+        }
+
+        // limits of length 2T containing [start_ix, end_ix] for each time step
+        std::vector<std::size_t> limits;
+        group.read("limits", limits);
+
+        // time of length T containing the time steps of recording the trajectory
+        std::vector<readdy::time_step_type> time;
+        group.read("time", time);
+
+        // records containing all particles for all times, slicing according to limits
+        // yield particles for a particular time step
+        std::vector<readdy::model::observables::TrajectoryEntry> entries;
+        auto trajectoryEntryTypes = readdy::model::observables::util::getTrajectoryEntryTypes(file->ref());
+        group.read(
+            "records", entries,
+            &std::get<0>(trajectoryEntryTypes),
+            &std::get<1>(trajectoryEntryTypes));
+
+        auto n_frames = limits.size() / 2;
+
+        // mapping the read-back data to the ParticleData struct
+        results.reserve(n_frames);
+
+        auto timeIt = time.begin();
+        for (std::size_t frame = 0; frame < limits.size(); frame += 2, ++timeIt) {
+            auto begin = limits[frame];
+            auto end = limits[frame + 1];
+            results.emplace_back();
+
+            auto& currentFrame = results.back();
+            currentFrame.reserve(end - begin);
+
+            for (auto it = entries.begin() + begin; it != entries.begin() + end; ++it) {
+                currentFrame.emplace_back(
+                    typeMapping[it->typeId],
+                    readdy::model::particleflavor::particleFlavorToString(it->flavor),
+                    it->pos.data, it->id, it->typeId, *timeIt);
+            }
+        }
+
+        return results;
+}
+
+TimeTopologyH5Info readTopologies(
     h5rd::Group& group,
     std::size_t from,
     std::size_t to,
