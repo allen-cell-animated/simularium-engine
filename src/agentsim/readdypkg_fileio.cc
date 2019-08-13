@@ -128,6 +128,7 @@ namespace agentsim {
 **/
 bool get_file_path(std::string& file_name)
 {
+    // Download the file from AWS if it is not present locally
     if (!file_exists(file_name)) {
         std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
         if (!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size()))) {
@@ -136,6 +137,8 @@ bool get_file_path(std::string& file_name)
         }
     }
 
+    // Modifies the file-path  to a format that H5rd can reliably load
+    // H5rd is a library written by the ReaDDy developers to load H5 files
     if (file_exists("/" + file_name)) {
         file_name = "/" + file_name;
         std::cout << "file name modified to " << file_name << std::endl;
