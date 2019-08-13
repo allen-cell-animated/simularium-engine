@@ -22,7 +22,7 @@ void read_h5file(
 
 void copy_frame(
     readdy::Simulation* sim,
-    std::vector<ParticleData>& particle_data,
+    const std::vector<ParticleData>& particle_data,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
 TrajectoryH5Info readTrajectory(
@@ -199,7 +199,7 @@ void read_h5file(
 
 void copy_frame(
     readdy::Simulation* sim,
-    std::vector<ParticleData>& particle_data,
+    const std::vector<ParticleData>& particle_data,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents)
 {
     std::size_t agent_index = 0;
