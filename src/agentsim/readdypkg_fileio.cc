@@ -26,7 +26,7 @@ void copy_frame(
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
 TrajectoryH5Info readTrajectory(
-    std::shared_ptr<h5rd::File>& file,
+    const std::shared_ptr<h5rd::File>& file,
     h5rd::Group& group);
 
 TimeTopologyH5Info readTopologies(
@@ -252,7 +252,7 @@ void copy_frame(
 }
 
 TrajectoryH5Info readTrajectory(
-    std::shared_ptr<h5rd::File>& file,
+    const std::shared_ptr<h5rd::File>& file,
     h5rd::Group& group)
 {
     TrajectoryH5Info results;
