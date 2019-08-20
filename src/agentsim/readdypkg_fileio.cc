@@ -621,10 +621,8 @@ void calculateOrientations(
             << " topology & trajectory have different number of frames" << std::endl;
     }
 
-
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
-    RotationH5List initialRotations;
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
@@ -667,15 +665,6 @@ void calculateOrientations(
                 rotation[2] = (rand() % 8) * 45;
 
                 rotationFrame.push_back(rotation);
-            }
-
-            if(frameIndex == 0)
-            {
-                initialRotations.push_back(rotationFrame.back());
-            }
-            else
-            {
-                rotationFrame.back() = rotationFrame.back() - initialRotations[particleIndex];
             }
         }
     }
