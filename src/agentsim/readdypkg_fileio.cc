@@ -116,6 +116,48 @@ namespace agentsim {
         return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
     }
 
+    std::size_t ReaDDyPkg::GetFrameCount()
+    {
+        return this->m_trajectoryInfo.size();
+    }
+
+    std::vector<std::size_t> ReaDDyPkg::GetNeighbors(
+        std::size_t particleId,
+        std::size_t frameNumber
+    )
+    {
+        std::vector<std::size_t> neighbors;
+        bool done = false;
+
+        auto& topologies = this->GetFileTopologies(frameNumber);
+        std::size_t topologyCount = topologies.size();
+
+        for(std::size_t topologyIndex = 0; topologyIndex < topologyCount; ++topologyCount)
+        {
+            auto topology = topologies.at(topologyIndex);
+            for(std::size_t edgeIndex = 0; edgeIndex < topology.edges.size(); ++edgeIndex)
+            {
+                auto edge = topology.edges[edgeIndex];
+                auto p1 = std::get<0>(edge);
+                auto p2 = std::get<1>(edge);
+
+                if(p1 == particleId) {
+                    neighbors.push_back(p2);
+                }
+                else if (p2 == particleId) {
+                    neighbors.push_back(p1);
+                }
+            }
+
+            if(done)
+            {
+                break;
+            }
+        }
+
+        return neighbors;
+    }
+
 } // namespace agentsim
 } // namespace aics
 
