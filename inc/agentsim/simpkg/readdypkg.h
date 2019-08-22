@@ -50,6 +50,9 @@ using ParticleH5List = std::vector<ParticleData>;
 using TrajectoryH5Info = std::vector<ParticleH5List>;
 using TimeTrajectoryH5Info = std::tuple<TimestepH5List, TrajectoryH5Info>;
 
+using RotationH5List = std::vector<Eigen::Vector3d>;
+using RotationH5Info = std::vector<RotationH5List>;
+
 using TopologyRecord = readdy::model::top::TopologyRecord;
 using TopologyH5List = std::vector<TopologyRecord>;
 using TopologyH5Info = std::vector<TopologyH5List>;
@@ -106,6 +109,9 @@ namespace agentsim {
         // Used to store FileIO data
         TimeTrajectoryH5Info m_trajectoryInfo;
         TimeTopologyH5Info m_topologyInfo;
+
+        // stored seperatley because these are calculated, not native to ReaDDy
+        RotationH5Info m_rotationInfo;
     };
 
 } // namespace agentsim

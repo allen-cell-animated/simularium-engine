@@ -18,11 +18,14 @@ void run_and_save_h5file(
 void read_h5file(
     std::string file_name,
     TimeTrajectoryH5Info& trajectoryInfo,
-    TimeTopologyH5Info& topologyInfo);
+    TimeTopologyH5Info& topologyInfo,
+    RotationH5Info& rotationInfo);
+>>>>>>> scaffolding for passing orientation
 
 void copy_frame(
     readdy::Simulation* sim,
     const std::vector<ParticleData>& particle_data,
+    RotationH5List& rotationInfo,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
 TimeTrajectoryH5Info readTrajectory(
@@ -34,6 +37,12 @@ TimeTopologyH5Info readTopologies(
     std::size_t from,
     std::size_t to,
     std::size_t stride);
+
+void calculateOrientations(
+    const TopologyH5Info& topologyH5Info,
+    const TrajectoryH5Info& trajectoryH5Info,
+    RotationH5Info& rotationInfo
+);
 
 namespace aics {
 namespace agentsim {
@@ -72,7 +81,13 @@ namespace agentsim {
         if (frame_no >= trajectoryInfo.size()) {
             this->m_hasFinishedStreaming = true;
         } else {
-            copy_frame(this->m_simulation, trajectoryInfo[frame_no], agents);
+
+            copy_frame(
+                this->m_simulation,
+                std::get<1>(this->m_trajectoryInfo).at(frame_no),
+                this->m_rotationInfo[frame_no],
+                agents);
+
             frame_no++;
         }
     }
@@ -104,7 +119,12 @@ namespace agentsim {
         if (!this->m_hasLoadedRunFile) {
             std::cout << "Loading trajectory file " << file_path << std::endl;
             frame_no = 0;
-            read_h5file(file_path, this->m_trajectoryInfo, this->m_topologyInfo);
+
+            read_h5file(file_path,
+                this->m_trajectoryInfo,
+                this->m_topologyInfo,
+                this->m_rotationInfo);
+
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
@@ -123,13 +143,12 @@ namespace agentsim {
 
     std::vector<std::size_t> ReaDDyPkg::GetNeighbors(
         std::size_t particleId,
-        std::size_t frameNumber
+        TopologyH5List& topologies
     )
     {
         std::vector<std::size_t> neighbors;
         bool done = false;
 
-        auto& topologies = this->GetFileTopologies(frameNumber);
         std::size_t topologyCount = topologies.size();
 
         for(std::size_t topologyIndex = 0; topologyIndex < topologyCount; ++topologyCount)
@@ -216,7 +235,9 @@ void run_and_save_h5file(
 void read_h5file(
     std::string file_name,
     TimeTrajectoryH5Info& trajectoryInfo,
-    TimeTopologyH5Info& topologyInfo)
+    TimeTopologyH5Info& topologyInfo,
+    RotationH5Info& rotationInfo
+)
 {
     if (!get_file_path(file_name)) {
         return;
@@ -231,6 +252,7 @@ void read_h5file(
 
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
+    calculateOrientations(std::get<1>(topologyInfo), trajectoryInfo, rotationInfo);
 
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
     std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
@@ -241,16 +263,20 @@ void read_h5file(
 void copy_frame(
     readdy::Simulation* sim,
     const std::vector<ParticleData>& particle_data,
+    RotationH5List& rotationInfo,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents)
 {
     std::size_t agent_index = 0;
     std::size_t ignore_count = 0;
     std::size_t bad_topology_count = 0;
     std::size_t good_topology_count = 0;
+    std::size_t particleCount = particle_data.size();
+    bool useRotation = particle_data.size() == rotationInfo.size();
 
     auto& particles = sim->context().particleTypes();
 
-    for (auto& p : particle_data) {
+    for (std::size_t particleIndex = 0; particleIndex < particleCount; ++particleIndex) {
+        auto& p = particle_data.at(particleIndex);
         auto pos = p.position;
 
         // check if this particle has a valid readdy location
@@ -277,6 +303,9 @@ void copy_frame(
         // copy the position of the particle to an AgentViz agent
         auto currentAgent = agents[agent_index].get();
         currentAgent->SetLocation(Eigen::Vector3d(pos[0], pos[1], pos[2]));
+        if(useRotation) {
+            currentAgent->SetRotation(rotationInfo[particleIndex]);
+        }
         currentAgent->SetTypeID(p.type_id);
         currentAgent->SetName(p.type);
         currentAgent->SetVisibility(true);
@@ -491,4 +520,41 @@ TimeTopologyH5Info readTopologies(
             time.size(), result.size()));
     }
     return std::make_tuple(time, result);
+}
+
+void calculateOrientations(
+    const TopologyH5Info& topologyH5Info,
+    const TrajectoryH5Info& trajectoryH5Info,
+    RotationH5Info& outRotations
+)
+{
+    if(topologyH5Info.size() != trajectoryH5Info.size())
+    {
+        std::cout << "Orientation calculation failed,"
+            << " topology & trajectory have different number of frames" << std::endl;
+    }
+
+
+    auto numberOfFrames = topologyH5Info.size();
+    outRotations.resize(numberOfFrames);
+
+    for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
+    {
+        auto trajectoryFrame = trajectoryH5Info.at(frameIndex);
+        auto topologyFrame = trajectoryH5Info.at(frameIndex);
+        auto& rotationFrame = outRotations.at(frameIndex);
+
+        for(
+            std::size_t particleIndex = 0;
+            particleIndex < trajectoryFrame.size();
+            ++particleIndex)
+        {
+            Eigen::Vector3d rotation;
+            rotation[0] = (rand() % 8) * 45;
+            rotation[1] = (rand() % 8) * 45;
+            rotation[2] = (rand() % 8) * 45;
+
+            rotationFrame.push_back(rotation);
+        }
+    }
 }
