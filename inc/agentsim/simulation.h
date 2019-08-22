@@ -158,6 +158,8 @@ namespace agentsim {
 
         bool IsRunningLive();
 
+        double GetTime(std::size_t frameNumber);
+
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;

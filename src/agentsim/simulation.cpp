@@ -261,5 +261,15 @@ namespace agentsim {
         }
     }
 
+    double Simulation::GetTime(std::size_t frameNumber)
+    {
+        if(this->m_SimPkgs.size() > 0)
+        {
+            return this->m_SimPkgs[0]->GetTime(frameNumber);
+        }
+
+        return 0.0;
+    }
+
 } // namespace agentsim
 } // namespace aics

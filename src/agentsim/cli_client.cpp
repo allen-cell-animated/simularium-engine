@@ -14,8 +14,42 @@ inline bool file_exists(const std::string& name)
     return (stat(name.c_str(), &buffer) == 0);
 }
 
+
 namespace aics {
 namespace agentsim {
+    void printAgentData(const Json::Value& jsonMsg)
+    {
+        const Json::Value& data = jsonMsg["data"];
+        std::size_t frameNumber = jsonMsg["frame_number"].asInt();
+        float time = jsonMsg["time"].asFloat();
+
+        Json::ArrayIndex size = data.size();
+        std::size_t agentCount = 0;
+        Json::ArrayIndex i = 0;
+        std::cout << std::endl << "Frame " << frameNumber << " [" << time << "]:" << std::endl;
+
+        while(i < size)
+        {
+            std::cout << "Agent " << agentCount++ << ": "
+            << "vis-type: " << data[i++].asFloat() << " | "
+            << "type: " << data[i++].asFloat() << " | "
+            << "pos: ["
+                << data[i++].asFloat() << ", "
+                << data[i++].asFloat() << ", "
+                << data[i++].asFloat() <<"]"
+                << " | "
+            << "rot: ["
+                << data[i++].asFloat() << ", "
+                << data[i++].asFloat() << ", "
+                << data[i++].asFloat() <<"]"
+                << " | "
+            << "col-radius: " << data[i++].asFloat()
+            << std::endl;
+
+            Json::ArrayIndex nSubPoints = data[i++].asInt();
+            i += nSubPoints; // don't care right now
+        }
+    }
 
     CliClient::CliClient(std::string uri)
     {
@@ -272,6 +306,9 @@ namespace agentsim {
         case WebRequestTypes::id_heartbeat_ping: {
             jsonMsg["msg_type"] = WebRequestTypes::id_heartbeat_pong;
             this->SendMessage(jsonMsg, "heartbeat ping");
+        } break;
+        case WebRequestTypes::id_vis_data_arrive: {
+            printAgentData(jsonMsg);
         } break;
         default: {
         } break;
