@@ -1,4 +1,5 @@
 #include "agentsim/aws/aws_util.h"
+#include "agentsim/util/math_util.h"
 
 inline bool file_exists(const std::string& name)
 {
@@ -19,8 +20,14 @@ void read_h5file(
     std::string file_name,
     TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo,
+<<<<<<< HEAD
     RotationH5Info& rotationInfo);
 >>>>>>> scaffolding for passing orientation
+=======
+    RotationH5Info& rotationInfo,
+    IdParticleMapping& particleLookup
+);
+>>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
 
 void copy_frame(
     readdy::Simulation* sim,
@@ -30,7 +37,9 @@ void copy_frame(
 
 TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
-    h5rd::Group& group);
+    h5rd::Group& group,
+    IdParticleMapping& particleLookup
+);
 
 TimeTopologyH5Info readTopologies(
     h5rd::Group& group,
@@ -38,10 +47,16 @@ TimeTopologyH5Info readTopologies(
     std::size_t to,
     std::size_t stride);
 
+std::vector<std::size_t> getNeighbors(
+    std::size_t particleId,
+    TopologyH5List& topologies
+);
+
 void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    RotationH5Info& rotationInfo
+    RotationH5Info& rotationInfo,
+    IdParticleMapping& particleLookup
 );
 
 namespace aics {
@@ -49,6 +64,7 @@ namespace agentsim {
 
     std::size_t frame_no = 0;
     std::string last_loaded_file = "";
+    IdParticleMapping ID_PARTICLE_CACHE;
 
     void ResetFileIO()
     {
@@ -123,14 +139,21 @@ namespace agentsim {
             read_h5file(file_path,
                 this->m_trajectoryInfo,
                 this->m_topologyInfo,
+<<<<<<< HEAD
                 this->m_rotationInfo);
 
+=======
+                this->m_rotationInfo,
+                ID_PARTICLE_CACHE
+            );
+>>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
         }
     }
 
+<<<<<<< HEAD
     double ReaDDyPkg::GetTime(std::size_t frameNumber)
     {
         return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
@@ -177,6 +200,8 @@ namespace agentsim {
         return neighbors;
     }
 
+=======
+>>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
 } // namespace agentsim
 } // namespace aics
 
@@ -236,8 +261,14 @@ void read_h5file(
     std::string file_name,
     TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo,
+<<<<<<< HEAD
     RotationH5Info& rotationInfo
 )
+=======
+    RotationH5Info& rotationInfo,
+    IdParticleMapping& particleLookup
+    )
+>>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
 {
     if (!get_file_path(file_name)) {
         return;
@@ -248,11 +279,17 @@ void read_h5file(
 
     // read back trajectory
     auto traj = file->getSubgroup("readdy/trajectory");
-    trajectoryInfo = readTrajectory(file, traj);
+    trajectoryInfo = readTrajectory(file, traj, particleLookup);
 
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
-    calculateOrientations(std::get<1>(topologyInfo), trajectoryInfo, rotationInfo);
+
+    calculateOrientations(
+        std::get<1>(topologyInfo),
+        trajectoryInfo,
+        rotationInfo,
+        particleLookup
+    );
 
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
     std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
@@ -323,8 +360,11 @@ void copy_frame(
 
 TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
-    h5rd::Group& group)
+    h5rd::Group& group,
+    IdParticleMapping& particleLookup
+)
 {
+    particleLookup.clear();
     TrajectoryH5Info results;
 
     // retrieve the h5 particle type info type
@@ -366,21 +406,31 @@ TimeTrajectoryH5Info readTrajectory(
 
     // mapping the read-back data to the ParticleData struct
     results.reserve(n_frames);
+    particleLookup.reserve(n_frames);
 
     auto timeIt = time.begin();
     for (std::size_t frame = 0; frame < limits.size(); frame += 2, ++timeIt) {
         auto begin = limits[frame];
         auto end = limits[frame + 1];
-        results.emplace_back();
 
+        results.emplace_back();
         auto& currentFrame = results.back();
         currentFrame.reserve(end - begin);
+
+        particleLookup.emplace_back();
+        auto& idparticleCache = particleLookup.back();
 
         for (auto it = entries.begin() + begin; it != entries.begin() + end; ++it) {
             currentFrame.emplace_back(
                 typeMapping[it->typeId],
                 readdy::model::particleflavor::particleFlavorToString(it->flavor),
                 it->pos.data, it->id, it->typeId, *timeIt);
+
+            ParticleData* pd = &currentFrame.back();
+            std::size_t id = currentFrame.back().id;
+            idparticleCache.emplace(
+                std::make_pair<std::size_t,ParticleData*>(std::move(id), std::move(pd))
+            );
         }
     }
 
@@ -522,10 +572,47 @@ TimeTopologyH5Info readTopologies(
     return std::make_tuple(time, result);
 }
 
+std::vector<std::size_t> getNeighbors(
+    std::size_t particleId,
+    TopologyH5List& topologies
+)
+{
+    std::vector<std::size_t> neighbors;
+    bool done = false;
+
+    std::size_t topologyCount = topologies.size();
+
+    for(std::size_t topologyIndex = 0; topologyIndex < topologyCount; ++topologyIndex)
+    {
+        auto topology = topologies.at(topologyIndex);
+        for(std::size_t edgeIndex = 0; edgeIndex < topology.edges.size(); ++edgeIndex)
+        {
+            auto edge = topology.edges[edgeIndex];
+            auto p1 = std::get<0>(edge);
+            auto p2 = std::get<1>(edge);
+
+            if(p1 == particleId) {
+                neighbors.push_back(p2);
+            }
+            else if (p2 == particleId) {
+                neighbors.push_back(p1);
+            }
+        }
+
+        if(done)
+        {
+            break;
+        }
+    }
+
+    return neighbors;
+}
+
 void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    RotationH5Info& outRotations
+    RotationH5Info& outRotations,
+    IdParticleMapping& particleLookup
 )
 {
     if(topologyH5Info.size() != trajectoryH5Info.size())
@@ -537,24 +624,59 @@ void calculateOrientations(
 
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
+    RotationH5List initialRotations;
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
         auto trajectoryFrame = trajectoryH5Info.at(frameIndex);
-        auto topologyFrame = trajectoryH5Info.at(frameIndex);
+        auto topologyFrame = topologyH5Info.at(frameIndex);
         auto& rotationFrame = outRotations.at(frameIndex);
+        auto& idmappingFrame = particleLookup.at(frameIndex);
 
         for(
             std::size_t particleIndex = 0;
             particleIndex < trajectoryFrame.size();
             ++particleIndex)
         {
-            Eigen::Vector3d rotation;
-            rotation[0] = (rand() % 8) * 45;
-            rotation[1] = (rand() % 8) * 45;
-            rotation[2] = (rand() % 8) * 45;
+            auto currentParticle = trajectoryFrame.at(particleIndex);
+            auto neighborIds = getNeighbors(currentParticle.id, topologyFrame);
 
-            rotationFrame.push_back(rotation);
+            if(neighborIds.size() >= 2)
+            {
+                auto rpos0 = currentParticle.position;
+                auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
+
+                auto rpos1 = idmappingFrame.at(neighborIds.at(0))->position;
+                auto rpos2 = idmappingFrame.at(neighborIds.at(0))->position;
+                auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
+                auto pos2 = Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]);
+
+                std::vector<Eigen::Vector3d> basisPositions;
+                basisPositions.push_back(pos0);
+                basisPositions.push_back(pos1);
+                basisPositions.push_back(pos2);
+                auto rmat = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+
+                rotationFrame.push_back(rmat.eulerAngles(0,1,2));
+            }
+            else
+            {
+                Eigen::Vector3d rotation;
+                rotation[0] = (rand() % 8) * 45;
+                rotation[1] = (rand() % 8) * 45;
+                rotation[2] = (rand() % 8) * 45;
+
+                rotationFrame.push_back(rotation);
+            }
+
+            if(frameIndex == 0)
+            {
+                initialRotations.push_back(rotationFrame.back());
+            }
+            else
+            {
+                rotationFrame.back() = rotationFrame.back() - initialRotations[particleIndex];
+            }
         }
     }
 }
