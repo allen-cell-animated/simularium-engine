@@ -31,6 +31,7 @@ namespace agentsim {
 
         virtual bool IsFinished() override;
         virtual void LoadTrajectoryFile(std::string file_path) override {};
+        virtual double GetTime(std::size_t frameNumber) override { return 0.0; };
 
     private:
         bool m_hasAlreadyRun = false;

@@ -17,7 +17,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    TrajectoryH5Info& trajectoryInfo,
+    TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo);
 
 void copy_frame(
@@ -25,7 +25,7 @@ void copy_frame(
     const std::vector<ParticleData>& particle_data,
     std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
-TrajectoryH5Info readTrajectory(
+TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
     h5rd::Group& group);
 
@@ -67,10 +67,12 @@ namespace agentsim {
             this->LoadTrajectoryFile("/tmp/test.h5");
         }
 
-        if (frame_no >= this->m_trajectoryInfo.size()) {
+        auto& trajectoryInfo = std::get<1>(this->m_trajectoryInfo);
+
+        if (frame_no >= trajectoryInfo.size()) {
             this->m_hasFinishedStreaming = true;
         } else {
-            copy_frame(this->m_simulation, this->m_trajectoryInfo[frame_no], agents);
+            copy_frame(this->m_simulation, trajectoryInfo[frame_no], agents);
             frame_no++;
         }
     }
@@ -102,7 +104,6 @@ namespace agentsim {
         if (!this->m_hasLoadedRunFile) {
             std::cout << "Loading trajectory file " << file_path << std::endl;
             frame_no = 0;
-            this->m_trajectoryInfo.clear();
             read_h5file(file_path, this->m_trajectoryInfo, this->m_topologyInfo);
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
@@ -110,14 +111,9 @@ namespace agentsim {
         }
     }
 
-    TopologyH5List& ReaDDyPkg::GetFileTopologies(std::size_t frameNumber)
+    double ReaDDyPkg::GetTime(std::size_t frameNumber)
     {
-        return std::get<1>(this->m_topologyInfo).at(frameNumber);
-    }
-
-    ParticleH5List& ReaDDyPkg::GetFileParticles(std::size_t frameNumber)
-    {
-        return this->m_trajectoryInfo.at(frameNumber);
+        return std::get<0>(this->m_topologyInfo).at(frameNumber);
     }
 
 } // namespace agentsim
@@ -177,7 +173,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::vector<std::vector<ParticleData>>& trajectoryInfo,
+    TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo)
 {
     if (!get_file_path(file_name)) {
@@ -194,7 +190,7 @@ void read_h5file(
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
 
-    std::cout << "Found trajectory for " << trajectoryInfo.size() << " frames" << std::endl;
+    std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
     std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
 
     file->close();
@@ -254,7 +250,7 @@ void copy_frame(
     }
 }
 
-TrajectoryH5Info readTrajectory(
+TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
     h5rd::Group& group)
 {
@@ -317,7 +313,7 @@ TrajectoryH5Info readTrajectory(
         }
     }
 
-    return results;
+    return std::make_tuple(time, results);
 }
 
 TimeTopologyH5Info readTopologies(

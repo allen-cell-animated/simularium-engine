@@ -32,13 +32,27 @@ struct ParticleData {
     readdy::time_step_type t;
 };
 
+/*
+struct TopologyRecord {
+    Topology::particle_indices particleIndices;
+    std::vector<std::tuple<std::size_t, std::size_t>> edges;
+    TopologyTypeId type;
+
+    bool operator==(const TopologyRecord &other) const {
+        return particleIndices == other.particleIndices && edges == other.edges;
+    }
+};
+*/
+
+using TimestepH5List = std::vector<readdy::time_step_type>;
+
 using ParticleH5List = std::vector<ParticleData>;
 using TrajectoryH5Info = std::vector<ParticleH5List>;
+using TimeTrajectoryH5Info = std::tuple<TimestepH5List, TrajectoryH5Info>;
 
 using TopologyRecord = readdy::model::top::TopologyRecord;
 using TopologyH5List = std::vector<TopologyRecord>;
 using TopologyH5Info = std::vector<TopologyH5List>;
-using TimestepH5List = std::vector<readdy::time_step_type>;
 using TimeTopologyH5Info = std::tuple<TimestepH5List, TopologyH5Info>;
 
 namespace aics {
@@ -76,11 +90,9 @@ namespace agentsim {
         virtual void Run(float timeStep, std::size_t nTimeStep) override;
 
         virtual void LoadTrajectoryFile(std::string file_path) override;
+        virtual double GetTime(std::size_t frameNumber) override;
 
     private:
-        TopologyH5List& GetFileTopologies(std::size_t frameNumber);
-        ParticleH5List& GetFileParticles(std::size_t frameNumber);
-
         readdy::Simulation* m_simulation;
         bool m_agents_initialized = false;
         bool m_reactions_initialized = false;
@@ -92,7 +104,7 @@ namespace agentsim {
         readdy::io::BloscFilter m_bloscFilter;
 
         // Used to store FileIO data
-        TrajectoryH5Info m_trajectoryInfo;
+        TimeTrajectoryH5Info m_trajectoryInfo;
         TimeTopologyH5Info m_topologyInfo;
     };
 
