@@ -20,14 +20,9 @@ void read_h5file(
     std::string file_name,
     TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo,
-<<<<<<< HEAD
-    RotationH5Info& rotationInfo);
->>>>>>> scaffolding for passing orientation
-=======
     RotationH5Info& rotationInfo,
     IdParticleMapping& particleLookup
 );
->>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
 
 void copy_frame(
     readdy::Simulation* sim,
@@ -139,69 +134,20 @@ namespace agentsim {
             read_h5file(file_path,
                 this->m_trajectoryInfo,
                 this->m_topologyInfo,
-<<<<<<< HEAD
-                this->m_rotationInfo);
-
-=======
                 this->m_rotationInfo,
                 ID_PARTICLE_CACHE
             );
->>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
         }
     }
 
-<<<<<<< HEAD
     double ReaDDyPkg::GetTime(std::size_t frameNumber)
     {
         return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
     }
 
-    std::size_t ReaDDyPkg::GetFrameCount()
-    {
-        return this->m_trajectoryInfo.size();
-    }
-
-    std::vector<std::size_t> ReaDDyPkg::GetNeighbors(
-        std::size_t particleId,
-        TopologyH5List& topologies
-    )
-    {
-        std::vector<std::size_t> neighbors;
-        bool done = false;
-
-        std::size_t topologyCount = topologies.size();
-
-        for(std::size_t topologyIndex = 0; topologyIndex < topologyCount; ++topologyCount)
-        {
-            auto topology = topologies.at(topologyIndex);
-            for(std::size_t edgeIndex = 0; edgeIndex < topology.edges.size(); ++edgeIndex)
-            {
-                auto edge = topology.edges[edgeIndex];
-                auto p1 = std::get<0>(edge);
-                auto p2 = std::get<1>(edge);
-
-                if(p1 == particleId) {
-                    neighbors.push_back(p2);
-                }
-                else if (p2 == particleId) {
-                    neighbors.push_back(p1);
-                }
-            }
-
-            if(done)
-            {
-                break;
-            }
-        }
-
-        return neighbors;
-    }
-
-=======
->>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
 } // namespace agentsim
 } // namespace aics
 
@@ -261,14 +207,9 @@ void read_h5file(
     std::string file_name,
     TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo,
-<<<<<<< HEAD
-    RotationH5Info& rotationInfo
-)
-=======
     RotationH5Info& rotationInfo,
     IdParticleMapping& particleLookup
     )
->>>>>>> use initial rotation to calculate rotation based on neighbors (majorly untested)
 {
     if (!get_file_path(file_name)) {
         return;
@@ -286,7 +227,7 @@ void read_h5file(
 
     calculateOrientations(
         std::get<1>(topologyInfo),
-        trajectoryInfo,
+        std::get<1>(trajectoryInfo),
         rotationInfo,
         particleLookup
     );
@@ -621,8 +562,10 @@ void calculateOrientations(
             << " topology & trajectory have different number of frames" << std::endl;
     }
 
+
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
+    RotationH5List initialRotations;
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
@@ -665,6 +608,15 @@ void calculateOrientations(
                 rotation[2] = (rand() % 8) * 45;
 
                 rotationFrame.push_back(rotation);
+            }
+
+            if(frameIndex == 0)
+            {
+                initialRotations.push_back(rotationFrame.back());
+            }
+            else
+            {
+                rotationFrame.back() = rotationFrame.back() - initialRotations[particleIndex];
             }
         }
     }
