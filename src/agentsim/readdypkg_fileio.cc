@@ -113,7 +113,7 @@ namespace agentsim {
 
     double ReaDDyPkg::GetTime(std::size_t frameNumber)
     {
-        return std::get<0>(this->m_topologyInfo).at(frameNumber);
+        return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
     }
 
 } // namespace agentsim
