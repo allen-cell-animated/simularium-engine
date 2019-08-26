@@ -9,6 +9,43 @@ inline bool file_exists(const std::string& name)
 
 bool get_file_path(std::string& name);
 
+NameRotationMap calculateInitialRotations() {
+    auto actinRotation = aics::agentsim::mathutil::GetRotationMatrix(
+        std::vector({
+            Eigen::Vector3d(0,0,0),
+            Eigen::Vector3d(-1.453012, 3.27238, 2.330608),
+            Eigen::Vector3d(-5.26267,  2.193798, 0.7260392)
+        })).eulerAngles(0,1,2);
+
+    auto arp2Rotation = aics::agentsim::mathutil::GetRotationMatrix(
+        std::vector({
+            Eigen::Vector3d(0,0,0),
+            Eigen::Vector3d(-1.119938, -3.72386, 1.493319),
+            Eigen::Vector3d(-3.509996, -5.283344, -1.561125)
+        })).eulerAngles(0,1,2);
+
+    auto arp3Rotation = aics::agentsim::mathutil::GetRotationMatrix(
+        std::vector({
+            Eigen::Vector3d(0,0,0),
+            Eigen::Vector3d(-2.390059, -1.559484, -3.054445),
+            Eigen::Vector3d(-0.7810671, 6.413439, -4.214316)
+        })).eulerAngles(0,1,2);
+
+    auto daughterRotation = aics::agentsim::mathutil::GetRotationMatrix(
+        std::vector({
+            Eigen::Vector3d(0,0,0),
+            Eigen::Vector3d(-1.345952, 3.272221, 2.238688),
+            Eigen::Vector3d(-5.155611, 2.193637, 0.63413)
+        })).eulerAngles(0,1,2);
+
+    return NameRotationMap {
+        {"actin", actinRotation},
+        {"arp2", arp2Rotation},
+        {"arp3", arp3Rotation},
+        {"daughter", daughterRotation}
+    };
+}
+
 void run_and_save_h5file(
     readdy::Simulation* sim,
     std::string file_name,
@@ -51,7 +88,8 @@ void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
     RotationH5Info& rotationInfo,
-    IdParticleMapping& particleLookup
+    IdParticleMapping& particleLookup,
+    NameRotationMap& initialRotations
 );
 
 namespace aics {
@@ -224,12 +262,14 @@ void read_h5file(
 
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
+    auto initialRotations = calculateInitialRotations();
 
     calculateOrientations(
         std::get<1>(topologyInfo),
         std::get<1>(trajectoryInfo),
         rotationInfo,
-        particleLookup
+        particleLookup,
+        initialRotations
     );
 
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
@@ -324,6 +364,8 @@ TimeTrajectoryH5Info readTrajectory(
     std::unordered_map<std::size_t, std::string> typeMapping;
     for (const auto& type : types) {
         typeMapping[type.type_id] = std::string(type.name);
+        std::cout << "Particle type found: " << type.type_id
+            << " with name " << type.name << std::endl;
     }
 
     // limits of length 2T containing [start_ix, end_ix] for each time step
@@ -553,7 +595,8 @@ void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
     RotationH5Info& outRotations,
-    IdParticleMapping& particleLookup
+    IdParticleMapping& particleLookup,
+    NameRotationMap& initialRotations
 )
 {
     if(topologyH5Info.size() != trajectoryH5Info.size())
@@ -565,7 +608,6 @@ void calculateOrientations(
 
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
-    RotationH5List initialRotations;
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
@@ -582,6 +624,25 @@ void calculateOrientations(
             auto currentParticle = trajectoryFrame.at(particleIndex);
             auto neighborIds = getNeighbors(currentParticle.id, topologyFrame);
 
+            // The current naming convention is
+            //  particle type name = [name]#[attributes]
+            //  additional information is encoded into the name after the '#' delimiter
+            std::string& name = currentParticle.type;
+            name = name.substr(0, name.find('#'));
+
+            // assuming that all agents that require orientation
+            //  will have an initial orientation specified
+            if(initialRotations.count(name) == 0 || neighborIds.size() < 2)
+            {
+                Eigen::Vector3d rotation;
+                rotation[0] = (rand() % 8) * 45;
+                rotation[1] = (rand() % 8) * 45;
+                rotation[2] = (rand() % 8) * 45;
+
+                rotationFrame.push_back(rotation);
+                continue;
+            }
+
             if(neighborIds.size() >= 2)
             {
                 auto rpos0 = currentParticle.position;
@@ -597,26 +658,10 @@ void calculateOrientations(
                 basisPositions.push_back(pos1);
                 basisPositions.push_back(pos2);
                 auto rmat = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+                auto rvec = rmat.eulerAngles(0,1,2);
+                rvec = rvec - initialRotations.at(name);
 
-                rotationFrame.push_back(rmat.eulerAngles(0,1,2));
-            }
-            else
-            {
-                Eigen::Vector3d rotation;
-                rotation[0] = (rand() % 8) * 45;
-                rotation[1] = (rand() % 8) * 45;
-                rotation[2] = (rand() % 8) * 45;
-
-                rotationFrame.push_back(rotation);
-            }
-
-            if(frameIndex == 0)
-            {
-                initialRotations.push_back(rotationFrame.back());
-            }
-            else
-            {
-                rotationFrame.back() = rotationFrame.back() - initialRotations[particleIndex];
+                rotationFrame.push_back(rvec);
             }
         }
     }

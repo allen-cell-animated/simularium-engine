@@ -59,6 +59,7 @@ using TopologyH5Info = std::vector<TopologyH5List>;
 using TimeTopologyH5Info = std::tuple<TimestepH5List, TopologyH5Info>;
 
 using IdParticleMapping = std::vector<std::unordered_map<std::size_t, ParticleData*>>;
+using NameRotationMap = std::unordered_map<std::string, Eigen::Vector3d>;
 
 namespace aics {
 namespace agentsim {
