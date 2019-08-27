@@ -38,11 +38,19 @@ NameRotationMap calculateInitialRotations() {
             Eigen::Vector3d(-5.155611, 2.193637, 0.63413)
         })).eulerAngles(0,1,2);
 
+    auto tubulinRotation = aics::agentsim::mathutil::GetRotationMatrix(
+        std::vector({
+            Eigen::Vector3d(0, 0, -1),
+            Eigen::Vector3d(0, 0, 0),
+            Eigen::Vector3d(0, 1, 0)
+        })).eulerAngles(0,1,2);
+
     return NameRotationMap {
         {"actin", actinRotation},
         {"arp2", arp2Rotation},
         {"arp3", arp3Rotation},
-        {"daughter", daughterRotation}
+        {"daughter", daughterRotation},
+        {"tubulin", tubulinRotation}
     };
 }
 
@@ -582,9 +590,11 @@ std::vector<std::size_t> getNeighbors(
             }
         }
 
-        if(done)
+        // Assuming each particle is only part of one topology
+        //  this means that if nieghbors are found, this function is done
+        if(neighbors.size() > 0)
         {
-            break;
+            return neighbors;
         }
     }
 
@@ -599,13 +609,6 @@ void calculateOrientations(
     NameRotationMap& initialRotations
 )
 {
-    if(topologyH5Info.size() != trajectoryH5Info.size())
-    {
-        std::cout << "Orientation calculation failed,"
-            << " topology & trajectory have different number of frames" << std::endl;
-    }
-
-
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
 
@@ -627,12 +630,21 @@ void calculateOrientations(
             // The current naming convention is
             //  particle type name = [name]#[attributes]
             //  additional information is encoded into the name after the '#' delimiter
-            std::string& name = currentParticle.type;
-            name = name.substr(0, name.find('#'));
+            std::string name = currentParticle.type;
+
+            std::string tag = "";
+            std::string typeName = name;
+            char delimiter = '#';
+            auto pos = name.find(delimiter);
+            if(pos != std::string::npos)
+            {
+                std::string tag = name.substr(name.find(delimiter));
+                std::string typeName = name.substr(0, name.find(delimiter));
+            }
 
             // assuming that all agents that require orientation
             //  will have an initial orientation specified
-            if(initialRotations.count(name) == 0 || neighborIds.size() < 2)
+            if(initialRotations.count(typeName) == 0 || neighborIds.size() < 2)
             {
                 Eigen::Vector3d rotation;
                 rotation[0] = (rand() % 8) * 45;
@@ -648,8 +660,11 @@ void calculateOrientations(
                 auto rpos0 = currentParticle.position;
                 auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
 
+                /*std::cout << "Using neighbors " << neighborIds.at(0) << " and "
+                    << neighborIds.at(1) << " to calculate orientation for " <<
+                    typeName << std::endl;*/
                 auto rpos1 = idmappingFrame.at(neighborIds.at(0))->position;
-                auto rpos2 = idmappingFrame.at(neighborIds.at(0))->position;
+                auto rpos2 = idmappingFrame.at(neighborIds.at(1))->position;
                 auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
                 auto pos2 = Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]);
 
@@ -659,7 +674,7 @@ void calculateOrientations(
                 basisPositions.push_back(pos2);
                 auto rmat = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
                 auto rvec = rmat.eulerAngles(0,1,2);
-                rvec = rvec - initialRotations.at(name);
+                rvec = rvec - initialRotations.at(typeName);
 
                 rotationFrame.push_back(rvec);
             }
