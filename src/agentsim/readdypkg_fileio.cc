@@ -638,14 +638,27 @@ void calculateOrientations(
             auto pos = name.find(delimiter);
             if(pos != std::string::npos)
             {
-                std::string tag = name.substr(name.find(delimiter));
-                std::string typeName = name.substr(0, name.find(delimiter));
+                tag = name.substr(name.find(delimiter));
+                typeName = name.substr(0, name.find(delimiter));
             }
+
+            bool isFree = (tag.find("free") != std::string::npos);
 
             // assuming that all agents that require orientation
             //  will have an initial orientation specified
-            if(initialRotations.count(typeName) == 0 || neighborIds.size() < 2)
+            bool hasInitialRotation = initialRotations.count(typeName);
+            std::size_t neighborCount = neighborIds.size();
+
+            if(!hasInitialRotation || neighborCount < 2)
             {
+                if(!isFree)
+                {
+                    std::cout << "Has initial rotation " << hasInitialRotation <<
+                    " Nieghbor count " << neighborCount << " " << typeName << " "
+                    << tag << " " << name << std::endl;
+                    std::raise(SIGINT);
+                }
+
                 Eigen::Vector3d rotation;
                 rotation[0] = (rand() % 8) * 45;
                 rotation[1] = (rand() % 8) * 45;
@@ -659,10 +672,6 @@ void calculateOrientations(
             {
                 auto rpos0 = currentParticle.position;
                 auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
-
-                /*std::cout << "Using neighbors " << neighborIds.at(0) << " and "
-                    << neighborIds.at(1) << " to calculate orientation for " <<
-                    typeName << std::endl;*/
                 auto rpos1 = idmappingFrame.at(neighborIds.at(0))->position;
                 auto rpos2 = idmappingFrame.at(neighborIds.at(1))->position;
                 auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
