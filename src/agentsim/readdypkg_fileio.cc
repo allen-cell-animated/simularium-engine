@@ -579,8 +579,8 @@ std::vector<std::size_t> getNeighbors(
         for(std::size_t edgeIndex = 0; edgeIndex < topology.edges.size(); ++edgeIndex)
         {
             auto edge = topology.edges[edgeIndex];
-            auto p1 = std::get<0>(edge);
-            auto p2 = std::get<1>(edge);
+            auto p1 = topology.particleIndices.at(std::get<0>(edge));
+            auto p2 = topology.particleIndices.at(std::get<1>(edge));
 
             if(p1 == particleId) {
                 neighbors.push_back(p2);
@@ -655,8 +655,28 @@ void calculateOrientations(
                 {
                     std::cout << "Has initial rotation " << hasInitialRotation <<
                     " Nieghbor count " << neighborCount << " " << typeName << " "
-                    << tag << " " << name << std::endl;
-                    std::raise(SIGINT);
+                    << tag << " " << name << " in frame " << frameIndex << std::endl;
+
+                    std::cout << "Looking for particle: " << currentParticle.id << std::endl;
+                    std::size_t topologyCount = topologyFrame.size();
+                    for(std::size_t topologyIndex = 0; topologyIndex < topologyCount; ++topologyIndex)
+                    {
+                        std::cout << "Topology: " << topologyIndex << std::endl;
+                        auto topology = topologyFrame.at(topologyIndex);
+                        for(std::size_t edgeIndex = 0; edgeIndex < topology.edges.size(); ++edgeIndex)
+                        {
+                            auto edge = topology.edges[edgeIndex];
+                            auto p1 = topology.particleIndices.at(std::get<0>(edge));
+                            auto p2 = topology.particleIndices.at(std::get<1>(edge));
+
+                            std::cout << "> Edge " << edgeIndex << ": " << p1 << "--" << p2 << std::endl;
+
+                            if(p1 == currentParticle.id) std::cout << "Matches particle 1:" << currentParticle.id << " " << p1 << std::endl;
+                            if(p2 == currentParticle.id) std::cout << "Matches particle 2:" << currentParticle.id << " " << p2 << std::endl;
+                        }
+                    }
+
+                    //std::raise(SIGINT);
                 }
 
                 Eigen::Vector3d rotation;
