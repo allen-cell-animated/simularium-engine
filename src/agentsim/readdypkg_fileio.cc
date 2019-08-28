@@ -49,6 +49,7 @@ NameRotationMap calculateInitialRotations() {
         {"actin", actinRotation},
         {"arp2", arp2Rotation},
         {"arp3", arp3Rotation},
+        {"arp23", arp3Rotation}, // arbitrarilly chosen
         {"daughter", daughterRotation},
         {"tubulin", tubulinRotation}
     };
@@ -653,43 +654,46 @@ void calculateOrientations(
             {
                 if(!isFree)
                 {
-                    std::cout << "Has initial rotation " << hasInitialRotation <<
-                    " Nieghbor count " << neighborCount << " " << typeName << " "
-                    << tag << " " << name << " in frame " << frameIndex << std::endl;
+                    // Presumably, in this case it is likely that the particle
+                    //  is part of a topology but doesn't have two neighbors
+                    //  @TODO: what should be done in this case?
+                    Eigen::Vector3d rotation;
+                    rotation[0] = 90;
+                    rotation[1] = 90;
+                    rotation[2] = 90;
 
-                    std::cout << "Looking for particle: " << currentParticle.id << std::endl;
-                    std::size_t topologyCount = topologyFrame.size();
-                    for(std::size_t topologyIndex = 0; topologyIndex < topologyCount; ++topologyIndex)
-                    {
-                        std::cout << "Topology: " << topologyIndex << std::endl;
-                        auto topology = topologyFrame.at(topologyIndex);
-                        for(std::size_t edgeIndex = 0; edgeIndex < topology.edges.size(); ++edgeIndex)
-                        {
-                            auto edge = topology.edges[edgeIndex];
-                            auto p1 = topology.particleIndices.at(std::get<0>(edge));
-                            auto p2 = topology.particleIndices.at(std::get<1>(edge));
+                    rotationFrame.push_back(rotation);
+                    continue;
+                }
+                else {
+                    Eigen::Vector3d rotation;
+                    rotation[0] = (rand() % 8) * 45;
+                    rotation[1] = (rand() % 8) * 45;
+                    rotation[2] = (rand() % 8) * 45;
 
-                            std::cout << "> Edge " << edgeIndex << ": " << p1 << "--" << p2 << std::endl;
-
-                            if(p1 == currentParticle.id) std::cout << "Matches particle 1:" << currentParticle.id << " " << p1 << std::endl;
-                            if(p2 == currentParticle.id) std::cout << "Matches particle 2:" << currentParticle.id << " " << p2 << std::endl;
-                        }
-                    }
-
-                    //std::raise(SIGINT);
+                    rotationFrame.push_back(rotation);
+                    continue;
                 }
 
-                Eigen::Vector3d rotation;
-                rotation[0] = (rand() % 8) * 45;
-                rotation[1] = (rand() % 8) * 45;
-                rotation[2] = (rand() % 8) * 45;
-
-                rotationFrame.push_back(rotation);
-                continue;
             }
 
             if(neighborIds.size() >= 2)
             {
+                if(idmappingFrame.count(neighborIds.at(0)) == 0 ||
+                    idmappingFrame.count(neighborIds.at(1)) == 0)
+                {
+                    std::cout << "Nieghbor value is null particle for " << currentParticle.id <<
+                        " in frame " << frameIndex << std::endl;
+
+                    Eigen::Vector3d rotation;
+                    rotation[0] = 90;
+                    rotation[1] = 90;
+                    rotation[2] = 90;
+
+                    rotationFrame.push_back(rotation);
+                    continue;
+                }
+
                 auto rpos0 = currentParticle.position;
                 auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
                 auto rpos1 = idmappingFrame.at(neighborIds.at(0))->position;
