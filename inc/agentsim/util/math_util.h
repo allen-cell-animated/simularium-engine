@@ -3,6 +3,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <vector>
 
 namespace aics {
 namespace agentsim {
