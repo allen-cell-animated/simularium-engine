@@ -610,6 +610,11 @@ void calculateOrientations(
     NameRotationMap& initialRotations
 )
 {
+    // Will be assigned to x, y, and z rotation in the case of an error
+    //  the purpose is to have a value that can be checked to know if the rotation
+    //  algorithm failed in some way
+    float errValue = 90;
+
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
 
@@ -658,9 +663,9 @@ void calculateOrientations(
                     //  is part of a topology but doesn't have two neighbors
                     //  @TODO: what should be done in this case?
                     Eigen::Vector3d rotation;
-                    rotation[0] = 90;
-                    rotation[1] = 90;
-                    rotation[2] = 90;
+                    rotation[0] = errValue;
+                    rotation[1] = errValue;
+                    rotation[2] = errValue;
 
                     rotationFrame.push_back(rotation);
                     continue;
@@ -683,12 +688,21 @@ void calculateOrientations(
                     idmappingFrame.count(neighborIds.at(1)) == 0)
                 {
                     std::cout << "Nieghbor value is null particle for " << currentParticle.id <<
-                        " in frame " << frameIndex << std::endl;
+                        " in frame " << frameIndex << " neighbors |";
 
+                    for(auto& id : neighborIds)
+                    {
+                        std::cout << " " << id;
+                    }
+
+                    std::cout << std::endl;
+
+                    // @ERROR: Microtubules19.h5 is missing many nieghbors?
+                    //  @TODO: confirm that this is not an error
                     Eigen::Vector3d rotation;
-                    rotation[0] = 90;
-                    rotation[1] = 90;
-                    rotation[2] = 90;
+                    rotation[0] = errValue;
+                    rotation[1] = errValue;
+                    rotation[2] = errValue;
 
                     rotationFrame.push_back(rotation);
                     continue;
