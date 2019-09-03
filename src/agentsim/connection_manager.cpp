@@ -349,7 +349,7 @@ namespace agentsim {
             }
 
             net_agent_data_frame["data"] = json_data_arr;
-            net_agent_data_frame["frame_number"] = netState.frame_no;
+            net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
             net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
             this->SendWebsocketMessage(uid, net_agent_data_frame);
         }
