@@ -33,6 +33,10 @@ struct ParticleData {
 };
 
 /*
+The below has been copied from ReaDDy for developer reference
+so that one can quickly double check the definition for the topology
+file io structure w/out digging through ReaDDy's python API
+
 struct TopologyRecord {
     Topology::particle_indices particleIndices;
     std::vector<std::tuple<std::size_t, std::size_t>> edges;
