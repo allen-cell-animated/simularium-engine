@@ -10,6 +10,12 @@ inline bool file_exists(const std::string& name)
 bool get_file_path(std::string& name);
 
 NameRotationMap calculateInitialRotations() {
+    /*
+    *   These values were calculated manually by Blair using Unity
+    *    Ultimatley these should come from the model definition
+    *    which will have information about spatial offests and
+    *    relations in complexes (topologies in ReaDDy)
+    */
     auto actinRotation = aics::agentsim::mathutil::GetRotationMatrix(
         std::vector({
             Eigen::Vector3d(0,0,0),
