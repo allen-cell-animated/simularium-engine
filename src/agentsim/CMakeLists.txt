@@ -2,6 +2,7 @@ set(SOURCES
 "${PROJECT_SOURCE_DIR}/dep/cytosim/src/play/frame_reader.cc"
 "jsoncpp.cpp"
 "aws_util.cpp"
+"math_util.cpp"
 "agent.cpp"
 "model.cpp"
 "readdypkg.cpp"
