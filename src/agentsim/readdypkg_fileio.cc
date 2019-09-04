@@ -424,11 +424,8 @@ TimeTrajectoryH5Info readTrajectory(
                 readdy::model::particleflavor::particleFlavorToString(it->flavor),
                 it->pos.data, it->id, it->typeId, *timeIt);
 
-            ParticleData* pd = &currentFrame.back();
-            std::size_t id = currentFrame.back().id;
-            idparticleCache.emplace(
-                std::make_pair<std::size_t,ParticleData*>(std::move(id), std::move(pd))
-            );
+            idparticleCache[currentFrame.back().id] =
+              currentFrame.size() - 1;
         }
     }
 
@@ -690,11 +687,13 @@ void calculateOrientations(
 
             if(neighborIds.size() >= 2)
             {
+                std::size_t numParticles = trajectoryFrame.size();
+
                 if(idmappingFrame.count(neighborIds.at(0)) == 0 ||
                     idmappingFrame.count(neighborIds.at(1)) == 0)
                 {
-                    std::cout << "Nieghbor value is null particle for " << currentParticle.id <<
-                        " in frame " << frameIndex << " neighbors |";
+                    std::cout << "Invalid neighbor ID for " << currentParticle.id <<
+                        " in frame " << frameIndex << " neighbor ids |";
 
                     for(auto& id : neighborIds)
                     {
@@ -713,11 +712,13 @@ void calculateOrientations(
                     rotationFrame.push_back(rotation);
                     continue;
                 }
+                std::size_t nid1 = idmappingFrame.at(neighborIds.at(0));
+                std::size_t nid2 = idmappingFrame.at(neighborIds.at(1));
 
                 auto rpos0 = currentParticle.position;
                 auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
-                auto rpos1 = idmappingFrame.at(neighborIds.at(0))->position;
-                auto rpos2 = idmappingFrame.at(neighborIds.at(1))->position;
+                auto rpos1 = trajectoryFrame.at(nid1).position;
+                auto rpos2 = trajectoryFrame.at(nid2).position;
                 auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
                 auto pos2 = Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]);
 
