@@ -203,6 +203,26 @@ namespace agentsim {
         this->m_netStates[connectionUID].frame_no = frameNumber;
     }
 
+    void ConnectionManager::CheckForFinishedClient(
+        std::size_t numberOfFrames,
+        bool allFramesLoaded,
+        std::string connectionUID,
+        NetState& netState)
+    {
+        if (netState.frame_no >= numberOfFrames - 1) {
+            if (netState.frame_no != this->kLatestFrameValue) {
+                std::cout << "End of simulation cache reached for client "
+                          << connectionUID << std::endl;
+                netState.frame_no = this->kLatestFrameValue;
+            }
+
+            if (allFramesLoaded) {
+                std::cout << "Simulation finished for client " << connectionUID << std::endl;
+                this->SetClientState(connectionUID, ClientPlayState::Finished);
+            }
+        }
+    }
+
     void ConnectionManager::CheckForFinishedClients(
         std::size_t numberOfFrames, bool allFramesLoaded)
     {
@@ -214,18 +234,7 @@ namespace agentsim {
                 continue;
             }
 
-            if (netState.frame_no >= numberOfFrames - 1) {
-                if (netState.frame_no != this->kLatestFrameValue) {
-                    std::cout << "End of simulation cache reached for client "
-                              << connectionUID << std::endl;
-                    netState.frame_no = this->kLatestFrameValue;
-                }
-
-                if (allFramesLoaded) {
-                    std::cout << "Simulation finished for client " << connectionUID << std::endl;
-                    this->SetClientState(connectionUID, ClientPlayState::Finished);
-                }
-            }
+            this->CheckForFinishedClient(numberOfFrames, allFramesLoaded, connectionUID, netState);
         }
     }
 
@@ -389,6 +398,35 @@ namespace agentsim {
     void ConnectionManager::SendDataToClient(
         Simulation& simulation,
         std::string connectionUID,
+        std::size_t start,
+        std::size_t count
+    )
+    {
+        std::size_t numberOfFrames = simulation.GetNumFrames();
+        bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+        this->SetClientState(connectionUID, ClientPlayState::Playing);
+
+        auto& netState = this->m_netStates.at(connectionUID);
+        for(std::size_t i = 0; i < count; ++i)
+        {
+            this->SendDataToClient(simulation, connectionUID, start + i);
+            netState.frame_no++;
+            this->CheckForFinishedClient(
+                numberOfFrames,
+                hasFinishedLoading,
+                connectionUID,
+                netState);
+        }
+
+        if(netState.play_state == ClientPlayState::Playing)
+        {
+            this->SetClientState(connectionUID, ClientPlayState::Stopped);
+        }
+    }
+
+    void ConnectionManager::SendDataToClient(
+        Simulation& simulation,
+        std::string connectionUID,
         std::size_t frameNumber)
     {
         auto& netState = this->m_netStates.at(connectionUID);
@@ -534,7 +572,14 @@ namespace agentsim {
                             // Load the first hundred simulation frames into a runtime cache
                             std::cout << "Loading trajectory file into runtime cache" << std::endl;
                             std::size_t fn = 0;
-                            while (!simulation.HasLoadedAllFrames() && fn < 100) {
+                            std::size_t count = 100;
+
+                            if(jsonMsg.isMember("count"))
+                            {
+                                count = jsonMsg["count"].asInt() + 1;
+                            }
+
+                            while (!simulation.HasLoadedAllFrames() && fn < count) {
                                 std::cout << "Loading frame " << ++fn << std::endl;
                                 simulation.LoadNextFrame();
                             }
@@ -542,8 +587,19 @@ namespace agentsim {
                         }
                     }
 
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
-                    this->SetClientFrame(senderUid, 0);
+                    if(jsonMsg.isMember("count"))
+                    {
+                        // this is arbitrarily capped at 5
+                        //  the current expected usage is to ask for a single frame
+                        std::size_t count = std::min(jsonMsg["count"].asInt(), 5);
+                        auto& netState = this->m_netStates.at(senderUid);
+
+                        this->SendDataToClient(simulation, senderUid, netState.frame_no, count);
+                    }
+                    else {
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                        this->SetClientFrame(senderUid, 0);
+                    }
                 } break;
                 case WebRequestTypes::id_vis_data_pause: {
                     this->SetClientState(senderUid, ClientPlayState::Paused);
