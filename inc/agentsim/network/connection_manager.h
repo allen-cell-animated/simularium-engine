@@ -91,6 +91,7 @@ namespace agentsim {
 
     private:
         void GenerateLocalUUID(std::string& uuid);
+        void SendDataToClient(Simulation& simulation, std::string connectionUID, std::size_t frameNumber);
 
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;

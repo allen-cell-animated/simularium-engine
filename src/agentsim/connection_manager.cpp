@@ -306,52 +306,7 @@ namespace agentsim {
             auto& uid = entry.first;
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing) {
-                continue;
-            }
-
-            AgentDataFrame simData;
-
-            // This state is currently being used to demark the 'latest' frame
-            if (netState.frame_no == this->kLatestFrameValue) {
-                simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
-            } else {
-                simData = simulation.GetDataFrame(netState.frame_no);
-            }
-
-            Json::Value net_agent_data_frame;
-            std::vector<float> vals;
-
-            net_agent_data_frame["msg_type"] = id_vis_data_arrive;
-            for (std::size_t i = 0; i < simData.size(); ++i) {
-                auto agentData = simData[i];
-                vals.push_back(agentData.vis_type);
-                vals.push_back(agentData.type);
-                vals.push_back(agentData.x);
-                vals.push_back(agentData.y);
-                vals.push_back(agentData.z);
-                vals.push_back(agentData.xrot);
-                vals.push_back(agentData.yrot);
-                vals.push_back(agentData.zrot);
-                vals.push_back(agentData.collision_radius);
-                vals.push_back(agentData.subpoints.size());
-
-                for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
-                    vals.push_back(agentData.subpoints[j]);
-                }
-            }
-
-            // Copy values to json data array
-            auto json_data_arr = Json::Value(Json::arrayValue);
-            for (std::size_t j = 0; j < vals.size(); ++j) {
-                int nd_index = static_cast<int>(j);
-                json_data_arr[nd_index] = vals[nd_index];
-            }
-
-            net_agent_data_frame["data"] = json_data_arr;
-            net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
-            net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
-            this->SendWebsocketMessage(uid, net_agent_data_frame);
+            this->SendDataToClient(simulation, uid, netState.frame_no);
         }
     }
 
@@ -429,6 +384,61 @@ namespace agentsim {
             rand(), rand(), rand()); // Generates a 96-bit Hex number
 
         uuid = strUuid;
+    }
+
+    void ConnectionManager::SendDataToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t frameNumber)
+    {
+        auto& netState = this->m_netStates.at(connectionUID);
+
+        if (netState.play_state != ClientPlayState::Playing) {
+            return;
+        }
+
+        AgentDataFrame simData;
+
+        // This state is currently being used to demark the 'latest' frame
+        if (netState.frame_no == this->kLatestFrameValue) {
+            simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
+        } else {
+            simData = simulation.GetDataFrame(netState.frame_no);
+        }
+
+        Json::Value net_agent_data_frame;
+        std::vector<float> vals;
+
+        net_agent_data_frame["msg_type"] = id_vis_data_arrive;
+        for (std::size_t i = 0; i < simData.size(); ++i) {
+            auto agentData = simData[i];
+            vals.push_back(agentData.vis_type);
+            vals.push_back(agentData.type);
+            vals.push_back(agentData.x);
+            vals.push_back(agentData.y);
+            vals.push_back(agentData.z);
+            vals.push_back(agentData.xrot);
+            vals.push_back(agentData.yrot);
+            vals.push_back(agentData.zrot);
+            vals.push_back(agentData.collision_radius);
+            vals.push_back(agentData.subpoints.size());
+
+            for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
+                vals.push_back(agentData.subpoints[j]);
+            }
+        }
+
+        // Copy values to json data array
+        auto json_data_arr = Json::Value(Json::arrayValue);
+        for (std::size_t j = 0; j < vals.size(); ++j) {
+            int nd_index = static_cast<int>(j);
+            json_data_arr[nd_index] = vals[nd_index];
+        }
+
+        net_agent_data_frame["data"] = json_data_arr;
+        net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
+        net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
+        this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
     }
 
     void ConnectionManager::HandleMessage(NetMessage nm)
