@@ -203,6 +203,26 @@ namespace agentsim {
         this->m_netStates[connectionUID].frame_no = frameNumber;
     }
 
+    void ConnectionManager::CheckForFinishedClient(
+        std::size_t numberOfFrames,
+        bool allFramesLoaded,
+        std::string connectionUID,
+        NetState& netState)
+    {
+        if (netState.frame_no >= numberOfFrames - 1) {
+            if (netState.frame_no != this->kLatestFrameValue) {
+                std::cout << "End of simulation cache reached for client "
+                          << connectionUID << std::endl;
+                netState.frame_no = this->kLatestFrameValue;
+            }
+
+            if (allFramesLoaded) {
+                std::cout << "Simulation finished for client " << connectionUID << std::endl;
+                this->SetClientState(connectionUID, ClientPlayState::Finished);
+            }
+        }
+    }
+
     void ConnectionManager::CheckForFinishedClients(
         std::size_t numberOfFrames, bool allFramesLoaded)
     {
@@ -214,18 +234,7 @@ namespace agentsim {
                 continue;
             }
 
-            if (netState.frame_no >= numberOfFrames - 1) {
-                if (netState.frame_no != this->kLatestFrameValue) {
-                    std::cout << "End of simulation cache reached for client "
-                              << connectionUID << std::endl;
-                    netState.frame_no = this->kLatestFrameValue;
-                }
-
-                if (allFramesLoaded) {
-                    std::cout << "Simulation finished for client " << connectionUID << std::endl;
-                    this->SetClientState(connectionUID, ClientPlayState::Finished);
-                }
-            }
+            this->CheckForFinishedClient(numberOfFrames, allFramesLoaded, connectionUID, netState);
         }
     }
 
@@ -306,52 +315,7 @@ namespace agentsim {
             auto& uid = entry.first;
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing) {
-                continue;
-            }
-
-            AgentDataFrame simData;
-
-            // This state is currently being used to demark the 'latest' frame
-            if (netState.frame_no == this->kLatestFrameValue) {
-                simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
-            } else {
-                simData = simulation.GetDataFrame(netState.frame_no);
-            }
-
-            Json::Value net_agent_data_frame;
-            std::vector<float> vals;
-
-            net_agent_data_frame["msg_type"] = id_vis_data_arrive;
-            for (std::size_t i = 0; i < simData.size(); ++i) {
-                auto agentData = simData[i];
-                vals.push_back(agentData.vis_type);
-                vals.push_back(agentData.type);
-                vals.push_back(agentData.x);
-                vals.push_back(agentData.y);
-                vals.push_back(agentData.z);
-                vals.push_back(agentData.xrot);
-                vals.push_back(agentData.yrot);
-                vals.push_back(agentData.zrot);
-                vals.push_back(agentData.collision_radius);
-                vals.push_back(agentData.subpoints.size());
-
-                for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
-                    vals.push_back(agentData.subpoints[j]);
-                }
-            }
-
-            // Copy values to json data array
-            auto json_data_arr = Json::Value(Json::arrayValue);
-            for (std::size_t j = 0; j < vals.size(); ++j) {
-                int nd_index = static_cast<int>(j);
-                json_data_arr[nd_index] = vals[nd_index];
-            }
-
-            net_agent_data_frame["data"] = json_data_arr;
-            net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
-            net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
-            this->SendWebsocketMessage(uid, net_agent_data_frame);
+            this->SendDataToClient(simulation, uid, netState.frame_no);
         }
     }
 
@@ -429,6 +393,90 @@ namespace agentsim {
             rand(), rand(), rand()); // Generates a 96-bit Hex number
 
         uuid = strUuid;
+    }
+
+    void ConnectionManager::SendDataToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t start,
+        std::size_t count
+    )
+    {
+        std::size_t numberOfFrames = simulation.GetNumFrames();
+        bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+        this->SetClientState(connectionUID, ClientPlayState::Playing);
+
+        auto& netState = this->m_netStates.at(connectionUID);
+        for(std::size_t i = 0; i < count; ++i)
+        {
+            this->SendDataToClient(simulation, connectionUID, start + i);
+            netState.frame_no++;
+            this->CheckForFinishedClient(
+                numberOfFrames,
+                hasFinishedLoading,
+                connectionUID,
+                netState);
+        }
+
+        if(netState.play_state == ClientPlayState::Playing)
+        {
+            this->SetClientState(connectionUID, ClientPlayState::Stopped);
+        }
+    }
+
+    void ConnectionManager::SendDataToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t frameNumber)
+    {
+        auto& netState = this->m_netStates.at(connectionUID);
+
+        if (netState.play_state != ClientPlayState::Playing) {
+            return;
+        }
+
+        AgentDataFrame simData;
+
+        // This state is currently being used to demark the 'latest' frame
+        if (netState.frame_no == this->kLatestFrameValue) {
+            simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
+        } else {
+            simData = simulation.GetDataFrame(netState.frame_no);
+        }
+
+        Json::Value net_agent_data_frame;
+        std::vector<float> vals;
+
+        net_agent_data_frame["msg_type"] = id_vis_data_arrive;
+        for (std::size_t i = 0; i < simData.size(); ++i) {
+            auto agentData = simData[i];
+            vals.push_back(agentData.vis_type);
+            vals.push_back(agentData.type);
+            vals.push_back(agentData.x);
+            vals.push_back(agentData.y);
+            vals.push_back(agentData.z);
+            vals.push_back(agentData.xrot);
+            vals.push_back(agentData.yrot);
+            vals.push_back(agentData.zrot);
+            vals.push_back(agentData.collision_radius);
+            vals.push_back(agentData.subpoints.size());
+
+            for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
+                vals.push_back(agentData.subpoints[j]);
+            }
+        }
+
+        // Copy values to json data array
+        auto json_data_arr = Json::Value(Json::arrayValue);
+        for (std::size_t j = 0; j < vals.size(); ++j) {
+            int nd_index = static_cast<int>(j);
+            json_data_arr[nd_index] = vals[nd_index];
+        }
+
+        net_agent_data_frame["data"] = json_data_arr;
+        net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
+        net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
+        this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
     }
 
     void ConnectionManager::HandleMessage(NetMessage nm)
@@ -524,7 +572,14 @@ namespace agentsim {
                             // Load the first hundred simulation frames into a runtime cache
                             std::cout << "Loading trajectory file into runtime cache" << std::endl;
                             std::size_t fn = 0;
-                            while (!simulation.HasLoadedAllFrames() && fn < 100) {
+                            std::size_t count = 100;
+
+                            if(jsonMsg.isMember("count"))
+                            {
+                                count = jsonMsg["count"].asInt() + 1;
+                            }
+
+                            while (!simulation.HasLoadedAllFrames() && fn < count) {
                                 std::cout << "Loading frame " << ++fn << std::endl;
                                 simulation.LoadNextFrame();
                             }
@@ -532,8 +587,19 @@ namespace agentsim {
                         }
                     }
 
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
-                    this->SetClientFrame(senderUid, 0);
+                    if(jsonMsg.isMember("count"))
+                    {
+                        // this is arbitrarily capped at 5
+                        //  the current expected usage is to ask for a single frame
+                        std::size_t count = std::min(jsonMsg["count"].asInt(), 5);
+                        auto& netState = this->m_netStates.at(senderUid);
+
+                        this->SendDataToClient(simulation, senderUid, netState.frame_no, count);
+                    }
+                    else {
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                        this->SetClientFrame(senderUid, 0);
+                    }
                 } break;
                 case WebRequestTypes::id_vis_data_pause: {
                     this->SetClientState(senderUid, ClientPlayState::Paused);
