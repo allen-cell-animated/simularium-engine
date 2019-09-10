@@ -101,6 +101,7 @@ namespace agentsim {
 
         virtual void LoadTrajectoryFile(std::string file_path) override;
         virtual double GetTime(std::size_t frameNumber) override;
+        virtual std::size_t GetFrameNumber(double timeNs) override;
 
     private:
         readdy::Simulation* m_simulation;

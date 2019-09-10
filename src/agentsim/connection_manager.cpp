@@ -203,6 +203,15 @@ namespace agentsim {
         this->m_netStates[connectionUID].frame_no = frameNumber;
     }
 
+    void ConnectionManager::SetClientPlaybackTime(
+        Simulation& simulation,
+        std::string connectionUID,
+        double timeNs)
+    {
+        std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
+        this->m_netStates[connectionUID].frame_no = frameNumber;
+    }
+
     void ConnectionManager::CheckForFinishedClient(
         std::size_t numberOfFrames,
         bool allFramesLoaded,
@@ -635,12 +644,26 @@ namespace agentsim {
                     this->BroadcastModelDefinition(jsonMsg);
                 } break;
                 case WebRequestTypes::id_play_cache: {
-                    auto frameNumber = jsonMsg["frame-num"].asInt();
-                    std::cout << "request to play cached from frame "
-                              << frameNumber << " arrived from client " << senderUid << std::endl;
+                    if(jsonMsg.isMember("time"))
+                    {
+                        auto timeNs = jsonMsg["time"].asFloat();
+                        std::cout << "request to play cached from time "
+                        << time << " frame " << simulation.GetFrameNumber(timeNs)
+                        << " arrived from client " << senderUid << std::endl;
 
-                    this->SetClientFrame(senderUid, frameNumber);
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                        this->SetClientPlaybackTime(simulation, senderUid, timeNs);
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                    }
+                    else if (jsonMsg.isMember("frame-num"))
+                    {
+                        auto frameNumber = jsonMsg["frame-num"].asInt();
+                        std::cout << "request to play cached from frame "
+                        << frameNumber << " arrived from client " << senderUid << std::endl;
+
+                        this->SetClientFrame(senderUid, frameNumber);
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                    }
+
                 } break;
                 default: {
                 } break;

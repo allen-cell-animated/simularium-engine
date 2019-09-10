@@ -160,6 +160,8 @@ namespace agentsim {
 
         double GetTime(std::size_t frameNumber);
 
+        std::size_t GetFrameNumber(double simulationTimeNs);
+
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;

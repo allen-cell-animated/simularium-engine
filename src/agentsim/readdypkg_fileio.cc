@@ -201,6 +201,13 @@ namespace agentsim {
         return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
     }
 
+    std::size_t ReaDDyPkg::GetFrameNumber(double timeNs)
+    {
+        auto times = std::get<0>(this->m_trajectoryInfo);
+        auto lower = std::lower_bound(times.begin(), times.end(), timeNs);
+        return std::distance(times.begin(), lower); 
+    }
+
 } // namespace agentsim
 } // namespace aics
 

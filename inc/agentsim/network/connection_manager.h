@@ -61,6 +61,11 @@ namespace agentsim {
 
         void SetClientState(std::string connectionUID, ClientPlayState state);
         void SetClientFrame(std::string connectionUID, std::size_t frameNumber);
+        void SetClientPlaybackTime(
+            Simulation& simulation,
+            std::string connectionUID,
+            double timeNs
+        );
 
         void SendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage);
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
@@ -97,7 +102,7 @@ namespace agentsim {
         void CheckForFinishedClient(
             std::size_t numberOfFrames,
             bool allFramesLoaded,
-            std::string connectionUID, 
+            std::string connectionUID,
             NetState& netState);
 
         std::unordered_map<std::string, NetState> m_netStates;
