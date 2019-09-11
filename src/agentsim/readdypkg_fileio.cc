@@ -205,7 +205,10 @@ namespace agentsim {
     {
         auto times = std::get<0>(this->m_trajectoryInfo);
         auto lower = std::lower_bound(times.begin(), times.end(), timeNs);
-        return std::distance(times.begin(), lower); 
+        auto frame = std::distance(times.begin(), lower);
+
+        if(frame > 0) { frame = frame - 1; }
+        return frame;
     }
 
 } // namespace agentsim

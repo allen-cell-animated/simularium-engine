@@ -203,15 +203,6 @@ namespace agentsim {
         this->m_netStates[connectionUID].frame_no = frameNumber;
     }
 
-    void ConnectionManager::SetClientPlaybackTime(
-        Simulation& simulation,
-        std::string connectionUID,
-        double timeNs)
-    {
-        std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
-        this->m_netStates[connectionUID].frame_no = frameNumber;
-    }
-
     void ConnectionManager::CheckForFinishedClient(
         std::size_t numberOfFrames,
         bool allFramesLoaded,
@@ -646,12 +637,15 @@ namespace agentsim {
                 case WebRequestTypes::id_play_cache: {
                     if(jsonMsg.isMember("time"))
                     {
-                        auto timeNs = jsonMsg["time"].asFloat();
-                        std::cout << "request to play cached from time "
-                        << time << " frame " << simulation.GetFrameNumber(timeNs)
-                        << " arrived from client " << senderUid << std::endl;
+                        double timeNs = jsonMsg["time"].asDouble();
+                        std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
+                        double closestTime = simulation.GetTime(frameNumber);
 
-                        this->SetClientPlaybackTime(simulation, senderUid, timeNs);
+                        std::cout << "request to play cached from time "
+                        << timeNs << " (frame " << frameNumber << " with time " << closestTime
+                        << ") arrived from client " << senderUid << std::endl;
+
+                        this->SetClientFrame(senderUid, frameNumber);
                         this->SetClientState(senderUid, ClientPlayState::Playing);
                     }
                     else if (jsonMsg.isMember("frame-num"))

@@ -61,11 +61,6 @@ namespace agentsim {
 
         void SetClientState(std::string connectionUID, ClientPlayState state);
         void SetClientFrame(std::string connectionUID, std::size_t frameNumber);
-        void SetClientPlaybackTime(
-            Simulation& simulation,
-            std::string connectionUID,
-            double timeNs
-        );
 
         void SendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage);
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
