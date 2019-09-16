@@ -20,7 +20,7 @@ namespace agentsim {
     void printAgentData(const Json::Value& jsonMsg)
     {
         const Json::Value& data = jsonMsg["data"];
-        std::size_t frameNumber = jsonMsg["frame_number"].asInt();
+        std::size_t frameNumber = jsonMsg["frameNumber"].asInt();
         float time = jsonMsg["time"].asFloat();
 
         Json::ArrayIndex size = data.size();
@@ -217,7 +217,7 @@ namespace agentsim {
     void CliClient::Resume()
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_resume;
+        jsonMsg["msgType"] = WebRequestTypes::id_vis_data_resume;
         jsonMsg["mode"] = id_live_simulation;
         this->SendMessage(jsonMsg, "resume command");
     }
@@ -225,14 +225,14 @@ namespace agentsim {
     void CliClient::Pause()
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_pause;
+        jsonMsg["msgType"] = WebRequestTypes::id_vis_data_pause;
         this->SendMessage(jsonMsg, "pause command");
     }
 
     void CliClient::StartLive()
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_request;
+        jsonMsg["msgType"] = WebRequestTypes::id_vis_data_request;
         jsonMsg["mode"] = id_live_simulation;
         this->SendMessage(jsonMsg, "start command live");
     }
@@ -240,17 +240,17 @@ namespace agentsim {
     void CliClient::StartPrecache(std::size_t numberOfSteps, float timeStepSize)
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_request;
+        jsonMsg["msgType"] = WebRequestTypes::id_vis_data_request;
         jsonMsg["mode"] = id_pre_run_simulation;
-        jsonMsg["time-step"] = 1e-9f;
-        jsonMsg["num-time-steps"] = 200;
+        jsonMsg["timeStep"] = 1e-9f;
+        jsonMsg["numTimeSteps"] = 200;
         this->SendMessage(jsonMsg, "start command precache");
     }
 
     void CliClient::StartTrajectory(std::string fileName)
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_request;
+        jsonMsg["msgType"] = WebRequestTypes::id_vis_data_request;
         jsonMsg["mode"] = id_traj_file_playback;
         jsonMsg["file-name"] = fileName;
         this->SendMessage(jsonMsg, "start command trajectory " + fileName);
@@ -259,16 +259,16 @@ namespace agentsim {
     void CliClient::Stop()
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_vis_data_abort;
+        jsonMsg["msgType"] = WebRequestTypes::id_vis_data_abort;
         this->SendMessage(jsonMsg, "stop command");
     }
 
     void CliClient::Set(std::string name, float value)
     {
         Json::Value jsonMsg;
-        jsonMsg["msg_type"] = WebRequestTypes::id_update_rate_param;
-        jsonMsg["param_name"] = name;
-        jsonMsg["param_value"] = value;
+        jsonMsg["msgType"] = WebRequestTypes::id_update_rate_param;
+        jsonMsg["paramName"] = name;
+        jsonMsg["paramValue"] = value;
         this->SendMessage(jsonMsg, "set command " + name);
     }
 
@@ -285,7 +285,7 @@ namespace agentsim {
         std::ifstream file(fileName);
         file >> jsonMsg;
 
-        jsonMsg["msg_type"] = WebRequestTypes::id_model_definition;
+        jsonMsg["msgType"] = WebRequestTypes::id_model_definition;
         this->SendMessage(jsonMsg, "load command " + fileName);
     }
 
@@ -300,11 +300,11 @@ namespace agentsim {
         jsonReader->parse(msg_str.c_str(), msg_str.c_str() + msg_str.length(),
             &jsonMsg, &errs);
 
-        int msgType = jsonMsg["msg_type"].asInt();
+        int msgType = jsonMsg["msgType"].asInt();
 
         switch (msgType) {
         case WebRequestTypes::id_heartbeat_ping: {
-            jsonMsg["msg_type"] = WebRequestTypes::id_heartbeat_pong;
+            jsonMsg["msgType"] = WebRequestTypes::id_heartbeat_pong;
             this->SendMessage(jsonMsg, "heartbeat ping");
         } break;
         case WebRequestTypes::id_vis_data_arrive: {

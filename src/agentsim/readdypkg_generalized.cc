@@ -451,21 +451,21 @@ namespace agentsim {
         }
     }
 
-    void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
+    void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue)
     {
-        if (!Registered_Reactions[param_name]) {
-            printf("Unrecognized parameter %s passed to ReaDDy Simulation.\n", param_name.c_str());
+        if (!Registered_Reactions[paramName]) {
+            printf("Unrecognized parameter %s passed to ReaDDy Simulation.\n", paramName.c_str());
             return;
         }
 
-        if (Fusion_Reactions[param_name]) {
+        if (Fusion_Reactions[paramName]) {
             auto& topologies = this->m_simulation->context().topologyRegistry();
-            auto& rx = topologies.spatialReactionByName(param_name).rate() = param_value;
+            auto& rx = topologies.spatialReactionByName(paramName).rate() = paramValue;
         }
 
-        if (Fission_Reactions[param_name]) {
-            printf("Reaction Rate Adjustment %s : %f\n", param_name.c_str(), param_value);
-            srx_Fission_Modifier[param_name] = param_value;
+        if (Fission_Reactions[paramName]) {
+            printf("Reaction Rate Adjustment %s : %f\n", paramName.c_str(), paramValue);
+            srx_Fission_Modifier[paramName] = paramValue;
 
             auto& topologies = this->m_simulation->context().topologyRegistry();
             auto tops = this->m_simulation->currentTopologies();

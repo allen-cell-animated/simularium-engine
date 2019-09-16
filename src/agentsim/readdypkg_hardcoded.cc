@@ -314,7 +314,7 @@ namespace agentsim {
         }
     }
 
-    void ReaDDyPkg::UpdateParameter(std::string param_name, float param_value)
+    void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue)
     {
         static const int num_params = 3;
         std::string recognized_params[num_params] = {
@@ -323,14 +323,14 @@ namespace agentsim {
         std::size_t paramIndex = 252; // assuming less than 252 parameters
 
         for (std::size_t i = 0; i < num_params; ++i) {
-            if (recognized_params[i] == param_name) {
+            if (recognized_params[i] == paramName) {
                 paramIndex = i;
                 break;
             }
         }
 
         if (paramIndex == 252) {
-            printf("Unrecognized parameter %s passed into ReaddyPkg.\n", param_name.c_str());
+            printf("Unrecognized parameter %s passed into ReaddyPkg.\n", paramName.c_str());
             return;
         }
 
@@ -349,7 +349,7 @@ namespace agentsim {
         } break;
         default: {
             printf("Recognized but unimplemented parameter %s in ReaDDy SimPkg, resolved as index %lu.\n",
-                param_name.c_str(), paramIndex);
+                paramName.c_str(), paramIndex);
             return;
         } break;
         }

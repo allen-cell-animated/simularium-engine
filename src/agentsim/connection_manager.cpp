@@ -79,7 +79,7 @@ namespace agentsim {
                     continue;
                 }
 
-                // Run simulation time-step
+                // Run simulation time step
                 if (simulation.IsRunningLive()) {
                     simulation.RunTimeStep(timeStep);
                 } else {
@@ -263,7 +263,7 @@ namespace agentsim {
     void ConnectionManager::SendWebsocketMessage(
         std::string connectionUID, Json::Value jsonMessage)
     {
-        jsonMessage["conn_id"] = connectionUID;
+        jsonMessage["connId"] = connectionUID;
         std::string message = Json::writeString(this->m_jsonStreamWriter, jsonMessage);
 
         try {
@@ -349,7 +349,7 @@ namespace agentsim {
     void ConnectionManager::PingAllClients()
     {
         Json::Value pingJsonMessage;
-        pingJsonMessage["msg_type"] = id_heartbeat_ping;
+        pingJsonMessage["msgType"] = id_heartbeat_ping;
 
         this->SendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
     }
@@ -447,7 +447,7 @@ namespace agentsim {
         Json::Value net_agent_data_frame;
         std::vector<float> vals;
 
-        net_agent_data_frame["msg_type"] = id_vis_data_arrive;
+        net_agent_data_frame["msgType"] = id_vis_data_arrive;
         for (std::size_t i = 0; i < simData.size(); ++i) {
             auto agentData = simData[i];
             vals.push_back(agentData.vis_type);
@@ -474,14 +474,14 @@ namespace agentsim {
         }
 
         net_agent_data_frame["data"] = json_data_arr;
-        net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
+        net_agent_data_frame["frameNumber"] = static_cast<int>(netState.frame_no);
         net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
         this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
     }
 
     void ConnectionManager::HandleMessage(NetMessage nm)
     {
-        auto msgType = nm.jsonMessage["msg_type"].asInt();
+        auto msgType = nm.jsonMessage["msgType"].asInt();
 
         if (msgType >= 0 && msgType < WebRequestNames.size()) {
             std::cout << "[" << nm.senderUid << "] Web socket message arrived: "
@@ -528,8 +528,8 @@ namespace agentsim {
                 std::string senderUid = messages[i].senderUid;
                 Json::Value jsonMsg = messages[i].jsonMessage;
 
-                int msg_type = jsonMsg["msg_type"].asInt();
-                switch (msg_type) {
+                int msgType = jsonMsg["msgType"].asInt();
+                switch (msgType) {
                 case WebRequestTypes::id_vis_data_request: {
                     // If a simulation is already in progress, don't allow a new client to
                     //	change the simulation, unless there is only one client connected
@@ -544,8 +544,8 @@ namespace agentsim {
                             simulation.Reset();
                         } break;
                         case id_pre_run_simulation: {
-                            timeStep = jsonMsg["time-step"].asFloat();
-                            auto n_time_steps = jsonMsg["num-time-steps"].asInt();
+                            timeStep = jsonMsg["timeStep"].asFloat();
+                            auto n_time_steps = jsonMsg["numTimeSteps"].asInt();
                             std::cout << "Running pre-run simulation" << std::endl;
 
                             simulation.SetPlaybackMode(runMode);
@@ -593,6 +593,7 @@ namespace agentsim {
                         //  the current expected usage is to ask for a single frame
                         std::size_t count = std::min(jsonMsg["count"].asInt(), 5);
                         auto& netState = this->m_netStates.at(senderUid);
+                        netState.frame_no = jsonMsg["frameNumber"].asInt();
 
                         this->SendDataToClient(simulation, senderUid, netState.frame_no, count);
                     }
@@ -611,13 +612,13 @@ namespace agentsim {
                     this->SetClientState(senderUid, ClientPlayState::Stopped);
                 } break;
                 case WebRequestTypes::id_update_time_step: {
-                    timeStep = jsonMsg["time_step"].asFloat();
+                    timeStep = jsonMsg["timeStep"].asFloat();
                     std::cout << "time step updated to " << timeStep << "\n";
-                    this->SendWebsocketMessageToAll(jsonMsg, "time-step update");
+                    this->SendWebsocketMessageToAll(jsonMsg, "time step update");
                 } break;
                 case WebRequestTypes::id_update_rate_param: {
-                    std::string paramName = jsonMsg["param_name"].asString();
-                    float paramValue = jsonMsg["param_value"].asFloat();
+                    std::string paramName = jsonMsg["paramName"].asString();
+                    float paramValue = jsonMsg["paramValue"].asFloat();
                     std::cout << "rate param " << paramName << " updated to " << paramValue << "\n";
 
                     simulation.UpdateParameter(paramName, paramValue);
