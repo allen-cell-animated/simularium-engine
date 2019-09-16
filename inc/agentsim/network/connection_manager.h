@@ -97,7 +97,7 @@ namespace agentsim {
         void CheckForFinishedClient(
             std::size_t numberOfFrames,
             bool allFramesLoaded,
-            std::string connectionUID, 
+            std::string connectionUID,
             NetState& netState);
 
         std::unordered_map<std::string, NetState> m_netStates;

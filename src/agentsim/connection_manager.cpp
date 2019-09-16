@@ -635,12 +635,29 @@ namespace agentsim {
                     this->BroadcastModelDefinition(jsonMsg);
                 } break;
                 case WebRequestTypes::id_play_cache: {
-                    auto frameNumber = jsonMsg["frame-num"].asInt();
-                    std::cout << "request to play cached from frame "
-                              << frameNumber << " arrived from client " << senderUid << std::endl;
+                    if(jsonMsg.isMember("time"))
+                    {
+                        double timeNs = jsonMsg["time"].asDouble();
+                        std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
+                        double closestTime = simulation.GetTime(frameNumber);
 
-                    this->SetClientFrame(senderUid, frameNumber);
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                        std::cout << "request to play cached from time "
+                        << timeNs << " (frame " << frameNumber << " with time " << closestTime
+                        << ") arrived from client " << senderUid << std::endl;
+
+                        this->SetClientFrame(senderUid, frameNumber);
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                    }
+                    else if (jsonMsg.isMember("frame-num"))
+                    {
+                        auto frameNumber = jsonMsg["frame-num"].asInt();
+                        std::cout << "request to play cached from frame "
+                        << frameNumber << " arrived from client " << senderUid << std::endl;
+
+                        this->SetClientFrame(senderUid, frameNumber);
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                    }
+
                 } break;
                 default: {
                 } break;

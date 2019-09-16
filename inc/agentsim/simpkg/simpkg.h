@@ -78,6 +78,7 @@ namespace agentsim {
         virtual void LoadTrajectoryFile(std::string file_path) = 0;
 
         virtual double GetTime(std::size_t frameNumber) = 0;
+        virtual std::size_t GetFrameNumber(double timeNs) = 0;
     };
 
 } // namespace agentsim
