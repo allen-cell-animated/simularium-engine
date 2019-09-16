@@ -22,3 +22,6 @@ sudo docker build -t agentsim-dev .
 
 To run the docker image:
 sudo docker run -it -p 9002:9002 agentsim-dev:latest agentsim_server.exe
+
+Tests are compiled into the "agentsim_tests.exe" target;
+to run them, run this executable, found in the build directory
