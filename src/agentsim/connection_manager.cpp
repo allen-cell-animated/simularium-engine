@@ -83,10 +83,6 @@ namespace agentsim {
                 // Run simulation time step
                 if (simulation.IsRunningLive()) {
                     simulation.RunTimeStep(timeStep);
-                } else {
-                    if (!simulation.HasLoadedAllFrames()) {
-                        simulation.LoadNextFrame();
-                    }
                 }
 
                 std::size_t numberOfFrames = simulation.GetNumFrames();
