@@ -21,7 +21,8 @@ namespace agentsim {
         id_model_definition,
         id_heartbeat_ping,
         id_heartbeat_pong,
-        id_play_cache
+        id_play_cache,
+        id_trajectory_file_info
     };
 
     //

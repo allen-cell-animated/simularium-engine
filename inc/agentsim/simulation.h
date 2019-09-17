@@ -4,6 +4,7 @@
 #include "agentsim/agent_data.h"
 #include "agentsim/model/model.h"
 #include "agentsim/simulation_cache.h"
+#include "agentsim/network/trajectory_properties.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -148,9 +149,13 @@ namespace agentsim {
 	*	@param	file_path		The location of the trajectory file to load
 	*											Currently, there is no validation for file <-> simPKG correctness
 	*
+    *   @param  fileProps       Is modified to contain information about the trajectory file loaded
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
 	*/
-        void LoadTrajectoryFile(std::string file_path);
+        void LoadTrajectoryFile(
+            std::string file_path,
+            TrajectoryFileProperties& fileProps
+        );
 
         void SetPlaybackMode(std::size_t playback_mode);
 
