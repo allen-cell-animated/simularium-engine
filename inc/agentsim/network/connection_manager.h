@@ -128,6 +128,7 @@ namespace agentsim {
         std::thread m_listeningThread;
         std::thread m_heartbeatThread;
         std::thread m_simThread;
+        std::thread m_fileIoThread;
     };
 
 } // namespace agentsim

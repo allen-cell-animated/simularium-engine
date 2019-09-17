@@ -584,21 +584,19 @@ namespace agentsim {
 
                         if (runMode == id_pre_run_simulation
                             || runMode == id_traj_file_playback) {
-                            // Load the first hundred simulation frames into a runtime cache
-                            std::cout << "Loading trajectory file into runtime cache" << std::endl;
-                            std::size_t fn = 0;
-                            std::size_t count = 100;
+                            this->m_fileIoThread = std::thread([&simulation] {
+                                // Load the first hundred simulation frames into a runtime cache
+                                std::cout << "Loading trajectory file into runtime cache" << std::endl;
+                                std::size_t fn = 0;
 
-                            if(jsonMsg.isMember("count"))
-                            {
-                                count = jsonMsg["count"].asInt() + 1;
-                            }
+                                while (!simulation.HasLoadedAllFrames()) {
+                                    std::cout << "Loading frame " << ++fn << std::endl;
+                                    simulation.LoadNextFrame();
+                                }
+                                std::cout << "Finished loading trajectory into runtime cache" << std::endl;
+                            });
 
-                            while (!simulation.HasLoadedAllFrames() && fn < count) {
-                                std::cout << "Loading frame " << ++fn << std::endl;
-                                simulation.LoadNextFrame();
-                            }
-                            std::cout << "Finished loading trajectory for now" << std::endl;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(500));
                         }
                     }
 
