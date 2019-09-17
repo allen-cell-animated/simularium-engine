@@ -177,12 +177,6 @@ namespace agentsim {
         TrajectoryFileProperties& fileProps
     )
     {
-        auto& time = std::get<0>(this->m_trajectoryInfo);
-        auto& traj = std::get<1>(this->m_trajectoryInfo);
-
-        fileProps.numberOfFrames = traj.size();
-        fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
-
         if (last_loaded_file != file_path) {
             this->m_hasLoadedRunFile = false;
         } else {
