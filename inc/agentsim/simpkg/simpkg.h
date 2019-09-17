@@ -2,6 +2,7 @@
 #define AICS_SIMPKG_H
 
 #include "agentsim/model/model.h"
+#include "agentsim/network/trajectory_properties.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -75,7 +76,10 @@ namespace agentsim {
 	*/
         virtual bool IsFinished() = 0;
 
-        virtual void LoadTrajectoryFile(std::string file_path) = 0;
+        virtual void LoadTrajectoryFile(
+            std::string file_path,
+            TrajectoryFileProperties& fileProps
+        ) = 0;
 
         virtual double GetTime(std::size_t frameNumber) = 0;
         virtual std::size_t GetFrameNumber(double timeNs) = 0;

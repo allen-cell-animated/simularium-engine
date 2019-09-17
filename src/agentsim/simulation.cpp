@@ -151,10 +151,13 @@ namespace agentsim {
         this->m_cache.AddFrame(newFrame);
     }
 
-    void Simulation::LoadTrajectoryFile(std::string file_path)
+    void Simulation::LoadTrajectoryFile(
+        std::string file_path,
+        TrajectoryFileProperties& fileProps
+    )
     {
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->LoadTrajectoryFile(file_path);
+            this->m_SimPkgs[i]->LoadTrajectoryFile(file_path, fileProps);
         }
     }
 

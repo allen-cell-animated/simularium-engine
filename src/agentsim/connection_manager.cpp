@@ -1,5 +1,6 @@
 #include "agentsim/network/connection_manager.h"
 #include "agentsim/network/net_message_ids.h"
+#include "agentsim/network/trajectory_properties.h"
 
 template <typename T, typename U>
 inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
@@ -561,9 +562,23 @@ namespace agentsim {
                                 continue;
                             }
 
+                            TrajectoryFileProperties trajProps;
                             simulation.SetPlaybackMode(runMode);
                             simulation.Reset();
-                            simulation.LoadTrajectoryFile(trajectory_file_directory + trajectoryFileName);
+                            simulation.LoadTrajectoryFile(
+                                trajectory_file_directory + trajectoryFileName,
+                                trajProps
+                            );
+
+                            std::cout << "Trajectory File Props " << std::endl
+                            << "Number of Frames: " << trajProps.numberOfFrames << std::endl
+                            << "Time step size : " << trajProps.timeStepSize << std::endl;
+
+                            Json::Value fprops;
+                            fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
+                            fprops["numberOfFrames"] = trajProps.numberOfFrames;
+                            fprops["timeStepSize"] = trajProps.timeStepSize;
+                            this->SendWebsocketMessage(senderUid, fprops);
                         } break;
                         }
 

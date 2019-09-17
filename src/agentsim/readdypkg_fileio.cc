@@ -137,7 +137,8 @@ namespace agentsim {
         }
 
         if (!this->m_hasLoadedRunFile) {
-            this->LoadTrajectoryFile("/tmp/test.h5");
+            TrajectoryFileProperties ignore;
+            this->LoadTrajectoryFile("/tmp/test.h5", ignore);
         }
 
         auto& trajectoryInfo = std::get<1>(this->m_trajectoryInfo);
@@ -171,12 +172,27 @@ namespace agentsim {
         this->m_hasLoadedRunFile = false;
     }
 
-    void ReaDDyPkg::LoadTrajectoryFile(std::string file_path)
+    void ReaDDyPkg::LoadTrajectoryFile(
+        std::string file_path,
+        TrajectoryFileProperties& fileProps
+    )
     {
+        auto& time = std::get<0>(this->m_trajectoryInfo);
+        auto& traj = std::get<1>(this->m_trajectoryInfo);
+
+        fileProps.numberOfFrames = traj.size();
+        fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
+
         if (last_loaded_file != file_path) {
             this->m_hasLoadedRunFile = false;
         } else {
             std::cout << "Using loaded file:  " << file_path << std::endl;
+            auto& time = std::get<0>(this->m_trajectoryInfo);
+            auto& traj = std::get<1>(this->m_trajectoryInfo);
+
+            fileProps.numberOfFrames = traj.size();
+            fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
+
             return;
         }
 
@@ -193,6 +209,12 @@ namespace agentsim {
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
+
+            auto& time = std::get<0>(this->m_trajectoryInfo);
+            auto& traj = std::get<1>(this->m_trajectoryInfo);
+
+            fileProps.numberOfFrames = traj.size();
+            fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
         }
     }
 

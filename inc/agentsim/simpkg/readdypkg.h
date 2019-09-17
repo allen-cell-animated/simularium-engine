@@ -99,7 +99,10 @@ namespace agentsim {
         virtual bool IsFinished() override;
         virtual void Run(float timeStep, std::size_t nTimeStep) override;
 
-        virtual void LoadTrajectoryFile(std::string file_path) override;
+        virtual void LoadTrajectoryFile(
+            std::string file_path,
+            TrajectoryFileProperties& fileProps
+        ) override;
         virtual double GetTime(std::size_t frameNumber) override;
         virtual std::size_t GetFrameNumber(double timeNs) override;
 
