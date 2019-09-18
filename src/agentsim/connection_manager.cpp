@@ -85,10 +85,10 @@ namespace agentsim {
                     simulation.RunTimeStep(timeStep);
                 }
 
-                std::size_t numberOfFrames = simulation.GetNumFrames();
-                bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+                std::size_t numberOfLoadedFrames = simulation.GetNumFrames();
+                std::size_t totalNumberOfFrames = this->m_trajectoryFileProperties.numberOfFrames;
 
-                this->CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
+                this->CheckForFinishedClients(numberOfLoadedFrames, totalNumberOfFrames);
                 this->SendDataToClients(simulation);
                 this->AdvanceClients();
             }
@@ -180,7 +180,10 @@ namespace agentsim {
     {
         for (auto& entry : this->m_netStates) {
             auto& netState = entry.second;
-            if (netState.play_state == ClientPlayState::Playing) {
+            if (
+                netState.play_state == ClientPlayState::Playing ||
+                netState.play_state == ClientPlayState::Waiting
+            ) {
                 return true;
             }
         }
@@ -201,37 +204,63 @@ namespace agentsim {
     }
 
     void ConnectionManager::CheckForFinishedClient(
-        std::size_t numberOfFrames,
-        bool allFramesLoaded,
+        std::size_t numberOfLoadedFrames,
+        std::size_t totalNumberOfFrames,
         std::string connectionUID,
         NetState& netState)
     {
-        if (netState.frame_no >= numberOfFrames - 1) {
-            if (netState.frame_no != this->kLatestFrameValue) {
-                std::cout << "End of simulation cache reached for client "
-                          << connectionUID << std::endl;
-                netState.frame_no = this->kLatestFrameValue;
-            }
+        auto currentFrame = netState.frame_no;
+        auto currentState = netState.play_state;
 
-            if (allFramesLoaded) {
-                std::cout << "Simulation finished for client " << connectionUID << std::endl;
-                this->SetClientState(connectionUID, ClientPlayState::Finished);
-            }
+        // Invalid frame, set to last frame
+        if(currentFrame >= totalNumberOfFrames)
+        {
+            std::cout << "Client " << connectionUID
+                << " finished streaming" << std::endl;
+            this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
+            this->SetClientState(connectionUID, ClientPlayState::Finished);
+        }
+
+        // Frame is valid but not loaded yet
+        if(currentState == ClientPlayState::Playing &&
+            currentFrame >= numberOfLoadedFrames &&
+            currentFrame < totalNumberOfFrames)
+        {
+            std::cout << "Client " << connectionUID
+                << " set to wait for frame " << currentFrame << std::endl;
+            this->SetClientState(connectionUID, ClientPlayState::Waiting);
+        }
+
+        // If the waited for frame has been loaded
+        if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
+        {
+            std::cout << "Client " << connectionUID
+                << " done waiting for frame " << currentFrame << std::endl;
+            this->SetClientState(connectionUID, ClientPlayState::Playing);
         }
     }
 
     void ConnectionManager::CheckForFinishedClients(
-        std::size_t numberOfFrames, bool allFramesLoaded)
+        std::size_t numberOfLoadedFrames,
+        std::size_t totalNumberOfFrames
+    )
     {
         for (auto& entry : this->m_netStates) {
             auto& connectionUID = entry.first;
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing) {
+            if(netState.play_state == ClientPlayState::Finished ||
+                netState.play_state == ClientPlayState::Stopped)
+            {
                 continue;
             }
 
-            this->CheckForFinishedClient(numberOfFrames, allFramesLoaded, connectionUID, netState);
+            this->CheckForFinishedClient(
+                numberOfLoadedFrames,
+                totalNumberOfFrames,
+                connectionUID,
+                netState
+            );
         }
     }
 
@@ -297,8 +326,7 @@ namespace agentsim {
         for (auto& entry : this->m_netStates) {
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing
-                || netState.frame_no == this->kLatestFrameValue) {
+            if (netState.play_state != ClientPlayState::Playing) {
                 continue;
             }
 
@@ -433,13 +461,7 @@ namespace agentsim {
         }
 
         AgentDataFrame simData;
-
-        // This state is currently being used to demark the 'latest' frame
-        if (netState.frame_no == this->kLatestFrameValue) {
-            simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
-        } else {
-            simData = simulation.GetDataFrame(netState.frame_no);
-        }
+        simData = simulation.GetDataFrame(netState.frame_no);
 
         Json::Value net_agent_data_frame;
         std::vector<float> vals;
@@ -575,6 +597,7 @@ namespace agentsim {
                             fprops["numberOfFrames"] = trajProps.numberOfFrames;
                             fprops["timeStepSize"] = trajProps.timeStepSize;
                             this->SendWebsocketMessage(senderUid, fprops);
+                            this->m_trajectoryFileProperties = trajProps;
                         } break;
                         }
 
@@ -586,7 +609,7 @@ namespace agentsim {
                                 std::size_t fn = 0;
 
                                 while (!simulation.HasLoadedAllFrames()) {
-                                    std::cout << "Loading frame " << ++fn << std::endl;
+                                    //std::cout << "Loading frame " << ++fn << std::endl;
                                     simulation.LoadNextFrame();
                                 }
                                 std::cout << "Finished loading trajectory into runtime cache" << std::endl;
