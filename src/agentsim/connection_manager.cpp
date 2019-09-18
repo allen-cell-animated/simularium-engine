@@ -568,12 +568,15 @@ namespace agentsim {
                         } break;
                         case id_pre_run_simulation: {
                             timeStep = jsonMsg["timeStep"].asFloat();
-                            auto n_time_steps = jsonMsg["numTimeSteps"].asInt();
+                            auto numberOfTimeSteps = jsonMsg["numTimeSteps"].asInt();
                             std::cout << "Running pre-run simulation" << std::endl;
 
                             simulation.SetPlaybackMode(runMode);
                             simulation.Reset();
-                            simulation.RunAndSaveFrames(timeStep, n_time_steps);
+                            simulation.RunAndSaveFrames(timeStep, numberOfTimeSteps);
+                            
+                            this->m_trajectoryFileProperties.numberOfFrames = numberOfTimeSteps;
+                            this->m_trajectoryFileProperties.numberOfFrames = timeStep;
                         } break;
                         case id_traj_file_playback: {
                             auto trajectoryFileName = jsonMsg["file-name"].asString();

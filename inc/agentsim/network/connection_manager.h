@@ -113,7 +113,6 @@ namespace agentsim {
         std::vector<std::string> m_uidsToDelete;
 
         Json::StreamWriterBuilder m_jsonStreamWriter;
-        const std::size_t kLatestFrameValue = std::numeric_limits<std::size_t>::max();
         const std::size_t kMaxMissedHeartBeats = 4;
         const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
