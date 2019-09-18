@@ -17,6 +17,10 @@ namespace agentsim {
 
     void ConnectionManager::CloseServer()
     {
+        if (this->m_fileIoThread.joinable()) {
+            this->m_fileIoThread.join();
+        }
+
         if (this->m_heartbeatThread.joinable()) {
             this->m_heartbeatThread.join();
         }
@@ -603,6 +607,10 @@ namespace agentsim {
 
                         if (runMode == id_pre_run_simulation
                             || runMode == id_traj_file_playback) {
+                            if (this->m_fileIoThread.joinable()) {
+                                this->m_fileIoThread.join();
+                            }
+
                             this->m_fileIoThread = std::thread([&simulation] {
                                 // Load the first hundred simulation frames into a runtime cache
                                 std::cout << "Loading trajectory file into runtime cache" << std::endl;
