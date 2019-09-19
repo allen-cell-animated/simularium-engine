@@ -115,7 +115,9 @@ namespace agentsim {
         /**
         * SetupRuntimeCacheAsync
         *
-        *   @param simulation: an object that
+        *   @param simulation: the simulation object used by the other functions
+        *   in this class; responsible for loading trajectories, running simulations
+        *   and keeping the run-time cache updated
         *
         *   @param  waitTimeMs: specifies an amount of time to wait
         *   this gives the trajectory loading thread a head-start before reading
