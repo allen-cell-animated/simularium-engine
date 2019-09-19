@@ -9,114 +9,65 @@ inline bool file_exists(const std::string& name)
 
 bool get_file_path(std::string& name);
 
-std::vector<std::pair<MonomerType,std::vector<MonomerType>>> orientationNeighborData {
-    {MonomerType ("actin", {"pointed"}, 0), {
-        MonomerType ("actin", {}, 1)
-    }},
-    {MonomerType ("actin", {"branch", "barbed"}, 0), {
-        MonomerType ("arp3", {}, 0)
-    }},
-    {MonomerType ("actin", {"barbed"}, 0), {
-        MonomerType ("actin", {}, -1)
-    }},
-    {MonomerType ("actin", {"branch"}, 0), {
-        MonomerType ("arp3", {}, 0), 
-        MonomerType ("actin", {}, 1)
-    }},
-    {MonomerType ("actin", {"new"}, 0), {}},
-    {MonomerType ("actin", {"free"}, 0), {}},
-    {MonomerType ("actin", {}, 0), {
-        MonomerType ("actin", {}, -1), 
-        MonomerType ("actin", {}, 1)
-    }},
-    {MonomerType ("arp2", {}, 0), {
-        MonomerType ("actin", {}, 0), 
-        MonomerType ("arp3", {}, 0)
-    }},
-    {MonomerType ("arp3", {}, 0), {
-        MonomerType ("arp2", {}, 0), 
-        MonomerType ("actin", {"branch"}, 0)
-    }},
-    {MonomerType ("cap", {}, 0), {
-        MonomerType ("actin", {}, 0)
-    }},
-    {MonomerType ("cap", {"bound"}, 0), {}}
-};
-
-MonomerTypeRotationMap calculateInitialRotations() {
-    /*
-    *   These values were calculated manually by Blair using Unity
-    *    Ultimatley these should come from the model definition
-    *    which will have information about spatial offests and
-    *    relations in complexes (topologies in ReaDDy)
-    */
-    auto actinRotation = aics::agentsim::mathutil::GetRotationMatrix(
-        std::vector({
-            Eigen::Vector3d(0,0,0),
-            Eigen::Vector3d(-1.453012, 3.27238, 2.330608),
-            Eigen::Vector3d(-5.26267,  2.193798, 0.7260392)
-        }));
-
-    auto arp3Rotation = aics::agentsim::mathutil::GetRotationMatrix(
-        std::vector({
-            Eigen::Vector3d(0,0,0),
-            Eigen::Vector3d(-2.390059, -1.559484,  -3.054445),
-            Eigen::Vector3d(-2.3088,   -4.948046,  -0.596437)
-        }));
-
-    auto branchRotation = aics::agentsim::mathutil::GetRotationMatrix(
-        std::vector({
-            Eigen::Vector3d(0,0,0),
-            Eigen::Vector3d(-1.345952, 3.272221, 2.238688),
-            Eigen::Vector3d(-5.155611, 2.193637, 0.63413)
-        }));
-
-    auto tubulinRotation = aics::agentsim::mathutil::GetRotationMatrix(
-        std::vector({
-            Eigen::Vector3d(0, 0, -1),
-            Eigen::Vector3d(0, 0, 0),
-            Eigen::Vector3d(0, 1, 0)
-        }));
-
-    return MonomerTypeRotationMap {
-        {MonomerType ("actin", {"branch"}, 0), branchRotation},
-        {MonomerType ("actin", {}, 0), actinRotation},
-        {MonomerType ("arp2", {}, 0), arp3Rotation},
-        {MonomerType ("tubulin", {}, 0), tubulinRotation}
-    };
-}
-
-MonomerTypeRotationMap calculateOffsetRotations() {
-    /*
-    *   These values were calculated manually by Blair using Unity
-    *    Ultimatley these should come from the model definition
-    *    which will have information about spatial offests and
-    *    relations in complexes (topologies in ReaDDy)
-    */
-    Eigen::Matrix3d rotation_to_prev_actin;
-    rotation_to_prev_actin <<  0.58509899, -0.80874088, -0.05997798,
-                              -0.79675461, -0.55949104, -0.22836785,
-                               0.15113327,  0.18140554, -0.97172566;
+OrientationDataMap initOrientationData() {
     
-    Eigen::Matrix3d rotation_to_next_actin;
-    rotation_to_next_actin <<  0.5851038,  -0.79675251, 0.15112575,
-                              -0.80873679, -0.55949491, 0.18141181,
-                              -0.05998622, -0.2283657, -0.97172566;
+    Eigen::Matrix3d zero_rotation;
+    zero_rotation << 1, 0, 0,
+                     0, 1, 0,
+                     0, 0, 1;
     
-    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis;
-    rotation_barbed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
-                                             -0.3445482,   0.76082255, -0.54994144,
-                                              0.92229704,  0.38359532, -0.0471465;
+    Eigen::Matrix3d rotation_actin_to_prev_actin;
+    rotation_actin_to_prev_actin <<  0.58509899, -0.80874088, -0.05997798,
+                                    -0.79675461, -0.55949104, -0.22836785,
+                                     0.15113327,  0.18140554, -0.97172566;
     
-    Eigen::Matrix3d rotation_from_arp_dimer_axis;
-    rotation_from_arp_dimer_axis <<  0.81557928, -0.35510793,  0.45686846,
-                                    -0.57175434, -0.37306342,  0.73069875,
-                                    -0.08903601, -0.85715929, -0.5072973;
-
-    return MonomerTypeRotationMap {
-        {MonomerType ("actin", {}, 1), rotation_to_next_actin},
-        {MonomerType ("actin", {}, -1), rotation_to_prev_actin},
-        {MonomerType ("arp2", {}, 0), rotation_from_arp_dimer_axis}
+    Eigen::Matrix3d rotation_actin_to_next_actin;
+    rotation_actin_to_next_actin <<  0.5851038,  -0.79675251, 0.15112575,
+                                    -0.80873679, -0.55949491, 0.18141181,
+                                    -0.05998622, -0.2283657, -0.97172566;
+    
+    Eigen::Matrix3d rotation_branch_actin_to_arp3;
+    rotation_branch_actin_to_arp3 <<  0.19687615, -0.47932213, -0.85527193,
+                                      0.80641304, -0.41697831,  0.41931742,
+                                     -0.55761796, -0.77225604,  0.30443854;
+    
+    return OrientationDataMap {
+        {"actin", {
+            {MonomerType ("actin", {"any"}, -1), 
+             OrientationData (
+                Eigen::Vector3d(1.453012, -3.27238, -2.330608), rotation_actin_to_prev_actin, zero_rotation)
+            },
+            {MonomerType ("actin", {"any"}, 1), 
+             OrientationData (
+                Eigen::Vector3d(-3.809657, -1.078586, -1.60457), rotation_actin_to_next_actin, zero_rotation)
+            },
+            {MonomerType ("arp3", {"any"}, 101), 
+             OrientationData (
+                Eigen::Vector3d(1.345954, -3.27222, 2.238695), rotation_branch_actin_to_arp3, zero_rotation)
+            }
+        }},
+        {"arp3", {
+            {MonomerType ("actin", {"branch"}, 101), 
+             OrientationData (
+                Eigen::Vector3d(0.08125937, -3.388564, 2.458009), zero_rotation, zero_rotation)
+            },
+            {MonomerType ("arp2", {"any"}, 101), 
+             OrientationData (
+                Eigen::Vector3d(2.390059, 1.559484, 3.054445), zero_rotation, zero_rotation)
+            }
+        }},
+        {"arp2", {
+            {MonomerType ("arp3", {"any"}, 101), 
+             OrientationData (
+                Eigen::Vector3d(0,0,0), zero_rotation, zero_rotation)
+            }
+        }},
+        {"cap", {
+            {MonomerType ("actin", {"any"}, 101), 
+             OrientationData (
+                Eigen::Vector3d(0,0,0), zero_rotation, zero_rotation)
+            }
+        }}
     };
 }
 
@@ -158,35 +109,20 @@ std::vector<std::size_t> getNeighbors(
     TopologyH5List& topologies
 );
 
-std::string getMainParticleType(
-    std::string readdyParticleType
-);
-
-std::string getMainParticleType(
-    std::string readdyParticleType
-);
-
 MonomerType getMonomerType(
     std::string readdyParticleType
 );
 
 int getMonomerN(
-    MonomerType startMonomerNumber,
-    MonomerType referenceMonomerType
+    int actualMonomerNumber,
+    MonomerType monomerType
 );
 
 bool monomerTypeIsSatisfied(
     MonomerType referenceMonomerType,
+    int referenceActualMonomerNumber,
     MonomerType testMonomerType,
-    int startMonomerNumber
-);
-
-std::vector<MonomerType> getOrientationNeighborTypes(
-    MonomerType particleMonomerType
-);
-
-std::vector<MonomerType> getOrientationNeighbors(
-    std::string readdyParticleType
+    int testActualMonomerNumber
 );
 
 Eigen::Matrix3d eulerToMatrix( 
@@ -200,6 +136,30 @@ std::string monomerTypeToString(
     MonomerType monomerType
 );
 
+std::vector<std::pair<MonomerType,OrientationData>> getOrientationDataForParticle(
+    OrientationDataMap orientationData,
+    MonomerType particleMonomerType
+);
+
+std::vector<std::pair<std::size_t,OrientationData>> getNeighborOrientationData(
+    std::size_t particleID,
+    MonomerType particleMonomerType,
+    std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData,
+    ParticleH5List trajectoryFrame,
+    TopologyH5List topologyFrame,
+    std::unordered_map<std::size_t, std::size_t> idmappingFrame
+);
+
+Eigen::Matrix3d getCurrentRotation(
+    ParticleData neighborParticle0,
+    ParticleData currentParticle,
+    ParticleData neighborParticle1
+);
+
+Eigen::Matrix3d getInitialRotation(
+    std::vector<std::pair<std::size_t,OrientationData>> neighborOrientationData
+);
+
 bool neighborMatchesMonomerType(
     std::string neighborReaDDyType,
     std::string particleReaDDyType,
@@ -209,10 +169,9 @@ bool neighborMatchesMonomerType(
 void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    RotationH5Info& rotationInfo,
+    RotationH5Info& outRotations,
     IdParticleMapping& particleLookup,
-    MonomerTypeRotationMap& initialRotations,
-    MonomerTypeRotationMap& offsetRotations
+    OrientationDataMap& orientationData
 );
 
 namespace aics {
@@ -385,16 +344,14 @@ void read_h5file(
 
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
-    auto initialRotations = calculateInitialRotations();
-    auto offsetRotations = calculateOffsetRotations();
+    auto orientationData = initOrientationData();
 
     calculateOrientations(
         std::get<1>(topologyInfo),
         std::get<1>(trajectoryInfo),
         rotationInfo,
         particleLookup,
-        initialRotations,
-        offsetRotations
+        orientationData
     );
 
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
@@ -715,23 +672,6 @@ std::vector<std::size_t> getNeighbors(
     return neighbors;
 }
 
-std::string getMainParticleType(
-    std::string readdyParticleType
-)
-{
-    char delimiter = '#';
-    auto pos = readdyParticleType.find(delimiter);
-    if (pos != std::string::npos)
-    {
-        return readdyParticleType.substr(0, readdyParticleType.find(delimiter));
-    }
-    else
-    {
-        std::cout << "Failed to get main particle type for " << readdyParticleType << std::endl;
-    }
-    return readdyParticleType;
-}
-
 MonomerType getMonomerType(
     std::string readdyParticleType
 )
@@ -779,10 +719,11 @@ MonomerType getMonomerType(
 }
 
 int getMonomerN(
-    int startMonomerNumber,
-    MonomerType referenceMonomerType)
+    int actualMonomerNumber,
+    MonomerType monomerType
+)
 {   
-    auto n = startMonomerNumber + std::get<2>(referenceMonomerType);
+    auto n = actualMonomerNumber + std::get<2>(monomerType);
     
     if (n > 3)
         n -= 3;
@@ -794,8 +735,9 @@ int getMonomerN(
 
 bool monomerTypeIsSatisfied(
     MonomerType referenceMonomerType,
+    int referenceActualMonomerNumber,
     MonomerType testMonomerType,
-    int startMonomerNumber
+    int testActualMonomerNumber
 )
 {
     // check that the main types are the same
@@ -805,9 +747,10 @@ bool monomerTypeIsSatisfied(
     }
     
     // check that the monomer number is correct
-    if (std::get<2>(referenceMonomerType) != 0)
+    if (std::get<2>(referenceMonomerType) <= 100)
     {
-        if (std::get<2>(testMonomerType) != getMonomerN(startMonomerNumber, referenceMonomerType))
+        if (getMonomerN(testActualMonomerNumber, testMonomerType) != 
+            getMonomerN(referenceActualMonomerNumber, referenceMonomerType))
         {
             return false;
         }
@@ -818,27 +761,16 @@ bool monomerTypeIsSatisfied(
     auto testFlags = std::get<1>(testMonomerType);
     for (std::size_t i = 0; i < referenceFlags.size(); ++i)
     {
+        if (referenceFlags[i] == "any")
+        {
+            return true;
+        }
         if (std::find(testFlags.begin(), testFlags.end(), referenceFlags[i]) == testFlags.end())
         {
             return false;
         }
     }
     return true;
-}
-
-std::vector<MonomerType> getOrientationNeighborTypes(
-    MonomerType particleMonomerType
-)
-{   
-    // get the types of the neighbors to use for orientation calculation
-    for (std::size_t i = 0; i < orientationNeighborData.size(); ++i)
-    {
-        if (monomerTypeIsSatisfied(orientationNeighborData[i].first, particleMonomerType, 0))
-        {
-            return orientationNeighborData[i].second;
-        }
-    }
-    return {MonomerType("", {""}, 0)};
 }
 
 Eigen::Matrix3d eulerToMatrix( 
@@ -886,13 +818,101 @@ std::string monomerTypeToString(
     return s + ") " + std::to_string(std::get<2>(monomerType)) + "]";
 }
 
+std::vector<std::pair<MonomerType,OrientationData>> getOrientationDataForParticle(
+    OrientationDataMap orientationData,
+    MonomerType particleMonomerType
+)
+{
+    // get the relevant orientation data for this particle
+    bool found = false;
+    std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData {};
+    for (std::size_t i = 0; i < orientationData.size(); ++i)
+    {  
+        if (std::get<0>(particleMonomerType) == orientationData.at(i).first)
+        {
+            particleOrientationData = orientationData.at(i).second;
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+    {
+        std::cout << "Failed to find orientation data for " 
+            << monomerTypeToString(particleMonomerType) << std::endl;
+    }
+    return particleOrientationData;
+}
+
+std::vector<std::pair<std::size_t,OrientationData>> getNeighborOrientationData(
+    std::size_t particleID,
+    MonomerType particleMonomerType,
+    std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData,
+    ParticleH5List trajectoryFrame,
+    TopologyH5List topologyFrame,
+    std::unordered_map<std::size_t, std::size_t> idmappingFrame
+)
+{
+    // match actual neighbors to orientation data
+    std::vector<std::pair<std::size_t,OrientationData>> neighborOrientationData {};
+    auto neighborIds = getNeighbors(particleID, topologyFrame);
+    for (std::size_t i = 0; i < particleOrientationData.size(); ++i)
+    { 
+        for (std::size_t j = 0; j < neighborIds.size(); ++j)
+        { 
+            auto neighborID = idmappingFrame.at(neighborIds.at(j));
+            auto neighborParticle = trajectoryFrame.at(neighborID);
+            auto neighborMonomerType = getMonomerType(neighborParticle.type);
+
+            if (monomerTypeIsSatisfied(
+                    particleOrientationData.at(i).first,
+                    std::get<2>(particleMonomerType), 
+                    neighborMonomerType, 0))
+            {
+                neighborOrientationData.push_back({
+                    neighborID, 
+                    particleOrientationData.at(i).second
+                });
+            }
+        }
+    }
+    return neighborOrientationData;
+}
+
+Eigen::Matrix3d getCurrentRotation(
+    ParticleData neighborParticle0,
+    ParticleData currentParticle,
+    ParticleData neighborParticle1
+)
+{
+    std::vector<Eigen::Vector3d> basisPositions {};
+    auto rpos0 = neighborParticle0.position;
+    basisPositions.push_back(Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]));
+    auto rpos1 = currentParticle.position;
+    basisPositions.push_back(Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]));
+    auto rpos2 = neighborParticle1.position;
+    basisPositions.push_back(Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]));
+
+    return aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+}
+
+Eigen::Matrix3d getInitialRotation(
+    std::vector<std::pair<std::size_t,OrientationData>> neighborOrientationData
+)
+{
+    std::vector<Eigen::Vector3d> basisPositions {};
+    basisPositions.push_back(neighborOrientationData.at(0).second.localPosition);
+    basisPositions.push_back(Eigen::Vector3d(0,0,0));
+    basisPositions.push_back(neighborOrientationData.at(1).second.localPosition);
+
+    return aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+}
+
 void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
     RotationH5Info& outRotations,
     IdParticleMapping& particleLookup,
-    MonomerTypeRotationMap& initialRotations,
-    MonomerTypeRotationMap& offsetRotations
+    OrientationDataMap& orientationData
 )
 {
     auto numberOfFrames = topologyH5Info.size();
@@ -903,179 +923,71 @@ void calculateOrientations(
         auto trajectoryFrame = trajectoryH5Info.at(frameIndex);
         auto topologyFrame = topologyH5Info.at(frameIndex);
         auto& rotationFrame = outRotations.at(frameIndex);
-        std::vector<Eigen::Matrix3d> rotationMatrixFrame {};
         auto& idmappingFrame = particleLookup.at(frameIndex);
-        std::unordered_map<std::size_t,MonomerType> orientRelativeToNeighbor = {};
-
-        for(std::size_t particleIndex = 0;
-            particleIndex < trajectoryFrame.size();
-            ++particleIndex)
+        
+        std::vector<Eigen::Matrix3d> orientationFrame {};
+        std::vector<std::pair<std::size_t,std::pair<std::size_t,OrientationData>>> orientRelativeToNeighbor {};
+        
+        // match particles to orientation data and calculate orientation for particles with 0 or 2 neighbors
+        for(std::size_t particleIndex = 0; particleIndex < trajectoryFrame.size(); ++particleIndex)
         {
             auto currentParticle = trajectoryFrame.at(particleIndex);
-            std::string particleName = currentParticle.type;
-            MonomerType particleMonomerType = getMonomerType(particleName);
+            auto particleMonomerType = getMonomerType(currentParticle.type);
+            auto particleOrientationData = getOrientationDataForParticle(orientationData, particleMonomerType);
+            auto neighborOrientationData = getNeighborOrientationData(
+                currentParticle.id, particleMonomerType, particleOrientationData, 
+                trajectoryFrame, topologyFrame, idmappingFrame);
             
-            auto neighborIds = getNeighbors(currentParticle.id, topologyFrame);
-            std::size_t neighborCount = neighborIds.size();
-            
-            // get the types of the neighbors to use for orientation calculation
-            std::vector<MonomerType> orientationNeighborTypes = getOrientationNeighborTypes(particleMonomerType);
-            std::size_t orientationNeighborTypesCount = orientationNeighborTypes.size();
-            
-            if (neighborCount < orientationNeighborTypesCount)
-            {
-                // not enough neighbors to correctly calculate orientation
-                std::cout << frameIndex << ": Expected " << orientationNeighborTypesCount 
-                    << " neighbors for " << particleName << ", found " << neighborCount << std::endl;
-                rotationMatrixFrame.push_back(getErrorOrientation());
-                continue;
-            }
-            
-            if (orientationNeighborTypesCount < 1)
+            if (neighborOrientationData.size() < 1)
             {
                 // no neighbors, use random rotation
                 std::cout << frameIndex << ": Use random orientation for " 
-                    << particleName << " " << currentParticle.id << std::endl;
-                rotationMatrixFrame.push_back(getRandomOrientation());
+                    << currentParticle.type << " " << currentParticle.id << std::endl;
+                orientationFrame.push_back(getRandomOrientation());
                 continue;
             }
             
-            if (orientationNeighborTypesCount < 2)
+            if (neighborOrientationData.size() < 2)
             {
+                // one neighbor, revisit after neighbor's orientation is calculated
                 std::cout << frameIndex << ": Use one neighbor for orientation of " 
-                    << particleName << " " << currentParticle.id << std::endl;
-                rotationMatrixFrame.push_back(getErrorOrientation());
-                orientRelativeToNeighbor[particleIndex] = orientationNeighborTypes[0];
+                    << currentParticle.type << " " << currentParticle.id << std::endl;
+                orientationFrame.push_back(getErrorOrientation());
+                orientRelativeToNeighbor.push_back({particleIndex, neighborOrientationData.at(0)});
                 continue;
             }
             
-            // get neighbor particles of the orientation neighbor types
-            std::vector<ParticleData> orientationNeighbors = {};
-            for (std::size_t i = 0; i < orientationNeighborTypesCount; ++i)
-            {   
-                for (std::size_t j = 0; j < neighborCount; ++j)
-                {
-                    if (idmappingFrame.count(neighborIds.at(j)) == 0)
-                    {
-                        std::cout << frameIndex << ": Invalid neighbor ID for " 
-                            << particleName << " " << currentParticle.id << std::endl;
-                        continue;
-                    }
-                    auto neighborID = idmappingFrame.at(neighborIds.at(j));
-                    auto neighborParticle = trajectoryFrame.at(neighborID);
-                    MonomerType neighborMonomerType = getMonomerType(neighborParticle.type);
-                
-                    if (monomerTypeIsSatisfied(
-                            orientationNeighborTypes[i], 
-                            neighborMonomerType, 
-                            std::get<2>(particleMonomerType)))
-                    {
-                        orientationNeighbors.push_back(neighborParticle);
-                    }
-                }
-            }
-            if (orientationNeighbors.size() < 2)
-            {
-                std::cout << frameIndex << ": Failed to find orientation neighbors for " 
-                    << particleName << " " << currentParticle.id << std::endl;
-                rotationMatrixFrame.push_back(getErrorOrientation());
-                continue;
-            }
-
-            auto rpos0 = orientationNeighbors[0].position;
-            auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
-            auto rpos1 = currentParticle.position;
-            auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
-            auto rpos2 = orientationNeighbors[1].position;
-            auto pos2 = Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]);
-
-            std::vector<Eigen::Vector3d> basisPositions;
-            basisPositions.push_back(pos0);
-            basisPositions.push_back(pos1);
-            basisPositions.push_back(pos2);
-            auto rmat = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
-            
-            Eigen::Matrix3d initialRotation;
-            for (std::size_t i = 0; i < initialRotations.size(); ++i)
-            {
-                if (monomerTypeIsSatisfied(initialRotations[i].first, particleMonomerType, 0))
-                {
-                    initialRotation = initialRotations[i].second;
-                    break;
-                }
-            }
-            
-            rotationMatrixFrame.push_back(rmat.inverse() * initialRotation);
+            // two+ neighbors, use vectors to neighbors to construct current rotation matrix
+            // and subtract the initial rotation for the particle constructed from the ideal
+            // relative positions of the neighbors
+            Eigen::Matrix3d currentRotation = getCurrentRotation(
+                trajectoryFrame.at(neighborOrientationData.at(0).first),
+                currentParticle,
+                trajectoryFrame.at(neighborOrientationData.at(1).first));
+            Eigen::Matrix3d initialRotation = getInitialRotation(neighborOrientationData);
+            orientationFrame.push_back(currentRotation.inverse() * initialRotation);
             std::cout << frameIndex << ": Successfully oriented " 
-                << particleName << " " << currentParticle.id << std::endl;
+                << currentParticle.type << " " << currentParticle.id << std::endl;
         }
         
         // go back and calculate orientation for particles with one neighbor
         // since their orientation is dependent on the neighbor's orientation
-        for (auto i = orientRelativeToNeighbor.begin(); i != orientRelativeToNeighbor.end(); ++i)
-        {
-            auto particleIndex = i->first;
-            auto orientationNeighborType = i->second;
+        for (std::size_t i = 0; i < orientRelativeToNeighbor.size(); ++i)
+        {   
+            auto particleID = orientRelativeToNeighbor.at(i).first;
+            auto neighborID = orientRelativeToNeighbor.at(i).second.first;
+            auto neighborOrientation = orientationFrame.at(neighborID);
+            auto offsetRotation = orientRelativeToNeighbor.at(i).second.second.localRotation.inverse();
             
-            auto currentParticle = trajectoryFrame.at(particleIndex);
-            std::string particleName = currentParticle.type;
-            MonomerType particleMonomerType = getMonomerType(particleName);
-            auto particleID = currentParticle.id;
-            
-            std::cout << monomerTypeToString(particleMonomerType) << std::endl;
-            std::cout << monomerTypeToString(orientationNeighborType) << std::endl;
-            
-            auto neighborIds = getNeighbors(particleID, topologyFrame);
-                
-            // get neighbor particle of the orientation neighbor type
-            std::size_t orientationNeighborID;
-            for(std::size_t j = 0; j < neighborIds.size(); ++j)
-            {
-                if(idmappingFrame.count(neighborIds.at(j)) == 0)
-                {
-                    std::cout << frameIndex << ": Invalid neighbor ID for " 
-                        << particleName << " " << particleID << std::endl;
-                    continue;
-                }
-                auto neighborID = idmappingFrame.at(neighborIds.at(j));
-                auto neighborParticle = trajectoryFrame.at(neighborID);
-                MonomerType neighborMonomerType = getMonomerType(neighborParticle.type);
-
-                if (monomerTypeIsSatisfied(
-                        orientationNeighborType, 
-                        neighborMonomerType, 
-                        std::get<2>(particleMonomerType)))
-                {
-                    orientationNeighborID = neighborID;
-                    break;
-                }
-            }
-            if (orientationNeighborID == 0)
-            {
-                std::cout << frameIndex << ": Failed to find orientation neighbor for " 
-                    << particleName << " " << particleID << std::endl;
-                continue;
-            }
-            
-            // multiply the neighbor's orientation by an offset rotation
-            auto neighborRMat = rotationMatrixFrame.at(orientationNeighborID);
-            Eigen::Matrix3d offsetRotation;
-            for(std::size_t j = 0; j < offsetRotations.size(); ++j)
-            {
-                if (monomerTypeIsSatisfied(offsetRotations[j].first, orientationNeighborType, 0))
-                {
-                    offsetRotation = offsetRotations[j].second;
-                    break;
-                }
-            }
-            rotationMatrixFrame.at(i->first) = neighborRMat * offsetRotation;
+            orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
             std::cout << frameIndex << ": Successfully oriented " 
-                << particleName << " " << particleID << " with 1 neighbor " << std::endl;
+                << particleID << " with one neighbor" << std::endl;
         }
         
-        for(std::size_t i = 0; i < rotationMatrixFrame.size(); ++i)
+        // save all the orientations as euler angles
+        for(std::size_t i = 0; i < orientationFrame.size(); ++i)
         {
-            rotationFrame.push_back(rotationMatrixFrame[i].eulerAngles(0,1,2));
+            rotationFrame.push_back(orientationFrame[i].eulerAngles(0,1,2));
         }
     }
 }

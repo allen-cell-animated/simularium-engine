@@ -32,6 +32,19 @@ struct ParticleData {
     readdy::time_step_type t;
 };
 
+struct OrientationData {
+    OrientationData(Eigen::Vector3d pos, Eigen::Matrix3d rot, Eigen::Matrix3d axisRot) 
+        : localPosition(pos)
+        , localRotation(rot)
+        , axisRotation(axisRot)
+    {
+    }
+    
+    Eigen::Vector3d localPosition;
+    Eigen::Matrix3d localRotation;
+    Eigen::Matrix3d axisRotation;
+};
+
 /*
 The below has been copied from ReaDDy for developer reference
 so that one can quickly double check the definition for the topology
@@ -65,7 +78,9 @@ using TimeTopologyH5Info = std::tuple<TimestepH5List, TopologyH5Info>;
 using IdParticleMapping = std::vector<std::unordered_map<std::size_t, std::size_t>>;
 
 using MonomerType = std::tuple<std::string,std::vector<std::string>,int>;
+using OrientationNeighborGroup = std::pair<MonomerType,std::vector<MonomerType>>;
 using MonomerTypeRotationMap = std::vector<std::pair<MonomerType, Eigen::Matrix3d>>;
+using OrientationDataMap = std::vector<std::pair<std::string,std::vector<std::pair<MonomerType,OrientationData>>>>;
 
 namespace aics {
 namespace agentsim {
