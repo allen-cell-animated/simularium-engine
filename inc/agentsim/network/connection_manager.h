@@ -15,6 +15,7 @@
 #include <websocketpp/server.hpp>
 
 #include "agentsim/network/net_message_ids.h"
+#include "agentsim/network/trajectory_properties.h"
 #include "agentsim/simulation.h"
 
 typedef websocketpp::server<websocketpp::config::asio> server;
@@ -25,6 +26,7 @@ namespace agentsim {
     enum ClientPlayState {
         Playing = 0,
         Paused = 1,
+        Waiting,
         Stopped,
         Finished
     };
@@ -65,7 +67,10 @@ namespace agentsim {
         void SendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage);
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
 
-        void CheckForFinishedClients(std::size_t numberOfFrames, bool allFramesLoaded);
+        void CheckForFinishedClients(
+            std::size_t numberOfLoadedFrames,
+            std::size_t totalNumberOfFrames
+        );
         void AdvanceClients();
         void SendDataToClients(Simulation& simulation);
 
@@ -95,10 +100,11 @@ namespace agentsim {
         void SendDataToClient(Simulation& simulation, std::string connectionUID, std::size_t start, std::size_t count);
 
         void CheckForFinishedClient(
-            std::size_t numberOfFrames,
-            bool allFramesLoaded,
+            std::size_t numberOfLoadedFrames,
+            std::size_t totalNumberOfFrames,
             std::string connectionUID,
-            NetState& netState);
+            NetState& netState
+        );
 
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
@@ -107,7 +113,6 @@ namespace agentsim {
         std::vector<std::string> m_uidsToDelete;
 
         Json::StreamWriterBuilder m_jsonStreamWriter;
-        const std::size_t kLatestFrameValue = std::numeric_limits<std::size_t>::max();
         const std::size_t kMaxMissedHeartBeats = 4;
         const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
@@ -128,6 +133,8 @@ namespace agentsim {
         std::thread m_listeningThread;
         std::thread m_heartbeatThread;
         std::thread m_simThread;
+        std::thread m_fileIoThread;
+        TrajectoryFileProperties m_trajectoryFileProperties;
     };
 
 } // namespace agentsim
