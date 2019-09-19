@@ -540,9 +540,6 @@ namespace agentsim {
         Simulation& simulation,
         float& timeStep)
     {
-        // the relative directory for trajectory files on S3
-        //  local downloads mirror the S3 directory structure
-        std::string trajectory_file_directory = "trajectory/";
         auto& messages = this->GetMessages();
 
         // handle net messages
@@ -574,59 +571,17 @@ namespace agentsim {
                             simulation.SetPlaybackMode(runMode);
                             simulation.Reset();
                             simulation.RunAndSaveFrames(timeStep, numberOfTimeSteps);
-                            
+
                             this->m_trajectoryFileProperties.numberOfFrames = numberOfTimeSteps;
                             this->m_trajectoryFileProperties.numberOfFrames = timeStep;
+                            this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
                         case id_traj_file_playback: {
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             std::cout << "Playing back trajectory file" << std::endl;
-
-                            if (trajectoryFileName.empty()) {
-                                std::cout << "Trajectory file not specified, ignoring request" << std::endl;
-                                continue;
-                            }
-
-                            TrajectoryFileProperties trajProps;
-                            simulation.SetPlaybackMode(runMode);
-                            simulation.Reset();
-                            simulation.LoadTrajectoryFile(
-                                trajectory_file_directory + trajectoryFileName,
-                                trajProps
-                            );
-
-                            std::cout << "Trajectory File Props " << std::endl
-                            << "Number of Frames: " << trajProps.numberOfFrames << std::endl
-                            << "Time step size : " << trajProps.timeStepSize << std::endl;
-
-                            Json::Value fprops;
-                            fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
-                            fprops["numberOfFrames"] = trajProps.numberOfFrames;
-                            fprops["timeStepSize"] = trajProps.timeStepSize;
-                            this->SendWebsocketMessage(senderUid, fprops);
-                            this->m_trajectoryFileProperties = trajProps;
+                            this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
+                            this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
-                        }
-
-                        if (runMode == id_pre_run_simulation
-                            || runMode == id_traj_file_playback) {
-                            if (this->m_fileIoThread.joinable()) {
-                                this->m_fileIoThread.join();
-                            }
-
-                            this->m_fileIoThread = std::thread([&simulation] {
-                                // Load the first hundred simulation frames into a runtime cache
-                                std::cout << "Loading trajectory file into runtime cache" << std::endl;
-                                std::size_t fn = 0;
-
-                                while (!simulation.HasLoadedAllFrames()) {
-                                    //std::cout << "Loading frame " << ++fn << std::endl;
-                                    simulation.LoadNextFrame();
-                                }
-                                std::cout << "Finished loading trajectory into runtime cache" << std::endl;
-                            });
-
-                            std::this_thread::sleep_for(std::chrono::milliseconds(500));
                         }
                     }
 
@@ -703,6 +658,22 @@ namespace agentsim {
                     }
 
                 } break;
+                case WebRequestTypes::id_goto_simulation_time: {
+                    double timeNs = jsonMsg["time"].asDouble();
+                    std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
+                    double closestTime = simulation.GetTime(frameNumber);
+
+                    std::cout << "Client " << senderUid <<
+                        " set to frame " << frameNumber << std::endl;
+
+                    this->SetClientFrame(senderUid, frameNumber);
+                    this->SetClientState(senderUid, ClientPlayState::Paused);
+                } break;
+                case WebRequestTypes::id_init_trajectory_file: {
+                    std::string fileName = jsonMsg["fileName"].asString();
+                    this->InitializeTrajectoryFile(simulation, senderUid, fileName);
+                    this->SetupRuntimeCacheAsync(simulation, 500);
+                } break;
                 default: {
                 } break;
                 }
@@ -710,6 +681,72 @@ namespace agentsim {
 
             messages.clear();
         }
+    }
+
+    void ConnectionManager::InitializeTrajectoryFile(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::string fileName
+    )
+    {
+        if (fileName.empty()) {
+            std::cout << "Trajectory file not specified, ignoring request" << std::endl;
+            return;
+        }
+
+        // the relative directory for trajectory files on S3
+        //  local downloads mirror the S3 directory structure
+        std::string trajectory_file_directory = "trajectory/";
+
+        std::string lastLoaded = this->m_trajectoryFileProperties.fileName;
+        if(fileName.compare(lastLoaded) == 0)
+        {
+            std::cout << "Using previously loaded file" << std::endl;
+        }
+        else {
+            this->m_trajectoryFileProperties.fileName = fileName;
+            simulation.SetPlaybackMode(id_traj_file_playback);
+            simulation.Reset();
+            simulation.LoadTrajectoryFile(
+                trajectory_file_directory + fileName,
+                this->m_trajectoryFileProperties
+            );
+        }
+
+        // Send Trajectory File Properties
+        std::cout << "Trajectory File Props " << std::endl
+        << "Number of Frames: "
+        << this->m_trajectoryFileProperties.numberOfFrames << std::endl
+        << "Time step size : "
+        << this->m_trajectoryFileProperties.timeStepSize << std::endl;
+
+        Json::Value fprops;
+        fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
+        fprops["numberOfFrames"] = this->m_trajectoryFileProperties.numberOfFrames;
+        fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
+        this->SendWebsocketMessage(connectionUID, fprops);
+    }
+
+    void ConnectionManager::SetupRuntimeCacheAsync(
+        Simulation& simulation,
+        std::size_t waitTimeMs
+    ) {
+        if (this->m_fileIoThread.joinable()) {
+            this->m_fileIoThread.join();
+        }
+
+        this->m_fileIoThread = std::thread([&simulation] {
+            // Load the first hundred simulation frames into a runtime cache
+            std::cout << "Loading trajectory file into runtime cache" << std::endl;
+            std::size_t fn = 0;
+
+            while (!simulation.HasLoadedAllFrames()) {
+                simulation.LoadNextFrame();
+            }
+            std::cout << "Finished loading trajectory into runtime cache" << std::endl;
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));
     }
 
 } // namespace agentsim

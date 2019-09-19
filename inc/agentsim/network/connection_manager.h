@@ -106,6 +106,27 @@ namespace agentsim {
             NetState& netState
         );
 
+        void InitializeTrajectoryFile(
+            Simulation& simulation,
+            std::string connectionUID,
+            std::string fileName
+        );
+
+        /**
+        * SetupRuntimeCacheAsync
+        *
+        *   @param simulation: the simulation object used by the other functions
+        *   in this class; responsible for loading trajectories, running simulations
+        *   and keeping the run-time cache updated
+        *
+        *   @param  waitTimeMs: specifies an amount of time to wait
+        *   this gives the trajectory loading thread a head-start before reading
+        */
+        void SetupRuntimeCacheAsync(
+            Simulation& simulation,
+            std::size_t waitTimeMs
+        );
+
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
         std::unordered_map<std::string, std::size_t> m_missedHeartbeats;
