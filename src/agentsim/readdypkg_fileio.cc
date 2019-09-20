@@ -21,51 +21,85 @@ OrientationDataMap initOrientationData() {
                                     -0.79675461, -0.55949104, -0.22836785,
                                      0.15113327,  0.18140554, -0.97172566;
     
+    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis;
+    rotation_barbed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
+                                             -0.3445482,   0.76082255, -0.54994144,
+                                              0.92229704,  0.38359532, -0.0471465;
+    
     Eigen::Matrix3d rotation_actin_to_next_actin;
     rotation_actin_to_next_actin <<  0.5851038,  -0.79675251, 0.15112575,
                                     -0.80873679, -0.55949491, 0.18141181,
                                     -0.05998622, -0.2283657, -0.97172566;
+    
+    Eigen::Matrix3d rotation_pointed_from_actin_dimer_axis; //TODO
+    rotation_pointed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
+                                              -0.3445482,   0.76082255, -0.54994144,
+                                               0.92229704,  0.38359532, -0.0471465;
     
     Eigen::Matrix3d rotation_branch_actin_to_arp3;
     rotation_branch_actin_to_arp3 <<  0.19687615, -0.47932213, -0.85527193,
                                       0.80641304, -0.41697831,  0.41931742,
                                      -0.55761796, -0.77225604,  0.30443854;
     
+    Eigen::Matrix3d rotation_arp2_from_arp_dimer_axis;
+    rotation_arp2_from_arp_dimer_axis <<  0.81557928, -0.35510793,  0.45686846,
+                                         -0.57175434, -0.37306342,  0.73069875,
+                                         -0.08903601, -0.85715929, -0.5072973;
+    
+    Eigen::Matrix3d rotation_arp3_from_arp_dimer_axis; //TODO
+    rotation_arp3_from_arp_dimer_axis <<  0.19687615, -0.47932213, -0.85527193,
+                                          0.80641304, -0.41697831,  0.41931742,
+                                         -0.55761796, -0.77225604,  0.30443854;
+    
     return OrientationDataMap {
         {"actin", {
             {MonomerType ("actin", {"any"}, -1), 
              OrientationData (
-                Eigen::Vector3d(1.453012, -3.27238, -2.330608), rotation_actin_to_prev_actin, zero_rotation)
+                 Eigen::Vector3d(1.453012, -3.27238, -2.330608), 
+                 rotation_actin_to_prev_actin, 
+                 zero_rotation) //rotation_barbed_from_actin_dimer_axis
             },
             {MonomerType ("actin", {"any"}, 1), 
              OrientationData (
-                Eigen::Vector3d(-3.809657, -1.078586, -1.60457), rotation_actin_to_next_actin, zero_rotation)
+                 Eigen::Vector3d(-3.809657, -1.078586, -1.60457), 
+                 rotation_actin_to_next_actin, 
+                 zero_rotation) //rotation_pointed_from_actin_dimer_axis
             },
             {MonomerType ("arp3", {"any"}, 101), 
              OrientationData (
-                Eigen::Vector3d(1.345954, -3.27222, 2.238695), rotation_branch_actin_to_arp3, zero_rotation)
+                 Eigen::Vector3d(1.345954, -3.27222, 2.238695), 
+                 rotation_branch_actin_to_arp3, 
+                 zero_rotation)
             }
         }},
         {"arp3", {
             {MonomerType ("actin", {"branch"}, 101), 
              OrientationData (
-                Eigen::Vector3d(0.08125937, -3.388564, 2.458009), zero_rotation, zero_rotation)
+                 Eigen::Vector3d(0.08125937, -3.388564, 2.458009), 
+                 zero_rotation, 
+                 zero_rotation)
             },
             {MonomerType ("arp2", {"any"}, 101), 
              OrientationData (
-                Eigen::Vector3d(2.390059, 1.559484, 3.054445), zero_rotation, zero_rotation)
+                 Eigen::Vector3d(2.390059, 1.559484, 3.054445), 
+                 zero_rotation, 
+                 zero_rotation) //rotation_arp3_from_arp_dimer_axis
             }
         }},
         {"arp2", {
             {MonomerType ("arp3", {"any"}, 101), 
              OrientationData (
-                Eigen::Vector3d(0,0,0), zero_rotation, zero_rotation)
+                 Eigen::Vector3d(0,0,0), 
+                 zero_rotation, 
+                 zero_rotation) //rotation_arp2_from_arp_dimer_axis
             }
         }},
         {"cap", {
             {MonomerType ("actin", {"any"}, 101), 
              OrientationData (
-                Eigen::Vector3d(0,0,0), zero_rotation, zero_rotation)
+                 Eigen::Vector3d(0,0,0), 
+                 zero_rotation, 
+                 zero_rotation)
             }
         }}
     };
@@ -160,10 +194,14 @@ Eigen::Matrix3d getInitialRotation(
     std::vector<std::pair<std::size_t,OrientationData>> neighborOrientationData
 );
 
-bool neighborMatchesMonomerType(
-    std::string neighborReaDDyType,
-    std::string particleReaDDyType,
-    MonomerType monomerType
+Eigen::Vector3d getRandomPerpendicularVector(
+    Eigen::Vector3d vector
+);
+
+Eigen::Matrix3d getRotationUsingAxis(
+    ParticleData particle,
+    ParticleData neighborParticle,
+    Eigen::Matrix3d axisRotation
 );
 
 void calculateOrientations(
@@ -907,6 +945,51 @@ Eigen::Matrix3d getInitialRotation(
     return aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
 }
 
+Eigen::Vector3d getRandomPerpendicularVector(
+    Eigen::Vector3d vector
+)
+{
+    if (vector[0] == 0 && vector[1] == 0)
+    {
+        if (vector[2] == 0)
+        {
+            std::cout << "Failed to get perpendicular vector to zero vector! " << std::endl;
+            return Eigen::Vector3d(0, 0, 0);
+        }
+        return Eigen::Vector3d(0, 1, 0);
+    }
+    
+    auto u = Eigen::Vector3d(-vector[1], vector[0], 0);
+    u.normalize();
+    auto r = Eigen::AngleAxisd(rand() % 2*M_PI, vector).toRotationMatrix();
+
+    return r * u;
+}
+
+Eigen::Matrix3d getRotationUsingAxis(
+    ParticleData particle,
+    ParticleData neighborParticle,
+    Eigen::Matrix3d axisRotation
+)
+{
+    auto particlePosition = Eigen::Vector3d(
+        particle.position[0], particle.position[1], particle.position[2]);
+    auto neighborPosition = Eigen::Vector3d(
+        neighborParticle.position[0], neighborParticle.position[1], neighborParticle.position[2]);
+    
+    Eigen::Vector3d axis = neighborPosition - particlePosition;
+    auto normal = getRandomPerpendicularVector(axis);
+    auto normalPos = particlePosition + normal;
+
+    std::vector<Eigen::Vector3d> basisPositions {};
+    basisPositions.push_back(neighborPosition);
+    basisPositions.push_back(particlePosition);
+    basisPositions.push_back(normalPos);
+
+    Eigen::Matrix3d rotation = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+    return rotation * axisRotation;
+}
+
 void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
@@ -918,7 +1001,7 @@ void calculateOrientations(
     auto numberOfFrames = topologyH5Info.size();
     outRotations.resize(numberOfFrames);
 
-    for(std::size_t frameIndex = 0; frameIndex < 1; ++frameIndex) //numberOfFrames
+    for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
         auto trajectoryFrame = trajectoryH5Info.at(frameIndex);
         auto topologyFrame = topologyH5Info.at(frameIndex);
@@ -975,13 +1058,29 @@ void calculateOrientations(
         for (std::size_t i = 0; i < orientRelativeToNeighbor.size(); ++i)
         {   
             auto particleID = orientRelativeToNeighbor.at(i).first;
-            auto neighborID = orientRelativeToNeighbor.at(i).second.first;
-            auto neighborOrientation = orientationFrame.at(neighborID);
-            auto offsetRotation = orientRelativeToNeighbor.at(i).second.second.localRotation.inverse();
-            
-            orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
-            std::cout << frameIndex << ": Successfully oriented " 
-                << particleID << " with one neighbor" << std::endl;
+            if (orientationFrame.at(particleID) == getErrorOrientation())
+            {
+                auto neighborID = orientRelativeToNeighbor.at(i).second.first;
+                auto neighborOrientation = orientationFrame.at(neighborID);
+                if (neighborOrientation == getErrorOrientation())
+                {
+                    // neighbor hasn't been oriented, so use axis rotation instead
+                    orientationFrame.at(particleID) = getRotationUsingAxis(
+                        trajectoryFrame.at(particleID),
+                        trajectoryFrame.at(neighborID),
+                        orientRelativeToNeighbor.at(i).second.second.axisRotation
+                    );
+                    std::cout << frameIndex << ": Successfully oriented " 
+                        << particleID << " with axis rotation from " << neighborID << std::endl;
+                    continue;
+                }
+
+                auto offsetRotation = orientRelativeToNeighbor.at(i).second.second.localRotation.inverse();
+
+                orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
+                std::cout << frameIndex << ": Successfully oriented " 
+                    << particleID << " with one neighbor" << std::endl;
+            }
         }
         
         // save all the orientations as euler angles
