@@ -51,6 +51,11 @@ OrientationDataMap initOrientationData() {
                                           0.80641304, -0.41697831,  0.41931742,
                                          -0.55761796, -0.77225604,  0.30443854;
     
+    Eigen::Matrix3d rotation_tub_from_tub_dimer_axis; //TODO
+    rotation_tub_from_tub_dimer_axis <<  1,  0,  0,
+                                         0,  0, -1,
+                                         0,  1,  0;
+    
     return OrientationDataMap {
         {"actin", {
             {MonomerType ("actin", {"any"}, -1), 
@@ -100,6 +105,26 @@ OrientationDataMap initOrientationData() {
                  Eigen::Vector3d(0,0,0), 
                  zero_rotation, 
                  zero_rotation)
+            }
+        }},
+        {"tubulin", {
+            {MonomerType ("site-protofilament1", {"any"}, 101), 
+             OrientationData (
+                 Eigen::Vector3d(0, 0, -1), 
+                 zero_rotation, 
+                 zero_rotation)
+            },
+            {MonomerType ("site-out", {"any"}, 101), 
+             OrientationData (
+                 Eigen::Vector3d(0, 1, 0), 
+                 zero_rotation, 
+                 zero_rotation)
+            },
+            {MonomerType ("tubulin", {"any"}, 101), 
+             OrientationData (
+                 Eigen::Vector3d(0, 0, 0), 
+                 zero_rotation, 
+                 rotation_tub_from_tub_dimer_axis)
             }
         }}
     };
@@ -428,6 +453,9 @@ void copy_frame(
         if (p.type.find("_CHILD") != std::string::npos) {
             continue;
         }
+        if (p.type.find("site") != std::string::npos) {
+            continue;
+        }
 
         // check if we have counted past the avaliable agents provided
         //	this would mean we used every agent in the 'agents' already
@@ -720,12 +748,15 @@ MonomerType getMonomerType(
     // get the main type
     char delimiter = '#';
     auto pos = readdyParticleType.find(delimiter);
-    std::string mainType;
+    std::string mainType = readdyParticleType.substr(0, pos);
     std::string flagStr;
     if (pos != std::string::npos)
     {
-        mainType = readdyParticleType.substr(0, pos);
         flagStr = readdyParticleType.substr(pos + 1, readdyParticleType.size() - pos);
+    }
+    else
+    {
+        return MonomerType (mainType, {}, 101);
     }
     
     // get the state flags
@@ -742,7 +773,7 @@ MonomerType getMonomerType(
     flags.push_back(flagStr.substr(start, flagStr.length() - start));
     
     // if one of the flags is a number, set it as the monomer number
-    int number = 0;
+    int number = 101;
     for (std::size_t i = 0; i < flags.size(); ++i)
     {
         if (!flags[i].empty() && std::all_of(flags[i].begin(), flags[i].end(), ::isdigit))
