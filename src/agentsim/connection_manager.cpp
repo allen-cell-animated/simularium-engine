@@ -428,7 +428,8 @@ namespace agentsim {
         Simulation& simulation,
         std::string connectionUID,
         std::size_t start,
-        std::size_t count
+        std::size_t count,
+        bool force
     )
     {
         std::size_t numberOfFrames = simulation.GetNumFrames();
@@ -438,13 +439,16 @@ namespace agentsim {
         auto& netState = this->m_netStates.at(connectionUID);
         for(std::size_t i = 0; i < count; ++i)
         {
-            this->SendDataToClient(simulation, connectionUID, start + i);
-            netState.frame_no++;
+            if(netState.play_state == ClientPlayState::Finished) { break; }
+
             this->CheckForFinishedClient(
                 numberOfFrames,
                 hasFinishedLoading,
                 connectionUID,
                 netState);
+
+            this->SendDataToClient(simulation, connectionUID, start + i, force);
+            netState.frame_no++;
         }
 
         if(netState.play_state == ClientPlayState::Playing)
@@ -456,12 +460,17 @@ namespace agentsim {
     void ConnectionManager::SendDataToClient(
         Simulation& simulation,
         std::string connectionUID,
-        std::size_t frameNumber)
+        std::size_t frameNumber,
+        bool force // set to true for one-off sends
+    )
     {
         auto& netState = this->m_netStates.at(connectionUID);
 
-        if (netState.play_state != ClientPlayState::Playing) {
-            return;
+        if(!force)
+        {
+            if (netState.play_state != ClientPlayState::Playing) {
+                return;
+            }
         }
 
         AgentDataFrame simData;
@@ -580,7 +589,6 @@ namespace agentsim {
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             std::cout << "Playing back trajectory file" << std::endl;
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
-                            this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
                         }
                     }
@@ -593,7 +601,13 @@ namespace agentsim {
                         auto& netState = this->m_netStates.at(senderUid);
                         netState.frame_no = jsonMsg["frameNumber"].asInt();
 
-                        this->SendDataToClient(simulation, senderUid, netState.frame_no, count);
+                        this->SendDataToClient(
+                            simulation,
+                            senderUid,
+                            netState.frame_no,
+                            count,
+                            true // force
+                        );
                     }
                     else {
                         this->SetClientState(senderUid, ClientPlayState::Playing);
@@ -668,11 +682,11 @@ namespace agentsim {
 
                     this->SetClientFrame(senderUid, frameNumber);
                     this->SetClientState(senderUid, ClientPlayState::Paused);
+                    this->SendDataToClient(simulation, senderUid, frameNumber, true);
                 } break;
                 case WebRequestTypes::id_init_trajectory_file: {
                     std::string fileName = jsonMsg["fileName"].asString();
                     this->InitializeTrajectoryFile(simulation, senderUid, fileName);
-                    this->SetupRuntimeCacheAsync(simulation, 500);
                 } break;
                 default: {
                 } break;
@@ -711,6 +725,7 @@ namespace agentsim {
                 trajectory_file_directory + fileName,
                 this->m_trajectoryFileProperties
             );
+            this->SetupRuntimeCacheAsync(simulation, 500);
         }
 
         // Send Trajectory File Properties
@@ -722,9 +737,12 @@ namespace agentsim {
 
         Json::Value fprops;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
-        fprops["numberOfFrames"] = this->m_trajectoryFileProperties.numberOfFrames;
+        fprops["totalDuration"] =
+            this->m_trajectoryFileProperties.numberOfFrames *
+            this->m_trajectoryFileProperties.timeStepSize;
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
         this->SendWebsocketMessage(connectionUID, fprops);
+        this->SendDataToClient(simulation, connectionUID, 0, true);
     }
 
     void ConnectionManager::SetupRuntimeCacheAsync(
