@@ -1,5 +1,6 @@
 #include "agentsim/network/connection_manager.h"
 #include "agentsim/network/net_message_ids.h"
+#include "agentsim/network/trajectory_properties.h"
 
 template <typename T, typename U>
 inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
@@ -16,6 +17,10 @@ namespace agentsim {
 
     void ConnectionManager::CloseServer()
     {
+        if (this->m_fileIoThread.joinable()) {
+            this->m_fileIoThread.join();
+        }
+
         if (this->m_heartbeatThread.joinable()) {
             this->m_heartbeatThread.join();
         }
@@ -79,19 +84,15 @@ namespace agentsim {
                     continue;
                 }
 
-                // Run simulation time-step
+                // Run simulation time step
                 if (simulation.IsRunningLive()) {
                     simulation.RunTimeStep(timeStep);
-                } else {
-                    if (!simulation.HasLoadedAllFrames()) {
-                        simulation.LoadNextFrame();
-                    }
                 }
 
-                std::size_t numberOfFrames = simulation.GetNumFrames();
-                bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+                std::size_t numberOfLoadedFrames = simulation.GetNumFrames();
+                std::size_t totalNumberOfFrames = this->m_trajectoryFileProperties.numberOfFrames;
 
-                this->CheckForFinishedClients(numberOfFrames, hasFinishedLoading);
+                this->CheckForFinishedClients(numberOfLoadedFrames, totalNumberOfFrames);
                 this->SendDataToClients(simulation);
                 this->AdvanceClients();
             }
@@ -183,7 +184,10 @@ namespace agentsim {
     {
         for (auto& entry : this->m_netStates) {
             auto& netState = entry.second;
-            if (netState.play_state == ClientPlayState::Playing) {
+            if (
+                netState.play_state == ClientPlayState::Playing ||
+                netState.play_state == ClientPlayState::Waiting
+            ) {
                 return true;
             }
         }
@@ -203,29 +207,64 @@ namespace agentsim {
         this->m_netStates[connectionUID].frame_no = frameNumber;
     }
 
+    void ConnectionManager::CheckForFinishedClient(
+        std::size_t numberOfLoadedFrames,
+        std::size_t totalNumberOfFrames,
+        std::string connectionUID,
+        NetState& netState)
+    {
+        auto currentFrame = netState.frame_no;
+        auto currentState = netState.play_state;
+
+        // Invalid frame, set to last frame
+        if(currentFrame >= totalNumberOfFrames)
+        {
+            std::cout << "Client " << connectionUID
+                << " finished streaming" << std::endl;
+            this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
+            this->SetClientState(connectionUID, ClientPlayState::Finished);
+        }
+
+        // Frame is valid but not loaded yet
+        if(currentState == ClientPlayState::Playing &&
+            currentFrame >= numberOfLoadedFrames &&
+            currentFrame < totalNumberOfFrames)
+        {
+            std::cout << "Client " << connectionUID
+                << " set to wait for frame " << currentFrame << std::endl;
+            this->SetClientState(connectionUID, ClientPlayState::Waiting);
+        }
+
+        // If the waited for frame has been loaded
+        if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
+        {
+            std::cout << "Client " << connectionUID
+                << " done waiting for frame " << currentFrame << std::endl;
+            this->SetClientState(connectionUID, ClientPlayState::Playing);
+        }
+    }
+
     void ConnectionManager::CheckForFinishedClients(
-        std::size_t numberOfFrames, bool allFramesLoaded)
+        std::size_t numberOfLoadedFrames,
+        std::size_t totalNumberOfFrames
+    )
     {
         for (auto& entry : this->m_netStates) {
             auto& connectionUID = entry.first;
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing) {
+            if(netState.play_state == ClientPlayState::Finished ||
+                netState.play_state == ClientPlayState::Stopped)
+            {
                 continue;
             }
 
-            if (netState.frame_no >= numberOfFrames - 1) {
-                if (netState.frame_no != this->kLatestFrameValue) {
-                    std::cout << "End of simulation cache reached for client "
-                              << connectionUID << std::endl;
-                    netState.frame_no = this->kLatestFrameValue;
-                }
-
-                if (allFramesLoaded) {
-                    std::cout << "Simulation finished for client " << connectionUID << std::endl;
-                    this->SetClientState(connectionUID, ClientPlayState::Finished);
-                }
-            }
+            this->CheckForFinishedClient(
+                numberOfLoadedFrames,
+                totalNumberOfFrames,
+                connectionUID,
+                netState
+            );
         }
     }
 
@@ -254,7 +293,7 @@ namespace agentsim {
     void ConnectionManager::SendWebsocketMessage(
         std::string connectionUID, Json::Value jsonMessage)
     {
-        jsonMessage["conn_id"] = connectionUID;
+        jsonMessage["connId"] = connectionUID;
         std::string message = Json::writeString(this->m_jsonStreamWriter, jsonMessage);
 
         try {
@@ -291,8 +330,7 @@ namespace agentsim {
         for (auto& entry : this->m_netStates) {
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing
-                || netState.frame_no == this->kLatestFrameValue) {
+            if (netState.play_state != ClientPlayState::Playing) {
                 continue;
             }
 
@@ -306,52 +344,7 @@ namespace agentsim {
             auto& uid = entry.first;
             auto& netState = entry.second;
 
-            if (netState.play_state != ClientPlayState::Playing) {
-                continue;
-            }
-
-            AgentDataFrame simData;
-
-            // This state is currently being used to demark the 'latest' frame
-            if (netState.frame_no == this->kLatestFrameValue) {
-                simData = simulation.GetDataFrame(simulation.GetNumFrames() - 1);
-            } else {
-                simData = simulation.GetDataFrame(netState.frame_no);
-            }
-
-            Json::Value net_agent_data_frame;
-            std::vector<float> vals;
-
-            net_agent_data_frame["msg_type"] = id_vis_data_arrive;
-            for (std::size_t i = 0; i < simData.size(); ++i) {
-                auto agentData = simData[i];
-                vals.push_back(agentData.vis_type);
-                vals.push_back(agentData.type);
-                vals.push_back(agentData.x);
-                vals.push_back(agentData.y);
-                vals.push_back(agentData.z);
-                vals.push_back(agentData.xrot);
-                vals.push_back(agentData.yrot);
-                vals.push_back(agentData.zrot);
-                vals.push_back(agentData.collision_radius);
-                vals.push_back(agentData.subpoints.size());
-
-                for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
-                    vals.push_back(agentData.subpoints[j]);
-                }
-            }
-
-            // Copy values to json data array
-            auto json_data_arr = Json::Value(Json::arrayValue);
-            for (std::size_t j = 0; j < vals.size(); ++j) {
-                int nd_index = static_cast<int>(j);
-                json_data_arr[nd_index] = vals[nd_index];
-            }
-
-            net_agent_data_frame["data"] = json_data_arr;
-            net_agent_data_frame["frame_number"] = static_cast<int>(netState.frame_no);
-            net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
-            this->SendWebsocketMessage(uid, net_agent_data_frame);
+            this->SendDataToClient(simulation, uid, netState.frame_no);
         }
     }
 
@@ -385,7 +378,7 @@ namespace agentsim {
     void ConnectionManager::PingAllClients()
     {
         Json::Value pingJsonMessage;
-        pingJsonMessage["msg_type"] = id_heartbeat_ping;
+        pingJsonMessage["msgType"] = id_heartbeat_ping;
 
         this->SendWebsocketMessageToAll(pingJsonMessage, "Heartbeat ping");
     }
@@ -431,9 +424,96 @@ namespace agentsim {
         uuid = strUuid;
     }
 
+    void ConnectionManager::SendDataToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t start,
+        std::size_t count,
+        bool force
+    )
+    {
+        std::size_t numberOfFrames = simulation.GetNumFrames();
+        bool hasFinishedLoading = simulation.HasLoadedAllFrames();
+        this->SetClientState(connectionUID, ClientPlayState::Playing);
+
+        auto& netState = this->m_netStates.at(connectionUID);
+        for(std::size_t i = 0; i < count; ++i)
+        {
+            if(netState.play_state == ClientPlayState::Finished) { break; }
+
+            this->CheckForFinishedClient(
+                numberOfFrames,
+                hasFinishedLoading,
+                connectionUID,
+                netState);
+
+            this->SendDataToClient(simulation, connectionUID, start + i, force);
+            netState.frame_no++;
+        }
+
+        if(netState.play_state == ClientPlayState::Playing)
+        {
+            this->SetClientState(connectionUID, ClientPlayState::Stopped);
+        }
+    }
+
+    void ConnectionManager::SendDataToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t frameNumber,
+        bool force // set to true for one-off sends
+    )
+    {
+        auto& netState = this->m_netStates.at(connectionUID);
+
+        if(!force)
+        {
+            if (netState.play_state != ClientPlayState::Playing) {
+                return;
+            }
+        }
+
+        AgentDataFrame simData;
+        simData = simulation.GetDataFrame(netState.frame_no);
+
+        Json::Value net_agent_data_frame;
+        std::vector<float> vals;
+
+        net_agent_data_frame["msgType"] = id_vis_data_arrive;
+        for (std::size_t i = 0; i < simData.size(); ++i) {
+            auto agentData = simData[i];
+            vals.push_back(agentData.vis_type);
+            vals.push_back(agentData.type);
+            vals.push_back(agentData.x);
+            vals.push_back(agentData.y);
+            vals.push_back(agentData.z);
+            vals.push_back(agentData.xrot);
+            vals.push_back(agentData.yrot);
+            vals.push_back(agentData.zrot);
+            vals.push_back(agentData.collision_radius);
+            vals.push_back(agentData.subpoints.size());
+
+            for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
+                vals.push_back(agentData.subpoints[j]);
+            }
+        }
+
+        // Copy values to json data array
+        auto json_data_arr = Json::Value(Json::arrayValue);
+        for (std::size_t j = 0; j < vals.size(); ++j) {
+            int nd_index = static_cast<int>(j);
+            json_data_arr[nd_index] = vals[nd_index];
+        }
+
+        net_agent_data_frame["data"] = json_data_arr;
+        net_agent_data_frame["frameNumber"] = static_cast<int>(netState.frame_no);
+        net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
+        this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
+    }
+
     void ConnectionManager::HandleMessage(NetMessage nm)
     {
-        auto msgType = nm.jsonMessage["msg_type"].asInt();
+        auto msgType = nm.jsonMessage["msgType"].asInt();
 
         if (msgType >= 0 && msgType < WebRequestNames.size()) {
             std::cout << "[" << nm.senderUid << "] Web socket message arrived: "
@@ -469,9 +549,6 @@ namespace agentsim {
         Simulation& simulation,
         float& timeStep)
     {
-        // the relative directory for trajectory files on S3
-        //  local downloads mirror the S3 directory structure
-        std::string trajectory_file_directory = "trajectory/";
         auto& messages = this->GetMessages();
 
         // handle net messages
@@ -480,8 +557,8 @@ namespace agentsim {
                 std::string senderUid = messages[i].senderUid;
                 Json::Value jsonMsg = messages[i].jsonMessage;
 
-                int msg_type = jsonMsg["msg_type"].asInt();
-                switch (msg_type) {
+                int msgType = jsonMsg["msgType"].asInt();
+                switch (msgType) {
                 case WebRequestTypes::id_vis_data_request: {
                     // If a simulation is already in progress, don't allow a new client to
                     //	change the simulation, unless there is only one client connected
@@ -496,44 +573,46 @@ namespace agentsim {
                             simulation.Reset();
                         } break;
                         case id_pre_run_simulation: {
-                            timeStep = jsonMsg["time-step"].asFloat();
-                            auto n_time_steps = jsonMsg["num-time-steps"].asInt();
+                            timeStep = jsonMsg["timeStep"].asFloat();
+                            auto numberOfTimeSteps = jsonMsg["numTimeSteps"].asInt();
                             std::cout << "Running pre-run simulation" << std::endl;
 
                             simulation.SetPlaybackMode(runMode);
                             simulation.Reset();
-                            simulation.RunAndSaveFrames(timeStep, n_time_steps);
+                            simulation.RunAndSaveFrames(timeStep, numberOfTimeSteps);
+
+                            this->m_trajectoryFileProperties.numberOfFrames = numberOfTimeSteps;
+                            this->m_trajectoryFileProperties.numberOfFrames = timeStep;
+                            this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
                         case id_traj_file_playback: {
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             std::cout << "Playing back trajectory file" << std::endl;
-
-                            if (trajectoryFileName.empty()) {
-                                std::cout << "Trajectory file not specified, ignoring request" << std::endl;
-                                continue;
-                            }
-
-                            simulation.SetPlaybackMode(runMode);
-                            simulation.Reset();
-                            simulation.LoadTrajectoryFile(trajectory_file_directory + trajectoryFileName);
+                            this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
                         } break;
-                        }
-
-                        if (runMode == id_pre_run_simulation
-                            || runMode == id_traj_file_playback) {
-                            // Load the first hundred simulation frames into a runtime cache
-                            std::cout << "Loading trajectory file into runtime cache" << std::endl;
-                            std::size_t fn = 0;
-                            while (!simulation.HasLoadedAllFrames() && fn < 100) {
-                                std::cout << "Loading frame " << ++fn << std::endl;
-                                simulation.LoadNextFrame();
-                            }
-                            std::cout << "Finished loading trajectory for now" << std::endl;
                         }
                     }
 
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
-                    this->SetClientFrame(senderUid, 0);
+                    if(jsonMsg.isMember("count"))
+                    {
+                        // this is arbitrarily capped at 5
+                        //  the current expected usage is to ask for a single frame
+                        std::size_t count = std::min(jsonMsg["count"].asInt(), 5);
+                        auto& netState = this->m_netStates.at(senderUid);
+                        netState.frame_no = jsonMsg["frameNumber"].asInt();
+
+                        this->SendDataToClient(
+                            simulation,
+                            senderUid,
+                            netState.frame_no,
+                            count,
+                            true // force
+                        );
+                    }
+                    else {
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                        this->SetClientFrame(senderUid, 0);
+                    }
                 } break;
                 case WebRequestTypes::id_vis_data_pause: {
                     this->SetClientState(senderUid, ClientPlayState::Paused);
@@ -545,13 +624,13 @@ namespace agentsim {
                     this->SetClientState(senderUid, ClientPlayState::Stopped);
                 } break;
                 case WebRequestTypes::id_update_time_step: {
-                    timeStep = jsonMsg["time_step"].asFloat();
+                    timeStep = jsonMsg["timeStep"].asFloat();
                     std::cout << "time step updated to " << timeStep << "\n";
-                    this->SendWebsocketMessageToAll(jsonMsg, "time-step update");
+                    this->SendWebsocketMessageToAll(jsonMsg, "time step update");
                 } break;
                 case WebRequestTypes::id_update_rate_param: {
-                    std::string paramName = jsonMsg["param_name"].asString();
-                    float paramValue = jsonMsg["param_value"].asFloat();
+                    std::string paramName = jsonMsg["paramName"].asString();
+                    float paramValue = jsonMsg["paramValue"].asFloat();
                     std::cout << "rate param " << paramName << " updated to " << paramValue << "\n";
 
                     simulation.UpdateParameter(paramName, paramValue);
@@ -569,12 +648,45 @@ namespace agentsim {
                     this->BroadcastModelDefinition(jsonMsg);
                 } break;
                 case WebRequestTypes::id_play_cache: {
-                    auto frameNumber = jsonMsg["frame-num"].asInt();
-                    std::cout << "request to play cached from frame "
-                              << frameNumber << " arrived from client " << senderUid << std::endl;
+                    if(jsonMsg.isMember("time"))
+                    {
+                        double timeNs = jsonMsg["time"].asDouble();
+                        std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
+                        double closestTime = simulation.GetTime(frameNumber);
+
+                        std::cout << "request to play cached from time "
+                        << timeNs << " (frame " << frameNumber << " with time " << closestTime
+                        << ") arrived from client " << senderUid << std::endl;
+
+                        this->SetClientFrame(senderUid, frameNumber);
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                    }
+                    else if (jsonMsg.isMember("frame-num"))
+                    {
+                        auto frameNumber = jsonMsg["frame-num"].asInt();
+                        std::cout << "request to play cached from frame "
+                        << frameNumber << " arrived from client " << senderUid << std::endl;
+
+                        this->SetClientFrame(senderUid, frameNumber);
+                        this->SetClientState(senderUid, ClientPlayState::Playing);
+                    }
+
+                } break;
+                case WebRequestTypes::id_goto_simulation_time: {
+                    double timeNs = jsonMsg["time"].asDouble();
+                    std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
+                    double closestTime = simulation.GetTime(frameNumber);
+
+                    std::cout << "Client " << senderUid <<
+                        " set to frame " << frameNumber << std::endl;
 
                     this->SetClientFrame(senderUid, frameNumber);
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                    this->SetClientState(senderUid, ClientPlayState::Paused);
+                    this->SendDataToClient(simulation, senderUid, frameNumber, true);
+                } break;
+                case WebRequestTypes::id_init_trajectory_file: {
+                    std::string fileName = jsonMsg["fileName"].asString();
+                    this->InitializeTrajectoryFile(simulation, senderUid, fileName);
                 } break;
                 default: {
                 } break;
@@ -583,6 +695,76 @@ namespace agentsim {
 
             messages.clear();
         }
+    }
+
+    void ConnectionManager::InitializeTrajectoryFile(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::string fileName
+    )
+    {
+        if (fileName.empty()) {
+            std::cout << "Trajectory file not specified, ignoring request" << std::endl;
+            return;
+        }
+
+        // the relative directory for trajectory files on S3
+        //  local downloads mirror the S3 directory structure
+        std::string trajectory_file_directory = "trajectory/";
+
+        std::string lastLoaded = this->m_trajectoryFileProperties.fileName;
+        if(fileName.compare(lastLoaded) == 0)
+        {
+            std::cout << "Using previously loaded file" << std::endl;
+        }
+        else {
+            this->m_trajectoryFileProperties.fileName = fileName;
+            simulation.SetPlaybackMode(id_traj_file_playback);
+            simulation.Reset();
+            simulation.LoadTrajectoryFile(
+                trajectory_file_directory + fileName,
+                this->m_trajectoryFileProperties
+            );
+            this->SetupRuntimeCacheAsync(simulation, 500);
+        }
+
+        // Send Trajectory File Properties
+        std::cout << "Trajectory File Props " << std::endl
+        << "Number of Frames: "
+        << this->m_trajectoryFileProperties.numberOfFrames << std::endl
+        << "Time step size : "
+        << this->m_trajectoryFileProperties.timeStepSize << std::endl;
+
+        Json::Value fprops;
+        fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
+        fprops["totalDuration"] =
+            this->m_trajectoryFileProperties.numberOfFrames *
+            this->m_trajectoryFileProperties.timeStepSize;
+        fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
+        this->SendWebsocketMessage(connectionUID, fprops);
+        this->SendDataToClient(simulation, connectionUID, 0, true);
+    }
+
+    void ConnectionManager::SetupRuntimeCacheAsync(
+        Simulation& simulation,
+        std::size_t waitTimeMs
+    ) {
+        if (this->m_fileIoThread.joinable()) {
+            this->m_fileIoThread.join();
+        }
+
+        this->m_fileIoThread = std::thread([&simulation] {
+            // Load the first hundred simulation frames into a runtime cache
+            std::cout << "Loading trajectory file into runtime cache" << std::endl;
+            std::size_t fn = 0;
+
+            while (!simulation.HasLoadedAllFrames()) {
+                simulation.LoadNextFrame();
+            }
+            std::cout << "Finished loading trajectory into runtime cache" << std::endl;
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));
     }
 
 } // namespace agentsim

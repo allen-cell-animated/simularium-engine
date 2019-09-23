@@ -97,17 +97,17 @@ namespace agentsim {
         auto dynamics = json_obj["dynamics"];
         for (Json::Value::iterator it = dynamics.begin(); it != dynamics.end(); ++it) {
             DynamicsConstraintConfig dcc;
-            float param_value;
+            float paramValue;
 
             parse(*it, "type", dcc.type);
-            if (parse(*it, "force-constant", param_value))
-                dcc.parameters["force-constant"] = param_value;
-            if (parse(*it, "multiplicity", param_value))
-                dcc.parameters["multiplicity"] = param_value;
-            if (parse(*it, "angle", param_value))
-                dcc.parameters["angle"] = param_value;
-            if (parse(*it, "radius", param_value))
-                dcc.parameters["radius"] = param_value;
+            if (parse(*it, "force-constant", paramValue))
+                dcc.parameters["force-constant"] = paramValue;
+            if (parse(*it, "multiplicity", paramValue))
+                dcc.parameters["multiplicity"] = paramValue;
+            if (parse(*it, "angle", paramValue))
+                dcc.parameters["angle"] = paramValue;
+            if (parse(*it, "radius", paramValue))
+                dcc.parameters["radius"] = paramValue;
 
             dcc.agents.push_back((*it)["agents"][0].asString());
             dcc.agents.push_back((*it)["agents"][1].asString());

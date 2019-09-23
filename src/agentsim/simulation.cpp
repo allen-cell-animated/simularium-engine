@@ -151,10 +151,13 @@ namespace agentsim {
         this->m_cache.AddFrame(newFrame);
     }
 
-    void Simulation::LoadTrajectoryFile(std::string file_path)
+    void Simulation::LoadTrajectoryFile(
+        std::string file_path,
+        TrajectoryFileProperties& fileProps
+    )
     {
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->LoadTrajectoryFile(file_path);
+            this->m_SimPkgs[i]->LoadTrajectoryFile(file_path, fileProps);
         }
     }
 
@@ -266,6 +269,16 @@ namespace agentsim {
         if(this->m_SimPkgs.size() > 0)
         {
             return this->m_SimPkgs[0]->GetTime(frameNumber);
+        }
+
+        return 0.0;
+    }
+
+    std::size_t Simulation::GetFrameNumber(double simulationTimeNs)
+    {
+        if(this->m_SimPkgs.size() > 0)
+        {
+            return this->m_SimPkgs[0]->GetFrameNumber(simulationTimeNs);
         }
 
         return 0.0;

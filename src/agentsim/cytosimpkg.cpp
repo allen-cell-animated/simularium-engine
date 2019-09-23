@@ -114,7 +114,7 @@ namespace agentsim {
         GetFiberPositionsFromFrame(agents);
     }
 
-    void CytosimPkg::UpdateParameter(std::string param_name, float param_value)
+    void CytosimPkg::UpdateParameter(std::string paramName, float paramValue)
     {
     }
 
