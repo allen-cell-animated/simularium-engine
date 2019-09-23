@@ -1,6 +1,8 @@
 #include "agentsim/aws/aws_util.h"
 #include "agentsim/util/math_util.h"
 
+bool verboseOrientation = false;
+
 inline bool file_exists(const std::string& name)
 {
     struct stat buffer;
@@ -143,6 +145,10 @@ void read_h5file(
     TimeTopologyH5Info& topologyInfo,
     RotationH5Info& rotationInfo,
     IdParticleMapping& particleLookup
+);
+
+bool is_child_particle(
+    std::string particleType
 );
 
 void copy_frame(
@@ -423,6 +429,20 @@ void read_h5file(
     file->close();
 }
 
+std::vector<std::string> childTypes { "_CHILD", "site-" };
+
+bool is_child_particle(
+    std::string particleType)
+{
+    for (std::size_t i = 0; i < childTypes.size(); ++i)
+    {
+        if (particleType.find(childTypes.at(i)) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void copy_frame(
     readdy::Simulation* sim,
     const std::vector<ParticleData>& particle_data,
@@ -447,13 +467,11 @@ void copy_frame(
             continue;
         }
 
-        // if this particle is a _CHILD particle, don't stream its position
+        // if this particle is a child particle, don't stream its position
         //  to stream child positions, we would need to correlate the children
         //  the owning parent from the trajectory/H5 file info
-        if (p.type.find("_CHILD") != std::string::npos) {
-            continue;
-        }
-        if (p.type.find("site") != std::string::npos) {
+        if (is_child_particle(p.type))
+        {
             continue;
         }
 
@@ -904,7 +922,7 @@ std::vector<std::pair<MonomerType,OrientationData>> getOrientationDataForParticl
             break;
         }
     }
-    if (!found)
+    if (!found && verboseOrientation)
     {
         std::cout << "Failed to find orientation data for " 
             << monomerTypeToString(particleMonomerType) << std::endl;
@@ -925,9 +943,17 @@ std::vector<std::pair<std::size_t,OrientationData>> getNeighborOrientationData(
     std::vector<std::pair<std::size_t,OrientationData>> neighborOrientationData {};
     auto neighborIds = getNeighbors(particleID, topologyFrame);
     for (std::size_t i = 0; i < particleOrientationData.size(); ++i)
-    { 
+    {
         for (std::size_t j = 0; j < neighborIds.size(); ++j)
         { 
+            if (idmappingFrame.find(neighborIds.at(j)) == idmappingFrame.end())
+            {
+                if (verboseOrientation)
+                {
+                    std::cout << "neighbor ID not found in id mapping! " << neighborIds.at(j) << std::endl;
+                }
+                continue;
+            }
             auto neighborID = idmappingFrame.at(neighborIds.at(j));
             auto neighborParticle = trajectoryFrame.at(neighborID);
             auto neighborMonomerType = getMonomerType(neighborParticle.type);
@@ -984,7 +1010,10 @@ Eigen::Vector3d getRandomPerpendicularVector(
     {
         if (vector[2] == 0)
         {
-            std::cout << "Failed to get perpendicular vector to zero vector! " << std::endl;
+            if (verboseOrientation)
+            {
+                std::cout << "Failed to get perpendicular vector to zero vector! " << std::endl;
+            }
             return Eigen::Vector3d(0, 0, 0);
         }
         return Eigen::Vector3d(0, 1, 0);
@@ -1046,6 +1075,12 @@ void calculateOrientations(
         for(std::size_t particleIndex = 0; particleIndex < trajectoryFrame.size(); ++particleIndex)
         {
             auto currentParticle = trajectoryFrame.at(particleIndex);
+            if (is_child_particle(currentParticle.type))
+            {
+                orientationFrame.push_back(getErrorOrientation());
+                continue;
+            }
+        
             auto particleMonomerType = getMonomerType(currentParticle.type);
             auto particleOrientationData = getOrientationDataForParticle(orientationData, particleMonomerType);
             auto neighborOrientationData = getNeighborOrientationData(
@@ -1055,8 +1090,11 @@ void calculateOrientations(
             if (neighborOrientationData.size() < 1)
             {
                 // no neighbors, use random rotation
-                std::cout << frameIndex << ": Use random orientation for " 
-                    << currentParticle.type << " " << currentParticle.id << std::endl;
+                if (verboseOrientation)
+                {
+                    std::cout << frameIndex << ": Use random orientation for " 
+                        << currentParticle.type << " " << currentParticle.id << std::endl;
+                }
                 orientationFrame.push_back(getRandomOrientation());
                 continue;
             }
@@ -1064,8 +1102,11 @@ void calculateOrientations(
             if (neighborOrientationData.size() < 2)
             {
                 // one neighbor, revisit after neighbor's orientation is calculated
-                std::cout << frameIndex << ": Use one neighbor for orientation of " 
-                    << currentParticle.type << " " << currentParticle.id << std::endl;
+                if (verboseOrientation)
+                {
+                    std::cout << frameIndex << ": Use one neighbor for orientation of " 
+                        << currentParticle.type << " " << currentParticle.id << std::endl;
+                }
                 orientationFrame.push_back(getErrorOrientation());
                 orientRelativeToNeighbor.push_back({particleIndex, neighborOrientationData.at(0)});
                 continue;
@@ -1080,8 +1121,11 @@ void calculateOrientations(
                 trajectoryFrame.at(neighborOrientationData.at(1).first));
             Eigen::Matrix3d initialRotation = getInitialRotation(neighborOrientationData);
             orientationFrame.push_back(currentRotation.inverse() * initialRotation);
-            std::cout << frameIndex << ": Successfully oriented " 
-                << currentParticle.type << " " << currentParticle.id << std::endl;
+            if (verboseOrientation)
+            {
+                std::cout << frameIndex << ": Successfully oriented " 
+                    << currentParticle.type << " " << currentParticle.id << std::endl;
+            }
         }
         
         // go back and calculate orientation for particles with one neighbor
@@ -1089,26 +1133,35 @@ void calculateOrientations(
         for (std::size_t i = 0; i < orientRelativeToNeighbor.size(); ++i)
         {   
             auto particleID = orientRelativeToNeighbor.at(i).first;
-            if (orientationFrame.at(particleID) == getErrorOrientation())
+            
+            if (orientationFrame.at(particleID) != getErrorOrientation())
             {
-                auto neighborID = orientRelativeToNeighbor.at(i).second.first;
-                auto neighborOrientation = orientationFrame.at(neighborID);
-                if (neighborOrientation == getErrorOrientation())
+                continue;
+            }
+            
+            auto neighborID = orientRelativeToNeighbor.at(i).second.first;
+            auto neighborOrientation = orientationFrame.at(neighborID);
+            if (neighborOrientation == getErrorOrientation())
+            {
+                // neighbor hasn't been oriented, so use axis rotation instead
+                orientationFrame.at(particleID) = getRotationUsingAxis(
+                    trajectoryFrame.at(particleID),
+                    trajectoryFrame.at(neighborID),
+                    orientRelativeToNeighbor.at(i).second.second.axisRotation
+                );
+                if (verboseOrientation)
                 {
-                    // neighbor hasn't been oriented, so use axis rotation instead
-                    orientationFrame.at(particleID) = getRotationUsingAxis(
-                        trajectoryFrame.at(particleID),
-                        trajectoryFrame.at(neighborID),
-                        orientRelativeToNeighbor.at(i).second.second.axisRotation
-                    );
                     std::cout << frameIndex << ": Successfully oriented " 
                         << particleID << " with axis rotation from " << neighborID << std::endl;
-                    continue;
                 }
+                continue;
+            }
 
-                auto offsetRotation = orientRelativeToNeighbor.at(i).second.second.localRotation.inverse();
+            auto offsetRotation = orientRelativeToNeighbor.at(i).second.second.localRotation.inverse();
 
-                orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
+            orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
+            if (verboseOrientation)
+            {
                 std::cout << frameIndex << ": Successfully oriented " 
                     << particleID << " with one neighbor" << std::endl;
             }
