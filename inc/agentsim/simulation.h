@@ -5,6 +5,7 @@
 #include "agentsim/model/model.h"
 #include "agentsim/simulation_cache.h"
 #include "agentsim/network/trajectory_properties.h"
+#include "agentsim/network/net_message_ids.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -20,7 +21,7 @@ namespace agentsim {
     class Simulation {
     public:
         /**
-	*
+	*   Constructor
 	*
 	*	@param 	simPkgs		a list of SimPKGs that this simulation object will own
 	*	@param	agents		a list of Agents that this simulation object will own
@@ -45,7 +46,7 @@ namespace agentsim {
 	*
 	*	Get a list of data corresponding to the agents owned by this simulation object
 	*	Includes information regarding position, type, and other relevant visualization
-	* information to be streamed to a front-end
+	*   information to be streamed to a front-end
 	*/
         std::vector<AgentData> GetData();
 
@@ -56,7 +57,7 @@ namespace agentsim {
 	*
 	*	Get a list of data corresponding to the agents owned by this simulation object
 	*	Includes information regarding position, type, and other relevant visualization
-	* information to be streamed to a front-end
+	*   information to be streamed to a front-end
 	*/
         std::vector<AgentData> GetDataFrame(std::size_t frame_no);
 
@@ -71,8 +72,6 @@ namespace agentsim {
 	*	SetModel
 	*
 	*	@param	simModel		a Model object containing information about the simulation to run
-	*
-	*
 	*/
         void SetModel(Model simModel);
 
@@ -90,7 +89,7 @@ namespace agentsim {
 	*	RunAndSaveFrames
 	*
 	*	Runs every owned SimPKG from start to completion
-	* Intended to run and save a simulation in some way
+	*   Intended to run and save a simulation in some way
 	*	GetNextFrame() should be used to retrieve results frame by frame
 	*/
         void RunAndSaveFrames(
@@ -100,8 +99,8 @@ namespace agentsim {
         /**
 	*	HasLoadedAllFrames
 	*
-	*	returns true if every SimPKG has finished retrieving/sid_live_simulationaving data
-	* returns false if there is more to retrieve using GetNextFrame()
+	*	returns true if every SimPKG has finished retrieving/saving data
+	*   returns false if there is more to retrieve using GetNextFrame()
 	*/
         bool HasLoadedAllFrames();
 
@@ -113,22 +112,6 @@ namespace agentsim {
         void LoadNextFrame();
 
         /**
-	*	PlayCacheFromFrame
-	*
-	*	@param	frame_number	The index used to tell the cache where to start
-	*												playing a simulation from. 0 represents the
-	*												beginning (start at the first indexed frame)
-	*/
-        void PlayCacheFromFrame(std::size_t frame_number);
-
-        /**
-	*	IncrementCacheFrame
-	*
-	*	Increment the current cache frame (e.g. move from frame 4 -> frame 5)
-	*/
-        void IncrementCacheFrame();
-
-        /**
 	*	CacheCurrentAgents
 	*
 	*	Saves an AgentFrame with the visualization data for the current
@@ -137,17 +120,10 @@ namespace agentsim {
         void CacheCurrentAgents();
 
         /**
-	*	IsPlayingFromCache
-	*
-	*	Is this simulation object currently streaming from cached visualization information?
-	*/
-        bool IsPlayingFromCache() { return this->m_isPlayingFromCache; }
-
-        /**
 	*	LoadTrajectoryFile
 	*
 	*	@param	file_path		The location of the trajectory file to load
-	*											Currently, there is no validation for file <-> simPKG correctness
+	*							Currently, there is no validation for file <-> simPKG correctness
 	*
     *   @param  fileProps       Is modified to contain information about the trajectory file loaded
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
@@ -157,23 +133,60 @@ namespace agentsim {
             TrajectoryFileProperties& fileProps
         );
 
-        void SetPlaybackMode(std::size_t playback_mode);
-
         std::size_t GetNumFrames() { return m_cache.GetNumFrames(); }
 
-        bool IsRunningLive();
+        /**
+        *   SetPlaybackMode
+        *
+        *   @param  playbackMode    the mode the server is expected to operate in
+        *                           this should be called every time the server switches 'function'
+        *                           e.g. transitioning from running a live simulation to
+        *                           streaming a trajectory file
+        *
+        *   Changes the mode the server is expected to operate in; this function
+        *   may change internal properties of the server; e.g. creating agents
+        *   for a specific mode to use, or resetting agents
+        */
+        void SetPlaybackMode(SimulationMode playbackMode);
 
-        double GetTime(std::size_t frameNumber);
+        /**
+        *   IsRunningLive
+        *
+        *   Is this simulation activley evaluating simulation trajectories
+        *   while clients are streaming? Returns true if yes
+        *   e.g. while streaming a pre-computed trajectory, this should return false
+        */
+        bool IsRunningLive()  {
+            return this->m_playbackMode == SimulationMode::id_live_simulation;
+        }
 
-        std::size_t GetFrameNumber(double simulationTimeNs);
+        /**
+        *   GetSimulationTimeAtFrame
+        *
+        *   @param  frameNumber     the frame to check simulation time at
+        *
+        *   This function returns the simulation time, in nano-seconds
+        *   at a specified frame
+        */
+        double GetSimulationTimeAtFrame(std::size_t frameNumber);
+
+        /**
+        *   GetClosestFrameNumberForTime
+        *
+        *   @param  simulationTimeNs    the simulation time in nano-seconds
+        *
+        *   This function returns the closest frame number for a simulation time
+        *   specified in nano-seconds. e.g. if each time step is 500 nano seconds and
+        *   time 505 ns is requested, the second frame number (index 1, time 500 ns) is returned
+        */
+        std::size_t GetClosestFrameNumberForTime(double simulationTimeNs);
 
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
         Model m_model;
         SimulationCache m_cache;
-        bool m_isPlayingFromCache = false;
-        std::size_t m_playbackMode = 0; // live simulation
+        std::size_t m_playbackMode = SimulationMode::id_live_simulation;
     };
 
 }

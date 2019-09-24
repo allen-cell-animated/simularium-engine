@@ -212,12 +212,12 @@ namespace agentsim {
         }
     }
 
-    double ReaDDyPkg::GetTime(std::size_t frameNumber)
+    double ReaDDyPkg::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
         return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
     }
 
-    std::size_t ReaDDyPkg::GetFrameNumber(double timeNs)
+    std::size_t ReaDDyPkg::GetClosestFrameNumberForTime(double timeNs)
     {
         auto times = std::get<0>(this->m_trajectoryInfo);
         auto lower = std::lower_bound(times.begin(), times.end(), timeNs);

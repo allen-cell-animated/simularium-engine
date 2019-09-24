@@ -507,7 +507,7 @@ namespace agentsim {
 
         net_agent_data_frame["data"] = json_data_arr;
         net_agent_data_frame["frameNumber"] = static_cast<int>(netState.frame_no);
-        net_agent_data_frame["time"] = simulation.GetTime(netState.frame_no);
+        net_agent_data_frame["time"] = simulation.GetSimulationTimeAtFrame(netState.frame_no);
         this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
     }
 
@@ -564,15 +564,15 @@ namespace agentsim {
                     //	change the simulation, unless there is only one client connected
                     if (!this->HasActiveClient()
                         || this->NumberOfClients() == 1) {
-                        auto runMode = jsonMsg["mode"].asInt();
+                        auto runMode = static_cast<SimulationMode>(jsonMsg["mode"].asInt());
 
                         switch (runMode) {
-                        case id_live_simulation: {
+                        case SimulationMode::id_live_simulation: {
                             std::cout << "Running live simulation" << std::endl;
                             simulation.SetPlaybackMode(runMode);
                             simulation.Reset();
                         } break;
-                        case id_pre_run_simulation: {
+                        case SimulationMode::id_pre_run_simulation: {
                             timeStep = jsonMsg["timeStep"].asFloat();
                             auto numberOfTimeSteps = jsonMsg["numTimeSteps"].asInt();
                             std::cout << "Running pre-run simulation" << std::endl;
@@ -585,7 +585,7 @@ namespace agentsim {
                             this->m_trajectoryFileProperties.numberOfFrames = timeStep;
                             this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
-                        case id_traj_file_playback: {
+                        case SimulationMode::id_traj_file_playback: {
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             std::cout << "Playing back trajectory file" << std::endl;
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
@@ -651,8 +651,8 @@ namespace agentsim {
                     if(jsonMsg.isMember("time"))
                     {
                         double timeNs = jsonMsg["time"].asDouble();
-                        std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
-                        double closestTime = simulation.GetTime(frameNumber);
+                        std::size_t frameNumber = simulation.GetClosestFrameNumberForTime(timeNs);
+                        double closestTime = simulation.GetSimulationTimeAtFrame(frameNumber);
 
                         std::cout << "request to play cached from time "
                         << timeNs << " (frame " << frameNumber << " with time " << closestTime
@@ -674,8 +674,8 @@ namespace agentsim {
                 } break;
                 case WebRequestTypes::id_goto_simulation_time: {
                     double timeNs = jsonMsg["time"].asDouble();
-                    std::size_t frameNumber = simulation.GetFrameNumber(timeNs);
-                    double closestTime = simulation.GetTime(frameNumber);
+                    std::size_t frameNumber = simulation.GetClosestFrameNumberForTime(timeNs);
+                    double closestTime = simulation.GetSimulationTimeAtFrame(frameNumber);
 
                     std::cout << "Client " << senderUid <<
                         " set to frame " << frameNumber << std::endl;

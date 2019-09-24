@@ -103,8 +103,8 @@ namespace agentsim {
             std::string file_path,
             TrajectoryFileProperties& fileProps
         ) override;
-        virtual double GetTime(std::size_t frameNumber) override;
-        virtual std::size_t GetFrameNumber(double timeNs) override;
+        virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override;
+        virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override;
 
     private:
         readdy::Simulation* m_simulation;
