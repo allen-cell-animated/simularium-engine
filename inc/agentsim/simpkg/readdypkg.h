@@ -78,8 +78,6 @@ using TimeTopologyH5Info = std::tuple<TimestepH5List, TopologyH5Info>;
 using IdParticleMapping = std::vector<std::unordered_map<std::size_t, std::size_t>>;
 
 using MonomerType = std::tuple<std::string,std::vector<std::string>,int>;
-using OrientationNeighborGroup = std::pair<MonomerType,std::vector<MonomerType>>;
-using MonomerTypeRotationMap = std::vector<std::pair<MonomerType, Eigen::Matrix3d>>;
 using OrientationDataMap = std::vector<std::pair<std::string,std::vector<std::pair<MonomerType,OrientationData>>>>;
 
 namespace aics {

@@ -23,7 +23,7 @@ OrientationDataMap initOrientationData() {
                                     -0.79675461, -0.55949104, -0.22836785,
                                      0.15113327,  0.18140554, -0.97172566;
     
-    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis;
+    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis; //TODO
     rotation_barbed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
                                              -0.3445482,   0.76082255, -0.54994144,
                                               0.92229704,  0.38359532, -0.0471465;
@@ -43,7 +43,7 @@ OrientationDataMap initOrientationData() {
                                       0.80641304, -0.41697831,  0.41931742,
                                      -0.55761796, -0.77225604,  0.30443854;
     
-    Eigen::Matrix3d rotation_arp2_from_arp_dimer_axis;
+    Eigen::Matrix3d rotation_arp2_from_arp_dimer_axis; //TODO
     rotation_arp2_from_arp_dimer_axis <<  0.81557928, -0.35510793,  0.45686846,
                                          -0.57175434, -0.37306342,  0.73069875,
                                          -0.08903601, -0.85715929, -0.5072973;
@@ -53,7 +53,7 @@ OrientationDataMap initOrientationData() {
                                           0.80641304, -0.41697831,  0.41931742,
                                          -0.55761796, -0.77225604,  0.30443854;
     
-    Eigen::Matrix3d rotation_tub_from_tub_dimer_axis; //TODO
+    Eigen::Matrix3d rotation_tub_from_tub_dimer_axis;
     rotation_tub_from_tub_dimer_axis <<  1,  0,  0,
                                          0,  0, -1,
                                          0,  1,  0;
@@ -195,7 +195,8 @@ Eigen::Matrix3d eulerToMatrix(
 
 Eigen::Matrix3d getRandomOrientation();
 
-Eigen::Matrix3d getErrorOrientation();
+Eigen::Matrix3d getErrorOrientation(
+    float errValue);
 
 std::string monomerTypeToString(
     MonomerType monomerType
@@ -906,11 +907,10 @@ Eigen::Matrix3d getRandomOrientation()
     return eulerToMatrix(rotation);
 }
 
-Eigen::Matrix3d getErrorOrientation()
+Eigen::Matrix3d getErrorOrientation(
+    float errValue)
 {
     // Assign an error orientation that can be checked to know if the rotation algorithm failed
-    float errValue = 0;
-    
     Eigen::Vector3d rotation;
     rotation[0] = errValue;
     rotation[1] = errValue;
@@ -1103,7 +1103,7 @@ void calculateOrientations(
             auto currentParticle = trajectoryFrame.at(particleIndex);
             if (is_child_particle(currentParticle.type))
             {
-                orientationFrame.push_back(getErrorOrientation());
+                orientationFrame.push_back(getErrorOrientation(0));
                 continue;
             }
         
@@ -1133,7 +1133,7 @@ void calculateOrientations(
                     std::cout << frameIndex << ": Use one neighbor for orientation of " 
                         << currentParticle.type << " " << currentParticle.id << std::endl;
                 }
-                orientationFrame.push_back(getErrorOrientation());
+                orientationFrame.push_back(getErrorOrientation(0));
                 orientRelativeToNeighbor.push_back({particleIndex, neighborOrientationData.at(0)});
                 continue;
             }
@@ -1160,14 +1160,14 @@ void calculateOrientations(
         {   
             auto particleID = orientRelativeToNeighbor.at(i).first;
             
-            if (orientationFrame.at(particleID) != getErrorOrientation())
+            if (orientationFrame.at(particleID) != getErrorOrientation(0))
             {
                 continue;
             }
             
             auto neighborID = orientRelativeToNeighbor.at(i).second.first;
             auto neighborOrientation = orientationFrame.at(neighborID);
-            if (neighborOrientation == getErrorOrientation())
+            if (neighborOrientation == getErrorOrientation(0))
             {
                 // neighbor hasn't been oriented, so use axis rotation instead
                 orientationFrame.at(particleID) = getRotationUsingAxis(
