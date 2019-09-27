@@ -1,39 +1,83 @@
 #include "agentsim/util/math_util.h"
+#include <iostream>
 
 namespace aics {
 namespace agentsim {
 namespace mathutil {
-
-    void OrthonormalizeMatrix(Eigen::Matrix3d& m)
+    
+    Eigen::Matrix3d eulerToMatrix( 
+        Eigen::Vector3d rotation)
     {
-        auto v1 = m.col(0).normalized();
-        auto v2 = m.col(1).normalized();
-        auto v3 = m.col(2).normalized();
+        Eigen::AngleAxisd rollAngle(rotation[0], Eigen::Vector3d::UnitX());
+        Eigen::AngleAxisd pitchAngle(rotation[1], Eigen::Vector3d::UnitY());
+        Eigen::AngleAxisd yawAngle(rotation[2], Eigen::Vector3d::UnitZ());
 
-        v2 = (v2 - v2.dot(v1) * v1).normalized();
-        v3 = (v3 - v3.dot(v1) * v1).normalized();
-        v3 = (v3 - v3.dot(v2) * v2).normalized();
-
-        m << v1[0], v1[1], v1[2],
-            v2[0], v2[1], v2[2],
-            v3[0], v3[1], v3[2];
+        Eigen::Quaterniond q = yawAngle * pitchAngle * rollAngle;
+        return q.matrix();
     }
-
+    
+    /**
+    *	given three positions (p0, p1, p2), construct an orthonormal rotation basis 
+    *   for the particle at p1 so that:
+    *      - X basis vector points to p2
+    *      - Y basis vector points to p0
+    *      - Z basis vector is cross product of X and Y
+    **/
     Eigen::Matrix3d GetRotationMatrix(
         std::vector<Eigen::Vector3d> basisPositions)
     {
-        std::vector<Eigen::Vector3d> basisVectors = std::vector<Eigen::Vector3d>(3);
-        basisVectors[0] = (basisPositions[1] - basisPositions[0]).normalized();
-        basisVectors[1] = (basisPositions[2] - basisPositions[0]).normalized();
-        basisVectors[2] = (basisPositions[3] - basisPositions[0]).normalized();
+        auto v1 = (basisPositions[2] - basisPositions[1]).normalized();
+        auto v2 = (basisPositions[0] - basisPositions[1]).normalized();
+        v1 = (v1 - v1.dot(v2) * v2).normalized();
+        auto v3 = v1.cross(v2);
+        
+        Eigen::Matrix3d m;
+        m << v1[0], v1[1], v1[2],
+             v2[0], v2[1], v2[2],
+             v3[0], v3[1], v3[2];
+        
+        return m;
+    }
 
-        Eigen::Matrix3d rotation_matrix;
-        rotation_matrix << basisVectors[0][0], basisVectors[0][1], basisVectors[0][2],
-            basisVectors[1][0], basisVectors[1][1], basisVectors[1][2],
-            basisVectors[2][0], basisVectors[2][1], basisVectors[2][2];
+    Eigen::Matrix3d getRandomOrientation()
+    {
+        Eigen::Vector3d rotation;
+        rotation[0] = (rand() % 8) * 45;
+        rotation[1] = (rand() % 8) * 45;
+        rotation[2] = (rand() % 8) * 45;
+        return eulerToMatrix(rotation);
+    }
 
-        OrthonormalizeMatrix(rotation_matrix);
-        return rotation_matrix;
+    Eigen::Matrix3d getErrorOrientation(
+        float errValue)
+    {
+        // Assign an error orientation that can be checked to know if the rotation algorithm failed
+        Eigen::Vector3d rotation;
+        rotation[0] = errValue;
+        rotation[1] = errValue;
+        rotation[2] = errValue;
+        return eulerToMatrix(rotation);
+    }
+
+    Eigen::Vector3d getRandomPerpendicularVector(
+        Eigen::Vector3d vector
+    )
+    {
+        if (vector[0] == 0 && vector[1] == 0)
+        {
+            if (vector[2] == 0)
+            {
+                std::cout << "Failed to get perpendicular vector to zero vector! " << std::endl;
+                return Eigen::Vector3d(0, 0, 0);
+            }
+            return Eigen::Vector3d(0, 1, 0);
+        }
+
+        auto u = Eigen::Vector3d(-vector[1], vector[0], 0);
+        u.normalize();
+        auto r = Eigen::AngleAxisd(rand() % 2*M_PI, vector).toRotationMatrix();
+
+        return r * u;
     }
 
 } // namespace mathutil
