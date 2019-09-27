@@ -427,43 +427,11 @@ namespace agentsim {
     void ConnectionManager::SendDataToClient(
         Simulation& simulation,
         std::string connectionUID,
-        std::size_t start,
-        std::size_t count,
-        bool force
-    )
-    {
-        std::size_t numberOfFrames = simulation.GetNumFrames();
-        bool hasFinishedLoading = simulation.HasLoadedAllFrames();
-        this->SetClientState(connectionUID, ClientPlayState::Playing);
-
-        auto& netState = this->m_netStates.at(connectionUID);
-        for(std::size_t i = 0; i < count; ++i)
-        {
-            if(netState.play_state == ClientPlayState::Finished) { break; }
-
-            this->CheckForFinishedClient(
-                numberOfFrames,
-                hasFinishedLoading,
-                connectionUID,
-                netState);
-
-            this->SendDataToClient(simulation, connectionUID, start + i, force);
-            netState.frame_no++;
-        }
-
-        if(netState.play_state == ClientPlayState::Playing)
-        {
-            this->SetClientState(connectionUID, ClientPlayState::Stopped);
-        }
-    }
-
-    void ConnectionManager::SendDataToClient(
-        Simulation& simulation,
-        std::string connectionUID,
         std::size_t frameNumber,
         bool force // set to true for one-off sends
     )
     {
+        auto numberOfFrames = this->m_trajectoryFileProperties.numberOfFrames;
         auto& netState = this->m_netStates.at(connectionUID);
 
         if(!force)
@@ -474,6 +442,7 @@ namespace agentsim {
         }
 
         AgentDataFrame simData;
+        netState.frame_no = std::min(frameNumber, numberOfFrames - 1);
         simData = simulation.GetDataFrame(netState.frame_no);
 
         Json::Value net_agent_data_frame;
@@ -593,21 +562,22 @@ namespace agentsim {
                         }
                     }
 
-                    if(jsonMsg.isMember("count"))
+                    if(jsonMsg.isMember("frameNumber"))
                     {
-                        // this is arbitrarily capped at 5
-                        //  the current expected usage is to ask for a single frame
-                        std::size_t count = std::min(jsonMsg["count"].asInt(), 5);
-                        auto& netState = this->m_netStates.at(senderUid);
-                        netState.frame_no = jsonMsg["frameNumber"].asInt();
+                        int frameNumber = jsonMsg["frameNumber"].asInt();
+                        frameNumber = std::max(frameNumber, 0);
+
+                        std::cout << "[" << senderUid << "] Data request for frame "
+                        << frameNumber << std::endl;
 
                         this->SendDataToClient(
                             simulation,
                             senderUid,
-                            netState.frame_no,
-                            count,
+                            frameNumber,
                             true // force
                         );
+
+                        this->SetClientState(senderUid, ClientPlayState::Stopped);
                     }
                     else {
                         this->SetClientState(senderUid, ClientPlayState::Playing);
