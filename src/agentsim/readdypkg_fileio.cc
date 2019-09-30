@@ -73,6 +73,7 @@ void read_h5file(
     TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo,
     RotationH5Info& rotationInfo,
+    std::unordered_map<std::size_t, std::string>& typeMapping,
     IdParticleMapping& particleLookup
 );
 
@@ -85,6 +86,7 @@ void copy_frame(
 TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
     h5rd::Group& group,
+    std::unordered_map<std::size_t, std::string>& typeMapping,
     IdParticleMapping& particleLookup
 );
 
@@ -198,6 +200,7 @@ namespace agentsim {
                 this->m_trajectoryInfo,
                 this->m_topologyInfo,
                 this->m_rotationInfo,
+                this->m_typeMapping,
                 ID_PARTICLE_CACHE
             );
             this->m_hasLoadedRunFile = true;
@@ -209,6 +212,7 @@ namespace agentsim {
 
             fileProps.numberOfFrames = traj.size();
             fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
+            fileProps.typeMapping = this->m_typeMapping;
         }
     }
 
@@ -287,6 +291,7 @@ void read_h5file(
     TimeTrajectoryH5Info& trajectoryInfo,
     TimeTopologyH5Info& topologyInfo,
     RotationH5Info& rotationInfo,
+    std::unordered_map<std::size_t, std::string>& typeMapping,
     IdParticleMapping& particleLookup
     )
 {
@@ -299,7 +304,7 @@ void read_h5file(
 
     // read back trajectory
     auto traj = file->getSubgroup("readdy/trajectory");
-    trajectoryInfo = readTrajectory(file, traj, particleLookup);
+    trajectoryInfo = readTrajectory(file, traj, typeMapping, particleLookup);
 
     auto topGroup = file->getSubgroup("readdy/observables/topologies");
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
@@ -383,6 +388,7 @@ void copy_frame(
 TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
     h5rd::Group& group,
+    std::unordered_map<std::size_t, std::string>& typeMapping,
     IdParticleMapping& particleLookup
 )
 {
@@ -402,7 +408,7 @@ TimeTrajectoryH5Info readTrajectory(
             &std::get<0>(particleInfoH5Type),
             &std::get<1>(particleInfoH5Type));
     }
-    std::unordered_map<std::size_t, std::string> typeMapping;
+
     for (const auto& type : types) {
         typeMapping[type.type_id] = std::string(type.name);
         std::cout << "Particle type found: " << type.type_id

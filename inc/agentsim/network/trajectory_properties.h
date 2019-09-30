@@ -10,6 +10,7 @@ struct TrajectoryFileProperties{
     std::string fileName = "";
     std::size_t numberOfFrames = 0;
     double timeStepSize = 100;
+    std::unordered_map<std::size_t, std::string> typeMapping;
 };
 
 } // namespace agentsim
