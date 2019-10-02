@@ -711,6 +711,17 @@ namespace agentsim {
             this->m_trajectoryFileProperties.numberOfFrames *
             this->m_trajectoryFileProperties.timeStepSize;
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
+
+        Json::Value nameMapping;
+        for(auto entry : this->m_trajectoryFileProperties.typeMapping)
+        {
+            std::string id = std::to_string(entry.first);
+            std::string name = entry.second;
+
+            nameMapping[id] = name;
+        }
+        fprops["nameMapping"] = nameMapping;
+
         this->SendWebsocketMessage(connectionUID, fprops);
         this->SendDataToClient(simulation, connectionUID, 0, true);
     }

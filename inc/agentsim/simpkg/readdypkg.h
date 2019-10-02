@@ -120,6 +120,7 @@ namespace agentsim {
         // Used to store FileIO data
         TimeTrajectoryH5Info m_trajectoryInfo;
         TimeTopologyH5Info m_topologyInfo;
+        std::unordered_map<std::size_t, std::string> m_typeMapping;
 
         // stored seperatley because these are calculated, not native to ReaDDy
         RotationH5Info m_rotationInfo;
