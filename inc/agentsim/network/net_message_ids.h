@@ -47,7 +47,7 @@ namespace agentsim {
         { id_init_trajectory_file, "init trajectory file" },
     };
 
-    enum {
+    enum SimulationMode {
         id_live_simulation = 0,
         id_pre_run_simulation = 1,
         id_traj_file_playback = 2

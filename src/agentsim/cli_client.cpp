@@ -218,7 +218,7 @@ namespace agentsim {
     {
         Json::Value jsonMsg;
         jsonMsg["msgType"] = WebRequestTypes::id_vis_data_resume;
-        jsonMsg["mode"] = id_live_simulation;
+        jsonMsg["mode"] = SimulationMode::id_live_simulation;
         this->SendMessage(jsonMsg, "resume command");
     }
 
@@ -233,7 +233,7 @@ namespace agentsim {
     {
         Json::Value jsonMsg;
         jsonMsg["msgType"] = WebRequestTypes::id_vis_data_request;
-        jsonMsg["mode"] = id_live_simulation;
+        jsonMsg["mode"] = SimulationMode::id_live_simulation;
         this->SendMessage(jsonMsg, "start command live");
     }
 
@@ -241,7 +241,7 @@ namespace agentsim {
     {
         Json::Value jsonMsg;
         jsonMsg["msgType"] = WebRequestTypes::id_vis_data_request;
-        jsonMsg["mode"] = id_pre_run_simulation;
+        jsonMsg["mode"] = SimulationMode::id_pre_run_simulation;
         jsonMsg["timeStep"] = 1e-9f;
         jsonMsg["numTimeSteps"] = 200;
         this->SendMessage(jsonMsg, "start command precache");
@@ -251,7 +251,7 @@ namespace agentsim {
     {
         Json::Value jsonMsg;
         jsonMsg["msgType"] = WebRequestTypes::id_vis_data_request;
-        jsonMsg["mode"] = id_traj_file_playback;
+        jsonMsg["mode"] = SimulationMode::id_traj_file_playback;
         jsonMsg["file-name"] = fileName;
         this->SendMessage(jsonMsg, "start command trajectory " + fileName);
     }

@@ -104,14 +104,6 @@ namespace agentsim {
             bool force = false // ignore play state & all conditions, just send
         );
 
-        void SendDataToClient(
-            Simulation& simulation,
-            std::string connectionUID,
-            std::size_t start,
-            std::size_t count,
-            bool force
-        );
-
         void CheckForFinishedClient(
             std::size_t numberOfLoadedFrames,
             std::size_t totalNumberOfFrames,

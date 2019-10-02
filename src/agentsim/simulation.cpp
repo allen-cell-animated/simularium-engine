@@ -46,15 +46,6 @@ namespace agentsim {
         this->CacheCurrentAgents();
     }
 
-    std::vector<AgentData> Simulation::GetData()
-    {
-        if (this->IsPlayingFromCache()) {
-            return this->m_cache.GetCurrentFrame();
-        } else {
-            return this->m_cache.GetLatestFrame();
-        }
-    }
-
     std::vector<AgentData> Simulation::GetDataFrame(std::size_t frame_no)
     {
         return this->m_cache.GetFrame(frame_no);
@@ -124,22 +115,6 @@ namespace agentsim {
         this->CacheCurrentAgents();
     }
 
-    void Simulation::PlayCacheFromFrame(std::size_t frame_number)
-    {
-        this->m_cache.SetCurrentFrame(frame_number);
-        this->m_isPlayingFromCache = true;
-    }
-
-    void Simulation::IncrementCacheFrame()
-    {
-        this->m_cache.IncrementCurrentFrame();
-
-        if (this->m_cache.CurrentIsLatestFrame()) {
-            std::cout << "Ending cache play" << std::endl;
-            this->m_isPlayingFromCache = false;
-        }
-    }
-
     void Simulation::CacheCurrentAgents()
     {
         AgentDataFrame newFrame;
@@ -161,14 +136,9 @@ namespace agentsim {
         }
     }
 
-    void Simulation::SetPlaybackMode(std::size_t playback_mode)
+    void Simulation::SetPlaybackMode(SimulationMode playbackMode)
     {
-        this->m_playbackMode = playback_mode;
-    }
-
-    bool Simulation::IsRunningLive()
-    {
-        return this->m_playbackMode == id_live_simulation;
+        this->m_playbackMode = playbackMode;
     }
 
     void AppendAgentData(
@@ -264,21 +234,21 @@ namespace agentsim {
         }
     }
 
-    double Simulation::GetTime(std::size_t frameNumber)
+    double Simulation::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
         if(this->m_SimPkgs.size() > 0)
         {
-            return this->m_SimPkgs[0]->GetTime(frameNumber);
+            return this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
         }
 
         return 0.0;
     }
 
-    std::size_t Simulation::GetFrameNumber(double simulationTimeNs)
+    std::size_t Simulation::GetClosestFrameNumberForTime(double simulationTimeNs)
     {
         if(this->m_SimPkgs.size() > 0)
         {
-            return this->m_SimPkgs[0]->GetFrameNumber(simulationTimeNs);
+            return this->m_SimPkgs[0]->GetClosestFrameNumberForTime(simulationTimeNs);
         }
 
         return 0.0;

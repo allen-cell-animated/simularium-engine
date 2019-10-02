@@ -159,8 +159,8 @@ namespace agentsim {
             std::string file_path,
             TrajectoryFileProperties& fileProps
         ) override;
-        virtual double GetTime(std::size_t frameNumber) override;
-        virtual std::size_t GetFrameNumber(double timeNs) override;
+        virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override;
+        virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override;
 
     private:
         readdy::Simulation* m_simulation;
@@ -176,6 +176,7 @@ namespace agentsim {
         // Used to store FileIO data
         TimeTrajectoryH5Info m_trajectoryInfo;
         TimeTopologyH5Info m_topologyInfo;
+        std::unordered_map<std::size_t, std::string> m_typeMapping;
 
         // stored seperatley because these are calculated, not native to ReaDDy
         RotationH5Info m_rotationInfo;
