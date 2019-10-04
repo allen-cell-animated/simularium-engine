@@ -227,7 +227,7 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
     std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData,
     const ParticleH5List& trajectoryFrame,
     const TopologyH5List& topologyFrame,
-    std::unordered_map<std::size_t, std::size_t> idmappingFrame
+    const std::unordered_map<std::size_t, std::size_t>& idmappingFrame
 );
 
 static Eigen::Matrix3d getCurrentRotation(
@@ -457,7 +457,6 @@ void read_h5file(
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
     auto orientationData = initOrientationData();
 
-/** Commenting out to unblock front-end dev while performance improvements are made
     calculateOrientations(
         std::get<1>(topologyInfo),
         std::get<1>(trajectoryInfo),
@@ -465,7 +464,7 @@ void read_h5file(
         particleLookup,
         orientationData
     );
-*/
+
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
     std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
 
@@ -942,7 +941,7 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
     std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData,
     const ParticleH5List& trajectoryFrame,
     const TopologyH5List& topologyFrame,
-    std::unordered_map<std::size_t, std::size_t> idmappingFrame
+    const std::unordered_map<std::size_t, std::size_t>& idmappingFrame
 )
 {
     // match actual neighbors to orientation data
@@ -1040,13 +1039,14 @@ static void calculateOrientations(
     const OrientationDataMap& orientationDataLookup
 )
 {
-    auto numberOfFrames = topologyH5Info.size();
+    auto numberOfFrames = trajectoryH5Info.size();
+    auto topologyStride = (trajectoryH5Info.size() / topologyH5Info.size()) + 1;
     outRotations.resize(numberOfFrames);
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
         auto trajectoryFrame = trajectoryH5Info.at(frameIndex);
-        auto topologyFrame = topologyH5Info.at(frameIndex);
+        auto topologyFrame = topologyH5Info.at(frameIndex / topologyStride);
         auto& rotationFrame = outRotations.at(frameIndex);
         auto& idmappingFrame = particleLookup.at(frameIndex);
 
