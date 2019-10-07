@@ -95,10 +95,7 @@ namespace agentsim {
     }
 
     bool Simulation::HasLoadedAllFrames()
-    { {
-
-        }
-
+    {
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
             if (!this->m_SimPkgs[i]->IsFinished()) {
                 return false;

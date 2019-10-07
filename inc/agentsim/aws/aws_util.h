@@ -21,7 +21,12 @@ namespace agentsim {
         /**
         *   Upload
         *
-        *   @param  objectName  the desired fullpath
+        *   @param  fileName    the local file path to the object to upload
+        *   @param  objectName  the desired fullpath of the object on AWS
+        *
+        *   uploads a specified object to AWS S3 storage, intended to
+        *   store objects that need persistent, centralized, storage
+        *   (e.g. reusable caches)
         */
         bool Upload(std::string fileName, std::string objectName);
 
