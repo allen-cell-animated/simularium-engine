@@ -161,6 +161,45 @@ namespace agentsim {
         }
 
         /**
+        *   UploadRuntimeCache
+        *
+        *   Saves the runtime cache on S3
+        *   The run-time cache is the version of a trajectory/simulation result
+        *   that can be immediately streamed to a client with-out any processing
+        */
+        void UploadRuntimeCache();
+
+        /**
+        *   DownloadRuntimeCache
+        *
+        *   @param  filePath    The path of the trajectory file to find a cache of (e.g. trajectory.h5)
+        *                       this function will do any necessary modification to find the cache on S3
+        *
+        *   Returns true if an already processed runtime cache is found for a simulation
+        */
+        bool DownloadRuntimeCache(std::string filePath);
+
+        /**
+        *   PreprocessRuntimeCache
+        *
+        *   This function is for use after downloading an already processed run-time cache
+        *   This function will evaluate the number of frames in the RunTime
+        *   and implement any optimizations for finding individual frames
+        */
+        void PreprocessRuntimeCache();
+
+        /**
+        *   IsPlayingTrajectory
+        *
+        *   Is this simulation playing back a specified trajectory file?
+        *   This is true for a specifically requested trajectory playback
+        *   and false in 'live' mode or pre-run mode
+        */
+        bool IsPlayingTrajectory()  {
+            return this->m_playbackMode == SimulationMode::id_traj_file_playback;
+        }
+
+        /**
         *   GetSimulationTimeAtFrame
         *
         *   @param  frameNumber     the frame to check simulation time at
@@ -181,12 +220,16 @@ namespace agentsim {
         */
         std::size_t GetClosestFrameNumberForTime(double simulationTimeNs);
 
+        std::size_t NumberOfCachedFrames() { return this->m_cache.GetNumFrames(); }
+
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
         Model m_model;
         SimulationCache m_cache;
         std::size_t m_playbackMode = SimulationMode::id_live_simulation;
+
+        std::string m_trajectoryFilePath = "";
     };
 
 }

@@ -2,6 +2,7 @@
 #include "agentsim/agents/agent.h"
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/simpkg/simpkg.h"
+#include "agentsim/aws/aws_util.h"
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
@@ -127,13 +128,15 @@ namespace agentsim {
     }
 
     void Simulation::LoadTrajectoryFile(
-        std::string file_path,
+        std::string filePath,
         TrajectoryFileProperties& fileProps
     )
     {
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->LoadTrajectoryFile(file_path, fileProps);
+            this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, fileProps);
         }
+
+        this->m_trajectoryFilePath = filePath;
     }
 
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)
@@ -141,11 +144,35 @@ namespace agentsim {
         this->m_playbackMode = playbackMode;
     }
 
+    void Simulation::UploadRuntimeCache()
+    {
+        std::string filePath = this->m_trajectoryFilePath + "_cache";
+        std::cout << "Uploading " << filePath << " to S3" << std::endl;
+        aics::agentsim::aws_util::Upload("/tmp/agentviz_runtime_cache.bin", filePath);
+    }
+
+    bool Simulation::DownloadRuntimeCache(std::string filePath)
+    {
+        std::cout << "Downloading cache for " << filePath << " from S3" << std::endl;
+        this->m_trajectoryFilePath = filePath;
+        std::string cacheFilePath = filePath + "_cache";
+        if (!aics::agentsim::aws_util::Download(cacheFilePath, "/tmp/agentviz_runtime_cache.bin")) {
+            std::cout << "Cache file for " << filePath << " not found on AWS S3" << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
+    void Simulation::PreprocessRuntimeCache()
+    {
+        this->m_cache.Preprocess();
+    }
+
     void AppendAgentData(
         std::vector<AgentData>& out,
         std::shared_ptr<Agent>& agent)
     {
-
         if (agent->IsVisible()) {
             AgentData ad;
 

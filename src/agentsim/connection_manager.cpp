@@ -555,6 +555,7 @@ namespace agentsim {
                             this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
                         case SimulationMode::id_traj_file_playback: {
+                            simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             std::cout << "Playing back trajectory file" << std::endl;
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
@@ -680,7 +681,7 @@ namespace agentsim {
 
         // the relative directory for trajectory files on S3
         //  local downloads mirror the S3 directory structure
-        std::string trajectory_file_directory = "trajectory/";
+        std::string trajectoryFileDirectory = "trajectory/";
 
         std::string lastLoaded = this->m_trajectoryFileProperties.fileName;
         if(fileName.compare(lastLoaded) == 0)
@@ -688,14 +689,24 @@ namespace agentsim {
             std::cout << "Using previously loaded file" << std::endl;
         }
         else {
-            this->m_trajectoryFileProperties.fileName = fileName;
-            simulation.SetPlaybackMode(id_traj_file_playback);
-            simulation.Reset();
-            simulation.LoadTrajectoryFile(
-                trajectory_file_directory + fileName,
-                this->m_trajectoryFileProperties
-            );
-            this->SetupRuntimeCacheAsync(simulation, 500);
+            std::string filePath = trajectoryFileDirectory + fileName;
+            if(simulation.DownloadRuntimeCache(filePath))
+            {
+                simulation.PreprocessRuntimeCache();
+                // We found an already processed run-time cache for this trajectory
+                this->m_trajectoryFileProperties.fileName = fileName;
+                this->m_trajectoryFileProperties.numberOfFrames = simulation.NumberOfCachedFrames();
+            }
+            else {
+                this->m_trajectoryFileProperties.fileName = fileName;
+                simulation.SetPlaybackMode(id_traj_file_playback);
+                simulation.Reset();
+                simulation.LoadTrajectoryFile(
+                    filePath,
+                    this->m_trajectoryFileProperties
+                );
+                this->SetupRuntimeCacheAsync(simulation, 500);
+            }
         }
 
         // Send Trajectory File Properties
@@ -743,6 +754,12 @@ namespace agentsim {
                 simulation.LoadNextFrame();
             }
             std::cout << "Finished loading trajectory into runtime cache" << std::endl;
+
+            // Save the result so it doesn't need to be calculated again
+            if(simulation.IsPlayingTrajectory())
+            {
+                simulation.UploadRuntimeCache();
+            }
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));

@@ -36,6 +36,8 @@ namespace agentsim {
 
         void ClearCache();
 
+        void Preprocess();
+
     private:
         std::size_t m_current = 0;
         std::size_t m_frameCounter = 0;

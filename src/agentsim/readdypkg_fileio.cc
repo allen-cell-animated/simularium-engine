@@ -9,7 +9,7 @@ inline bool file_exists(const std::string& name)
     return (stat(name.c_str(), &buffer) == 0);
 }
 
-bool get_file_path(std::string& name);
+bool get_file_path(std::string& fileName);
 
 OrientationDataMap initOrientationData() {
 
@@ -227,7 +227,7 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
     std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData,
     const ParticleH5List& trajectoryFrame,
     const TopologyH5List& topologyFrame,
-    std::unordered_map<std::size_t, std::size_t> idmappingFrame
+    const std::unordered_map<std::size_t, std::size_t>& idmappingFrame
 );
 
 static Eigen::Matrix3d getCurrentRotation(
@@ -365,7 +365,13 @@ namespace agentsim {
 
     double ReaDDyPkg::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
-        return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
+        auto times = std::get<0>(this->m_trajectoryInfo);
+        if(times.size() > frameNumber)
+        {
+            return times.at(frameNumber);
+        }
+
+        return 0.0;
     }
 
     std::size_t ReaDDyPkg::GetClosestFrameNumberForTime(double timeNs)
@@ -384,25 +390,25 @@ namespace agentsim {
 /**
 *	File IO Functions
 **/
-bool get_file_path(std::string& file_name)
+bool get_file_path(std::string& fileName)
 {
     // Download the file from AWS if it is not present locally
-    if (!file_exists(file_name)) {
-        std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
-        if (!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size()))) {
-            std::cout << file_name << " not found on AWS S3" << std::endl;
+    if (!file_exists(fileName)) {
+        std::cout << fileName << " doesn't exist locally, checking S3..." << std::endl;
+        if (!aics::agentsim::aws_util::Download(fileName, fileName)) {
+            std::cout << fileName << " not found on AWS S3" << std::endl;
             return false;
         }
     }
 
     // Modifies the file-path  to a format that H5rd can reliably load
     // H5rd is a library written by the ReaDDy developers to load H5 files
-    if (file_exists("/" + file_name)) {
-        file_name = "/" + file_name;
-        std::cout << "file name modified to " << file_name << std::endl;
-    } else if (file_exists("./" + file_name)) {
-        file_name = "./" + file_name;
-        std::cout << "file name modified to " << file_name << std::endl;
+    if (file_exists("/" + fileName)) {
+        fileName = "/" + fileName;
+        std::cout << "file name modified to " << fileName << std::endl;
+    } else if (file_exists("./" + fileName)) {
+        fileName = "./" + fileName;
+        std::cout << "file name modified to " << fileName << std::endl;
     }
 
     return true;
@@ -457,7 +463,6 @@ void read_h5file(
     topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
     auto orientationData = initOrientationData();
 
-/** Commenting out to unblock front-end dev while performance improvements are made
     calculateOrientations(
         std::get<1>(topologyInfo),
         std::get<1>(trajectoryInfo),
@@ -465,7 +470,7 @@ void read_h5file(
         particleLookup,
         orientationData
     );
-*/
+
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
     std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
 
@@ -942,7 +947,7 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
     std::vector<std::pair<MonomerType,OrientationData>> particleOrientationData,
     const ParticleH5List& trajectoryFrame,
     const TopologyH5List& topologyFrame,
-    std::unordered_map<std::size_t, std::size_t> idmappingFrame
+    const std::unordered_map<std::size_t, std::size_t>& idmappingFrame
 )
 {
     // match actual neighbors to orientation data
@@ -1040,13 +1045,14 @@ static void calculateOrientations(
     const OrientationDataMap& orientationDataLookup
 )
 {
-    auto numberOfFrames = topologyH5Info.size();
+    auto numberOfFrames = trajectoryH5Info.size();
+    auto topologyStride = (trajectoryH5Info.size() / topologyH5Info.size()) + 1;
     outRotations.resize(numberOfFrames);
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
         auto trajectoryFrame = trajectoryH5Info.at(frameIndex);
-        auto topologyFrame = topologyH5Info.at(frameIndex);
+        auto topologyFrame = topologyH5Info.at(frameIndex / topologyStride);
         auto& rotationFrame = outRotations.at(frameIndex);
         auto& idmappingFrame = particleLookup.at(frameIndex);
 
