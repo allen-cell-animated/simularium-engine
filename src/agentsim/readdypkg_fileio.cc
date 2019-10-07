@@ -9,7 +9,7 @@ inline bool file_exists(const std::string& name)
     return (stat(name.c_str(), &buffer) == 0);
 }
 
-bool get_file_path(std::string& name);
+bool get_file_path(std::string& fileName);
 
 OrientationDataMap initOrientationData() {
 
@@ -365,7 +365,13 @@ namespace agentsim {
 
     double ReaDDyPkg::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
-        return std::get<0>(this->m_trajectoryInfo).at(frameNumber);
+        auto times = std::get<0>(this->m_trajectoryInfo);
+        if(times.size() > frameNumber)
+        {
+            return times.at(frameNumber);
+        }
+
+        return 0.0;
     }
 
     std::size_t ReaDDyPkg::GetClosestFrameNumberForTime(double timeNs)
@@ -384,25 +390,25 @@ namespace agentsim {
 /**
 *	File IO Functions
 **/
-bool get_file_path(std::string& file_name)
+bool get_file_path(std::string& fileName)
 {
     // Download the file from AWS if it is not present locally
-    if (!file_exists(file_name)) {
-        std::cout << file_name << " doesn't exist locally, checking S3..." << std::endl;
-        if (!aics::agentsim::aws_util::Download(Aws::String(file_name.c_str(), file_name.size()))) {
-            std::cout << file_name << " not found on AWS S3" << std::endl;
+    if (!file_exists(fileName)) {
+        std::cout << fileName << " doesn't exist locally, checking S3..." << std::endl;
+        if (!aics::agentsim::aws_util::Download(fileName, fileName)) {
+            std::cout << fileName << " not found on AWS S3" << std::endl;
             return false;
         }
     }
 
     // Modifies the file-path  to a format that H5rd can reliably load
     // H5rd is a library written by the ReaDDy developers to load H5 files
-    if (file_exists("/" + file_name)) {
-        file_name = "/" + file_name;
-        std::cout << "file name modified to " << file_name << std::endl;
-    } else if (file_exists("./" + file_name)) {
-        file_name = "./" + file_name;
-        std::cout << "file name modified to " << file_name << std::endl;
+    if (file_exists("/" + fileName)) {
+        fileName = "/" + fileName;
+        std::cout << "file name modified to " << fileName << std::endl;
+    } else if (file_exists("./" + fileName)) {
+        fileName = "./" + fileName;
+        std::cout << "file name modified to " << fileName << std::endl;
     }
 
     return true;

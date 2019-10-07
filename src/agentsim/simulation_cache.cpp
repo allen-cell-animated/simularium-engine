@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <iterator>
 
 /**
 *	File Serialization Functions
@@ -121,6 +122,19 @@ namespace agentsim {
         this->m_runtimeCache.clear();
         this->m_current = 0;
         this->m_frameCounter = 0;
+    }
+
+    void SimulationCache::Preprocess()
+    {
+        std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
+        std::string line;
+        while (std::getline(is, line))
+        {
+            this->m_frameCounter++;
+            line = "";
+        }
+
+        std::cout << "Number of frames in runtime cache: " << this->m_frameCounter << std::endl;
     }
 
 } // namespace agentsim

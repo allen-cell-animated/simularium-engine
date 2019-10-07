@@ -81,7 +81,7 @@ namespace agentsim {
 
         TEST_F(AwsSdkTest, AwsUtilDownload)
         {
-            aics::agentsim::aws_util::Download("trajectory/test.txt");
+            aics::agentsim::aws_util::Download("trajectory/test.txt", "trajectory/test.txt");
         }
 
     } // namespace test
