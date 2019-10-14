@@ -35,6 +35,41 @@ namespace agentsim {
         }
     }
 
+    context_ptr ConnectionManager::OnTLSConnect()
+    {
+        namespace asio = websocketpp::lib::asio;
+        enum TLS_MODE {
+            MOZILLA_INTERMEDIATE = 1,
+            MOZILLA_MODERN = 2
+        };
+
+        auto mode = TLS_MODE::MOZILLA_MODERN;
+        context_ptr ctx =
+            websocketpp::lib::make_shared<asio::ssl::context>(
+                asio::ssl::context::sslv23
+            );
+
+        if(mode == TLS_MODE::MOZILLA_MODERN)
+        {
+            ctx->set_options(
+                asio::ssl::context::default_workarounds |
+                asio::ssl::context::no_sslv2 |
+                asio::ssl::context::no_sslv3 |
+                asio::ssl::context::no_tlsv1 |
+                asio::ssl::context::single_dh_use
+            );
+        } else {
+            ctx->set_options(
+                asio::ssl::context::default_workarounds |
+                asio::ssl::context::no_sslv2 |
+                asio::ssl::context::no_sslv3 |
+                asio::ssl::context::single_dh_use
+            );
+        }
+
+        return ctx;
+    }
+
     void ConnectionManager::ListenAsync()
     {
         this->m_listeningThread = std::thread([&] {

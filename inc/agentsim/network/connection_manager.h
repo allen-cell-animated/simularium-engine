@@ -11,14 +11,15 @@
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
 #include <json/json.h>
-#include <websocketpp/config/asio_no_tls.hpp>
+#include <websocketpp/config/asio.hpp>
 #include <websocketpp/server.hpp>
 
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/network/trajectory_properties.h"
 #include "agentsim/simulation.h"
 
-typedef websocketpp::server<websocketpp::config::asio> server;
+typedef websocketpp::server<websocketpp::config::asio_tls> server;
+typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> context_ptr;
 
 namespace aics {
 namespace agentsim {
@@ -93,6 +94,8 @@ namespace agentsim {
         // e.g. changing parameters, time-step, starting, stopping, etc.
         void HandleNetMessages(Simulation& simulation, float& timeStep);
         void CloseServer();
+
+        context_ptr OnTLSConnect();
 
     private:
         void GenerateLocalUUID(std::string& uuid);
