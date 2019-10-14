@@ -2,6 +2,7 @@
 #define AICS_CONNECTION_MANAGER_H
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -95,7 +96,12 @@ namespace agentsim {
         void HandleNetMessages(Simulation& simulation, float& timeStep);
         void CloseServer();
 
-        context_ptr OnTLSConnect();
+        enum TLS_MODE {
+            MOZILLA_INTERMEDIATE = 1,
+            MOZILLA_MODERN = 2
+        };
+
+        context_ptr OnTLSConnect(TLS_MODE mode, websocketpp::connection_hdl hdl);
 
     private:
         void GenerateLocalUUID(std::string& uuid);
@@ -134,6 +140,16 @@ namespace agentsim {
             Simulation& simulation,
             std::size_t waitTimeMs
         );
+
+        /**
+        *   TLS Functions
+        */
+        std::string GetPassword() {
+            return std::getenv("TLS_PASSWORD") ? std::getenv("TLS_PASSWORD") : "";
+        }
+        std::string GetCertificateFilepath() {
+            return std::getenv("TLS_CERT_PATH") ? std::getenv("TLS_CERT_PATH") : "";
+        }
 
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
