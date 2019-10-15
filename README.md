@@ -29,6 +29,12 @@ build-essential cmake curl git libblas-dev libhdf5-dev liblapack-dev
 python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 
 ## Building
+### TLS Setup
+1. Install [makecrt](https://github.com/FiloSottile/mkcert)
+2. generate a certificate for localhost
+3. In a terminal window, run: `source [repo-path]/setup.sh`
+4. From the same terminal window, run: `./agentsim_server.exe`
+
 ### Docker
 1. Install [docker](https://docs.docker.com/v17.09/engine/installation/)
 2. Clone the repository locally: `git clone --recursive *repository-address*`
