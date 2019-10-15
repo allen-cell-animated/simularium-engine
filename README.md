@@ -1,8 +1,7 @@
 # Agent Viz
 
 ## Description
-Agent-Viz is a spatial simulation framework and visualization environment
-integrated visualization environment for biological simulation.
+Agent-Viz is a spatial simulation framework and visualization environment for biological simulations.
 
 ### Packages
 Agent-Viz integrates existing spatial simulation software:
