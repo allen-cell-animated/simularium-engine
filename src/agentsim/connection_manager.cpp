@@ -70,8 +70,9 @@ namespace agentsim {
                 ));
 
             auto certFilePath = this->GetCertificateFilepath();
+            auto keyFilePath = this->GetKeyFilepath();
             ctx->use_certificate_chain_file(certFilePath);
-            ctx->use_private_key_file(certFilePath, asio::ssl::context::pem);
+            ctx->use_private_key_file(keyFilePath, asio::ssl::context::pem);
 
             // Example method of generating this file:
             // `openssl dhparam -out dh.pem 2048`

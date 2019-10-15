@@ -150,6 +150,9 @@ namespace agentsim {
         std::string GetCertificateFilepath() {
             return std::getenv("TLS_CERT_PATH") ? std::getenv("TLS_CERT_PATH") : "";
         }
+        std::string GetKeyFilepath() {
+            return std::getenv("TLS_KEY_PATH") ? std::getenv("TLS_KEY_PATH") : "";
+        }
 
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
