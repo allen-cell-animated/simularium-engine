@@ -34,7 +34,7 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 3. To build the container, run: `sudo docker build -t agentsim-dev .`
 4. To run the container, run: `sudo docker run -it -p 9002:9002 agentsim-dev:latest agentsim_server.exe --no-exit`
 5. Mount the tls certificate to /etc/ssl/tls.crt
-6. Mount the tls key to /etc/ssl/tls.crt
+6. Mount the tls key to /etc/ssl/tls.key
 
 ### Native
 1. Clone the repository locally: `git clone --recursive *repository-address*`
