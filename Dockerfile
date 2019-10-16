@@ -11,6 +11,7 @@ RUN mkdir /agentsim-dev && \
 	cmake \
 	curl \
 	git \
+    openssl \
 	libblas-dev \
 	libhdf5-dev \
 	liblapack-dev \

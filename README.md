@@ -28,17 +28,13 @@ build-essential cmake curl git libblas-dev libhdf5-dev liblapack-dev
 python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 
 ## Building
-### TLS Setup
-1. Install [makecrt](https://github.com/FiloSottile/mkcert)
-2. generate a certificate for localhost
-3. In a terminal window, run: `source [repo-path]/setup.sh`
-4. From the same terminal window, run: `./agentsim_server.exe`
-
 ### Docker
 1. Install [docker](https://docs.docker.com/v17.09/engine/installation/)
 2. Clone the repository locally: `git clone --recursive *repository-address*`
 3. To build the container, run: `sudo docker build -t agentsim-dev .`
 4. To run the container, run: `sudo docker run -it -p 9002:9002 agentsim-dev:latest agentsim_server.exe --no-exit`
+5. Mount the tls certificate to /etc/ssl/tls.crt
+6. Mount the tls key to /etc/ssl/tls.crt
 
 ### Native
 1. Clone the repository locally: `git clone --recursive *repository-address*`
@@ -49,6 +45,14 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 5. Run: `make`
 6. To run the server, run: `./agentsim_server.exe --no-exit`
 7. To run the tests, run: `./agentsim_tests`
+
+### TLS Setup (Native)
+1. Install [makecrt](https://github.com/FiloSottile/mkcert)
+2. generate a certificate for localhost
+3. In a terminal window, navigate to the build directory
+3. From the same terminal window, run: `openssl dhparam -out dh.pem 2048`
+3. From the same terminal window, run: `source [repo-path]/setup.sh`
+4. From the same terminal window, run: `./agentsim_server.exe`
 
 ## Tests
 This project uses the [google test framework](https://github.com/google/googletest)
