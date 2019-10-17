@@ -3,6 +3,7 @@
 #include <aws/core/utils/threading/Executor.h>
 #include <aws/s3/S3Client.h>
 #include <aws/transfer/TransferManager.h>
+#include <aws/core/utils/logging/ConsoleLogSystem.h>
 #include <iostream>
 #include <string>
 
@@ -20,7 +21,13 @@ namespace agentsim {
 
             bool success = true;
             Aws::SDKOptions options;
-            options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info;
+            options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Debug;
+            options.loggingOptions.logger_create_fn =
+                [] {
+                    return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
+                        Aws::Utils::Logging::LogLevel::Trace
+                    );
+                 };
 
             Aws::InitAPI(options);
             {
@@ -54,7 +61,13 @@ namespace agentsim {
 
             bool success = true;
             Aws::SDKOptions options;
-            options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info;
+            options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Debug;
+            options.loggingOptions.logger_create_fn =
+                [] {
+                    return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
+                        Aws::Utils::Logging::LogLevel::Trace
+                    );
+                 };
 
             Aws::InitAPI(options);
             {
