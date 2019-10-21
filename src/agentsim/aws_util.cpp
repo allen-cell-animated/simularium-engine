@@ -25,7 +25,7 @@ namespace agentsim {
             options.loggingOptions.logger_create_fn =
                 [] {
                     return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
-                        Aws::Utils::Logging::LogLevel::Trace
+                        Aws::Utils::Logging::LogLevel::Debug
                     );
                  };
 
@@ -65,7 +65,7 @@ namespace agentsim {
             options.loggingOptions.logger_create_fn =
                 [] {
                     return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
-                        Aws::Utils::Logging::LogLevel::Trace
+                        Aws::Utils::Logging::LogLevel::Debug
                     );
                  };
 

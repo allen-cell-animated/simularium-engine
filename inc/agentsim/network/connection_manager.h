@@ -153,7 +153,7 @@ namespace agentsim {
         std::string GetKeyFilepath() {
             return std::getenv("TLS_KEY_PATH") ? std::getenv("TLS_KEY_PATH") : "";
         }
-        bool UploadTrajectoryProperties();
+        bool UploadTrajectoryProperties(std::string fileName);
         bool DownloadTrajectoryProperties(std::string fileName);
 
         std::unordered_map<std::string, NetState> m_netStates;
