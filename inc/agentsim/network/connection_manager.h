@@ -2,6 +2,7 @@
 #define AICS_CONNECTION_MANAGER_H
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -11,14 +12,15 @@
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
 #include <json/json.h>
-#include <websocketpp/config/asio_no_tls.hpp>
+#include <websocketpp/config/asio.hpp>
 #include <websocketpp/server.hpp>
 
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/network/trajectory_properties.h"
 #include "agentsim/simulation.h"
 
-typedef websocketpp::server<websocketpp::config::asio> server;
+typedef websocketpp::server<websocketpp::config::asio_tls> server;
+typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> context_ptr;
 
 namespace aics {
 namespace agentsim {
@@ -94,6 +96,13 @@ namespace agentsim {
         void HandleNetMessages(Simulation& simulation, float& timeStep);
         void CloseServer();
 
+        enum TLS_MODE {
+            MOZILLA_INTERMEDIATE = 1,
+            MOZILLA_MODERN = 2
+        };
+
+        context_ptr OnTLSConnect(TLS_MODE mode, websocketpp::connection_hdl hdl);
+
     private:
         void GenerateLocalUUID(std::string& uuid);
 
@@ -131,6 +140,19 @@ namespace agentsim {
             Simulation& simulation,
             std::size_t waitTimeMs
         );
+
+        /**
+        *   TLS Functions
+        */
+        std::string GetPassword() {
+            return std::getenv("TLS_PASSWORD") ? std::getenv("TLS_PASSWORD") : "";
+        }
+        std::string GetCertificateFilepath() {
+            return std::getenv("TLS_CERT_PATH") ? std::getenv("TLS_CERT_PATH") : "";
+        }
+        std::string GetKeyFilepath() {
+            return std::getenv("TLS_KEY_PATH") ? std::getenv("TLS_KEY_PATH") : "";
+        }
 
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;

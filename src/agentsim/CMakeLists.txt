@@ -15,12 +15,14 @@ set(SOURCES
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 add_library(${TARGET} STATIC ${SOURCES})
 
 target_include_directories(${TARGET} PRIVATE
 ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
+${OPENSSL_INCLUDES}
 )
 
 target_link_libraries(${TARGET} PRIVATE
@@ -28,4 +30,5 @@ target_link_libraries(${TARGET} PRIVATE
 "${READDY_DLLS}"
 "${CYTOSIM_LIBRARIES}"
 "${AWS_DLLS}"
+"${OPENSSL_LIBRARIES}"
 )
