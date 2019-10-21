@@ -1,6 +1,8 @@
 #include "agentsim/network/connection_manager.h"
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/network/trajectory_properties.h"
+#include <fstream>
+#include <iostream>
 
 template <typename T, typename U>
 inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
@@ -776,6 +778,7 @@ namespace agentsim {
                     filePath,
                     this->m_trajectoryFileProperties
                 );
+                this->UploadTrajectoryProperties();
                 this->SetupRuntimeCacheAsync(simulation, 500);
             }
         }
@@ -834,6 +837,37 @@ namespace agentsim {
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));
+    }
+
+    bool ConnectionManager::UploadTrajectoryProperties()
+    {
+        std::ofstream propsFile;
+        propsFile.open("./fprops.json");
+
+        Json::Value fprops;
+        fprops["fileName"] = this->m_trajectoryFileProperties.fileName;
+        fprops["numberOfFrames"] = this->m_trajectoryFileProperties.numberOfFrames;
+        fprops["timeStepSize"] = this->m_trajectoryFileProperties.fileName;
+
+        Json::Value nameMapping;
+        for(auto& entry : this->m_trajectoryFileProperties.typeMapping)
+        {
+            std::string id = std::to_string(entry.first);
+            std::string name = entry.second;
+
+            nameMapping[id] = name;
+        }
+        fprops["typeMapping"] = nameMapping;
+        propsFile << fprops;
+        propsFile.close();
+        return true;
+
+        //return aics::agentsim::aws_util::Upload();
+    }
+
+    bool ConnectionManager::DownloadTrajectoryProperties(std::string fileName)
+    {
+        return true;
     }
 
 } // namespace agentsim
