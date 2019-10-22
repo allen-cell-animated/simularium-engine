@@ -1,6 +1,9 @@
 #include "agentsim/network/connection_manager.h"
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/network/trajectory_properties.h"
+#include "agentsim/aws/aws_util.h"
+#include <fstream>
+#include <iostream>
 
 template <typename T, typename U>
 inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
@@ -760,13 +763,36 @@ namespace agentsim {
             std::cout << "Using previously loaded file" << std::endl;
         }
         else {
+            // Reset trajectory file properties
+            this->m_trajectoryFileProperties = TrajectoryFileProperties();
+
             std::string filePath = trajectoryFileDirectory + fileName;
+
+            // Attempt to download an already processed runtime cache
             if(simulation.DownloadRuntimeCache(filePath))
             {
-                simulation.PreprocessRuntimeCache();
-                // We found an already processed run-time cache for this trajectory
-                this->m_trajectoryFileProperties.fileName = fileName;
-                this->m_trajectoryFileProperties.numberOfFrames = simulation.NumberOfCachedFrames();
+                // Download a file from AWS w/ info about the trajecty file requested
+                if(this->DownloadTrajectoryProperties(filePath))
+                {
+                    simulation.PreprocessRuntimeCache();
+                    std::ifstream is(filePath + "_info", std::ifstream::binary);
+                    Json::Value fprops;
+                    is >> fprops;
+
+                    const Json::Value nameMapping = fprops["nameMapping"];
+                    std::vector<std::string> ids = fprops.getMemberNames();
+                    for(auto& id : ids)
+                    {
+                        std::size_t idKey = std::atoi(id.c_str());
+                        this->m_trajectoryFileProperties.typeMapping[idKey] =
+                            nameMapping[id].asString();
+                    }
+
+                    // We found an already processed run-time cache for this trajectory
+                    this->m_trajectoryFileProperties.fileName = fprops["fileName"].asString();
+                    this->m_trajectoryFileProperties.numberOfFrames = fprops["numberOfFrames"].asInt();
+                    this->m_trajectoryFileProperties.timeStepSize = fprops["timeStepSize"].asFloat();
+                }
             }
             else {
                 this->m_trajectoryFileProperties.fileName = fileName;
@@ -776,6 +802,7 @@ namespace agentsim {
                     filePath,
                     this->m_trajectoryFileProperties
                 );
+                this->UploadTrajectoryProperties(filePath);
                 this->SetupRuntimeCacheAsync(simulation, 500);
             }
         }
@@ -834,6 +861,39 @@ namespace agentsim {
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));
+    }
+
+    bool ConnectionManager::UploadTrajectoryProperties(std::string fileName)
+    {
+        std::string awsFileName = fileName + "_info";
+
+        std::ofstream propsFile;
+        propsFile.open(awsFileName);
+
+        Json::Value fprops;
+        fprops["fileName"] = this->m_trajectoryFileProperties.fileName;
+        fprops["numberOfFrames"] = this->m_trajectoryFileProperties.numberOfFrames;
+        fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
+
+        Json::Value nameMapping;
+        for(auto& entry : this->m_trajectoryFileProperties.typeMapping)
+        {
+            std::string id = std::to_string(entry.first);
+            std::string name = entry.second;
+
+            nameMapping[id] = name;
+        }
+        fprops["typeMapping"] = nameMapping;
+        propsFile << fprops;
+        propsFile.close();
+
+        return aics::agentsim::aws_util::Upload(awsFileName, awsFileName);
+    }
+
+    bool ConnectionManager::DownloadTrajectoryProperties(std::string fileName)
+    {
+        std::string awsFileName = fileName + "_info";
+        return aics::agentsim::aws_util::Download(awsFileName, awsFileName);
     }
 
 } // namespace agentsim
