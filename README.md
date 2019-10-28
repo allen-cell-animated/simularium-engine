@@ -40,8 +40,8 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 1. Clone the repository locally: `git clone --recursive *repository-address*`
 2. Create a new directory for the build: e.g. '~/Documents/build/agentviz'
 3. Navigate to the new directory in a terminal and run:
-	`sudo cmake [path to repository] -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release`
-4. Run: `sudo chown -R $USER`
+	`sudo cmake [path to repository] -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl`
+4. Run: `sudo chown -R $USER *`
 5. Run: `make`
 6. To run the server, run: `./agentsim_server.exe --no-exit`
 7. To run the tests, run: `./agentsim_tests`

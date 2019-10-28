@@ -872,7 +872,7 @@ namespace agentsim {
 
         Json::Value fprops;
         fprops["fileName"] = this->m_trajectoryFileProperties.fileName;
-        fprops["numberOfFrames"] = this->m_trajectoryFileProperties.numberOfFrames;
+        fprops["numberOfFrames"] = static_cast<int>(this->m_trajectoryFileProperties.numberOfFrames);
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
 
         Json::Value nameMapping;
