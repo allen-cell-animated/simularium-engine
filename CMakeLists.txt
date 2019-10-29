@@ -9,6 +9,10 @@ set(SERVER_TARGET "agentsim_server")
 set(CLIENT_TARGET "agentsim_client")
 set(TEST_TARGET "agentsim_tests")
 
+link_directories(
+  "/usr/local/opt/openssl/lib"
+)
+
 if(${AGENTVIZ_FULL_DEBUG_SYMBOLS})
   message("Building Agent Viz with full debugging symbols")
   add_definitions("-g3 -ggdb")
@@ -43,7 +47,11 @@ target_link_libraries(${CLIENT_PROGRAM} Threads::Threads)
 
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(HDF5 COMPONENTS HL REQUIRED)
+
 set(HDF5_INCLUDES
 "${HDF5_INCLUDE_DIRS}"
 "${HDF5_HL_INCLUDE_DIR}"
@@ -76,6 +84,8 @@ set(EXTERNAL_INCLUDES
 "${EXTERNAL_DIRECTORY}/asio"
 "${EXTERNAL_DIRECTORY}/aws-sdk-cpp"
 "${HDF5_INCLUDES}"
+"${OPENSSL_INCLUDES}"
+"/usr/local/opt/openssl/include"
 )
 
 set(INTERNAL_INCLUDES
@@ -105,9 +115,6 @@ add_subdirectory(${DEPENDENCY_DIRECTORY})
 add_dependencies(${TARGET} readdy)
 add_dependencies(${TARGET} gtest)
 add_dependencies(${TARGET} gtest_main)
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
 
 foreach(CYTO_LIB ${CYTOSIM_LIBRARIES})
   add_dependencies(${TARGET} ${CYTO_LIB})
