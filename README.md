@@ -17,12 +17,12 @@ Agent-Viz integrates existing spatial simulation software:
 * openssl
 
 On **Mac**, install [homebrew](https://brew.sh/) and run:
-`brew install cmake hdf5 openssl`
+`brew install cmake hdf5 openssl mkcert`
 
 On **Arch Linux**, run:
-`sudo pacman -S cmake hdf5 blosc blas lapack openssl`
+`sudo pacman -S cmake hdf5 blosc blas lapack openssl mkcert`
 
-On **Ubuntu 19.04**, run:
+On **Ubuntu 19.04**, install [mkcert](https://github.com/FiloSottile/mkcert) and run:
 `apt-get update && apt-get install -y
 build-essential cmake curl git libblas-dev libhdf5-dev liblapack-dev
 python-dev libssl-dev libcurl4-openssl-dev libblosc1`
@@ -41,18 +41,11 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 2. Create a new directory for the build: e.g. '~/Documents/build/agentviz'
 3. Navigate to the new directory in a terminal and run:
 	`sudo [path to repository]/local_build.sh`
-4. Run: `sudo chown -R $USER *`
-5. To run the server, run: `./agentsim_server.exe --no-exit`
-6. To run the tests, run: `./agentsim_tests`
-7. To rebuild/update, from the build directory, run: `make`
-
-### TLS Setup (Native)
-1. Install [makecrt](https://github.com/FiloSottile/mkcert)
-2. generate a certificate for localhost
-3. In a terminal window, navigate to the build directory
-3. From the same terminal window, run: `openssl dhparam -out dh.pem 2048`
-3. From the same terminal window, run: `source [repo-path]/setup.sh`
-4. From the same terminal window, run: `./agentsim_server.exe`
+4. From the same terminal window, run: `sudo chown -R $USER *`
+5. From the same terminal window, run: `source [path to repository]/setup_env.sh`
+6. To run the server, run: `./agentsim_server.exe --no-exit`
+7. To rebuild/update after source changes, run `make` from the build directory
 
 ## Tests
 This project uses the [google test framework](https://github.com/google/googletest)
+To run the tests, navigate to the build directory and run: `./agentsim_tests`
