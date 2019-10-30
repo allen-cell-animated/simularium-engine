@@ -13,9 +13,11 @@ set(SOURCES
 "cli_client.cpp"
 )
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
+if(UNIX AND APPLE)
+  set(PLATFORM_LIBRARIES
+    "crypto"
+  )
+endif()
 
 add_library(${TARGET} STATIC ${SOURCES})
 
@@ -31,4 +33,5 @@ target_link_libraries(${TARGET} PRIVATE
 "${CYTOSIM_LIBRARIES}"
 "${AWS_DLLS}"
 "${OPENSSL_LIBRARIES}"
+"${PLATFORM_LIBRARIES}"
 )
