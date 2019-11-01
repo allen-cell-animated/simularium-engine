@@ -769,30 +769,27 @@ namespace agentsim {
             std::string filePath = trajectoryFileDirectory + fileName;
 
             // Attempt to download an already processed runtime cache
-            if(simulation.DownloadRuntimeCache(filePath))
+            if(simulation.DownloadRuntimeCache(filePath)
+                && this->DownloadTrajectoryProperties(filePath))
             {
-                // Download a file from AWS w/ info about the trajecty file requested
-                if(this->DownloadTrajectoryProperties(filePath))
+                simulation.PreprocessRuntimeCache();
+                std::ifstream is(filePath + "_info", std::ifstream::binary);
+                Json::Value fprops;
+                is >> fprops;
+
+                const Json::Value nameMapping = fprops["nameMapping"];
+                std::vector<std::string> ids = fprops.getMemberNames();
+                for(auto& id : ids)
                 {
-                    simulation.PreprocessRuntimeCache();
-                    std::ifstream is(filePath + "_info", std::ifstream::binary);
-                    Json::Value fprops;
-                    is >> fprops;
-
-                    const Json::Value nameMapping = fprops["nameMapping"];
-                    std::vector<std::string> ids = fprops.getMemberNames();
-                    for(auto& id : ids)
-                    {
-                        std::size_t idKey = std::atoi(id.c_str());
-                        this->m_trajectoryFileProperties.typeMapping[idKey] =
-                            nameMapping[id].asString();
-                    }
-
-                    // We found an already processed run-time cache for this trajectory
-                    this->m_trajectoryFileProperties.fileName = fprops["fileName"].asString();
-                    this->m_trajectoryFileProperties.numberOfFrames = fprops["numberOfFrames"].asInt();
-                    this->m_trajectoryFileProperties.timeStepSize = fprops["timeStepSize"].asFloat();
+                    std::size_t idKey = std::atoi(id.c_str());
+                    this->m_trajectoryFileProperties.typeMapping[idKey] =
+                        nameMapping[id].asString();
                 }
+
+                // We found an already processed run-time cache for this trajectory
+                this->m_trajectoryFileProperties.fileName = fprops["fileName"].asString();
+                this->m_trajectoryFileProperties.numberOfFrames = fprops["numberOfFrames"].asInt();
+                this->m_trajectoryFileProperties.timeStepSize = fprops["timeStepSize"].asFloat();
             }
             else {
                 this->m_trajectoryFileProperties.fileName = fileName;
