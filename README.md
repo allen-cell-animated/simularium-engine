@@ -49,3 +49,12 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 ## Tests
 This project uses the [google test framework](https://github.com/google/googletest)
 To run the tests, navigate to the build directory and run: `./agentsim_tests`
+
+## AWS Authentication
+Agent-Viz stores various runtime files on Amazon Web Services (AWS) S3. The following steps are necessary to allow a local build to
+upload to S3.
+
+1. Install the [aws-cli](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
+2. [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) the aws-cli using your [private key](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_CreateAccessKey_CLIAPI); the region is **us-east-2**
+
+Agent-Viz will use the credentials configured above to upload, download, and otherwise interact with other components of the application setup on AWS. The application should function normally without these credentials, but will be unable to upload files to the AWS S3 repository.
