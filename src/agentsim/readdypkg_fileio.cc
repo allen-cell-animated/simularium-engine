@@ -456,20 +456,36 @@ void read_h5file(
     auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
 
     // read back trajectory
-    auto traj = file->getSubgroup("readdy/trajectory");
-    trajectoryInfo = readTrajectory(file, traj, typeMapping, particleLookup);
+    try {
+      auto traj = file->getSubgroup("readdy/trajectory");
+      trajectoryInfo = readTrajectory(file, traj, typeMapping, particleLookup);
+      traj.close();
+    } catch(...) {
+      std::cout << "Error, no trajectory information found" << std::endl;
+      return;
+    }
 
-    auto topGroup = file->getSubgroup("readdy/observables/topologies");
-    topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
-    auto orientationData = initOrientationData();
+    bool hasTopologies = false;
+    try {
+      auto topGroup = file->getSubgroup("readdy/observables/topologies");
+      topologyInfo = readTopologies(topGroup, 0, std::numeric_limits<std::size_t>::max(), 1);
+      topGroup.close();
+      hasTopologies = true;
+    } catch(...) {
+      std::cout << "Error in reading Topology observable" << std::endl;
+    }
 
-    calculateOrientations(
-        std::get<1>(topologyInfo),
-        std::get<1>(trajectoryInfo),
-        rotationInfo,
-        particleLookup,
-        orientationData
-    );
+    if(hasTopologies)
+    {
+      auto orientationData = initOrientationData();
+      calculateOrientations(
+          std::get<1>(topologyInfo),
+          std::get<1>(trajectoryInfo),
+          rotationInfo,
+          particleLookup,
+          orientationData
+      );
+    }
 
     std::cout << "Found trajectory for " << std::get<0>(trajectoryInfo).size() << " frames" << std::endl;
     std::cout << "Found topology for " << std::get<0>(topologyInfo).size() << " frames" << std::endl;
