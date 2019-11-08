@@ -222,6 +222,21 @@ namespace agentsim {
 
         std::size_t NumberOfCachedFrames() { return this->m_cache.GetNumFrames(); }
 
+        /**
+        *   SetCacheInfo
+        *
+        *   @param  trajectoryProperties    an object containing metadata about a simulation trajectory
+        *
+        *   Sets basic info about the simulation cache; this is intended for use when
+        *   an intermediate simulation file is pulled down from the network.
+        *   During a live simulation or local processing, this object should already have enough
+        *   information to function properly without this function
+        */
+        void SetCacheInfo(const TrajectoryFileProperties& trajectoryProperties)
+        {
+            this->m_numTimeSteps = trajectoryProperties.numberOfFrames;
+            this->m_timeStepSize = trajectoryProperties.timeStepSize;
+        }
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
@@ -230,6 +245,10 @@ namespace agentsim {
         std::size_t m_playbackMode = SimulationMode::id_live_simulation;
 
         std::string m_trajectoryFilePath = "";
+
+        // Used for cache play-back
+        std::size_t m_numTimeSteps = 0;
+        double m_timeStepSize = 0;
     };
 
 }

@@ -263,16 +263,29 @@ namespace agentsim {
 
     double Simulation::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
+        double time = 0.0;
         if(this->m_SimPkgs.size() > 0)
         {
-            return this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
+            time = this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
         }
 
-        return 0.0;
+        return std::max( // one of the below is expected to be 0.0
+            static_cast<double>(this->m_numTimeSteps * frameNumber), // non-zero if cache info was set
+            time // non-zero if local processing or a live simulation happened
+        ); // if both were zero, a dev error was made
     }
 
     std::size_t Simulation::GetClosestFrameNumberForTime(double simulationTimeNs)
     {
+        // If theres is cached meta-data for the simulation,
+        //  assume we are running using a cache pulled down from the network
+        if(this->m_numTimeSteps != 0)
+        {
+            // Integer division performed to get nearest frames
+            // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
+            return static_cast<int>(simulationTimeNs) / static_cast<int>(this->m_numTimeSteps);
+        }
+
         if(this->m_SimPkgs.size() > 0)
         {
             return this->m_SimPkgs[0]->GetClosestFrameNumberForTime(simulationTimeNs);
