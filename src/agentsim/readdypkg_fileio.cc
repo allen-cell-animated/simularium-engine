@@ -11,6 +11,8 @@ inline bool file_exists(const std::string& name)
 
 bool get_file_path(std::string& fileName);
 
+std::unordered_map<std::string, Eigen::Matrix3d> default_orientation;
+
 OrientationDataMap initOrientationData() {
 
     Eigen::Matrix3d zero_rotation;
@@ -58,6 +60,12 @@ OrientationDataMap initOrientationData() {
                                          0,  0, -1,
                                          0,  1,  0;
 
+    default_orientation = {
+        {"channel", zero_rotation},
+        {"atpase", zero_rotation},
+        {"membrane", zero_rotation}
+    };
+    
     OrientationDataMap data;
     data["actin"] = {
         {
@@ -1093,6 +1101,17 @@ static void calculateOrientations(
 
             if (neighborOrientationData.size() < 1)
             {
+                if (default_orientation.find(particleMonomerType.name) != default_orientation.end())
+                {
+                    // no neighbors, use default orientation
+                    if (verboseOrientation)
+                    {
+                        std::cout << frameIndex << ": Use default orientation for "
+                            << currentParticle.type << " " << currentParticle.id << std::endl;
+                    }
+                    orientationFrame.push_back(default_orientation[particleMonomerType.name]);
+                    continue;
+                }
                 // no neighbors, use random rotation
                 if (verboseOrientation)
                 {
