@@ -269,6 +269,19 @@ namespace agentsim {
             time = this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
         }
 
+        float nearlyZero = 1e-9;
+        if(static_cast<double>(this->m_numTimeSteps * frameNumber) < nearlyZero
+            && time < nearlyZero)
+        {
+            if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
+            {
+                std::cout << "Both the cached time and the live-calculated time are zero, a " <<
+                "dev error may have been made" << std::endl;
+                return frameNumber; // this will allow client to function properly
+                // a client may reasonably assume that frames are sequential
+            }
+        }
+
         return std::max( // one of the below is expected to be 0.0
             static_cast<double>(this->m_numTimeSteps * frameNumber), // non-zero if cache info was set
             time // non-zero if local processing or a live simulation happened
@@ -291,7 +304,7 @@ namespace agentsim {
             return this->m_SimPkgs[0]->GetClosestFrameNumberForTime(simulationTimeNs);
         }
 
-        return 0.0;
+        return 0;
     }
 
 } // namespace agentsim
