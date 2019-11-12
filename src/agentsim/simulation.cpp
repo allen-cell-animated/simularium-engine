@@ -263,22 +263,48 @@ namespace agentsim {
 
     double Simulation::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
+        double time = 0.0;
         if(this->m_SimPkgs.size() > 0)
         {
-            return this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
+            time = this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
         }
 
-        return 0.0;
+        float nearlyZero = 1e-9;
+        if(static_cast<double>(this->m_numTimeSteps * frameNumber) < nearlyZero
+            && time < nearlyZero)
+        {
+            if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
+            {
+                std::cout << "Both the cached time and the live-calculated time are zero, a " <<
+                "dev error may have been made" << std::endl;
+                return frameNumber; // this will allow client to function properly
+                // a client may reasonably assume that frames are sequential
+            }
+        }
+
+        return std::max( // one of the below is expected to be 0.0
+            static_cast<double>(this->m_numTimeSteps * frameNumber), // non-zero if cache info was set
+            time // non-zero if local processing or a live simulation happened
+        ); // if both were zero, a dev error was made
     }
 
     std::size_t Simulation::GetClosestFrameNumberForTime(double simulationTimeNs)
     {
+        // If theres is cached meta-data for the simulation,
+        //  assume we are running using a cache pulled down from the network
+        if(this->m_numTimeSteps != 0)
+        {
+            // Integer division performed to get nearest frames
+            // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
+            return static_cast<int>(simulationTimeNs) / static_cast<int>(this->m_numTimeSteps);
+        }
+
         if(this->m_SimPkgs.size() > 0)
         {
             return this->m_SimPkgs[0]->GetClosestFrameNumberForTime(simulationTimeNs);
         }
 
-        return 0.0;
+        return 0;
     }
 
 } // namespace agentsim

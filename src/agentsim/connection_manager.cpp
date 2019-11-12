@@ -790,6 +790,7 @@ namespace agentsim {
                 this->m_trajectoryFileProperties.fileName = fprops["fileName"].asString();
                 this->m_trajectoryFileProperties.numberOfFrames = fprops["numberOfFrames"].asInt();
                 this->m_trajectoryFileProperties.timeStepSize = fprops["timeStepSize"].asFloat();
+                simulation.SetCacheInfo(this->m_trajectoryFileProperties);
             }
             else {
                 this->m_trajectoryFileProperties.fileName = fileName;
