@@ -92,6 +92,17 @@ void ParseArguments(int argc, char* argv[], ConnectionManager& connectionManager
         if (arg.compare("--no-exit") == 0) {
             std::cout << "Argument : --no-exit; ignoring no-client timeout" << std::endl;
             connectionManager.SetNoTimeoutArg(true);
+        } else if (arg.compare("--no-upload") == 0) {
+            std::cout << "Argument : --no-upload; caches will not be uploaded to S3" << std::endl;
+            connectionManager.SetNoUploadArg(true);
+        } else if (arg.compare("--force-init") == 0) {
+            std::cout << "Argument : --force-init; no caches will be downloaded from S3" << std::endl;
+            connectionManager.SetForceInitArg(true);
+        } else if (arg.compare("--dev") == 0) {
+            std::cout << "Argument: --dev; setting --no-exit --no-upload --force-init" << std::endl;
+            connectionManager.SetNoTimeoutArg(true);
+            connectionManager.SetNoUploadArg(true);
+            connectionManager.SetForceInitArg(true);
         } else {
             std::cout << "Unrecognized argument " << arg << " ignored" << std::endl;
         }

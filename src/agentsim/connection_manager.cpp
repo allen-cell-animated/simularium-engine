@@ -422,11 +422,6 @@ namespace agentsim {
         }
     }
 
-    void ConnectionManager::SetNoTimeoutArg(bool val)
-    {
-        this->m_argNoTimeout = val;
-    }
-
     bool ConnectionManager::CheckNoClientTimeout()
     {
         if (this->m_argNoTimeout) {
@@ -769,7 +764,8 @@ namespace agentsim {
             std::string filePath = trajectoryFileDirectory + fileName;
 
             // Attempt to download an already processed runtime cache
-            if(simulation.DownloadRuntimeCache(filePath)
+            if(!this->m_argForceInit // this will force the server to re-download/process a trajectory
+                && simulation.DownloadRuntimeCache(filePath)
                 && this->DownloadTrajectoryProperties(filePath))
             {
                 simulation.PreprocessRuntimeCache();
@@ -800,7 +796,11 @@ namespace agentsim {
                     filePath,
                     this->m_trajectoryFileProperties
                 );
-                this->UploadTrajectoryProperties(filePath);
+
+                if(!this->m_argNoUpload) {
+                    this->UploadTrajectoryProperties(filePath);
+                }
+
                 this->SetupRuntimeCacheAsync(simulation, 500);
             }
         }
@@ -841,7 +841,7 @@ namespace agentsim {
             this->m_fileIoThread.join();
         }
 
-        this->m_fileIoThread = std::thread([&simulation] {
+        this->m_fileIoThread = std::thread([&simulation, this] {
             // Load the first hundred simulation frames into a runtime cache
             std::cout << "Loading trajectory file into runtime cache" << std::endl;
             std::size_t fn = 0;
@@ -852,7 +852,7 @@ namespace agentsim {
             std::cout << "Finished loading trajectory into runtime cache" << std::endl;
 
             // Save the result so it doesn't need to be calculated again
-            if(simulation.IsPlayingTrajectory())
+            if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
             {
                 simulation.UploadRuntimeCache();
             }
