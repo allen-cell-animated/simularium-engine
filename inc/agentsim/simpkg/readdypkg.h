@@ -33,57 +33,57 @@ struct ParticleData {
 };
 
 struct OrientationData {
-    OrientationData(Eigen::Vector3d pos, Eigen::Matrix3d rot, Eigen::Matrix3d axisRot) 
+    OrientationData(Eigen::Vector3d pos, Eigen::Matrix3d rot, Eigen::Matrix3d axisRot)
         : localPosition(pos)
         , localRotation(rot)
         , axisRotation(axisRot)
     {
     }
-    
-    OrientationData() 
+
+    OrientationData()
         : localPosition()
         , localRotation()
         , axisRotation()
     {
     }
-    
+
     Eigen::Vector3d localPosition;
     Eigen::Matrix3d localRotation;
     Eigen::Matrix3d axisRotation;
 };
 
 struct MonomerType {
-    MonomerType(std::string name, std::vector<std::string> flags, int number) 
+    MonomerType(std::string name, std::vector<std::string> flags, int number)
         : name(name)
         , flags(flags)
         , number(number)
     {
     }
-    
+
     std::string name;
     std::vector<std::string> flags;
     int number;
 };
 
 struct RelativeOrientationData {
-    RelativeOrientationData(std::size_t neighborID, OrientationData data) 
+    RelativeOrientationData(std::size_t neighborID, OrientationData data)
         : neighborID(neighborID)
         , data(data)
     {
     }
-    
-    RelativeOrientationData(const RelativeOrientationData& other) 
+
+    RelativeOrientationData(const RelativeOrientationData& other)
         : neighborID(other.neighborID)
         , data(other.data)
     {
     }
-    
-    RelativeOrientationData() 
+
+    RelativeOrientationData()
         : neighborID(0)
         , data()
     {
     }
-    
+
     std::size_t neighborID;
     OrientationData data;
 };
@@ -126,16 +126,8 @@ namespace agentsim {
 
     class ReaDDyPkg : public SimPkg {
     public:
-        ReaDDyPkg()
-        {
-            this->m_simulation = new readdy::Simulation("SingleCPU");
-            this->m_bloscFilter.registerFilter();
-        }
-        virtual ~ReaDDyPkg()
-        {
-            delete this->m_simulation;
-            this->m_simulation = nullptr;
-        }
+        ReaDDyPkg();
+        virtual ~ReaDDyPkg();
 
         virtual void Setup() override;
         virtual void Shutdown() override;

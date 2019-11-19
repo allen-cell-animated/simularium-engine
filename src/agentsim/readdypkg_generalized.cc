@@ -90,7 +90,6 @@ void ResetStaticVariables()
 }
 
 #define IMMEDIATE_RATE 1e30
-#include "readdypkg_fileio.cc"
 
 /**
 *	Simulation API

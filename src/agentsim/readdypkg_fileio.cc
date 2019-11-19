@@ -1,6 +1,9 @@
 #include "agentsim/aws/aws_util.h"
 #include "agentsim/util/math_util.h"
 
+#include <csignal>
+#include <math.h>
+
 bool verboseOrientation = false;
 
 inline bool file_exists(const std::string& name)
@@ -65,7 +68,7 @@ OrientationDataMap initOrientationData() {
         {"atpase", zero_rotation},
         {"membrane", zero_rotation}
     };
-    
+
     OrientationDataMap data;
     data["actin"] = {
         {
