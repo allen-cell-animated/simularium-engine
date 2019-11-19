@@ -769,17 +769,17 @@ namespace agentsim {
                 && this->DownloadTrajectoryProperties(filePath))
             {
                 simulation.PreprocessRuntimeCache();
-                std::ifstream is(filePath + "_info", std::ifstream::binary);
+                std::ifstream is(filePath + "_info");
                 Json::Value fprops;
                 is >> fprops;
 
-                const Json::Value nameMapping = fprops["nameMapping"];
-                std::vector<std::string> ids = fprops.getMemberNames();
+                const Json::Value typeMapping = fprops["typeMapping"];
+                std::vector<std::string> ids = typeMapping.getMemberNames();
                 for(auto& id : ids)
                 {
                     std::size_t idKey = std::atoi(id.c_str());
                     this->m_trajectoryFileProperties.typeMapping[idKey] =
-                        nameMapping[id].asString();
+                        typeMapping[id].asString();
                 }
 
                 // We found an already processed run-time cache for this trajectory
@@ -819,15 +819,15 @@ namespace agentsim {
             this->m_trajectoryFileProperties.timeStepSize;
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
 
-        Json::Value nameMapping;
+        Json::Value typeMapping;
         for(auto entry : this->m_trajectoryFileProperties.typeMapping)
         {
             std::string id = std::to_string(entry.first);
             std::string name = entry.second;
 
-            nameMapping[id] = name;
+            typeMapping[id] = name;
         }
-        fprops["nameMapping"] = nameMapping;
+        fprops["typeMapping"] = typeMapping;
 
         this->SendWebsocketMessage(connectionUID, fprops);
         this->SendDataToClient(simulation, connectionUID, 0, true);
@@ -873,15 +873,15 @@ namespace agentsim {
         fprops["numberOfFrames"] = static_cast<int>(this->m_trajectoryFileProperties.numberOfFrames);
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
 
-        Json::Value nameMapping;
+        Json::Value typeMapping;
         for(auto& entry : this->m_trajectoryFileProperties.typeMapping)
         {
             std::string id = std::to_string(entry.first);
             std::string name = entry.second;
 
-            nameMapping[id] = name;
+            typeMapping[id] = name;
         }
-        fprops["typeMapping"] = nameMapping;
+        fprops["typeMapping"] = typeMapping;
         propsFile << fprops;
         propsFile.close();
 
