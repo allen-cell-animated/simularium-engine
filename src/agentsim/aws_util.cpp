@@ -25,7 +25,7 @@ namespace agentsim {
             options.loggingOptions.logger_create_fn =
                 [] {
                     return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
-                        Aws::Utils::Logging::LogLevel::Debug
+                        Aws::Utils::Logging::LogLevel::Error
                     );
                  };
 
@@ -61,7 +61,7 @@ namespace agentsim {
 
             bool success = true;
             Aws::SDKOptions options;
-            options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Debug;
+            options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Error;
             options.loggingOptions.logger_create_fn =
                 [] {
                     return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(

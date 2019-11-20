@@ -1,3 +1,5 @@
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/readdypkg.cmake)
+
 set(SOURCES
 "${PROJECT_SOURCE_DIR}/dep/cytosim/src/play/frame_reader.cc"
 "jsoncpp.cpp"
@@ -5,7 +7,6 @@ set(SOURCES
 "math_util.cpp"
 "agent.cpp"
 "model.cpp"
-"readdypkg.cpp"
 "cytosimpkg.cpp"
 "simulation_cache.cpp"
 "simulation.cpp"
@@ -28,8 +29,7 @@ ${OPENSSL_INCLUDES}
 )
 
 target_link_libraries(${TARGET} PRIVATE
-"${HDF5_DLLS}"
-"${READDY_DLLS}"
+"readdyPKG"
 "${CYTOSIM_LIBRARIES}"
 "${AWS_DLLS}"
 "${OPENSSL_LIBRARIES}"
