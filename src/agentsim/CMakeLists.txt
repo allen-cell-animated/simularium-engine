@@ -14,12 +14,6 @@ set(SOURCES
 "cli_client.cpp"
 )
 
-if(UNIX AND APPLE)
-  set(PLATFORM_LIBRARIES
-    "crypto"
-  )
-endif()
-
 add_library(${TARGET} STATIC ${SOURCES})
 
 target_include_directories(${TARGET} PRIVATE

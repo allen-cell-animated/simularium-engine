@@ -182,6 +182,11 @@ namespace agentsim {
             std::bind(
                 &CliClient::OnFail,
                 this));
+        this->m_webSocketClient.set_tls_init_handler(
+            std::bind(
+                &CliClient::OnTLSConnect,
+                this
+        ));
 
         websocketpp::lib::error_code ec;
         client::connection_ptr con = this->m_webSocketClient.get_connection(uri, ec);
@@ -289,6 +294,27 @@ namespace agentsim {
         this->SendMessage(jsonMsg, "load command " + fileName);
     }
 
+    context_ptr CliClient::OnTLSConnect() {
+        namespace asio = websocketpp::lib::asio;
+        context_ptr ctx =
+            websocketpp::lib::make_shared<asio::ssl::context>(
+                asio::ssl::context::sslv23
+            );
+
+        try {
+            ctx->set_options(
+                asio::ssl::context::default_workarounds |
+                asio::ssl::context::no_sslv2 |
+                asio::ssl::context::no_sslv3 |
+                asio::ssl::context::single_dh_use
+            );
+        } catch(std::exception& e) {
+            std::cout << "Exception: " << e.what() << std::endl;
+        }
+
+        return ctx;
+    }
+
     void CliClient::OnMessage(websocketpp::connection_hdl, client::message_ptr msg)
     {
         Json::CharReaderBuilder jsonReaderBuilder;
@@ -308,7 +334,7 @@ namespace agentsim {
             this->SendMessage(jsonMsg, "heartbeat ping");
         } break;
         case WebRequestTypes::id_vis_data_arrive: {
-            printAgentData(jsonMsg);
+            //printAgentData(jsonMsg);
         } break;
         default: {
         } break;

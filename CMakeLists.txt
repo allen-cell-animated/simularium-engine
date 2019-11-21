@@ -35,21 +35,17 @@ SET(CMAKE_EXE_LINKER_FLAGS
 
 project(${TARGET})
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
-
-set(CLIENT_PROGRAM_SOURCES
-    "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
-    "${SOURCE_DIRECTORY}/${TARGET}/jsoncpp.cpp"
-    "${SOURCE_DIRECTORY}/${TARGET}/cli_client.cpp"
-)
-add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
-target_include_directories(${CLIENT_PROGRAM} PRIVATE ${INTERNAL_INCLUDES})
-target_link_libraries(${CLIENT_PROGRAM} Threads::Threads)
-
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+
+if(UNIX AND APPLE)
+  set(PLATFORM_LIBRARIES
+    "crypto"
+  )
+endif()
 
 set(CYTOSIM_INCLUDES
   "${EXTERNAL_DIRECTORY}/cytosim"
@@ -85,11 +81,6 @@ set(INTERNAL_INCLUDES
 )
 
 target_include_directories(${SERVER_PROGRAM} PUBLIC
-${INTERNAL_INCLUDES}
-${EXTERNAL_INCLUDES}
-)
-
-target_include_directories(${CLIENT_PROGRAM} PUBLIC
 ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
 )
@@ -154,6 +145,24 @@ target_include_directories(${TEST_PROGRAM} PRIVATE
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/pybind11/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include/"
+)
+
+
+set(CLIENT_PROGRAM_SOURCES
+    "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/jsoncpp.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/cli_client.cpp"
+)
+add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
+target_include_directories(${CLIENT_PROGRAM} PRIVATE
+    ${INTERNAL_INCLUDES}
+    ${EXTERNAL_INCLUDES}
+    ${OPENSSL_INCLUDES}
+)
+target_link_libraries(${CLIENT_PROGRAM}
+    Threads::Threads
+    ${OPENSSL_LIBRARIES}
+    ${PLATFORM_LIBRARIES}
 )
 
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/trajectory")
