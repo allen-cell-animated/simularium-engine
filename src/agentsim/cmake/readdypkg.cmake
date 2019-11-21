@@ -1,5 +1,3 @@
-find_package(HDF5 COMPONENTS HL REQUIRED)
-
 add_library("readdyPKG" STATIC
     "jsoncpp.cpp"
     "aws_util.cpp"

@@ -40,6 +40,7 @@ add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(HDF5 COMPONENTS HL REQUIRED)
 
 if(UNIX AND APPLE)
   set(PLATFORM_LIBRARIES
@@ -145,8 +146,9 @@ target_include_directories(${TEST_PROGRAM} PRIVATE
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/pybind11/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include/"
+    "${HDF5_INCLUDE_DIRS}"
+    "${HDF5_HL_INCLUDE_DIR}"
 )
-
 
 set(CLIENT_PROGRAM_SOURCES
     "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
