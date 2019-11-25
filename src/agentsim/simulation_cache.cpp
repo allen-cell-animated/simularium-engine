@@ -37,104 +37,119 @@ namespace agentsim {
 
     SimulationCache::SimulationCache()
     {
-        std::remove(this->m_cacheFileName.c_str());
-        tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
+        this->DeleteCacheFolder();
+        this->CreateCacheFolder();
     }
 
     SimulationCache::~SimulationCache()
     {
-        tmp_cache_file.close();
-        std::remove(this->m_cacheFileName.c_str());
+        this->CloseFileStreams();
+        this->DeleteCacheFolder();
     }
 
-    void SimulationCache::AddFrame(AgentDataFrame data)
+    void SimulationCache::AddFrame(std::string identifier, AgentDataFrame data)
     {
-        if (this->m_runtimeCache.size() == 0) {
-            this->m_runtimeCache.push_back(data);
+        if(this->m_numFrames.count(identifier) == 0) {
+            this->m_numFrames[identifier] = 0;
         } else {
-            this->m_runtimeCache[0] = data;
+            this->m_numFrames[identifier]++;
         }
 
-        serialize(tmp_cache_file, this->m_frameCounter, data);
-        this->m_frameCounter++;
+        auto& fstream = this->GetOfstream(identifier);
+        serialize(fstream, this->m_numFrames[identifier], data);
     }
 
-    void SimulationCache::SetCurrentFrame(std::size_t index)
+    AgentDataFrame SimulationCache::GetFrame(std::string identifier, std::size_t frameNumber)
     {
-        this->m_current = std::min(index, this->m_frameCounter);
-    }
+        if(this->m_numFrames.count(identifier) == 0) {
+            return AgentDataFrame(); // not in cache at all
+        }
 
-    AgentDataFrame SimulationCache::GetFrame(std::size_t frame_no)
-    {
-        if (frame_no > this->m_frameCounter || this->m_frameCounter == 0) {
+        std::size_t numFrames = this->m_numFrames.at(identifier);
+        if (frameNumber > numFrames || numFrames == 0) {
             return AgentDataFrame();
         }
 
-        std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
+        std::ifstream& is = this->GetIfstream(identifier);
         if (is) {
             AgentDataFrame adf;
-            deserialize(is, frame_no, adf);
-            is.close();
+            deserialize(is, frameNumber, adf);
             return adf;
         }
 
-        is.close();
-        std::cout << "Failed to load frame" << frame_no << " from cache" << std::endl;
+        std::cout << "Failed to load frame " << frameNumber << " from cache" << std::endl;
         return AgentDataFrame();
     }
 
-    AgentDataFrame SimulationCache::GetCurrentFrame()
+    std::size_t SimulationCache::GetNumFrames(std::string identifier)
     {
-        return this->GetFrame(this->m_current);
+        return this->m_numFrames.count(identifier) ?
+            this->m_numFrames.at(identifier) : 0;
     }
 
-    bool SimulationCache::CurrentIsLatestFrame()
+    void SimulationCache::ClearCache(std::string identifier)
     {
-        return this->m_current >= this->m_frameCounter;
+        std::string filePath = this->GetFilePath(identifier);
+        std::remove(filePath.c_str());
     }
 
-    void SimulationCache::IncrementCurrentFrame()
+    void SimulationCache::Preprocess(std::string identifier)
     {
-        this->m_current++;
-        this->m_current = std::min(this->m_current, this->m_frameCounter);
-    }
+        std::size_t numFrames;
+        std::string filePath = this->GetFilePath(identifier);
 
-    AgentDataFrame SimulationCache::GetLatestFrame()
-    {
-        if (this->m_runtimeCache.size() > 0) {
-            return this->m_runtimeCache[0];
-        }
-
-        return this->GetFrame(this->m_frameCounter - 1);
-    }
-
-    std::size_t SimulationCache::GetNumFrames()
-    {
-        return this->m_frameCounter;
-    }
-
-    void SimulationCache::ClearCache()
-    {
-        tmp_cache_file.close();
-        std::remove(this->m_cacheFileName.c_str());
-        tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
-
-        this->m_runtimeCache.clear();
-        this->m_current = 0;
-        this->m_frameCounter = 0;
-    }
-
-    void SimulationCache::Preprocess()
-    {
-        std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
+        std::ifstream& is = this->GetIfstream(identifier);
         std::string line;
         while (std::getline(is, line))
         {
-            this->m_frameCounter++;
+            numFrames++;
             line = "";
         }
 
-        std::cout << "Number of frames in runtime cache: " << this->m_frameCounter << std::endl;
+        this->m_numFrames[identifier] = numFrames;
+        std::cout << "Number of frames in " << identifier
+            << " runtime cache: " << numFrames << std::endl;
+    }
+
+    std::string SimulationCache::GetFilePath(std::string identifier)
+    {
+        return this->m_cacheFolder + identifier + ".bin";
+    }
+
+    std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {
+        if(!this->m_ofstreams.count(identifier)) {
+            std::ofstream& newStream = this->m_ofstreams[identifier];
+            std::string filePath = this->GetFilePath(identifier);
+            newStream.open(filePath, this->m_ofstreamFlags);
+            return newStream;
+        } else {
+            std::ofstream& fstream = this->m_ofstreams[identifier];
+            return fstream;
+        }
+    }
+
+    std::ifstream& SimulationCache::GetIfstream(std::string& identifier) {
+        if(!this->m_ifstreams.count(identifier)) {
+            std::ifstream& newStream = this->m_ifstreams[identifier];
+            std::string filePath = this->GetFilePath(identifier);
+            newStream.open(filePath, this->m_ifstreamFlags);
+            return newStream;
+        } else {
+            std::ifstream& fstream = this->m_ifstreams[identifier];
+            return fstream;
+        }
+    }
+
+    void SimulationCache::CloseFileStreams() {
+        for (auto& entry : this->m_ofstreams)
+        {
+            entry.second.close();
+        }
+
+        for (auto& entry : this->m_ifstreams)
+        {
+            entry.second.close();
+        }
     }
 
 } // namespace agentsim
@@ -148,6 +163,7 @@ bool goto_frameno(
     std::size_t fno,
     std::string& line)
 {
+    is.seekg(0, is.beg); // go to beginning
     for (std::size_t i = 0; i < fno; ++i) {
         if (std::getline(is, line)) {
             line = "";

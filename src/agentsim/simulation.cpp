@@ -49,7 +49,7 @@ namespace agentsim {
 
     std::vector<AgentData> Simulation::GetDataFrame(std::size_t frame_no)
     {
-        return this->m_cache.GetFrame(frame_no);
+        return this->m_cache.GetFrame("runtime", frame_no);
     }
 
     void Simulation::Reset()
@@ -69,7 +69,7 @@ namespace agentsim {
             }
         }
 
-        this->m_cache.ClearCache();
+        this->m_cache.ClearCache("runtime");
     }
 
     void Simulation::UpdateParameter(std::string name, float value)
@@ -124,7 +124,7 @@ namespace agentsim {
             AppendAgentData(newFrame, agent);
         }
 
-        this->m_cache.AddFrame(newFrame);
+        this->m_cache.AddFrame("runtime", newFrame);
     }
 
     void Simulation::LoadTrajectoryFile(
@@ -166,7 +166,7 @@ namespace agentsim {
 
     void Simulation::PreprocessRuntimeCache()
     {
-        this->m_cache.Preprocess();
+        this->m_cache.Preprocess("runtime");
     }
 
     void AppendAgentData(

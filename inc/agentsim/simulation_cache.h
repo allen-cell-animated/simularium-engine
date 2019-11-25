@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
 
 namespace aics {
 namespace agentsim {
@@ -19,30 +20,55 @@ namespace agentsim {
         SimulationCache();
         ~SimulationCache();
 
-        void AddFrame(AgentDataFrame data);
+        /**
+        *   AddFrame
+        *
+        *   @param  identifier      a name used to reference the trajectory being saved to a cache
+        *                           frames can be retrieved using the same identifier specified here
+        *   @param  data            the trajectory frame to be stored in a cache
+        *
+        *   Stores data for a single trajectory frame in a cache that can be
+        *   retrieved using the 'identifier' parameter
+        */
+        void AddFrame(std::string identifier, AgentDataFrame data);
 
-        void SetCurrentFrame(std::size_t index);
+        /**
+        *   GetFrame
+        *
+        *   @param      identifier      a name used to specify the cache to be read
+        *   @param      frameNumber     the frame number to retrieve
+        *
+        *   Returns a single trajectory frame from a cache specified by the
+        *   'identifier' parameter
+        */
+        AgentDataFrame GetFrame(std::string identifier, std::size_t frameNumber);
 
-        AgentDataFrame GetFrame(std::size_t frame_no);
-        AgentDataFrame GetCurrentFrame();
+        std::size_t GetNumFrames(std::string identifier);
 
-        bool CurrentIsLatestFrame();
+        /**
+        *   ClearCache
+        *
+        *   Deletes a single cache specified by the 'identifier' parameter
+        */
+        void ClearCache(std::string identifier);
 
-        void IncrementCurrentFrame();
-
-        AgentDataFrame GetLatestFrame();
-
-        std::size_t GetNumFrames();
-
-        void ClearCache();
-
-        void Preprocess();
+        void Preprocess(std::string identifier);
 
     private:
-        std::size_t m_current = 0;
-        std::size_t m_frameCounter = 0;
-        std::string m_cacheFileName = "/tmp/agentviz_runtime_cache.bin";
-        std::vector<AgentDataFrame> m_runtimeCache;
+        std::string GetFilePath(std::string identifier);
+        inline void CreateCacheFolder() { system("mkdir -p /tmp/aics/simularium/"); }
+        inline void DeleteCacheFolder() { system("rm -rf /tmp/aics/"); }
+
+        std::ofstream& GetOfstream(std::string& identifier);
+        std::ifstream& GetIfstream(std::string& identifier);
+        void CloseFileStreams();
+
+        std::string m_cacheFolder = "/tmp/aics/simularium/";
+        std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
+        std::ios_base::openmode m_ifstreamFlags = std::ios::in | std::ios::binary;
+        std::unordered_map<std::string, std::ofstream> m_ofstreams;
+        std::unordered_map<std::string, std::ifstream> m_ifstreams;
+        std::unordered_map<std::string, std::size_t> m_numFrames;
     };
 
 }

@@ -133,7 +133,7 @@ namespace agentsim {
             TrajectoryFileProperties& fileProps
         );
 
-        std::size_t GetNumFrames() { return m_cache.GetNumFrames(); }
+        std::size_t GetNumFrames() { return m_cache.GetNumFrames("runtime"); }
 
         /**
         *   SetPlaybackMode
@@ -219,8 +219,6 @@ namespace agentsim {
         *   time 505 ns is requested, the second frame number (index 1, time 500 ns) is returned
         */
         std::size_t GetClosestFrameNumberForTime(double simulationTimeNs);
-
-        std::size_t NumberOfCachedFrames() { return this->m_cache.GetNumFrames(); }
 
         /**
         *   SetCacheInfo
