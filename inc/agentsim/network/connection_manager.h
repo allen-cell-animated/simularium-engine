@@ -36,6 +36,7 @@ namespace agentsim {
     struct NetState {
         std::size_t frame_no = 0;
         ClientPlayState play_state = ClientPlayState::Stopped;
+        std::string sim_identifier = "runtime";
     };
 
     struct NetMessage {
@@ -65,13 +66,13 @@ namespace agentsim {
 
         void SetClientState(std::string connectionUID, ClientPlayState state);
         void SetClientFrame(std::string connectionUID, std::size_t frameNumber);
+        void SetClientSimId(std::string connectionUID, std::string simId);
 
         void SendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage);
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
 
         void CheckForFinishedClients(
-            std::size_t numberOfLoadedFrames,
-            std::size_t totalNumberOfFrames
+            Simulation& simulation
         );
         void AdvanceClients();
         void SendDataToClients(Simulation& simulation);
@@ -117,10 +118,8 @@ namespace agentsim {
         );
 
         void CheckForFinishedClient(
-            std::size_t numberOfLoadedFrames,
-            std::size_t totalNumberOfFrames,
-            std::string connectionUID,
-            NetState& netState
+            Simulation& simulation,
+            std::string connectionUID
         );
 
         void InitializeTrajectoryFile(
@@ -187,7 +186,6 @@ namespace agentsim {
         std::thread m_heartbeatThread;
         std::thread m_simThread;
         std::thread m_fileIoThread;
-        TrajectoryFileProperties m_trajectoryFileProperties;
     };
 
 } // namespace agentsim

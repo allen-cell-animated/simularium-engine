@@ -163,10 +163,7 @@ namespace agentsim {
                     simulation.RunTimeStep(timeStep);
                 }
 
-                std::size_t numberOfLoadedFrames = simulation.GetNumFrames("runtime");
-                std::size_t totalNumberOfFrames = simulation.GetFileProperties("runtime").numberOfFrames;
-
-                this->CheckForFinishedClients(numberOfLoadedFrames, totalNumberOfFrames);
+                this->CheckForFinishedClients(simulation);
                 this->SendDataToClients(simulation);
                 this->AdvanceClients();
             }
@@ -281,12 +278,23 @@ namespace agentsim {
         this->m_netStates[connectionUID].frame_no = frameNumber;
     }
 
-    void ConnectionManager::CheckForFinishedClient(
-        std::size_t numberOfLoadedFrames,
-        std::size_t totalNumberOfFrames,
-        std::string connectionUID,
-        NetState& netState)
+    void ConnectionManager::SetClientSimId(
+        std::string connectionUID, std::string simId)
     {
+        this->m_netStates[connectionUID].sim_identifier = simId;
+    }
+
+    void ConnectionManager::CheckForFinishedClient(
+        Simulation& simulation,
+        std::string connectionUID
+    )
+    {
+        auto& netState = this->m_netStates.at(connectionUID);
+        auto sid = netState.sim_identifier;
+        auto totalNumberOfFrames =
+            simulation.GetFileProperties(sid).numberOfFrames;
+        auto numberOfLoadedFrames = simulation.GetNumFrames(sid);
+
         auto currentFrame = netState.frame_no;
         auto currentState = netState.play_state;
 
@@ -319,8 +327,7 @@ namespace agentsim {
     }
 
     void ConnectionManager::CheckForFinishedClients(
-        std::size_t numberOfLoadedFrames,
-        std::size_t totalNumberOfFrames
+        Simulation& simulation
     )
     {
         for (auto& entry : this->m_netStates) {
@@ -334,10 +341,8 @@ namespace agentsim {
             }
 
             this->CheckForFinishedClient(
-                numberOfLoadedFrames,
-                totalNumberOfFrames,
-                connectionUID,
-                netState
+                simulation,
+                connectionUID
             );
         }
     }
@@ -500,8 +505,9 @@ namespace agentsim {
         bool force // set to true for one-off sends
     )
     {
-        auto numberOfFrames = simulation.GetNumFrames("runtime");
         auto& netState = this->m_netStates.at(connectionUID);
+        std::string sid = netState.sim_identifier;
+        auto numberOfFrames = simulation.GetNumFrames(sid);
 
         if(!force)
         {
@@ -512,7 +518,7 @@ namespace agentsim {
 
         AgentDataFrame simData;
         netState.frame_no = std::min(frameNumber, numberOfFrames - 1);
-        simData = simulation.GetDataFrame(netState.frame_no);
+        simData = simulation.GetDataFrame(sid, netState.frame_no);
 
         Json::Value net_agent_data_frame;
         std::vector<float> vals;
@@ -545,7 +551,7 @@ namespace agentsim {
 
         net_agent_data_frame["data"] = json_data_arr;
         net_agent_data_frame["frameNumber"] = static_cast<int>(netState.frame_no);
-        net_agent_data_frame["time"] = simulation.GetSimulationTimeAtFrame("runtime", netState.frame_no);
+        net_agent_data_frame["time"] = simulation.GetSimulationTimeAtFrame(sid, netState.frame_no);
         this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
     }
 
@@ -598,12 +604,15 @@ namespace agentsim {
                 int msgType = jsonMsg["msgType"].asInt();
                 switch (msgType) {
                 case WebRequestTypes::id_vis_data_request: {
+                    auto runMode = static_cast<SimulationMode>(jsonMsg["mode"].asInt());
+
                     // If a simulation is already in progress, don't allow a new client to
                     //	change the simulation, unless there is only one client connected
+                    //  update: trajectory file streaming can be multi-file
                     if (!this->HasActiveClient()
-                        || this->NumberOfClients() == 1) {
-                        auto runMode = static_cast<SimulationMode>(jsonMsg["mode"].asInt());
-
+                        || this->NumberOfClients() == 1
+                        || runMode == SimulationMode::id_traj_file_playback
+                    ) {
                         switch (runMode) {
                         case SimulationMode::id_live_simulation: {
                             std::cout << "Running live simulation" << std::endl;
@@ -619,8 +628,11 @@ namespace agentsim {
                             simulation.Reset();
                             simulation.RunAndSaveFrames(timeStep, numberOfTimeSteps);
 
-                            this->m_trajectoryFileProperties.numberOfFrames = numberOfTimeSteps;
-                            this->m_trajectoryFileProperties.numberOfFrames = timeStep;
+                            TrajectoryFileProperties tfp;
+                            tfp.numberOfFrames = numberOfTimeSteps;
+                            tfp.timeStepSize = timeStep;
+                            simulation.SetFileProperties("prerun", tfp);
+                            this->SetClientSimId(senderUid, "prerun");
                             this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
                         case SimulationMode::id_traj_file_playback: {
@@ -690,9 +702,14 @@ namespace agentsim {
                 case WebRequestTypes::id_play_cache: {
                     if(jsonMsg.isMember("time"))
                     {
+                        auto& netState = this->m_netStates[senderUid];
                         double timeNs = jsonMsg["time"].asDouble();
-                        std::size_t frameNumber = simulation.GetClosestFrameNumberForTime("runtime", timeNs);
-                        double closestTime = simulation.GetSimulationTimeAtFrame("runtime", frameNumber);
+                        std::size_t frameNumber = simulation.GetClosestFrameNumberForTime(
+                            netState.sim_identifier, timeNs
+                        );
+                        double closestTime = simulation.GetSimulationTimeAtFrame(
+                            netState.sim_identifier, frameNumber
+                        );
 
                         std::cout << "request to play cached from time "
                         << timeNs << " (frame " << frameNumber << " with time " << closestTime
@@ -713,9 +730,14 @@ namespace agentsim {
 
                 } break;
                 case WebRequestTypes::id_goto_simulation_time: {
+                    auto& netState = this->m_netStates[senderUid];
                     double timeNs = jsonMsg["time"].asDouble();
-                    std::size_t frameNumber = simulation.GetClosestFrameNumberForTime("runtime", timeNs);
-                    double closestTime = simulation.GetSimulationTimeAtFrame("runtime", frameNumber);
+                    std::size_t frameNumber = simulation.GetClosestFrameNumberForTime(
+                        netState.sim_identifier, timeNs
+                    );
+                    double closestTime = simulation.GetSimulationTimeAtFrame(
+                        netState.sim_identifier, frameNumber
+                    );
 
                     std::cout << "Client " << senderUid <<
                         " set to frame " << frameNumber << std::endl;
@@ -725,8 +747,8 @@ namespace agentsim {
                     this->SendDataToClient(simulation, senderUid, frameNumber, true);
                 } break;
                 case WebRequestTypes::id_init_trajectory_file: {
-                    std::string fileName = jsonMsg["fileName"].asString();
-                    this->InitializeTrajectoryFile(simulation, senderUid, fileName);
+                    std::string trajectoryFileName = jsonMsg["fileName"].asString();
+                    this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
                 } break;
                 default: {
                 } break;
@@ -748,27 +770,25 @@ namespace agentsim {
             return;
         }
 
-        // the relative directory for trajectory files on S3
-        //  local downloads mirror the S3 directory structure
-        std::string trajectoryFileDirectory = "trajectory/";
+        std::cout << "[" << connectionUID << "]" << " set to file " << fileName << std::endl;
+        this->SetClientSimId(connectionUID, fileName);
+        this->SetClientFrame(connectionUID, 0);
 
         if(simulation.HasFileInCache(fileName))
         {
             std::cout << "Using previously loaded file" << std::endl;
         }
         else {
-            std::string filePath = trajectoryFileDirectory + fileName;
-
             // Attempt to download an already processed runtime cache
             if(!this->m_argForceInit // this will force the server to re-download/process a trajectory
-                && simulation.DownloadRuntimeCache(filePath))
+                && simulation.DownloadRuntimeCache(fileName))
             {
-                simulation.PreprocessRuntimeCache();
+                simulation.PreprocessRuntimeCache(fileName);
             }
             else {
                 simulation.SetPlaybackMode(id_traj_file_playback);
                 simulation.Reset();
-                simulation.LoadTrajectoryFile(filePath);
+                simulation.LoadTrajectoryFile(fileName);
                 this->SetupRuntimeCacheAsync(simulation, 500);
             }
         }

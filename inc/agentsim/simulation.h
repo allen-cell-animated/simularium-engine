@@ -59,7 +59,10 @@ namespace agentsim {
 	*	Includes information regarding position, type, and other relevant visualization
 	*   information to be streamed to a front-end
 	*/
-        std::vector<AgentData> GetDataFrame(std::size_t frame_no);
+        std::vector<AgentData> GetDataFrame(
+            std::string identifier,
+            std::size_t frame_no
+        );
 
         /**
 	*	Reset
@@ -122,16 +125,15 @@ namespace agentsim {
         /**
 	*	LoadTrajectoryFile
 	*
-	*	@param	file_path		The location of the trajectory file to load
+	*	@param	fileName		The name of the trajectory file to load
+    *                           This function will modify to get the file path
 	*							Currently, there is no validation for file <-> simPKG correctness
 	*
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
 	*/
         void LoadTrajectoryFile(
-            std::string file_path
+            std::string fileName
         );
-
-        std::size_t GetNumFrames() { return m_cache.GetNumFrames("runtime"); }
 
         /**
         *   SetPlaybackMode
@@ -170,12 +172,12 @@ namespace agentsim {
         /**
         *   DownloadRuntimeCache
         *
-        *   @param  filePath    The path of the trajectory file to find a cache of (e.g. trajectory.h5)
+        *   @param  fileName    The name of the trajectory file to find a cache of (e.g. trajectory.h5)
         *                       this function will do any necessary modification to find the cache on S3
         *
         *   Returns true if an already processed runtime cache is found for a simulation
         */
-        bool DownloadRuntimeCache(std::string filePath);
+        bool DownloadRuntimeCache(std::string fileName);
 
         /**
         *   PreprocessRuntimeCache
@@ -184,7 +186,7 @@ namespace agentsim {
         *   This function will evaluate the number of frames in the RunTime
         *   and implement any optimizations for finding individual frames
         */
-        void PreprocessRuntimeCache();
+        void PreprocessRuntimeCache(std::string identifier);
 
         /**
         *   IsPlayingTrajectory
@@ -228,6 +230,10 @@ namespace agentsim {
 
         TrajectoryFileProperties GetFileProperties(std::string identifier)
             { return this->m_cache.GetFileProperties(identifier); }
+
+        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp) {
+            this->m_cache.SetFileProperties(identifier, tfp);
+        }
 
         std::size_t GetNumFrames(std::string identifier)
             { return this->m_cache.GetNumFrames(identifier); }
