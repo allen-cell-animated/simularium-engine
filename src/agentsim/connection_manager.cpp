@@ -422,11 +422,6 @@ namespace agentsim {
         }
     }
 
-    void ConnectionManager::SetNoTimeoutArg(bool val)
-    {
-        this->m_argNoTimeout = val;
-    }
-
     bool ConnectionManager::CheckNoClientTimeout()
     {
         if (this->m_argNoTimeout) {
@@ -769,21 +764,22 @@ namespace agentsim {
             std::string filePath = trajectoryFileDirectory + fileName;
 
             // Attempt to download an already processed runtime cache
-            if(simulation.DownloadRuntimeCache(filePath)
+            if(!this->m_argForceInit // this will force the server to re-download/process a trajectory
+                && simulation.DownloadRuntimeCache(filePath)
                 && this->DownloadTrajectoryProperties(filePath))
             {
                 simulation.PreprocessRuntimeCache();
-                std::ifstream is(filePath + "_info", std::ifstream::binary);
+                std::ifstream is(filePath + "_info");
                 Json::Value fprops;
                 is >> fprops;
 
-                const Json::Value nameMapping = fprops["nameMapping"];
-                std::vector<std::string> ids = fprops.getMemberNames();
+                const Json::Value typeMapping = fprops["typeMapping"];
+                std::vector<std::string> ids = typeMapping.getMemberNames();
                 for(auto& id : ids)
                 {
                     std::size_t idKey = std::atoi(id.c_str());
                     this->m_trajectoryFileProperties.typeMapping[idKey] =
-                        nameMapping[id].asString();
+                        typeMapping[id].asString();
                 }
 
                 // We found an already processed run-time cache for this trajectory
@@ -800,7 +796,11 @@ namespace agentsim {
                     filePath,
                     this->m_trajectoryFileProperties
                 );
-                this->UploadTrajectoryProperties(filePath);
+
+                if(!this->m_argNoUpload) {
+                    this->UploadTrajectoryProperties(filePath);
+                }
+
                 this->SetupRuntimeCacheAsync(simulation, 500);
             }
         }
@@ -819,15 +819,15 @@ namespace agentsim {
             this->m_trajectoryFileProperties.timeStepSize;
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
 
-        Json::Value nameMapping;
+        Json::Value typeMapping;
         for(auto entry : this->m_trajectoryFileProperties.typeMapping)
         {
             std::string id = std::to_string(entry.first);
             std::string name = entry.second;
 
-            nameMapping[id] = name;
+            typeMapping[id] = name;
         }
-        fprops["nameMapping"] = nameMapping;
+        fprops["typeMapping"] = typeMapping;
 
         this->SendWebsocketMessage(connectionUID, fprops);
         this->SendDataToClient(simulation, connectionUID, 0, true);
@@ -841,7 +841,7 @@ namespace agentsim {
             this->m_fileIoThread.join();
         }
 
-        this->m_fileIoThread = std::thread([&simulation] {
+        this->m_fileIoThread = std::thread([&simulation, this] {
             // Load the first hundred simulation frames into a runtime cache
             std::cout << "Loading trajectory file into runtime cache" << std::endl;
             std::size_t fn = 0;
@@ -852,7 +852,7 @@ namespace agentsim {
             std::cout << "Finished loading trajectory into runtime cache" << std::endl;
 
             // Save the result so it doesn't need to be calculated again
-            if(simulation.IsPlayingTrajectory())
+            if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
             {
                 simulation.UploadRuntimeCache();
             }
@@ -873,15 +873,15 @@ namespace agentsim {
         fprops["numberOfFrames"] = static_cast<int>(this->m_trajectoryFileProperties.numberOfFrames);
         fprops["timeStepSize"] = this->m_trajectoryFileProperties.timeStepSize;
 
-        Json::Value nameMapping;
+        Json::Value typeMapping;
         for(auto& entry : this->m_trajectoryFileProperties.typeMapping)
         {
             std::string id = std::to_string(entry.first);
             std::string name = entry.second;
 
-            nameMapping[id] = name;
+            typeMapping[id] = name;
         }
-        fprops["typeMapping"] = nameMapping;
+        fprops["typeMapping"] = typeMapping;
         propsFile << fprops;
         propsFile.close();
 

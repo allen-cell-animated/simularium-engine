@@ -35,16 +35,6 @@ SET(CMAKE_EXE_LINKER_FLAGS
 
 project(${TARGET})
 add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
-
-set(CLIENT_PROGRAM_SOURCES
-    "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
-    "${SOURCE_DIRECTORY}/${TARGET}/jsoncpp.cpp"
-    "${SOURCE_DIRECTORY}/${TARGET}/cli_client.cpp"
-)
-add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
-target_include_directories(${CLIENT_PROGRAM} PRIVATE ${INTERNAL_INCLUDES})
-target_link_libraries(${CLIENT_PROGRAM} Threads::Threads)
-
 add_executable(${TEST_PROGRAM} ${SOURCE_DIRECTORY}/${TEST_TARGET}.cpp)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -52,14 +42,11 @@ find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(HDF5 COMPONENTS HL REQUIRED)
 
-set(HDF5_INCLUDES
-"${HDF5_INCLUDE_DIRS}"
-"${HDF5_HL_INCLUDE_DIR}"
-)
-set(HDF5_DLLS
-"${HDF5_LIBRARIES}"
-"${HDF5_HL_LIBRARIES}"
-)
+if(UNIX AND APPLE)
+  set(PLATFORM_LIBRARIES
+    "crypto"
+  )
+endif()
 
 set(CYTOSIM_INCLUDES
   "${EXTERNAL_DIRECTORY}/cytosim"
@@ -99,11 +86,6 @@ ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
 )
 
-target_include_directories(${CLIENT_PROGRAM} PUBLIC
-${INTERNAL_INCLUDES}
-${EXTERNAL_INCLUDES}
-)
-
 target_include_directories(${TEST_PROGRAM} PUBLIC
 ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
@@ -120,17 +102,6 @@ foreach(CYTO_LIB ${CYTOSIM_LIBRARIES})
   add_dependencies(${TARGET} ${CYTO_LIB})
   break()
 endforeach()
-
-
-set(READDY_DLLS
-  "readdy"
-  "readdy_model"
-  "readdy_kernel_cpu"
-  "readdy_kernel_singlecpu"
-  "readdy_common"
-  "readdy_io"
-  "readdy_plugin"
-)
 
 set(CYTOSIM_DLLS
   "${CYTOSIM_LIBRARIES}"
@@ -156,8 +127,6 @@ target_link_libraries(${SERVER_PROGRAM}
   "${AGENTSIM_DLL}"
   "${CYTOSIM_DLLS}"
   Threads::Threads
-  "${HDF5_DLLS}"
-  "${READDY_DLLS}"
   "${AWS_DLLS}"
 )
 
@@ -165,9 +134,37 @@ target_link_libraries(${TEST_PROGRAM}
   "${AGENTSIM_DLL}"
   Threads::Threads
   "${GTEST_DLLS}"
-  "${HDF5_DLLS}"
-  "${READDY_DLLS}"
   ${AWS_DLLS}
+)
+
+target_include_directories(${TEST_PROGRAM} PRIVATE
+    "${DEPENDENCY_DIRECTORY}/readdy/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/readdy_testing/include"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/c-blosc/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/Catch2/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/h5rd/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/pybind11/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include/"
+    "${HDF5_INCLUDE_DIRS}"
+    "${HDF5_HL_INCLUDE_DIR}"
+)
+
+set(CLIENT_PROGRAM_SOURCES
+    "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/jsoncpp.cpp"
+    "${SOURCE_DIRECTORY}/${TARGET}/cli_client.cpp"
+)
+add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
+target_include_directories(${CLIENT_PROGRAM} PRIVATE
+    ${INTERNAL_INCLUDES}
+    ${EXTERNAL_INCLUDES}
+    ${OPENSSL_INCLUDES}
+)
+target_link_libraries(${CLIENT_PROGRAM}
+    Threads::Threads
+    ${OPENSSL_LIBRARIES}
+    ${PLATFORM_LIBRARIES}
 )
 
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/trajectory")

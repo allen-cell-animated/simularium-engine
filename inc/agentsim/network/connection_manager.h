@@ -76,7 +76,10 @@ namespace agentsim {
         void AdvanceClients();
         void SendDataToClients(Simulation& simulation);
 
-        void SetNoTimeoutArg(bool val);
+        void SetNoUploadArg(bool val) { this->m_argNoUpload = val; }
+        void SetForceInitArg(bool val) { this->m_argForceInit = val; }
+        void SetNoTimeoutArg(bool val) { this->m_argNoTimeout = val; }
+
         bool CheckNoClientTimeout();
         void RemoveUnresponsiveClients();
         void RegisterHeartBeat(std::string connectionUID);
@@ -169,6 +172,8 @@ namespace agentsim {
         const std::size_t kServerTickIntervalMilliSeconds = 200;
 
         bool m_argNoTimeout = false;
+        bool m_argForceInit = false;
+        bool m_argNoUpload = false;
 
         std::chrono::time_point<std::chrono::system_clock>
             m_noClientTimer = std::chrono::system_clock::now();

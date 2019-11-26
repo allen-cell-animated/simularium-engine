@@ -1,6 +1,9 @@
 #include "agentsim/aws/aws_util.h"
 #include "agentsim/util/math_util.h"
 
+#include <csignal>
+#include <math.h>
+
 bool verboseOrientation = false;
 
 inline bool file_exists(const std::string& name)
@@ -65,7 +68,7 @@ OrientationDataMap initOrientationData() {
         {"atpase", zero_rotation},
         {"membrane", zero_rotation}
     };
-    
+
     OrientationDataMap data;
     data["actin"] = {
         {
@@ -296,17 +299,19 @@ namespace agentsim {
             this->LoadTrajectoryFile("/tmp/test.h5", ignore);
         }
 
-        auto& trajectoryInfo = std::get<1>(this->m_trajectoryInfo);
+        auto& trajectoryInfo = std::get<1>(this->m_fileInfo->trajectoryInfo);
 
         if (frame_no >= trajectoryInfo.size()) {
             this->m_hasFinishedStreaming = true;
         } else {
 
-            auto rotationList = this->m_rotationInfo.size() > 0 ? this->m_rotationInfo[frame_no] : RotationH5List();
+            auto rotationList =
+                this->m_fileInfo->rotationInfo.size() > 0 ?
+                    this->m_fileInfo->rotationInfo[frame_no] : RotationH5List();
 
             copy_frame(
                 this->m_simulation,
-                std::get<1>(this->m_trajectoryInfo).at(frame_no),
+                std::get<1>(this->m_fileInfo->trajectoryInfo).at(frame_no),
                 rotationList,
                 agents);
 
@@ -338,8 +343,8 @@ namespace agentsim {
             this->m_hasLoadedRunFile = false;
         } else {
             std::cout << "Using loaded file:  " << file_path << std::endl;
-            auto& time = std::get<0>(this->m_trajectoryInfo);
-            auto& traj = std::get<1>(this->m_trajectoryInfo);
+            auto& time = std::get<0>(this->m_fileInfo->trajectoryInfo);
+            auto& traj = std::get<1>(this->m_fileInfo->trajectoryInfo);
 
             fileProps.numberOfFrames = traj.size();
             fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
@@ -352,28 +357,28 @@ namespace agentsim {
             frame_no = 0;
 
             read_h5file(file_path,
-                this->m_trajectoryInfo,
-                this->m_topologyInfo,
-                this->m_rotationInfo,
-                this->m_typeMapping,
+                this->m_fileInfo->trajectoryInfo,
+                this->m_fileInfo->topologyInfo,
+                this->m_fileInfo->rotationInfo,
+                this->m_fileInfo->typeMapping,
                 ID_PARTICLE_CACHE
             );
             this->m_hasLoadedRunFile = true;
             last_loaded_file = file_path;
             std::cout << "Finished loading trajectory file: " << file_path << std::endl;
 
-            auto& time = std::get<0>(this->m_trajectoryInfo);
-            auto& traj = std::get<1>(this->m_trajectoryInfo);
+            auto& time = std::get<0>(this->m_fileInfo->trajectoryInfo);
+            auto& traj = std::get<1>(this->m_fileInfo->trajectoryInfo);
 
             fileProps.numberOfFrames = traj.size();
             fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
-            fileProps.typeMapping = this->m_typeMapping;
+            fileProps.typeMapping = this->m_fileInfo->typeMapping;
         }
     }
 
     double ReaDDyPkg::GetSimulationTimeAtFrame(std::size_t frameNumber)
     {
-        auto times = std::get<0>(this->m_trajectoryInfo);
+        auto times = std::get<0>(this->m_fileInfo->trajectoryInfo);
         if(times.size() > frameNumber)
         {
             return times.at(frameNumber);
@@ -384,7 +389,7 @@ namespace agentsim {
 
     std::size_t ReaDDyPkg::GetClosestFrameNumberForTime(double timeNs)
     {
-        auto times = std::get<0>(this->m_trajectoryInfo);
+        auto times = std::get<0>(this->m_fileInfo->trajectoryInfo);
         auto lower = std::lower_bound(times.begin(), times.end(), timeNs);
         auto frame = std::distance(times.begin(), lower);
 

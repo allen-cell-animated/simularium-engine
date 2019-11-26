@@ -123,8 +123,6 @@ std::map<readdy::model::top::graph::Vertex*, Eigen::Matrix3d> filament_rotations
 
 bool log_events = false;
 
-#include "readdypkg_fileio.cc"
-
 /**
 *	Simulation API
 **/

@@ -4,14 +4,15 @@
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
 #include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_no_tls_client.hpp>
+#include <websocketpp/config/asio_client.hpp>
 
 #include <json/json.h>
 #include <string>
 #include <thread>
 #include <unordered_map>
 
-typedef websocketpp::client<websocketpp::config::asio_client> client;
+typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> context_ptr;
 
 namespace aics {
 namespace agentsim {
@@ -45,6 +46,7 @@ namespace agentsim {
 
         void SendMessage(Json::Value message, std::string description);
         void OnFail();
+        context_ptr OnTLSConnect();
 
     private:
         std::unordered_map<std::string, std::string> m_commandList = {

@@ -53,7 +53,7 @@ namespace agentsim {
 
             std::atomic<bool> isRunning = true;
             float timeStep = 1e-12;
-            std::string uri = "ws://localhost:9002";
+            std::string uri = "wss://localhost:9002";
             std::string simFileName = "actin19.h5";
 
             std::vector<std::shared_ptr<SimPkg>> simulators;
