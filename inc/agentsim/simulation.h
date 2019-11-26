@@ -125,12 +125,10 @@ namespace agentsim {
 	*	@param	file_path		The location of the trajectory file to load
 	*							Currently, there is no validation for file <-> simPKG correctness
 	*
-    *   @param  fileProps       Is modified to contain information about the trajectory file loaded
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
 	*/
         void LoadTrajectoryFile(
-            std::string file_path,
-            TrajectoryFileProperties& fileProps
+            std::string file_path
         );
 
         std::size_t GetNumFrames() { return m_cache.GetNumFrames("runtime"); }
@@ -167,7 +165,7 @@ namespace agentsim {
         *   The run-time cache is the version of a trajectory/simulation result
         *   that can be immediately streamed to a client with-out any processing
         */
-        void UploadRuntimeCache();
+        void UploadRuntimeCache(std::string identifier);
 
         /**
         *   DownloadRuntimeCache
@@ -207,7 +205,10 @@ namespace agentsim {
         *   This function returns the simulation time, in nano-seconds
         *   at a specified frame
         */
-        double GetSimulationTimeAtFrame(std::size_t frameNumber);
+        double GetSimulationTimeAtFrame(
+            std::string identifier,
+            std::size_t frameNumber
+        );
 
         /**
         *   GetClosestFrameNumberForTime
@@ -218,35 +219,24 @@ namespace agentsim {
         *   specified in nano-seconds. e.g. if each time step is 500 nano seconds and
         *   time 505 ns is requested, the second frame number (index 1, time 500 ns) is returned
         */
-        std::size_t GetClosestFrameNumberForTime(double simulationTimeNs);
+        std::size_t GetClosestFrameNumberForTime(
+            std::string identifier,
+            double simulationTimeNs
+        );
 
-        /**
-        *   SetCacheInfo
-        *
-        *   @param  trajectoryProperties    an object containing metadata about a simulation trajectory
-        *
-        *   Sets basic info about the simulation cache; this is intended for use when
-        *   an intermediate simulation file is pulled down from the network.
-        *   During a live simulation or local processing, this object should already have enough
-        *   information to function properly without this function
-        */
-        void SetCacheInfo(const TrajectoryFileProperties& trajectoryProperties)
-        {
-            this->m_numTimeSteps = trajectoryProperties.numberOfFrames;
-            this->m_timeStepSize = trajectoryProperties.timeStepSize;
-        }
+        bool HasFileInCache(std::string identifier) { return this->m_cache.HasIdentifier(identifier); }
+
+        TrajectoryFileProperties GetFileProperties(std::string identifier)
+            { return this->m_cache.GetFileProperties(identifier); }
+
+        std::size_t GetNumFrames(std::string identifier)
+            { return this->m_cache.GetNumFrames(identifier); }
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
         Model m_model;
         SimulationCache m_cache;
         std::size_t m_playbackMode = SimulationMode::id_live_simulation;
-
-        std::string m_trajectoryFilePath = "";
-
-        // Used for cache play-back
-        std::size_t m_numTimeSteps = 0;
-        double m_timeStepSize = 0;
     };
 
 }

@@ -2,6 +2,7 @@
 #define AICS_TRAJECTORY_PROPERTIES_H
 
 #include <string>
+#include <unordered_map>
 
 namespace aics {
 namespace agentsim {

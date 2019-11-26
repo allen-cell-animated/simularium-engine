@@ -127,16 +127,13 @@ namespace agentsim {
         this->m_cache.AddFrame("runtime", newFrame);
     }
 
-    void Simulation::LoadTrajectoryFile(
-        std::string filePath,
-        TrajectoryFileProperties& fileProps
-    )
+    void Simulation::LoadTrajectoryFile(std::string filePath)
     {
+        TrajectoryFileProperties tfp;
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, fileProps);
+            this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, tfp);
         }
-
-        this->m_trajectoryFilePath = filePath;
+        this->m_cache.SetFileProperties("runtime", tfp);
     }
 
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)
@@ -144,14 +141,13 @@ namespace agentsim {
         this->m_playbackMode = playbackMode;
     }
 
-    void Simulation::UploadRuntimeCache()
+    void Simulation::UploadRuntimeCache(std::string filePath)
     {
-        this->m_cache.UploadRuntimeCache(this->m_trajectoryFilePath, "runtime");
+        this->m_cache.UploadRuntimeCache(filePath, "runtime");
     }
 
     bool Simulation::DownloadRuntimeCache(std::string filePath)
     {
-        this->m_trajectoryFilePath = filePath;
         return this->m_cache.DownloadRuntimeCache(filePath, "runtime");
     }
 
@@ -252,8 +248,12 @@ namespace agentsim {
         }
     }
 
-    double Simulation::GetSimulationTimeAtFrame(std::size_t frameNumber)
+    double Simulation::GetSimulationTimeAtFrame(
+        std::string identifier, std::size_t frameNumber
+    )
     {
+        auto tfp = this->GetFileProperties(identifier);
+
         double time = 0.0;
         if(this->m_SimPkgs.size() > 0)
         {
@@ -261,7 +261,7 @@ namespace agentsim {
         }
 
         float nearlyZero = 1e-9;
-        if(static_cast<double>(this->m_numTimeSteps * frameNumber) < nearlyZero
+        if(static_cast<double>(tfp.numberOfFrames * frameNumber) < nearlyZero
             && time < nearlyZero)
         {
             if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
@@ -274,20 +274,24 @@ namespace agentsim {
         }
 
         return std::max( // one of the below is expected to be 0.0
-            static_cast<double>(this->m_numTimeSteps * frameNumber), // non-zero if cache info was set
+            static_cast<double>(tfp.numberOfFrames * frameNumber), // non-zero if cache info was set
             time // non-zero if local processing or a live simulation happened
         ); // if both were zero, a dev error was made
     }
 
-    std::size_t Simulation::GetClosestFrameNumberForTime(double simulationTimeNs)
+    std::size_t Simulation::GetClosestFrameNumberForTime(
+        std::string identifier, double simulationTimeNs
+    )
     {
+        auto tfp = this->GetFileProperties(identifier);
+
         // If theres is cached meta-data for the simulation,
         //  assume we are running using a cache pulled down from the network
-        if(this->m_numTimeSteps != 0)
+        if(tfp.numberOfFrames != 0)
         {
             // Integer division performed to get nearest frames
             // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
-            return static_cast<int>(simulationTimeNs) / static_cast<int>(this->m_numTimeSteps);
+            return static_cast<int>(simulationTimeNs) / static_cast<int>(tfp.numberOfFrames);
         }
 
         if(this->m_SimPkgs.size() > 0)

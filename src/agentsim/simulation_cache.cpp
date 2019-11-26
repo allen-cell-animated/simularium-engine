@@ -1,5 +1,6 @@
 #include "agentsim/simulation_cache.h"
 #include "agentsim/aws/aws_util.h"
+#include <json/json.h>
 #include <algorithm>
 #include <csignal>
 #include <cstdio>
@@ -106,46 +107,106 @@ namespace agentsim {
 
     void SimulationCache::Preprocess(std::string identifier)
     {
-        std::size_t numFrames;
-        std::string filePath = this->GetFilePath(identifier);
+        this->ParseFileProperties(identifier);
 
-        std::ifstream& is = this->GetIfstream(identifier);
-        std::string line;
-        while (std::getline(is, line))
-        {
-            numFrames++;
-            line = "";
-        }
-
-        this->m_numFrames[identifier] = numFrames;
+        this->m_numFrames[identifier] = this->m_fileProps[identifier].numberOfFrames;
         std::cout << "Number of frames in " << identifier
-            << " runtime cache: " << numFrames << std::endl;
+            << " runtime cache: " << this->m_numFrames[identifier] << std::endl;
     }
 
-    bool SimulationCache::DownloadRuntimeCache(std::string filePath, std::string identifier)
+    bool SimulationCache::DownloadRuntimeCache(std::string awsFilePath, std::string identifier)
     {
-        std::cout << "Downloading cache for " << filePath << " from S3" << std::endl;
+        std::cout << "Downloading cache for " << awsFilePath << " from S3" << std::endl;
         std::string destination = this->GetFilePath(identifier);
-        std::string cacheFilePath = filePath + "_cache";
+        std::string cacheFilePath = awsFilePath + "_cache";
         if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
-            std::cout << "Cache file for " << filePath << " not found on AWS S3" << std::endl;
+            std::cout << "Cache file for " << identifier << " not found on AWS S3" << std::endl;
+            return false;
+        }
+
+        std::string fpropsFilePath = awsFilePath + "_info";
+        std::string fpropsDestination = this->GetInfoFilePath(identifier);
+        if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
+        {
+            std::cout << "Info file for " << awsFilePath << " not found on AWS S3" << std::endl;
             return false;
         }
 
         return true;
     }
 
-    void SimulationCache::UploadRuntimeCache(std::string filePath, std::string identifier)
+    bool SimulationCache::UploadRuntimeCache(std::string awsFilePath, std::string identifier)
     {
-        std::string destination = filePath + "_cache";
+        std::string destination = awsFilePath + "_cache";
         std::string source = this->GetFilePath(identifier);
-        std::cout << "Uploading " << destination << " to S3" << std::endl;
-        aics::agentsim::aws_util::Upload(source, destination);
+        std::cout << "Uploading cache file for " << identifier << " to S3" << std::endl;
+        if(!aics::agentsim::aws_util::Upload(source, destination)) {
+            return false;
+        }
+
+        std::string filePropsPath = this->GetInfoFilePath(identifier);
+        std::string filePropsDest = awsFilePath + "_info";
+        std::ofstream propsFile;
+        propsFile.open(filePropsPath);
+
+        TrajectoryFileProperties tfp = this->GetFileProperties(identifier);
+        Json::Value fprops;
+        fprops["fileName"] = tfp.fileName;
+        fprops["numberOfFrames"] = static_cast<int>(tfp.numberOfFrames);
+        fprops["timeStepSize"] = tfp.timeStepSize;
+
+        Json::Value typeMapping;
+        for(auto& entry : tfp.typeMapping)
+        {
+            std::string id = std::to_string(entry.first);
+            std::string name = entry.second;
+
+            typeMapping[id] = name;
+        }
+        fprops["typeMapping"] = typeMapping;
+        propsFile << fprops;
+        propsFile.close();
+
+        std::cout << "Uploading info file for " << identifier << " to S3" << std::endl;
+        if(!aics::agentsim::aws_util::Upload(filePropsPath, filePropsDest))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    void SimulationCache::ParseFileProperties(std::string identifier)
+    {
+        std::string filePath = this->GetInfoFilePath(identifier);
+        std::ifstream is(filePath);
+        Json::Value fprops;
+        is >> fprops;
+
+        TrajectoryFileProperties trajFileProps;
+        const Json::Value typeMapping = fprops["typeMapping"];
+        std::vector<std::string> ids = typeMapping.getMemberNames();
+        for(auto& id : ids)
+        {
+            std::size_t idKey = std::atoi(id.c_str());
+            trajFileProps.typeMapping[idKey] =
+                typeMapping[id].asString();
+        }
+
+        trajFileProps.fileName = fprops["fileName"].asString();
+        trajFileProps.numberOfFrames = fprops["numberOfFrames"].asInt();
+        trajFileProps.timeStepSize = fprops["timeStepSize"].asFloat();
+        this->m_fileProps[identifier] = trajFileProps;
     }
 
     std::string SimulationCache::GetFilePath(std::string identifier)
     {
         return this->m_cacheFolder + identifier + ".bin";
+    }
+
+    std::string SimulationCache::GetInfoFilePath(std::string identifier)
+    {
+        return this->m_cacheFolder + identifier + ".json";
     }
 
     std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {

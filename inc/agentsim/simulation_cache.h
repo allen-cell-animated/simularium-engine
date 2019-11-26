@@ -2,6 +2,7 @@
 #define AICS_SIMULATION_CACHE_H
 
 #include "agentsim/agent_data.h"
+#include "agentsim/network/trajectory_properties.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -55,11 +56,24 @@ namespace agentsim {
 
         void Preprocess(std::string identifier);
 
-        bool DownloadRuntimeCache(std::string filePath, std::string identifier);
-        void UploadRuntimeCache(std::string filePath, std::string identifier);
+        bool DownloadRuntimeCache(std::string awsFilePath, std::string identifier);
+        bool UploadRuntimeCache(std::string awsFilePath, std::string identifier);
+
+        bool HasIdentifier(std::string identifier) { return this->m_fileProps.count(identifier); }
+
+        TrajectoryFileProperties GetFileProperties(std::string identifier) {
+            return this->m_fileProps.count(identifier) ?
+                this->m_fileProps[identifier] : TrajectoryFileProperties();
+        }
+
+        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp) {
+            this->m_fileProps[identifier] = tfp;
+        }
 
     private:
         std::string GetFilePath(std::string identifier);
+        std::string GetInfoFilePath(std::string identifier);
+
         inline void CreateCacheFolder() { system("mkdir -p /tmp/aics/simularium/"); }
         inline void DeleteCacheFolder() { system("rm -rf /tmp/aics/"); }
 
@@ -68,12 +82,15 @@ namespace agentsim {
 
         void CloseFileStreams();
 
+        void ParseFileProperties(std::string identifier);
+
         std::string m_cacheFolder = "/tmp/aics/simularium/";
         std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
         std::ios_base::openmode m_ifstreamFlags = std::ios::in | std::ios::binary;
         std::unordered_map<std::string, std::ofstream> m_ofstreams;
         std::unordered_map<std::string, std::ifstream> m_ifstreams;
         std::unordered_map<std::string, std::size_t> m_numFrames;
+        std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
     };
 
 }
