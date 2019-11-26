@@ -617,6 +617,7 @@ namespace agentsim {
                         case SimulationMode::id_live_simulation: {
                             std::cout << "Running live simulation" << std::endl;
                             simulation.SetPlaybackMode(runMode);
+                            simulation.SetSimId("live");
                             simulation.Reset();
                         } break;
                         case SimulationMode::id_pre_run_simulation: {
@@ -634,6 +635,7 @@ namespace agentsim {
                             simulation.SetFileProperties("prerun", tfp);
                             this->SetClientSimId(senderUid, "prerun");
                             this->SetupRuntimeCacheAsync(simulation, 500);
+                            simulation.SetSimId("prerun");
                         } break;
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);
@@ -841,7 +843,7 @@ namespace agentsim {
             // Save the result so it doesn't need to be calculated again
             if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
             {
-                simulation.UploadRuntimeCache("runtime");
+                simulation.UploadRuntimeCache();
             }
         });
 

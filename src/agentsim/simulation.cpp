@@ -72,7 +72,7 @@ namespace agentsim {
             }
         }
 
-        this->m_cache.ClearCache("runtime");
+        this->m_cache.ClearCache(this->m_simIdentifier);
     }
 
     void Simulation::UpdateParameter(std::string name, float value)
@@ -127,7 +127,7 @@ namespace agentsim {
             AppendAgentData(newFrame, agent);
         }
 
-        this->m_cache.AddFrame("runtime", newFrame);
+        this->m_cache.AddFrame(this->m_simIdentifier, newFrame);
     }
 
     void Simulation::LoadTrajectoryFile(std::string fileName)
@@ -138,6 +138,7 @@ namespace agentsim {
             this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, tfp);
         }
         this->m_cache.SetFileProperties(fileName, tfp);
+        this->m_simIdentifier = fileName;
     }
 
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)
@@ -145,9 +146,10 @@ namespace agentsim {
         this->m_playbackMode = playbackMode;
     }
 
-    void Simulation::UploadRuntimeCache(std::string filePath)
+    void Simulation::UploadRuntimeCache()
     {
-        this->m_cache.UploadRuntimeCache(filePath, "runtime");
+        std::string awsFilePath = "trajectory/" + this->m_simIdentifier;
+        this->m_cache.UploadRuntimeCache(awsFilePath, this->m_simIdentifier);
     }
 
     bool Simulation::DownloadRuntimeCache(std::string fileName)

@@ -167,7 +167,7 @@ namespace agentsim {
         *   The run-time cache is the version of a trajectory/simulation result
         *   that can be immediately streamed to a client with-out any processing
         */
-        void UploadRuntimeCache(std::string identifier);
+        void UploadRuntimeCache();
 
         /**
         *   DownloadRuntimeCache
@@ -237,12 +237,15 @@ namespace agentsim {
 
         std::size_t GetNumFrames(std::string identifier)
             { return this->m_cache.GetNumFrames(identifier); }
+
+        void SetSimId(std::string identifier) { this->m_simIdentifier = identifier; }
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;
         Model m_model;
         SimulationCache m_cache;
         std::size_t m_playbackMode = SimulationMode::id_live_simulation;
+        std::string m_simIdentifier = "runtime"; // identifier for currently running simulation
     };
 
 }
