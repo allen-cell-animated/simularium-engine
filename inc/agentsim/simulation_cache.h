@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <unordered_map>
 
 namespace aics {
 namespace agentsim {
@@ -54,6 +55,9 @@ namespace agentsim {
 
         void Preprocess(std::string identifier);
 
+        bool DownloadRuntimeCache(std::string filePath, std::string identifier);
+        void UploadRuntimeCache(std::string filePath, std::string identifier);
+
     private:
         std::string GetFilePath(std::string identifier);
         inline void CreateCacheFolder() { system("mkdir -p /tmp/aics/simularium/"); }
@@ -61,6 +65,7 @@ namespace agentsim {
 
         std::ofstream& GetOfstream(std::string& identifier);
         std::ifstream& GetIfstream(std::string& identifier);
+
         void CloseFileStreams();
 
         std::string m_cacheFolder = "/tmp/aics/simularium/";

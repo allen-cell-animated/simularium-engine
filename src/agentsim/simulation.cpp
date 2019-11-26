@@ -146,22 +146,13 @@ namespace agentsim {
 
     void Simulation::UploadRuntimeCache()
     {
-        std::string filePath = this->m_trajectoryFilePath + "_cache";
-        std::cout << "Uploading " << filePath << " to S3" << std::endl;
-        aics::agentsim::aws_util::Upload("/tmp/agentviz_runtime_cache.bin", filePath);
+        this->m_cache.UploadRuntimeCache(this->m_trajectoryFilePath, "runtime");
     }
 
     bool Simulation::DownloadRuntimeCache(std::string filePath)
     {
-        std::cout << "Downloading cache for " << filePath << " from S3" << std::endl;
         this->m_trajectoryFilePath = filePath;
-        std::string cacheFilePath = filePath + "_cache";
-        if (!aics::agentsim::aws_util::Download(cacheFilePath, "/tmp/agentviz_runtime_cache.bin")) {
-            std::cout << "Cache file for " << filePath << " not found on AWS S3" << std::endl;
-            return false;
-        }
-
-        return true;
+        return this->m_cache.DownloadRuntimeCache(filePath, "runtime");
     }
 
     void Simulation::PreprocessRuntimeCache()

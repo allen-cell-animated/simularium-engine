@@ -1,4 +1,5 @@
 #include "agentsim/simulation_cache.h"
+#include "agentsim/aws/aws_util.h"
 #include <algorithm>
 #include <csignal>
 #include <cstdio>
@@ -77,7 +78,8 @@ namespace agentsim {
             return adf;
         }
 
-        std::cout << "Failed to load frame " << frameNumber << " from cache" << std::endl;
+        std::cout << "Failed to load frame " << frameNumber
+            << " from cache " << identifier << std::endl;
         return AgentDataFrame();
     }
 
@@ -91,6 +93,15 @@ namespace agentsim {
     {
         std::string filePath = this->GetFilePath(identifier);
         std::remove(filePath.c_str());
+
+        std::ifstream& is = this->GetIfstream(identifier);
+        std::ofstream& os = this->GetOfstream(identifier);
+
+        is.close();
+        os.close();
+
+        this->m_ofstreams.erase(identifier);
+        this->m_ifstreams.erase(identifier);
     }
 
     void SimulationCache::Preprocess(std::string identifier)
@@ -111,6 +122,27 @@ namespace agentsim {
             << " runtime cache: " << numFrames << std::endl;
     }
 
+    bool SimulationCache::DownloadRuntimeCache(std::string filePath, std::string identifier)
+    {
+        std::cout << "Downloading cache for " << filePath << " from S3" << std::endl;
+        std::string destination = this->GetFilePath(identifier);
+        std::string cacheFilePath = filePath + "_cache";
+        if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
+            std::cout << "Cache file for " << filePath << " not found on AWS S3" << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
+    void SimulationCache::UploadRuntimeCache(std::string filePath, std::string identifier)
+    {
+        std::string destination = filePath + "_cache";
+        std::string source = this->GetFilePath(identifier);
+        std::cout << "Uploading " << destination << " to S3" << std::endl;
+        aics::agentsim::aws_util::Upload(source, destination);
+    }
+
     std::string SimulationCache::GetFilePath(std::string identifier)
     {
         return this->m_cacheFolder + identifier + ".bin";
@@ -119,24 +151,32 @@ namespace agentsim {
     std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {
         if(!this->m_ofstreams.count(identifier)) {
             std::ofstream& newStream = this->m_ofstreams[identifier];
-            std::string filePath = this->GetFilePath(identifier);
-            newStream.open(filePath, this->m_ofstreamFlags);
+            newStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
             return newStream;
+        } else if (!this->m_ofstreams[identifier]) {
+            std::ofstream& badStream = this->m_ofstreams[identifier];
+            badStream.close();
+            badStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            return badStream;
         } else {
-            std::ofstream& fstream = this->m_ofstreams[identifier];
-            return fstream;
+            std::ofstream& currentStream = this->m_ofstreams[identifier];
+            return currentStream;
         }
     }
 
     std::ifstream& SimulationCache::GetIfstream(std::string& identifier) {
         if(!this->m_ifstreams.count(identifier)) {
             std::ifstream& newStream = this->m_ifstreams[identifier];
-            std::string filePath = this->GetFilePath(identifier);
-            newStream.open(filePath, this->m_ifstreamFlags);
+            newStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
             return newStream;
+        } else if(!this->m_ifstreams[identifier]) {
+            std::ifstream& badStream = this->m_ifstreams[identifier];
+            badStream.close();
+            badStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            return badStream;
         } else {
-            std::ifstream& fstream = this->m_ifstreams[identifier];
-            return fstream;
+            std::ifstream& currentStream = this->m_ifstreams[identifier];
+            return currentStream;
         }
     }
 
