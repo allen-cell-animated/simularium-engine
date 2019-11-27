@@ -1,4 +1,6 @@
 #include "agentsim/simulation_cache.h"
+#include "agentsim/aws/aws_util.h"
+#include <json/json.h>
 #include <algorithm>
 #include <csignal>
 #include <cstdio>
@@ -37,104 +39,218 @@ namespace agentsim {
 
     SimulationCache::SimulationCache()
     {
-        std::remove(this->m_cacheFileName.c_str());
-        tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
+        this->DeleteCacheFolder();
+        this->CreateCacheFolder();
     }
 
     SimulationCache::~SimulationCache()
     {
-        tmp_cache_file.close();
-        std::remove(this->m_cacheFileName.c_str());
+        this->CloseFileStreams();
+        this->DeleteCacheFolder();
     }
 
-    void SimulationCache::AddFrame(AgentDataFrame data)
+    void SimulationCache::AddFrame(std::string identifier, AgentDataFrame data)
     {
-        if (this->m_runtimeCache.size() == 0) {
-            this->m_runtimeCache.push_back(data);
+        if(this->m_numFrames.count(identifier) == 0) {
+            this->m_numFrames[identifier] = 0;
         } else {
-            this->m_runtimeCache[0] = data;
+            this->m_numFrames[identifier]++;
         }
 
-        serialize(tmp_cache_file, this->m_frameCounter, data);
-        this->m_frameCounter++;
+        auto& fstream = this->GetOfstream(identifier);
+        serialize(fstream, this->m_numFrames[identifier], data);
     }
 
-    void SimulationCache::SetCurrentFrame(std::size_t index)
+    AgentDataFrame SimulationCache::GetFrame(std::string identifier, std::size_t frameNumber)
     {
-        this->m_current = std::min(index, this->m_frameCounter);
-    }
+        if(this->m_numFrames.count(identifier) == 0) {
+            return AgentDataFrame(); // not in cache at all
+        }
 
-    AgentDataFrame SimulationCache::GetFrame(std::size_t frame_no)
-    {
-        if (frame_no > this->m_frameCounter || this->m_frameCounter == 0) {
+        std::size_t numFrames = this->m_numFrames.at(identifier);
+        if (frameNumber > numFrames || numFrames == 0) {
             return AgentDataFrame();
         }
 
-        std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
+        std::ifstream& is = this->GetIfstream(identifier);
         if (is) {
             AgentDataFrame adf;
-            deserialize(is, frame_no, adf);
-            is.close();
+            deserialize(is, frameNumber, adf);
             return adf;
         }
 
-        is.close();
-        std::cout << "Failed to load frame" << frame_no << " from cache" << std::endl;
+        std::cout << "Failed to load frame " << frameNumber
+            << " from cache " << identifier << std::endl;
         return AgentDataFrame();
     }
 
-    AgentDataFrame SimulationCache::GetCurrentFrame()
+    std::size_t SimulationCache::GetNumFrames(std::string identifier)
     {
-        return this->GetFrame(this->m_current);
+        return this->m_numFrames.count(identifier) ?
+            this->m_numFrames.at(identifier) : 0;
     }
 
-    bool SimulationCache::CurrentIsLatestFrame()
+    void SimulationCache::ClearCache(std::string identifier)
     {
-        return this->m_current >= this->m_frameCounter;
+        std::string filePath = this->GetFilePath(identifier);
+        std::remove(filePath.c_str());
+
+        std::ifstream& is = this->GetIfstream(identifier);
+        std::ofstream& os = this->GetOfstream(identifier);
+
+        is.close();
+        os.close();
+
+        this->m_ofstreams.erase(identifier);
+        this->m_ifstreams.erase(identifier);
     }
 
-    void SimulationCache::IncrementCurrentFrame()
+    void SimulationCache::Preprocess(std::string identifier)
     {
-        this->m_current++;
-        this->m_current = std::min(this->m_current, this->m_frameCounter);
+        this->ParseFileProperties(identifier);
+
+        this->m_numFrames[identifier] = this->m_fileProps[identifier].numberOfFrames;
+        std::cout << "Number of frames in " << identifier
+            << " runtime cache: " << this->m_numFrames[identifier] << std::endl;
     }
 
-    AgentDataFrame SimulationCache::GetLatestFrame()
+    bool SimulationCache::DownloadRuntimeCache(std::string awsFilePath, std::string identifier)
     {
-        if (this->m_runtimeCache.size() > 0) {
-            return this->m_runtimeCache[0];
+        std::cout << "Downloading cache for " << awsFilePath << " from S3" << std::endl;
+        std::string destination = this->GetFilePath(identifier);
+        std::string cacheFilePath = awsFilePath + "_cache";
+        if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
+            std::cout << "Cache file for " << identifier << " not found on AWS S3" << std::endl;
+            return false;
         }
 
-        return this->GetFrame(this->m_frameCounter - 1);
-    }
-
-    std::size_t SimulationCache::GetNumFrames()
-    {
-        return this->m_frameCounter;
-    }
-
-    void SimulationCache::ClearCache()
-    {
-        tmp_cache_file.close();
-        std::remove(this->m_cacheFileName.c_str());
-        tmp_cache_file.open(this->m_cacheFileName, std::ios::out | std::ios::app | std::ios::binary);
-
-        this->m_runtimeCache.clear();
-        this->m_current = 0;
-        this->m_frameCounter = 0;
-    }
-
-    void SimulationCache::Preprocess()
-    {
-        std::ifstream is(this->m_cacheFileName, std::ios::in | std::ios::binary);
-        std::string line;
-        while (std::getline(is, line))
+        std::string fpropsFilePath = awsFilePath + "_info";
+        std::string fpropsDestination = this->GetInfoFilePath(identifier);
+        if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
         {
-            this->m_frameCounter++;
-            line = "";
+            std::cout << "Info file for " << awsFilePath << " not found on AWS S3" << std::endl;
+            return false;
         }
 
-        std::cout << "Number of frames in runtime cache: " << this->m_frameCounter << std::endl;
+        return true;
+    }
+
+    bool SimulationCache::UploadRuntimeCache(std::string awsFilePath, std::string identifier)
+    {
+        std::string destination = awsFilePath + "_cache";
+        std::string source = this->GetFilePath(identifier);
+        std::cout << "Uploading cache file for " << identifier << " to S3" << std::endl;
+        if(!aics::agentsim::aws_util::Upload(source, destination)) {
+            return false;
+        }
+
+        std::string filePropsPath = this->GetInfoFilePath(identifier);
+        std::string filePropsDest = awsFilePath + "_info";
+        std::ofstream propsFile;
+        propsFile.open(filePropsPath);
+
+        TrajectoryFileProperties tfp = this->GetFileProperties(identifier);
+        Json::Value fprops;
+        fprops["fileName"] = tfp.fileName;
+        fprops["numberOfFrames"] = static_cast<int>(tfp.numberOfFrames);
+        fprops["timeStepSize"] = tfp.timeStepSize;
+
+        Json::Value typeMapping;
+        for(auto& entry : tfp.typeMapping)
+        {
+            std::string id = std::to_string(entry.first);
+            std::string name = entry.second;
+
+            typeMapping[id] = name;
+        }
+        fprops["typeMapping"] = typeMapping;
+        propsFile << fprops;
+        propsFile.close();
+
+        std::cout << "Uploading info file for " << identifier << " to S3" << std::endl;
+        if(!aics::agentsim::aws_util::Upload(filePropsPath, filePropsDest))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    void SimulationCache::ParseFileProperties(std::string identifier)
+    {
+        std::string filePath = this->GetInfoFilePath(identifier);
+        std::ifstream is(filePath);
+        Json::Value fprops;
+        is >> fprops;
+
+        TrajectoryFileProperties trajFileProps;
+        const Json::Value typeMapping = fprops["typeMapping"];
+        std::vector<std::string> ids = typeMapping.getMemberNames();
+        for(auto& id : ids)
+        {
+            std::size_t idKey = std::atoi(id.c_str());
+            trajFileProps.typeMapping[idKey] =
+                typeMapping[id].asString();
+        }
+
+        trajFileProps.fileName = fprops["fileName"].asString();
+        trajFileProps.numberOfFrames = fprops["numberOfFrames"].asInt();
+        trajFileProps.timeStepSize = fprops["timeStepSize"].asFloat();
+        this->m_fileProps[identifier] = trajFileProps;
+    }
+
+    std::string SimulationCache::GetFilePath(std::string identifier)
+    {
+        return this->m_cacheFolder + identifier + ".bin";
+    }
+
+    std::string SimulationCache::GetInfoFilePath(std::string identifier)
+    {
+        return this->m_cacheFolder + identifier + ".json";
+    }
+
+    std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {
+        if(!this->m_ofstreams.count(identifier)) {
+            std::ofstream& newStream = this->m_ofstreams[identifier];
+            newStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            return newStream;
+        } else if (!this->m_ofstreams[identifier]) {
+            std::ofstream& badStream = this->m_ofstreams[identifier];
+            badStream.close();
+            badStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            return badStream;
+        } else {
+            std::ofstream& currentStream = this->m_ofstreams[identifier];
+            return currentStream;
+        }
+    }
+
+    std::ifstream& SimulationCache::GetIfstream(std::string& identifier) {
+        if(!this->m_ifstreams.count(identifier)) {
+            std::ifstream& newStream = this->m_ifstreams[identifier];
+            newStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            return newStream;
+        } else if(!this->m_ifstreams[identifier]) {
+            std::ifstream& badStream = this->m_ifstreams[identifier];
+            badStream.close();
+            badStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            return badStream;
+        } else {
+            std::ifstream& currentStream = this->m_ifstreams[identifier];
+            return currentStream;
+        }
+    }
+
+    void SimulationCache::CloseFileStreams() {
+        for (auto& entry : this->m_ofstreams)
+        {
+            entry.second.close();
+        }
+
+        for (auto& entry : this->m_ifstreams)
+        {
+            entry.second.close();
+        }
     }
 
 } // namespace agentsim
@@ -148,6 +264,7 @@ bool goto_frameno(
     std::size_t fno,
     std::string& line)
 {
+    is.seekg(0, is.beg); // go to beginning
     for (std::size_t i = 0; i < fno; ++i) {
         if (std::getline(is, line)) {
             line = "";

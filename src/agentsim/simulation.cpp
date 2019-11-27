@@ -47,9 +47,12 @@ namespace agentsim {
         this->CacheCurrentAgents();
     }
 
-    std::vector<AgentData> Simulation::GetDataFrame(std::size_t frame_no)
+    std::vector<AgentData> Simulation::GetDataFrame(
+        std::string identifier,
+        std::size_t frame_no
+    )
     {
-        return this->m_cache.GetFrame(frame_no);
+        return this->m_cache.GetFrame(identifier, frame_no);
     }
 
     void Simulation::Reset()
@@ -69,7 +72,7 @@ namespace agentsim {
             }
         }
 
-        this->m_cache.ClearCache();
+        this->m_cache.ClearCache(this->m_simIdentifier);
     }
 
     void Simulation::UpdateParameter(std::string name, float value)
@@ -124,19 +127,18 @@ namespace agentsim {
             AppendAgentData(newFrame, agent);
         }
 
-        this->m_cache.AddFrame(newFrame);
+        this->m_cache.AddFrame(this->m_simIdentifier, newFrame);
     }
 
-    void Simulation::LoadTrajectoryFile(
-        std::string filePath,
-        TrajectoryFileProperties& fileProps
-    )
+    void Simulation::LoadTrajectoryFile(std::string fileName)
     {
+        std::string filePath = "trajectory/" + fileName;
+        TrajectoryFileProperties tfp;
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, fileProps);
+            this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, tfp);
         }
-
-        this->m_trajectoryFilePath = filePath;
+        this->m_cache.SetFileProperties(fileName, tfp);
+        this->m_simIdentifier = fileName;
     }
 
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)
@@ -146,27 +148,19 @@ namespace agentsim {
 
     void Simulation::UploadRuntimeCache()
     {
-        std::string filePath = this->m_trajectoryFilePath + "_cache";
-        std::cout << "Uploading " << filePath << " to S3" << std::endl;
-        aics::agentsim::aws_util::Upload("/tmp/agentviz_runtime_cache.bin", filePath);
+        std::string awsFilePath = "trajectory/" + this->m_simIdentifier;
+        this->m_cache.UploadRuntimeCache(awsFilePath, this->m_simIdentifier);
     }
 
-    bool Simulation::DownloadRuntimeCache(std::string filePath)
+    bool Simulation::DownloadRuntimeCache(std::string fileName)
     {
-        std::cout << "Downloading cache for " << filePath << " from S3" << std::endl;
-        this->m_trajectoryFilePath = filePath;
-        std::string cacheFilePath = filePath + "_cache";
-        if (!aics::agentsim::aws_util::Download(cacheFilePath, "/tmp/agentviz_runtime_cache.bin")) {
-            std::cout << "Cache file for " << filePath << " not found on AWS S3" << std::endl;
-            return false;
-        }
-
-        return true;
+        std::string awsFilePath = "trajectory/" + fileName;
+        return this->m_cache.DownloadRuntimeCache(awsFilePath, fileName);
     }
 
-    void Simulation::PreprocessRuntimeCache()
+    void Simulation::PreprocessRuntimeCache(std::string identifier)
     {
-        this->m_cache.Preprocess();
+        this->m_cache.Preprocess(identifier);
     }
 
     void AppendAgentData(
@@ -261,8 +255,12 @@ namespace agentsim {
         }
     }
 
-    double Simulation::GetSimulationTimeAtFrame(std::size_t frameNumber)
+    double Simulation::GetSimulationTimeAtFrame(
+        std::string identifier, std::size_t frameNumber
+    )
     {
+        auto tfp = this->GetFileProperties(identifier);
+
         double time = 0.0;
         if(this->m_SimPkgs.size() > 0)
         {
@@ -270,7 +268,7 @@ namespace agentsim {
         }
 
         float nearlyZero = 1e-9;
-        if(static_cast<double>(this->m_numTimeSteps * frameNumber) < nearlyZero
+        if(static_cast<double>(tfp.numberOfFrames * frameNumber) < nearlyZero
             && time < nearlyZero)
         {
             if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
@@ -283,20 +281,24 @@ namespace agentsim {
         }
 
         return std::max( // one of the below is expected to be 0.0
-            static_cast<double>(this->m_numTimeSteps * frameNumber), // non-zero if cache info was set
+            static_cast<double>(tfp.numberOfFrames * frameNumber), // non-zero if cache info was set
             time // non-zero if local processing or a live simulation happened
         ); // if both were zero, a dev error was made
     }
 
-    std::size_t Simulation::GetClosestFrameNumberForTime(double simulationTimeNs)
+    std::size_t Simulation::GetClosestFrameNumberForTime(
+        std::string identifier, double simulationTimeNs
+    )
     {
+        auto tfp = this->GetFileProperties(identifier);
+
         // If theres is cached meta-data for the simulation,
         //  assume we are running using a cache pulled down from the network
-        if(this->m_numTimeSteps != 0)
+        if(tfp.numberOfFrames != 0)
         {
             // Integer division performed to get nearest frames
             // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
-            return static_cast<int>(simulationTimeNs) / static_cast<int>(this->m_numTimeSteps);
+            return static_cast<int>(simulationTimeNs) / static_cast<int>(tfp.numberOfFrames);
         }
 
         if(this->m_SimPkgs.size() > 0)
