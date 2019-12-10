@@ -1,13 +1,12 @@
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/readdypkg.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cytosimpkg.cmake)
 
 set(SOURCES
-"${PROJECT_SOURCE_DIR}/dep/cytosim/src/play/frame_reader.cc"
 "jsoncpp.cpp"
 "aws_util.cpp"
 "math_util.cpp"
 "agent.cpp"
 "model.cpp"
-"cytosimpkg.cpp"
 "simulation_cache.cpp"
 "simulation.cpp"
 "connection_manager.cpp"
@@ -28,7 +27,7 @@ target_include_directories(${TARGET} PRIVATE
 
 target_link_libraries(${TARGET} PRIVATE
 "readdyPKG"
-"${CYTOSIM_LIBRARIES}"
+"cytosimPKG"
 "${AWS_DLLS}"
 "${OPENSSL_LIBRARIES}"
 "${PLATFORM_LIBRARIES}"

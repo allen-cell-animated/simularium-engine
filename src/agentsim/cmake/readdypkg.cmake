@@ -5,7 +5,7 @@ add_library("readdyPKG" STATIC
     "readdypkg.cpp"
 )
 
-set(READDY_PKG_INCLUDE_DIRECTORIES
+set(READDY_PKG_INCLUDES
     "${DEPENDENCY_DIRECTORY}/readdy/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/readdy_testing/include"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/c-blosc/include/"

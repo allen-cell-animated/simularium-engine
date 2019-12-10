@@ -48,23 +48,7 @@ if(UNIX AND APPLE)
   )
 endif()
 
-set(CYTOSIM_INCLUDES
-  "${EXTERNAL_DIRECTORY}/cytosim"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/spaces"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/couples"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/fibers"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/hands"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/organizers"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/singles"
-  "${EXTERNAL_DIRECTORY}/cytosim/base"
-  "${EXTERNAL_DIRECTORY}/cytosim/math"
-  "${EXTERNAL_DIRECTORY}/cytosim/SFMT"
-  "${EXTERNAL_DIRECTORY}/cytosim/play"
-)
-
 set(EXTERNAL_INCLUDES
-"${CYTOSIM_INCLUDES}"
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
@@ -89,8 +73,11 @@ ${INTERNAL_INCLUDES}
 ${EXTERNAL_INCLUDES}
 )
 
-add_subdirectory(${SOURCE_DIRECTORY})
 add_subdirectory(${DEPENDENCY_DIRECTORY})
+set(CYTOSIM_DLLS
+  "${CYTOSIM_LIBRARIES}"
+)
+add_subdirectory(${SOURCE_DIRECTORY})
 
 add_dependencies(${TARGET} readdy)
 add_dependencies(${TARGET} gtest)
@@ -100,10 +87,6 @@ foreach(CYTO_LIB ${CYTOSIM_LIBRARIES})
   add_dependencies(${TARGET} ${CYTO_LIB})
   break()
 endforeach()
-
-set(CYTOSIM_DLLS
-  "${CYTOSIM_LIBRARIES}"
-)
 
 set(AGENTSIM_DLL
   "agentsim"
@@ -123,7 +106,6 @@ set(AWS_DLLS
 
 target_link_libraries(${SERVER_PROGRAM}
   "${AGENTSIM_DLL}"
-  "${CYTOSIM_DLLS}"
   Threads::Threads
   "${AWS_DLLS}"
 )
@@ -136,7 +118,7 @@ target_link_libraries(${TEST_PROGRAM}
 )
 
 target_include_directories(${TEST_PROGRAM} PRIVATE
-    "${READDY_PKG_INCLUDE_DIRECTORIES}"
+    "${READDY_PKG_INCLUDES}"
 )
 
 set(CLIENT_PROGRAM_SOURCES
