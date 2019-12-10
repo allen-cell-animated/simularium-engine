@@ -64,12 +64,10 @@ set(CYTOSIM_INCLUDES
 )
 
 set(EXTERNAL_INCLUDES
-"${EXTERNAL_DIRECTORY}/readdy"
 "${CYTOSIM_INCLUDES}"
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
-"${EXTERNAL_DIRECTORY}/aws-sdk-cpp"
 "${HDF5_INCLUDES}"
 "${OPENSSL_INCLUDES}"
 "/usr/local/opt/openssl/include"
@@ -138,16 +136,7 @@ target_link_libraries(${TEST_PROGRAM}
 )
 
 target_include_directories(${TEST_PROGRAM} PRIVATE
-    "${DEPENDENCY_DIRECTORY}/readdy/include/"
-    "${DEPENDENCY_DIRECTORY}/readdy/readdy_testing/include"
-    "${DEPENDENCY_DIRECTORY}/readdy/libraries/c-blosc/include/"
-    "${DEPENDENCY_DIRECTORY}/readdy/libraries/Catch2/include/"
-    "${DEPENDENCY_DIRECTORY}/readdy/libraries/h5rd/include/"
-    "${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include/"
-    "${DEPENDENCY_DIRECTORY}/readdy/libraries/pybind11/include/"
-    "${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include/"
-    "${HDF5_INCLUDE_DIRS}"
-    "${HDF5_HL_INCLUDE_DIR}"
+    "${READDY_PKG_INCLUDE_DIRECTORIES}"
 )
 
 set(CLIENT_PROGRAM_SOURCES
