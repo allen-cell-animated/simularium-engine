@@ -1,21 +1,21 @@
 add_library("cytosimPKG" STATIC
-    "${PROJECT_SOURCE_DIR}/dep/cytosim/src/play/frame_reader.cc"
+    "${DEPENDENCY_DIRECTORY}/cytosim/src/play/frame_reader.cc"
     "cytosimpkg.cpp"
 )
 
 set(CYTOSIM_PKG_INCLUDES
-  "${EXTERNAL_DIRECTORY}/cytosim"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/spaces"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/couples"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/fibers"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/hands"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/organizers"
-  "${EXTERNAL_DIRECTORY}/cytosim/sim/singles"
-  "${EXTERNAL_DIRECTORY}/cytosim/base"
-  "${EXTERNAL_DIRECTORY}/cytosim/math"
-  "${EXTERNAL_DIRECTORY}/cytosim/SFMT"
-  "${EXTERNAL_DIRECTORY}/cytosim/play"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim/spaces"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim/couples"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim/fibers"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim/hands"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim/organizers"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/sim/singles"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/base"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/math"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/SFMT"
+  "${DEPENDENCY_DIRECTORY}/cytosim/src/play"
   CACHE STRING "The include directories needed by the Cytosim simulation package"
 )
 
@@ -24,7 +24,6 @@ target_include_directories("cytosimPKG" PRIVATE
     "${INTERNAL_INCLUDES}"
 )
 
-message("${CYTOSIM_DLLS}")
 target_link_libraries("cytosimPKG" PRIVATE
     "${CYTOSIM_DLLS}"
 )

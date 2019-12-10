@@ -17,7 +17,9 @@ add_library(${TARGET} STATIC ${SOURCES})
 
 target_include_directories(${TARGET} PRIVATE
 "${INTERNAL_INCLUDES}"
-"${EXTERNAL_INCLUDES}"
+"${EXTERNAL_DIRECTORY}/websocketpp"
+"${EXTERNAL_DIRECTORY}/websocketpp/common"
+"${EXTERNAL_DIRECTORY}/asio"
 "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-core/include"
 "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-transfer/include"
 "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"

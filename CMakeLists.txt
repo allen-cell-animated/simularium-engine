@@ -74,19 +74,8 @@ ${EXTERNAL_INCLUDES}
 )
 
 add_subdirectory(${DEPENDENCY_DIRECTORY})
-set(CYTOSIM_DLLS
-  "${CYTOSIM_LIBRARIES}"
-)
+set(CYTOSIM_DLLS "${CYTOSIM_LIBRARIES}")
 add_subdirectory(${SOURCE_DIRECTORY})
-
-add_dependencies(${TARGET} readdy)
-add_dependencies(${TARGET} gtest)
-add_dependencies(${TARGET} gtest_main)
-
-foreach(CYTO_LIB ${CYTOSIM_LIBRARIES})
-  add_dependencies(${TARGET} ${CYTO_LIB})
-  break()
-endforeach()
 
 set(AGENTSIM_DLL
   "agentsim"
