@@ -48,15 +48,6 @@ if(UNIX AND APPLE)
   )
 endif()
 
-set(EXTERNAL_INCLUDES
-"${EXTERNAL_DIRECTORY}/websocketpp"
-"${EXTERNAL_DIRECTORY}/websocketpp/common"
-"${EXTERNAL_DIRECTORY}/asio"
-"${HDF5_INCLUDES}"
-"${OPENSSL_INCLUDES}"
-"/usr/local/opt/openssl/include"
-)
-
 set(INTERNAL_INCLUDES
 "${INCLUDE_DIRECTORY}"
 "${SOURCE_DIRECTORY}"
@@ -65,49 +56,44 @@ set(INTERNAL_INCLUDES
 
 target_include_directories(${SERVER_PROGRAM} PUBLIC
 ${INTERNAL_INCLUDES}
-${EXTERNAL_INCLUDES}
+"${EXTERNAL_DIRECTORY}/websocketpp"
+"${EXTERNAL_DIRECTORY}/websocketpp/common"
+"${EXTERNAL_DIRECTORY}/asio"
+"${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-core/include"
+"${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-transfer/include"
+"${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"
+"${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-s3/include"
 )
 
 target_include_directories(${TEST_PROGRAM} PUBLIC
-${INTERNAL_INCLUDES}
-${EXTERNAL_INCLUDES}
+"${INTERNAL_INCLUDES}"
+"${EXTERNAL_DIRECTORY}/websocketpp"
+"${EXTERNAL_DIRECTORY}/websocketpp/common"
+"${EXTERNAL_DIRECTORY}/asio"
 )
 
 add_subdirectory(${DEPENDENCY_DIRECTORY})
 set(CYTOSIM_DLLS "${CYTOSIM_LIBRARIES}")
 add_subdirectory(${SOURCE_DIRECTORY})
 
-set(AGENTSIM_DLL
-  "agentsim"
+target_link_libraries(${SERVER_PROGRAM}
+    "${TARGET}"
+    Threads::Threads
 )
 
-set(GTEST_DLLS
+target_link_libraries(${TEST_PROGRAM}
+  "${TARGET}"
+  Threads::Threads
   "gtest_main"
   "gtest"
 )
 
-set(AWS_DLLS
-  "aws-cpp-sdk-s3"
-  "aws-cpp-sdk-awstransfer"
-  "aws-cpp-sdk-transfer"
-  "aws-cpp-sdk-core"
-)
-
-target_link_libraries(${SERVER_PROGRAM}
-  "${AGENTSIM_DLL}"
-  Threads::Threads
-  "${AWS_DLLS}"
-)
-
-target_link_libraries(${TEST_PROGRAM}
-  "${AGENTSIM_DLL}"
-  Threads::Threads
-  "${GTEST_DLLS}"
-  ${AWS_DLLS}
-)
-
 target_include_directories(${TEST_PROGRAM} PRIVATE
     "${READDY_PKG_INCLUDES}"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-core/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-transfer/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-s3/include"
 )
 
 set(CLIENT_PROGRAM_SOURCES
@@ -118,8 +104,11 @@ set(CLIENT_PROGRAM_SOURCES
 add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
 target_include_directories(${CLIENT_PROGRAM} PRIVATE
     ${INTERNAL_INCLUDES}
-    ${EXTERNAL_INCLUDES}
-    ${OPENSSL_INCLUDES}
+    "${EXTERNAL_DIRECTORY}/websocketpp"
+    "${EXTERNAL_DIRECTORY}/websocketpp/common"
+    "${EXTERNAL_DIRECTORY}/asio"
+    "${OPENSSL_INCLUDES}"
+    "/usr/local/opt/openssl/include"
 )
 target_link_libraries(${CLIENT_PROGRAM}
     Threads::Threads

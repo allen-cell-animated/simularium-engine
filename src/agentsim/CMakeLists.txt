@@ -25,12 +25,16 @@ target_include_directories(${TARGET} PRIVATE
 "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"
 "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-s3/include"
 "${OPENSSL_INCLUDES}"
+"/usr/local/opt/openssl/include"
 )
 
 target_link_libraries(${TARGET} PRIVATE
 "readdyPKG"
 "cytosimPKG"
-"${AWS_DLLS}"
+"aws-cpp-sdk-s3"
+"aws-cpp-sdk-awstransfer"
+"aws-cpp-sdk-transfer"
+"aws-cpp-sdk-core"
 "${OPENSSL_LIBRARIES}"
 "${PLATFORM_LIBRARIES}"
 )
