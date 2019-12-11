@@ -1,3 +1,9 @@
+# All of the tests should be placed alongside the certificates needed for the
+#  network tests, the top level of the binary directory
+set(EXECUTABLE_OUTPUT_PATH
+    "${CMAKE_BINARY_DIR}"
+)
+
 set(TEST_LIST
 "test_agent"
 "test_aws_util"
