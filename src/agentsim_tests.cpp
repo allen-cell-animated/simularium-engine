@@ -1,4 +1,4 @@
-#include "tests/all_tests.h"
+#include "test/test_agentsim.h"
 #include "gtest/gtest.h"
 
 int main(int argc, char** argv)
