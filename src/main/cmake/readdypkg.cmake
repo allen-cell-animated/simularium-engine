@@ -19,7 +19,7 @@ set(READDY_PKG_INCLUDES
 
 target_include_directories("readdyPKG" PRIVATE
     "${READDY_PKG_INCLUDE_DIRECTORIES}"
-    "${INTERNAL_INCLUDES}"
+    "${INCLUDE_DIRECTORY}"
     "${EXTERNAL_DIRECTORY}"
 )
 target_link_libraries("readdyPKG" PRIVATE

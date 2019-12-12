@@ -21,7 +21,8 @@ set(CYTOSIM_PKG_INCLUDES
 
 target_include_directories("cytosimPKG" PRIVATE
     "${CYTOSIM_PKG_INCLUDES}"
-    "${INTERNAL_INCLUDES}"
+    "${INCLUDE_DIRECTORY}"
+    "${EXTERNAL_DIRECTORY}"
 )
 
 target_link_libraries("cytosimPKG" PRIVATE

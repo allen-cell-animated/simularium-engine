@@ -16,7 +16,8 @@ set(SOURCES
 add_library(${TARGET} STATIC ${SOURCES})
 
 target_include_directories(${TARGET} PRIVATE
-"${INTERNAL_INCLUDES}"
+"${INCLUDE_DIRECTORY}"
+"${EXTERNAL_DIRECTORY}"
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"

@@ -12,7 +12,8 @@ set(TEST_LIST
 )
 
 set(TEST_INCLUDES
-    "${INTERNAL_INCLUDES}"
+    "${INCLUDE_DIRECTORY}"
+    "${EXTERNAL_DIRECTORY}"
     "${EXTERNAL_DIRECTORY}/websocketpp"
     "${EXTERNAL_DIRECTORY}/websocketpp/common"
     "${EXTERNAL_DIRECTORY}/asio"
