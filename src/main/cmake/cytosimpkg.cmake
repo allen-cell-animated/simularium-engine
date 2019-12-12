@@ -26,5 +26,5 @@ target_include_directories("cytosimPKG" PRIVATE
 )
 
 target_link_libraries("cytosimPKG" PRIVATE
-    "${CYTOSIM_DLLS}"
+    "${CYTOSIM_LIBRARIES}"
 )

@@ -54,7 +54,6 @@ target_include_directories(${SERVER_PROGRAM} PUBLIC
 )
 
 add_subdirectory(${DEPENDENCY_DIRECTORY})
-set(CYTOSIM_DLLS "${CYTOSIM_LIBRARIES}")
 add_subdirectory(${SOURCE_DIRECTORY})
 
 target_link_libraries(${SERVER_PROGRAM}
