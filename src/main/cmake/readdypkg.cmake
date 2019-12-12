@@ -1,6 +1,4 @@
 add_library("readdyPKG" STATIC
-    "jsoncpp.cpp"
-    "aws_util.cpp"
     "math_util.cpp"
     "readdypkg.cpp"
 )
@@ -23,10 +21,6 @@ target_include_directories("readdyPKG" PRIVATE
     "${READDY_PKG_INCLUDE_DIRECTORIES}"
     "${INTERNAL_INCLUDES}"
     "${EXTERNAL_DIRECTORY}"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-core/include"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-transfer/include"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-s3/include"
 )
 target_link_libraries("readdyPKG" PRIVATE
     "readdy"
@@ -38,5 +32,4 @@ target_link_libraries("readdyPKG" PRIVATE
     "readdy_plugin"
     "${HDF5_LIBRARIES}"
     "${HDF5_HL_LIBRARIES}"
-    "${AWS_DLLS}"
 )

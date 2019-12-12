@@ -7,6 +7,37 @@
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/stat.h>
+
+inline bool FileExists(const std::string& name)
+{
+    struct stat buffer;
+    return (stat(name.c_str(), &buffer) == 0);
+}
+
+bool FindFile(std::string& filePath)
+{
+    // Download the file from AWS if it is not present locally
+    if (!FileExists(filePath)) {
+        std::cout << filePath << " doesn't exist locally, checking S3..." << std::endl;
+        if (!aics::agentsim::aws_util::Download(filePath, filePath)) {
+            std::cout << filePath << " not found on AWS S3" << std::endl;
+            return false;
+        }
+    }
+
+    // Modifies the file-path  to a format that H5rd can reliably load
+    // H5rd is a library written by the ReaDDy developers to load H5 files
+    if (FileExists("/" + filePath)) {
+        filePath = "/" + filePath;
+        std::cout << "file name modified to " << filePath << std::endl;
+    } else if (FileExists("./" + filePath)) {
+        filePath = "./" + filePath;
+        std::cout << "file name modified to " << filePath << std::endl;
+    }
+
+    return true;
+}
 
 namespace aics {
 namespace agentsim {
@@ -130,15 +161,28 @@ namespace agentsim {
         this->m_cache.AddFrame(this->m_simIdentifier, newFrame);
     }
 
-    void Simulation::LoadTrajectoryFile(std::string fileName)
+    bool Simulation::LoadTrajectoryFile(std::string fileName)
     {
         std::string filePath = "trajectory/" + fileName;
         TrajectoryFileProperties tfp;
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->LoadTrajectoryFile(filePath, tfp);
+            auto simPkg = this->m_SimPkgs[i];
+
+            if(simPkg->CanLoadFile(fileName)) {
+                if(!FindFile(filePath)) {
+                    std::cout << "File not found" << std::endl;
+                    return false;
+                }
+
+                simPkg->LoadTrajectoryFile(filePath, tfp);
+                this->m_cache.SetFileProperties(fileName, tfp);
+                this->m_simIdentifier = fileName;
+                return true;
+            }
         }
-        this->m_cache.SetFileProperties(fileName, tfp);
-        this->m_simIdentifier = fileName;
+
+        std::cout << "No sim pkg found that can load " << fileName << std::endl;
+        return false;
     }
 
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)

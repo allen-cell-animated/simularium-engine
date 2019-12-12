@@ -47,6 +47,9 @@ namespace agentsim {
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override;
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override;
 
+        virtual bool CanLoadFile(std::string filePath) override
+            { return filePath.substr(filePath.find_last_of(".") + 1) == "h5"; }
+
     private:
         readdy::Simulation* m_simulation;
         bool m_agents_initialized = false;

@@ -1,18 +1,9 @@
-#include "agentsim/aws/aws_util.h"
 #include "agentsim/util/math_util.h"
 
 #include <csignal>
 #include <math.h>
 
 bool verboseOrientation = false;
-
-inline bool file_exists(const std::string& name)
-{
-    struct stat buffer;
-    return (stat(name.c_str(), &buffer) == 0);
-}
-
-bool get_file_path(std::string& fileName);
 
 std::unordered_map<std::string, Eigen::Matrix3d> default_orientation;
 
@@ -403,30 +394,6 @@ namespace agentsim {
 /**
 *	File IO Functions
 **/
-bool get_file_path(std::string& fileName)
-{
-    // Download the file from AWS if it is not present locally
-    if (!file_exists(fileName)) {
-        std::cout << fileName << " doesn't exist locally, checking S3..." << std::endl;
-        if (!aics::agentsim::aws_util::Download(fileName, fileName)) {
-            std::cout << fileName << " not found on AWS S3" << std::endl;
-            return false;
-        }
-    }
-
-    // Modifies the file-path  to a format that H5rd can reliably load
-    // H5rd is a library written by the ReaDDy developers to load H5 files
-    if (file_exists("/" + fileName)) {
-        fileName = "/" + fileName;
-        std::cout << "file name modified to " << fileName << std::endl;
-    } else if (file_exists("./" + fileName)) {
-        fileName = "./" + fileName;
-        std::cout << "file name modified to " << fileName << std::endl;
-    }
-
-    return true;
-}
-
 void run_and_save_h5file(
     readdy::Simulation* sim,
     std::string file_name,
@@ -461,10 +428,6 @@ void read_h5file(
     IdParticleMapping& particleLookup
     )
 {
-    if (!get_file_path(file_name)) {
-        return;
-    }
-
     // open the output file
     auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
 

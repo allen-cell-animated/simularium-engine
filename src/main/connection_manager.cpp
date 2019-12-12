@@ -790,8 +790,10 @@ namespace agentsim {
             else {
                 simulation.SetPlaybackMode(id_traj_file_playback);
                 simulation.Reset();
-                simulation.LoadTrajectoryFile(fileName);
-                this->SetupRuntimeCacheAsync(simulation, 500);
+                if(simulation.LoadTrajectoryFile(fileName))
+                {
+                    this->SetupRuntimeCacheAsync(simulation, 500);
+                }
             }
         }
 
