@@ -51,6 +51,7 @@ target_include_directories(${SERVER_PROGRAM} PUBLIC
 "${EXTERNAL_DIRECTORY}/websocketpp"
 "${EXTERNAL_DIRECTORY}/websocketpp/common"
 "${EXTERNAL_DIRECTORY}/asio"
+"/usr/local/opt/openssl/include"
 )
 
 add_subdirectory(${DEPENDENCY_DIRECTORY})
