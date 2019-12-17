@@ -449,7 +449,7 @@ namespace agentsim {
             auto& timeOut = this->kNoClientTimeoutSeconds;
 
             if (diff >= std::chrono::seconds(timeOut)) {
-                LOG_F(INFO, "No clients connected for %i seconds, server timeout ...", timeOut);
+                LOG_F(INFO, "No clients connected for %zu seconds, server timeout ...", timeOut);
                 return true;
             }
         } else {

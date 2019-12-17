@@ -327,7 +327,7 @@ namespace agentsim {
             unsigned n_iterations = timeStep / max_time_step;
 
             for (unsigned i = 0; i < n_iterations; ++i) {
-                LOG_F(INFO, "Running iteration %i of %i", i, n_iterations);
+                LOG_F(INFO, "Running iteration %zu of %zu", i, n_iterations);
                 this->m_timeStepCount++;
                 loop.runIntegrator(); // propagate particles
                 loop.runUpdateNeighborList(); // neighbor list update

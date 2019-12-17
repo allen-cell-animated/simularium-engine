@@ -464,11 +464,11 @@ void read_h5file(
       );
     }
 
-    std::string nTrajFrames = std::to_string(std::get<0>(trajectoryInfo).size());
-    std::string nTopFrames = std::to_string(std::get<0>(topologyInfo).size());
+    std::size_t nTrajFrames = std::get<0>(trajectoryInfo).size();
+    std::size_t nTopFrames = std::get<0>(topologyInfo).size();
 
-    LOG_F(INFO,"Found trajectory info for %i frames", nTrajFrames);
-    LOG_F(INFO,"Found topology info for %i frames", nTopFrames);
+    LOG_F(INFO,"Found trajectory info for %zu frames", nTrajFrames);
+    LOG_F(INFO,"Found topology info for %zu frames", nTopFrames);
     file->close();
 }
 
@@ -521,10 +521,7 @@ void copy_frame(
         // check if we have counted past the avaliable agents provided
         //	this would mean we used every agent in the 'agents' already
         if (agentIndex >= agents.size()) {
-            std::string nAgents = std::to_string(agents.size());
-            std::string nNeeded = std::to_string(agentIndex);
-
-            LOG_F(WARNING, "%i agents needed vs %i passed to ReaDDy PKG", nNeeded, nAgents);
+            LOG_F(WARNING, "%zu+ agents needed vs %zu passed to ReaDDy PKG", agentIndex, agents.size());
             LOG_F(ERROR, "Not enough agents to represent Readdy file run");
 
             readdy::log::info("\t type {}, id {}, pos ({}, {}, {})",
@@ -579,7 +576,7 @@ TimeTrajectoryH5Info readTrajectory(
 
     for (const auto& type : types) {
         typeMapping[type.type_id] = std::string(type.name);
-        LOG_F(INFO, "Particle type found: %i with name %s", type.type_id, type.name);
+        LOG_F(INFO, "Particle type found: %zu with name %s", type.type_id, type.name);
     }
 
     // limits of length 2T containing [start_ix, end_ix] for each time step
@@ -961,7 +958,7 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
             {
                 if (verboseOrientation)
                 {
-                    LOG_F(ERROR, "Neighbor ID not found in id mapping! %i", neighborIds.at(j));
+                    LOG_F(ERROR, "Neighbor ID not found in id mapping! %zu", neighborIds.at(j));
                 }
                 continue;
             }
@@ -1082,7 +1079,7 @@ static void calculateOrientations(
                     // no neighbors, use default orientation
                     if (verboseOrientation)
                     {
-                        LOG_F(INFO,"%i: Use default orientation for %s %i",
+                        LOG_F(INFO,"%zu: Use default orientation for %s %zu",
                             frameIndex, currentParticle.type, currentParticle.id
                         );
                     }
@@ -1092,7 +1089,7 @@ static void calculateOrientations(
                 // no neighbors, use random rotation
                 if (verboseOrientation)
                 {
-                    LOG_F(INFO,"%i: Use random orientation for %s %i",
+                    LOG_F(INFO,"%zu: Use random orientation for %s %zu",
                         frameIndex, currentParticle.type, currentParticle.id
                     );
                 }
@@ -1105,7 +1102,7 @@ static void calculateOrientations(
                 // one neighbor, revisit after neighbor's orientation is calculated
                 if (verboseOrientation)
                 {
-                    LOG_F(INFO,"%i: Use one neighbor orientation of %s %i",
+                    LOG_F(INFO,"%zu: Use one neighbor orientation of %s %zu",
                         frameIndex, currentParticle.type, currentParticle.id
                     );
                 }
@@ -1127,7 +1124,7 @@ static void calculateOrientations(
             orientationFrame.push_back(currentRotation.inverse() * initialRotation);
             if (verboseOrientation)
             {
-                LOG_F(INFO,"%i: Successfully oriented %s %i",
+                LOG_F(INFO,"%zu: Successfully oriented %s %zu",
                     frameIndex, currentParticle.type, currentParticle.id
                 );
             }
@@ -1156,7 +1153,7 @@ static void calculateOrientations(
                 );
                 if (verboseOrientation)
                 {
-                    LOG_F(INFO,"%i: Successfully oriented %i with axis rotation from %i",
+                    LOG_F(INFO,"%zu: Successfully oriented %zu with axis rotation from %zu",
                         frameIndex, particleID, neighborID
                     );
                 }
@@ -1168,7 +1165,7 @@ static void calculateOrientations(
             orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
             if (verboseOrientation)
             {
-                LOG_F(INFO,"%i: Successfully oriented %i with one neighbor",
+                LOG_F(INFO,"%zu: Successfully oriented %zu with one neighbor",
                     frameIndex, particleID
                 );
             }

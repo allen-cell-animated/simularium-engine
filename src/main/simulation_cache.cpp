@@ -80,7 +80,7 @@ namespace agentsim {
             return adf;
         }
 
-        LOG_F(ERROR, "Failed to load frame %i from cache %s", frameNumber, identifier.c_str());
+        LOG_F(ERROR, "Failed to load frame %zu from cache %s", frameNumber, identifier.c_str());
         return AgentDataFrame();
     }
 
@@ -110,7 +110,7 @@ namespace agentsim {
         this->ParseFileProperties(identifier);
 
         this->m_numFrames[identifier] = this->m_fileProps[identifier].numberOfFrames;
-        LOG_F(INFO, "Number of frames in %s cache: %i",
+        LOG_F(INFO, "Number of frames in %s cache: %zu",
             identifier.c_str(), this->m_numFrames[identifier]
         );
     }
