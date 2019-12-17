@@ -34,4 +34,5 @@ target_link_libraries("readdyPKG" PRIVATE
     "readdy_plugin"
     "${HDF5_LIBRARIES}"
     "${HDF5_HL_LIBRARIES}"
+    "loguru"
 )

@@ -29,4 +29,5 @@ target_include_directories("cytosimPKG" PRIVATE
 
 target_link_libraries("cytosimPKG" PRIVATE
     "${CYTOSIM_LIBRARIES}"
+    "loguru"
 )

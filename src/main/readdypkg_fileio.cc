@@ -1,5 +1,5 @@
 #include "agentsim/util/math_util.h"
-#include "agentsim/util/logger.h"
+#include "loguru/loguru.hpp"
 
 #include <csignal>
 #include <math.h>
@@ -334,7 +334,7 @@ namespace agentsim {
         if (last_loaded_file != filePath) {
             this->m_hasLoadedRunFile = false;
         } else {
-            aicslogger::Info("Using loaded file: " + filePath);
+            LOG_F(INFO,"Using loaded file: %s", filePath.c_str());
             auto& time = std::get<0>(this->m_fileInfo->trajectoryInfo);
             auto& traj = std::get<1>(this->m_fileInfo->trajectoryInfo);
 
@@ -345,7 +345,7 @@ namespace agentsim {
         }
 
         if (!this->m_hasLoadedRunFile) {
-            aicslogger::Info("Loading trajectory file " + filePath);
+            LOG_F(INFO,"Loading trajectory file %s", filePath.c_str());
             frame_no = 0;
 
             read_h5file(filePath,
@@ -357,7 +357,7 @@ namespace agentsim {
             );
             this->m_hasLoadedRunFile = true;
             last_loaded_file = filePath;
-            aicslogger::Info("Finished loading trajectory file: " + filePath);
+            LOG_F(INFO,"Finished loading trajectory file: %s", filePath.c_str());
 
             auto& time = std::get<0>(this->m_fileInfo->trajectoryInfo);
             auto& traj = std::get<1>(this->m_fileInfo->trajectoryInfo);
@@ -414,7 +414,7 @@ void run_and_save_h5file(
         loop.run(n_time_steps);
     } catch (...) {
         std::raise(SIGABRT);
-        aicslogger::Error("Exception while running ReaDDy simulation");
+        LOG_F(ERROR, "Exception while running ReaDDy simulation");
     }
 
     file->close();
@@ -438,7 +438,7 @@ void read_h5file(
       trajectoryInfo = readTrajectory(file, traj, typeMapping, particleLookup);
       traj.close();
     } catch(...) {
-        aicslogger::Error("No Trajectory information found in " + file_name);
+        LOG_F(ERROR,"No Trajectory information found in %s", file_name.c_str());
       return;
     }
 
@@ -449,7 +449,7 @@ void read_h5file(
       topGroup.close();
       hasTopologies = true;
     } catch(...) {
-        aicslogger::Error("No Topology observable information found in " + file_name);
+        LOG_F(ERROR, "No Topology observable information found in %s", file_name);
     }
 
     if(hasTopologies)
@@ -467,8 +467,8 @@ void read_h5file(
     std::string nTrajFrames = std::to_string(std::get<0>(trajectoryInfo).size());
     std::string nTopFrames = std::to_string(std::get<0>(topologyInfo).size());
 
-    aicslogger::Info("Found trajectory info for " + nTrajFrames + " frames");
-    aicslogger::Info("Found topology info for " + nTopFrames + " frames");
+    LOG_F(INFO,"Found trajectory info for %i frames", nTrajFrames);
+    LOG_F(INFO,"Found topology info for %i frames", nTopFrames);
     file->close();
 }
 
@@ -524,8 +524,8 @@ void copy_frame(
             std::string nAgents = std::to_string(agents.size());
             std::string nNeeded = std::to_string(agentIndex);
 
-            aicslogger::Warn(nNeeded + " agents needed vs " + nAgents + " passed to ReaDDy PKG");
-            aicslogger::Error("Not enough agents to represent Readdy file run");
+            LOG_F(WARNING, "%i agents needed vs %i passed to ReaDDy PKG", nNeeded, nAgents);
+            LOG_F(ERROR, "Not enough agents to represent Readdy file run");
 
             readdy::log::info("\t type {}, id {}, pos ({}, {}, {})",
                 p.type, p.id, p.position[0], p.position[1], p.position[2]);
@@ -579,10 +579,7 @@ TimeTrajectoryH5Info readTrajectory(
 
     for (const auto& type : types) {
         typeMapping[type.type_id] = std::string(type.name);
-        aicslogger::Info(
-            "Particle type found: " + std::to_string(type.type_id) +
-            " with name " + type.name
-        );
+        LOG_F(INFO, "Particle type found: %i with name %s", type.type_id, type.name);
     }
 
     // limits of length 2T containing [start_ix, end_ix] for each time step
@@ -935,9 +932,8 @@ static std::vector<std::pair<MonomerType,OrientationData>> getOrientationDataFor
     {
         if (verboseOrientation)
         {
-            aicslogger::Error(
-                "Failed to find orientation data for " +
-                monomerTypeToString(particleMonomerType)
+            LOG_F(ERROR, "Failed to find orientation data for %s",
+                monomerTypeToString(particleMonomerType).c_str()
             );
         }
         return {};
@@ -965,9 +961,7 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
             {
                 if (verboseOrientation)
                 {
-                    aicslogger::Error(
-                        "Neighbor ID not found in id mapping!" + std::to_string(neighborIds.at(j))
-                    );
+                    LOG_F(ERROR, "Neighbor ID not found in id mapping! %i", neighborIds.at(j));
                 }
                 continue;
             }
@@ -1088,10 +1082,8 @@ static void calculateOrientations(
                     // no neighbors, use default orientation
                     if (verboseOrientation)
                     {
-                        aicslogger::Info(
-                            std::to_string(frameIndex) + ": Use default orientation for " +
-                            currentParticle.type + " " +
-                            std::to_string(currentParticle.id)
+                        LOG_F(INFO,"%i: Use default orientation for %s %i",
+                            frameIndex, currentParticle.type, currentParticle.id
                         );
                     }
                     orientationFrame.push_back(default_orientation[particleMonomerType.name]);
@@ -1100,10 +1092,8 @@ static void calculateOrientations(
                 // no neighbors, use random rotation
                 if (verboseOrientation)
                 {
-                    aicslogger::Info(
-                        std::to_string(frameIndex) + ": Use random orientation for " +
-                        currentParticle.type + " " +
-                        std::to_string(currentParticle.id)
+                    LOG_F(INFO,"%i: Use random orientation for %s %i",
+                        frameIndex, currentParticle.type, currentParticle.id
                     );
                 }
                 orientationFrame.push_back(aics::agentsim::mathutil::getRandomOrientation());
@@ -1115,10 +1105,8 @@ static void calculateOrientations(
                 // one neighbor, revisit after neighbor's orientation is calculated
                 if (verboseOrientation)
                 {
-                    aicslogger::Info(
-                        std::to_string(frameIndex) + ": Use one neighbor orientation of " +
-                        currentParticle.type + " " +
-                        std::to_string(currentParticle.id)
+                    LOG_F(INFO,"%i: Use one neighbor orientation of %s %i",
+                        frameIndex, currentParticle.type, currentParticle.id
                     );
                 }
                 orientationFrame.push_back(aics::agentsim::mathutil::getErrorOrientation(0));
@@ -1139,10 +1127,8 @@ static void calculateOrientations(
             orientationFrame.push_back(currentRotation.inverse() * initialRotation);
             if (verboseOrientation)
             {
-                aicslogger::Info(
-                    std::to_string(frameIndex) + ": Successfully oriented " +
-                    currentParticle.type + " " +
-                    std::to_string(currentParticle.id)
+                LOG_F(INFO,"%i: Successfully oriented %s %i",
+                    frameIndex, currentParticle.type, currentParticle.id
                 );
             }
         }
@@ -1170,10 +1156,8 @@ static void calculateOrientations(
                 );
                 if (verboseOrientation)
                 {
-                    aicslogger::Info(
-                        std::to_string(frameIndex) + ": Successfully oriented " +
-                        std::to_string(particleID) + " with axis rotation from " +
-                        std::to_string(neighborID)
+                    LOG_F(INFO,"%i: Successfully oriented %i with axis rotation from %i",
+                        frameIndex, particleID, neighborID
                     );
                 }
                 continue;
@@ -1184,9 +1168,8 @@ static void calculateOrientations(
             orientationFrame.at(particleID) = neighborOrientation * offsetRotation;
             if (verboseOrientation)
             {
-                aicslogger::Info(
-                    std::to_string(frameIndex) + ": Successfully oriented " +
-                    std::to_string(particleID) + " with one neighbor"
+                LOG_F(INFO,"%i: Successfully oriented %i with one neighbor",
+                    frameIndex, particleID
                 );
             }
         }

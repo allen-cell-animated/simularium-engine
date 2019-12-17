@@ -2,7 +2,7 @@
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/network/trajectory_properties.h"
 #include "agentsim/aws/aws_util.h"
-#include "agentsim/util/logger.h"
+#include "loguru/loguru.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -17,7 +17,7 @@ namespace agentsim {
 
     ConnectionManager::ConnectionManager()
     {
-        aicslogger::Info("Connection Manager Created");
+        LOG_F(INFO, "Connection Manager Created");
     }
 
     void ConnectionManager::CloseServer()
@@ -41,7 +41,7 @@ namespace agentsim {
     }
 
     void ConnectionManager::LogClientEvent(std::string uid, std::string msg) {
-        aicslogger::Info("[" + uid + "] " + msg);
+        LOG_F(INFO, "[%s]%s", uid.c_str(), msg.c_str());
     }
 
     context_ptr ConnectionManager::OnTLSConnect(
@@ -97,12 +97,12 @@ namespace agentsim {
             }
 
             if(SSL_CTX_set_cipher_list(ctx->native_handle(), ciphers.c_str()) != 1) {
-                aicslogger::Error("Error setting cipher list");
+                LOG_F(ERROR, "Error setting cipher list");
             }
         } catch(std::exception& e)
         {
-            aicslogger::Error("Exception: " + std::string(e.what()));
-            aicslogger::Fatal("Failed to establish TLS context");
+            LOG_F(ERROR, "Exception: %s", e.what());
+            LOG_F(FATAL, "Failed to establish TLS context");
             std::raise(SIGABRT);
         }
 
@@ -112,7 +112,7 @@ namespace agentsim {
     void ConnectionManager::ListenAsync()
     {
         this->m_listeningThread = std::thread([&] {
-            aicslogger::SetThreadName("Websocket");
+            loguru::set_thread_name("Websocket");
             this->m_server.set_reuse_addr(true);
             this->m_server.set_message_handler(
                 std::bind(
@@ -155,7 +155,7 @@ namespace agentsim {
         float& timeStep)
     {
         this->m_simThread = std::thread([&isRunning, &simulation, &timeStep, this] {
-            aicslogger::SetThreadName("Simulation");
+            loguru::set_thread_name("Simulation");
             while (isRunning) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(this->kServerTickIntervalMilliSeconds));
 
@@ -183,7 +183,7 @@ namespace agentsim {
     void ConnectionManager::StartHeartbeatAsync(std::atomic<bool>& isRunning)
     {
         this->m_heartbeatThread = std::thread([&isRunning, this] {
-            aicslogger::SetThreadName("Heartbeat");
+            loguru::set_thread_name("Heartbeat");
             while (isRunning) {
                 std::this_thread::sleep_for(std::chrono::seconds(this->kHeartBeatIntervalSeconds));
 
@@ -396,7 +396,7 @@ namespace agentsim {
     void ConnectionManager::SendWebsocketMessageToAll(
         Json::Value jsonMessage, std::string description)
     {
-        aicslogger::Info("Sending message to all clients: " + description);
+        LOG_F(INFO, "Sending message to all clients: %s", description.c_str());
         for (auto& entry : this->m_netConnections) {
             auto uid = entry.first;
             SendWebsocketMessage(uid, jsonMessage);
@@ -449,11 +449,7 @@ namespace agentsim {
             auto& timeOut = this->kNoClientTimeoutSeconds;
 
             if (diff >= std::chrono::seconds(timeOut)) {
-                aicslogger::Info(
-                    "No clients connected for " +
-                    std::to_string(timeOut) +
-                    " seconds, server timeout"
-                );
+                LOG_F(INFO, "No clients connected for %i seconds, server timeout ...", timeOut);
                 return true;
             }
         } else {
@@ -580,7 +576,7 @@ namespace agentsim {
                 this->m_simThreadMessages.push_back(nm);
             }
         } else {
-            aicslogger::Warn("Websocket message arrived: UNRECOGNIZED of type " + msgType);
+            LOG_F(WARNING,"Websocket message arrived: UNRECOGNIZED of type %i", msgType);
         }
     }
 
@@ -656,7 +652,7 @@ namespace agentsim {
                         } break;
                         }
                     } else {
-                        aicslogger::Warn("Ignoring request to change server mode; other clients are listening");
+                        LOG_F(WARNING, "Ignoring request to change server mode; other clients are listening");
                     }
 
                     if(jsonMsg.isMember("frameNumber"))
@@ -805,7 +801,7 @@ namespace agentsim {
 
         if(simulation.HasFileInCache(fileName))
         {
-            aicslogger::Info("Using previously loaded file");
+            LOG_F(INFO,"Using previously loaded file");
         }
         else {
             // Attempt to download an already processed runtime cache
@@ -826,7 +822,7 @@ namespace agentsim {
 
         // Send Trajectory File Properties
         TrajectoryFileProperties tfp = simulation.GetFileProperties(fileName);
-        aicslogger::Info(tfp.Str());
+        LOG_F(INFO, tfp.Str().c_str());
 
         Json::Value fprops;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
@@ -856,15 +852,14 @@ namespace agentsim {
         }
 
         this->m_fileIoThread = std::thread([&simulation, this] {
-            aicslogger::SetThreadName("File IO");
-            // Load the first hundred simulation frames into a runtime cache
-            aicslogger::Info("Loading trajectory file into runtime cache");
+            loguru::set_thread_name("File IO");
+            LOG_F(INFO,"Loading trajectory file into runtime cache");
             std::size_t fn = 0;
 
             while (!simulation.HasLoadedAllFrames()) {
                 simulation.LoadNextFrame();
             }
-            aicslogger::Info("Finished loading trajectory into runtime cache");
+            LOG_F(INFO, "Finished loading trajectory into runtime cache");
 
             // Save the result so it doesn't need to be calculated again
             if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))

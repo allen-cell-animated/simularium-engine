@@ -3,7 +3,7 @@
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/simpkg/simpkg.h"
 #include "agentsim/aws/aws_util.h"
-#include "agentsim/util/logger.h"
+#include "loguru/loguru.hpp"
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
@@ -20,9 +20,9 @@ bool FindFile(std::string& filePath)
 {
     // Download the file from AWS if it is not present locally
     if (!FileExists(filePath)) {
-        aicslogger::Info(filePath + " doesn't exist locally, checking S3...");
+        LOG_F(INFO, "%s doesn't exist locally, checking S3...", filePath.c_str());
         if (!aics::agentsim::aws_util::Download(filePath, filePath)) {
-            aicslogger::Warn(filePath + " not found on AWS S3");
+            LOG_F(WARNING, "%s not found on AWS S3", filePath.c_str());
             return false;
         }
     }
@@ -31,10 +31,10 @@ bool FindFile(std::string& filePath)
     // H5rd is a library written by the ReaDDy developers to load H5 files
     if (FileExists("/" + filePath)) {
         filePath = "/" + filePath;
-        aicslogger::Info("File name modified to " + filePath);
+        LOG_F(INFO,"File name modified to %s", filePath.c_str());
     } else if (FileExists("./" + filePath)) {
         filePath = "./" + filePath;
-        aicslogger::Info("File name modified to " + filePath);
+        LOG_F(INFO, "File name modified to %s", filePath.c_str());
     }
 
     return true;
@@ -171,7 +171,7 @@ namespace agentsim {
 
             if(simPkg->CanLoadFile(fileName)) {
                 if(!FindFile(filePath)) {
-                    aicslogger::Error(fileName + " | File not found");
+                    LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;
                 }
 
@@ -182,7 +182,7 @@ namespace agentsim {
             }
         }
 
-        aicslogger::Warn("No Sim PKG can load " + fileName);
+        LOG_F(WARNING,"No Sim PKG can load %s", fileName.c_str());
         return false;
     }
 
@@ -318,7 +318,7 @@ namespace agentsim {
         {
             if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
             {
-                aicslogger::Error(
+                LOG_F(ERROR,
                     "Both the cached time and the live-calculated time are zero, a dev error may have been made"
                 );
                 return frameNumber; // this will allow client to function properly

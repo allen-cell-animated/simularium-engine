@@ -1,5 +1,5 @@
 #include "agentsim/util/math_util.h"
-#include "agentsim/util/logger.h"
+#include "loguru/loguru.hpp"
 #include <iostream>
 
 namespace aics {
@@ -68,7 +68,7 @@ namespace mathutil {
         {
             if (vector[2] == 0)
             {
-                aicslogger::Error("Failed to get perpendicular vector to zero vector!");
+                LOG_F(ERROR, "Failed to get perpendicular vector to zero vector!");
                 return Eigen::Vector3d(0, 0, 0);
             }
             return Eigen::Vector3d(0, 1, 0);
