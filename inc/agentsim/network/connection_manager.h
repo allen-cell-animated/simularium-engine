@@ -156,6 +156,8 @@ namespace agentsim {
             return std::getenv("TLS_KEY_PATH") ? std::getenv("TLS_KEY_PATH") : "";
         }
 
+        void LogClientEvent(std::string uid, std::string msg);
+
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
         std::unordered_map<std::string, std::size_t> m_missedHeartbeats;
