@@ -1,5 +1,6 @@
 add_library("cytosimPKG" STATIC
     "${DEPENDENCY_DIRECTORY}/cytosim/src/play/frame_reader.cc"
+    "agent.cpp"
     "cytosimpkg.cpp"
 )
 

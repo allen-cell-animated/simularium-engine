@@ -31,6 +31,7 @@ set(TEST_LIBS
     Threads::Threads
     "gtest_main"
     "gtest"
+    "${CYTOSIM_LIBRARIES}"
 )
 
 foreach(TEST_NAME ${TEST_LIST})
