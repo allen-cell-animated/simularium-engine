@@ -112,6 +112,7 @@ namespace agentsim {
     void ConnectionManager::ListenAsync()
     {
         this->m_listeningThread = std::thread([&] {
+            aicslogger::SetThreadName("Websocket");
             this->m_server.set_reuse_addr(true);
             this->m_server.set_message_handler(
                 std::bind(
@@ -154,6 +155,7 @@ namespace agentsim {
         float& timeStep)
     {
         this->m_simThread = std::thread([&isRunning, &simulation, &timeStep, this] {
+            aicslogger::SetThreadName("Simulation");
             while (isRunning) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(this->kServerTickIntervalMilliSeconds));
 
@@ -181,6 +183,7 @@ namespace agentsim {
     void ConnectionManager::StartHeartbeatAsync(std::atomic<bool>& isRunning)
     {
         this->m_heartbeatThread = std::thread([&isRunning, this] {
+            aicslogger::SetThreadName("Heartbeat");
             while (isRunning) {
                 std::this_thread::sleep_for(std::chrono::seconds(this->kHeartBeatIntervalSeconds));
 
@@ -853,6 +856,7 @@ namespace agentsim {
         }
 
         this->m_fileIoThread = std::thread([&simulation, this] {
+            aicslogger::SetThreadName("File IO");
             // Load the first hundred simulation frames into a runtime cache
             aicslogger::Info("Loading trajectory file into runtime cache");
             std::size_t fn = 0;

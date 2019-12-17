@@ -10,6 +10,8 @@ namespace logger {
     void Error(std::string msg);
     void Warn(std::string msg);
     void Info(std::string msg);
+
+    void SetThreadName(std::string name);
 } // namespace logger
 } // namespace agentsim
 } // namespace aics

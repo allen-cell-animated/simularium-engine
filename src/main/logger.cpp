@@ -22,6 +22,10 @@ namespace logger {
         LOG_F(INFO, msg.c_str());
     }
 
+    void SetThreadName(std::string name) {
+        loguru::set_thread_name(name.c_str());
+    }
+
 } // namespace logger
 } // namespace agentsim
 } // namespace aics
