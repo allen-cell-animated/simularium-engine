@@ -12,8 +12,6 @@ inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
     return !t.owner_before(u) && !u.owner_before(t);
 }
 
-namespace aicslogger = aics::agentsim::logger;
-
 namespace aics {
 namespace agentsim {
 

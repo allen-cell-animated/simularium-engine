@@ -14,4 +14,6 @@ namespace logger {
 } // namespace agentsim
 } // namespace aics
 
+namespace aicslogger = aics::agentsim::logger;
+
 #endif // AICS_LOGGER_H
