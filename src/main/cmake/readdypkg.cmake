@@ -1,6 +1,7 @@
 add_library("readdyPKG" STATIC
     "math_util.cpp"
     "agent.cpp"
+    "logger.cpp"
     "readdypkg.cpp"
 )
 

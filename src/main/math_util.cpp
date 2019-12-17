@@ -1,11 +1,12 @@
 #include "agentsim/util/math_util.h"
+#include "agentsim/util/logger.h"
 #include <iostream>
 
 namespace aics {
 namespace agentsim {
 namespace mathutil {
-    
-    Eigen::Matrix3d eulerToMatrix( 
+
+    Eigen::Matrix3d eulerToMatrix(
         Eigen::Vector3d rotation)
     {
         Eigen::AngleAxisd rollAngle(rotation[0], Eigen::Vector3d::UnitX());
@@ -15,9 +16,9 @@ namespace mathutil {
         Eigen::Quaterniond q = yawAngle * pitchAngle * rollAngle;
         return q.matrix();
     }
-    
+
     /**
-    *	given three positions (p0, p1, p2), construct an orthonormal rotation basis 
+    *	given three positions (p0, p1, p2), construct an orthonormal rotation basis
     *   for the particle at p1 so that:
     *      - X basis vector points to p2
     *      - Y basis vector points to p0
@@ -30,12 +31,12 @@ namespace mathutil {
         auto v2 = (basisPositions[0] - basisPositions[1]).normalized();
         v1 = (v1 - v1.dot(v2) * v2).normalized();
         auto v3 = v1.cross(v2);
-        
+
         Eigen::Matrix3d m;
         m << v1[0], v1[1], v1[2],
              v2[0], v2[1], v2[2],
              v3[0], v3[1], v3[2];
-        
+
         return m;
     }
 
@@ -67,7 +68,7 @@ namespace mathutil {
         {
             if (vector[2] == 0)
             {
-                std::cout << "Failed to get perpendicular vector to zero vector! " << std::endl;
+                aicslogger::Error("Failed to get perpendicular vector to zero vector!");
                 return Eigen::Vector3d(0, 0, 0);
             }
             return Eigen::Vector3d(0, 1, 0);
