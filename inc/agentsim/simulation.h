@@ -131,7 +131,7 @@ namespace agentsim {
 	*
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
 	*/
-        void LoadTrajectoryFile(
+        bool LoadTrajectoryFile(
             std::string fileName
         );
 

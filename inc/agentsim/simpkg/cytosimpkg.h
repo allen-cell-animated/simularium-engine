@@ -36,6 +36,8 @@ namespace agentsim {
         ) override {};
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override { return 0.0; };
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override { return 0; };
+        virtual bool CanLoadFile(std::string filePath) override
+            { return filePath.substr(filePath.find_last_of(".") + 1) == "cmo"; }
 
     private:
         bool m_hasAlreadyRun = false;
