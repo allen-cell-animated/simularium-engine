@@ -121,7 +121,7 @@ namespace agentsim {
         std::string destination = this->GetFilePath(identifier);
         std::string cacheFilePath = awsFilePath + "_cache";
         if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
-            LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier);
+            LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
             return false;
         }
 
@@ -140,7 +140,7 @@ namespace agentsim {
     {
         std::string destination = awsFilePath + "_cache";
         std::string source = this->GetFilePath(identifier);
-        LOG_F(INFO, "Uploading cache file for %s to S3", identifier);
+        LOG_F(INFO, "Uploading cache file for %s to S3", identifier.c_str());
         if(!aics::agentsim::aws_util::Upload(source, destination)) {
             return false;
         }
@@ -168,7 +168,7 @@ namespace agentsim {
         propsFile << fprops;
         propsFile.close();
 
-        LOG_F(INFO, "Uploading info file for %s to S3", identifier);
+        LOG_F(INFO, "Uploading info file for %s to S3", identifier.c_str());
         if(!aics::agentsim::aws_util::Upload(filePropsPath, filePropsDest))
         {
             return false;

@@ -822,7 +822,7 @@ namespace agentsim {
 
         // Send Trajectory File Properties
         TrajectoryFileProperties tfp = simulation.GetFileProperties(fileName);
-        LOG_F(INFO, tfp.Str().c_str());
+        LOG_F(INFO, "%s", tfp.Str().c_str());
 
         Json::Value fprops;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
