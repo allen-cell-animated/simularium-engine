@@ -449,7 +449,7 @@ void read_h5file(
       topGroup.close();
       hasTopologies = true;
     } catch(...) {
-        LOG_F(ERROR, "No Topology observable information found in %s", file_name);
+        LOG_F(ERROR, "No Topology observable information found in %s", file_name.c_str());
     }
 
     if(hasTopologies)
@@ -1080,7 +1080,7 @@ static void calculateOrientations(
                     if (verboseOrientation)
                     {
                         LOG_F(INFO,"%zu: Use default orientation for %s %zu",
-                            frameIndex, currentParticle.type, currentParticle.id
+                            frameIndex, currentParticle.type.c_str(), currentParticle.id
                         );
                     }
                     orientationFrame.push_back(default_orientation[particleMonomerType.name]);
@@ -1090,7 +1090,7 @@ static void calculateOrientations(
                 if (verboseOrientation)
                 {
                     LOG_F(INFO,"%zu: Use random orientation for %s %zu",
-                        frameIndex, currentParticle.type, currentParticle.id
+                        frameIndex, currentParticle.type.c_str(), currentParticle.id
                     );
                 }
                 orientationFrame.push_back(aics::agentsim::mathutil::getRandomOrientation());
@@ -1103,7 +1103,7 @@ static void calculateOrientations(
                 if (verboseOrientation)
                 {
                     LOG_F(INFO,"%zu: Use one neighbor orientation of %s %zu",
-                        frameIndex, currentParticle.type, currentParticle.id
+                        frameIndex, currentParticle.type.c_str(), currentParticle.id
                     );
                 }
                 orientationFrame.push_back(aics::agentsim::mathutil::getErrorOrientation(0));
@@ -1125,7 +1125,7 @@ static void calculateOrientations(
             if (verboseOrientation)
             {
                 LOG_F(INFO,"%zu: Successfully oriented %s %zu",
-                    frameIndex, currentParticle.type, currentParticle.id
+                    frameIndex, currentParticle.type.c_str(), currentParticle.id
                 );
             }
         }
