@@ -323,14 +323,14 @@ namespace agentsim {
             currentFrame >= numberOfLoadedFrames &&
             currentFrame < totalNumberOfFrames)
         {
-            this->LogClientEvent(connectionUID, "Waiting for frame " + currentFrame);
+            this->LogClientEvent(connectionUID, "Waiting for frame " + std::to_string(currentFrame));
             this->SetClientState(connectionUID, ClientPlayState::Waiting);
         }
 
         // If the waited for frame has been loaded
         if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
         {
-            this->LogClientEvent(connectionUID, "Done waiting for frame " + currentFrame);
+            this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
             this->SetClientState(connectionUID, ClientPlayState::Playing);
         }
     }
@@ -766,7 +766,7 @@ namespace agentsim {
                         netState.sim_identifier, frameNumber
                     );
 
-                    this->LogClientEvent(senderUid, "Set to frame " + frameNumber);
+                    this->LogClientEvent(senderUid, "Set to frame " + std::to_string(frameNumber));
                     this->SetClientFrame(senderUid, frameNumber);
                     this->SetClientState(senderUid, ClientPlayState::Paused);
                     this->SendDataToClient(simulation, senderUid, frameNumber, true);
