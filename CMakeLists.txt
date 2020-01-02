@@ -64,7 +64,7 @@ target_link_libraries(${SERVER_PROGRAM}
 
 set(CLIENT_PROGRAM_SOURCES
     "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
-    "${SOURCE_DIRECTORY}/main/jsoncpp.cpp"
+    "${EXTERNAL_DIRECTORY}/json/jsoncpp.cpp"
     "${SOURCE_DIRECTORY}/main/cli_client.cpp"
 )
 add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})

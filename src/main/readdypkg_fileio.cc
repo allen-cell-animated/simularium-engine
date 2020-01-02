@@ -1,5 +1,6 @@
 #include "agentsim/util/math_util.h"
 #include "loguru/loguru.hpp"
+#include <json/json.h>
 
 #include <csignal>
 #include <math.h>
@@ -164,10 +165,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    TimeTrajectoryH5Info& trajectoryInfo,
-    TimeTopologyH5Info& topologyInfo,
-    RotationH5Info& rotationInfo,
-    std::unordered_map<std::size_t, std::string>& typeMapping,
+    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& rfi,
     IdParticleMapping& particleLookup
 );
 
@@ -349,10 +347,7 @@ namespace agentsim {
             frame_no = 0;
 
             read_h5file(filePath,
-                this->m_fileInfo->trajectoryInfo,
-                this->m_fileInfo->topologyInfo,
-                this->m_fileInfo->rotationInfo,
-                this->m_fileInfo->typeMapping,
+                this->m_fileInfo,
                 ID_PARTICLE_CACHE
             );
             this->m_hasLoadedRunFile = true;
@@ -422,15 +417,36 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    TimeTrajectoryH5Info& trajectoryInfo,
-    TimeTopologyH5Info& topologyInfo,
-    RotationH5Info& rotationInfo,
-    std::unordered_map<std::size_t, std::string>& typeMapping,
+    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& rfi,
     IdParticleMapping& particleLookup
     )
 {
+    TimeTrajectoryH5Info& trajectoryInfo = rfi->trajectoryInfo;
+    TimeTopologyH5Info& topologyInfo = rfi->topologyInfo;
+    RotationH5Info& rotationInfo = rfi->rotationInfo;
+    std::unordered_map<std::size_t, std::string>& typeMapping = rfi->typeMapping;
+
     // open the output file
     auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
+
+    // read box extents
+    try {
+        auto config = file->getSubgroup("readdy/config");
+        char test[512];
+        H5LTread_dataset_string(config.id(), "general", test);
+
+        Json::Value jsonMsg;
+        Json::CharReaderBuilder jsonReadBuilder;
+        std::unique_ptr<Json::CharReader> const jsonReader(jsonReadBuilder.newCharReader());
+        std::string errs;
+        std::string message = test;
+
+        jsonReader->parse(message.c_str(), message.c_str() + message.length(), &jsonMsg, &errs);
+        std::cout << "JSON Config: " << jsonMsg << std::endl;
+    } catch(...) {
+        LOG_F(ERROR,"Config info not found in %s", file_name.c_str());
+        return;
+    }
 
     // read back trajectory
     try {
