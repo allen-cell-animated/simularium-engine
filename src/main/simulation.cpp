@@ -3,6 +3,7 @@
 #include "agentsim/network/net_message_ids.h"
 #include "agentsim/simpkg/simpkg.h"
 #include "agentsim/aws/aws_util.h"
+#include "loguru/loguru.hpp"
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
@@ -19,9 +20,9 @@ bool FindFile(std::string& filePath)
 {
     // Download the file from AWS if it is not present locally
     if (!FileExists(filePath)) {
-        std::cout << filePath << " doesn't exist locally, checking S3..." << std::endl;
+        LOG_F(INFO, "%s doesn't exist locally, checking S3...", filePath.c_str());
         if (!aics::agentsim::aws_util::Download(filePath, filePath)) {
-            std::cout << filePath << " not found on AWS S3" << std::endl;
+            LOG_F(WARNING, "%s not found on AWS S3", filePath.c_str());
             return false;
         }
     }
@@ -30,10 +31,10 @@ bool FindFile(std::string& filePath)
     // H5rd is a library written by the ReaDDy developers to load H5 files
     if (FileExists("/" + filePath)) {
         filePath = "/" + filePath;
-        std::cout << "file name modified to " << filePath << std::endl;
+        LOG_F(INFO,"File name modified to %s", filePath.c_str());
     } else if (FileExists("./" + filePath)) {
         filePath = "./" + filePath;
-        std::cout << "file name modified to " << filePath << std::endl;
+        LOG_F(INFO, "File name modified to %s", filePath.c_str());
     }
 
     return true;
@@ -170,7 +171,7 @@ namespace agentsim {
 
             if(simPkg->CanLoadFile(fileName)) {
                 if(!FindFile(filePath)) {
-                    std::cout << "File not found" << std::endl;
+                    LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;
                 }
 
@@ -181,7 +182,7 @@ namespace agentsim {
             }
         }
 
-        std::cout << "No sim pkg found that can load " << fileName << std::endl;
+        LOG_F(WARNING,"No Sim PKG can load %s", fileName.c_str());
         return false;
     }
 
@@ -317,8 +318,9 @@ namespace agentsim {
         {
             if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
             {
-                std::cout << "Both the cached time and the live-calculated time are zero, a " <<
-                "dev error may have been made" << std::endl;
+                LOG_F(ERROR,
+                    "Both the cached time and the live-calculated time are zero, a dev error may have been made"
+                );
                 return frameNumber; // this will allow client to function properly
                 // a client may reasonably assume that frames are sequential
             }

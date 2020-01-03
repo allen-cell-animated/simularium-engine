@@ -1,5 +1,6 @@
 #include "agentsim/simpkg/cytosimpkg.h"
 #include "agentsim/agents/agent.h"
+#include "loguru/loguru.hpp"
 
 #include "exceptions.h"
 #include "frame_reader.h"
@@ -41,14 +42,14 @@ namespace agentsim {
         if (this->m_hasAlreadySetup)
             return;
 
-        std::cout << "CYTOSIM SETUP STARTED" << endl;
+        LOG_F(INFO,"Cytosim PKG Setup started");
 
         // Register a function to be called for Floating point exceptions:
         if (signal(SIGINT, killed_handler) == SIG_ERR)
-            std::cerr << "Could not register SIGINT handler\n";
+            LOG_F(ERROR,"Could not register SIGINT handler");
 
         if (signal(SIGTERM, killed_handler) == SIG_ERR)
-            std::cerr << "Could not register SIGTERM handler\n";
+            LOG_F(ERROR,"Could not register SIGTERM handler");
 
         glos.clear();
         glos.set_values("config", input_file);
@@ -57,17 +58,17 @@ namespace agentsim {
             simul.initialize(glos);
             Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
         } catch (Exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+            LOG_F(FATAL,e.what());
             return;
         } catch (...) {
-            std::cerr << "Error: an unknown exception occured during initialization" << std::endl;
+            LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
             return;
         }
 
         glos.warnings(std::cerr);
 
         this->m_hasAlreadySetup = true;
-        std::cout << "CYTOSIM SETUP ENDED" << endl;
+        LOG_F(INFO,"Cytosim PKG Setup ended");
     }
 
     void CytosimPkg::Shutdown()
@@ -123,23 +124,20 @@ namespace agentsim {
         if (this->m_hasAlreadyRun)
             return;
 
-        std::cout << "CYTOSIM RUN STARTED" << endl;
-        std::cout << "..." << endl;
+        LOG_F(INFO,"Cytosim PKG Run Started");
         try {
             Parser(simul, 0, 0, 0, 1, 1).readConfig(input_file);
         } catch (Exception& e) {
-            std::cerr << std::endl
-                      << "Error: " << e.what() << std::endl;
+            LOG_F(FATAL,e.what());
             return;
         } catch (...) {
-            std::cerr << std::endl
-                      << "Error: an unknown exception occured" << std::endl;
+            LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
             return;
         }
 
         Cytosim::close();
 
-        std::cout << "CYTOSIM RUN ENDED" << endl;
+        LOG_F(INFO,"Cytosim PKG Run ended");
         this->m_hasAlreadyRun = true;
     }
 
@@ -172,7 +170,7 @@ namespace agentsim {
         if (0 == reader.readNextFrame(simul)) {
             GetFiberPositionsFromFrame(agents);
         } else {
-            std::cout << "Finished Streaming Cytosim Run from File" << std::endl;
+            LOG_F(INFO,"Finished Streaming Cytosim Run from File");
             this->m_hasFinishedStreaming = true;
         }
     }

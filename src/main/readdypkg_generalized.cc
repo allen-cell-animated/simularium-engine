@@ -1,5 +1,6 @@
 #include "agentsim/agents/agent.h"
 #include "agentsim/simpkg/readdypkg.h"
+#include "loguru/loguru.hpp"
 #include <algorithm>
 #include <array>
 #include <csignal>
@@ -326,7 +327,7 @@ namespace agentsim {
             unsigned n_iterations = timeStep / max_time_step;
 
             for (unsigned i = 0; i < n_iterations; ++i) {
-                std::cout << "Running iteration " << i << " of " << n_iterations << std::endl;
+                LOG_F(INFO, "Running iteration %zu of %zu", i, n_iterations);
                 this->m_timeStepCount++;
                 loop.runIntegrator(); // propagate particles
                 loop.runUpdateNeighborList(); // neighbor list update

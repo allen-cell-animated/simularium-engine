@@ -1,5 +1,6 @@
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/readdypkg.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/cytosimpkg.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/loguru.cmake)
 
 set(SOURCES
 "jsoncpp.cpp"
@@ -34,4 +35,5 @@ target_link_libraries(${TARGET} PRIVATE
 "aws-cpp-sdk-core"
 "${OPENSSL_LIBRARIES}"
 "${PLATFORM_LIBRARIES}"
+"loguru"
 )
