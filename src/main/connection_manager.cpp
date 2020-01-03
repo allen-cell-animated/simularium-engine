@@ -41,7 +41,7 @@ namespace agentsim {
     }
 
     void ConnectionManager::LogClientEvent(std::string uid, std::string msg) {
-        LOG_F(INFO, "[%s]%s", uid.c_str(), msg.c_str());
+        LOG_F(INFO, "[%s] %s", uid.c_str(), msg.c_str());
     }
 
     context_ptr ConnectionManager::OnTLSConnect(
@@ -313,9 +313,13 @@ namespace agentsim {
         // Invalid frame, set to last frame
         if(currentFrame >= totalNumberOfFrames)
         {
-            this->LogClientEvent(connectionUID, "Finished Streaming");
-            this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
-            this->SetClientState(connectionUID, ClientPlayState::Finished);
+            if(netState.sim_identifier == "live") {
+                this->SetClientState(connectionUID, ClientPlayState::Waiting);
+            } else {
+                this->LogClientEvent(connectionUID, "Finished Streaming");
+                this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
+                this->SetClientState(connectionUID, ClientPlayState::Finished);
+            }
         }
 
         // Frame is valid but not loaded yet
@@ -330,7 +334,9 @@ namespace agentsim {
         // If the waited for frame has been loaded
         if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
         {
-            this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
+            if(netState.sim_identifier != "live") {
+                this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
+            }
             this->SetClientState(connectionUID, ClientPlayState::Playing);
         }
     }
@@ -623,6 +629,7 @@ namespace agentsim {
                         switch (runMode) {
                         case SimulationMode::id_live_simulation: {
                             this->LogClientEvent(senderUid, "Running Live Simulation");
+                            this->SetClientSimId(senderUid, "live");
                             simulation.SetPlaybackMode(runMode);
                             simulation.SetSimId("live");
                             simulation.Reset();
