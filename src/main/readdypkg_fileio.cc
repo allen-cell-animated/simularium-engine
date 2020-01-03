@@ -446,8 +446,7 @@ void read_h5file(
         std::string message = test;
 
         jsonReader->parse(message.c_str(), message.c_str() + message.length(), &jsonMsg, &errs);
-<<<<<<< HEAD
-        
+
         const Json::Value& boxSize = jsonMsg["box_size"];
         std::vector<float> boxSizeVec;
         for (Json::Value::const_iterator it = boxSize.begin(); it != boxSize.end(); ++it) {
@@ -462,9 +461,6 @@ void read_h5file(
 
         rfi->configInfo.kbt = jsonMsg["kbt"].asFloat();
         rfi->configInfo.boxVolume = jsonMsg["box_volume"].asFloat();
-=======
-        std::cout << "JSON Config: " << jsonMsg << std::endl;
->>>>>>> parse ReaDDy config info from JSON
     } catch(...) {
         LOG_F(ERROR,"Config info not found in %s", file_name.c_str());
         return;
