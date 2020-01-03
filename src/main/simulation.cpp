@@ -104,7 +104,12 @@ namespace agentsim {
             }
         }
 
-        this->m_cache.ClearCache(this->m_simIdentifier);
+        // Allow trajectory file cache to persist for efficiency
+        //  Assumption: live and pre-run have no use for outdated cache files
+        if(this->m_playbackMode != SimulationMode::id_traj_file_playback)
+        {
+            this->m_cache.ClearCache(this->m_simIdentifier);
+        }
     }
 
     void Simulation::UpdateParameter(std::string name, float value)

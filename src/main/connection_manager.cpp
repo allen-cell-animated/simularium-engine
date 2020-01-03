@@ -810,7 +810,7 @@ namespace agentsim {
 
         if(simulation.HasFileInCache(fileName))
         {
-            LOG_F(INFO,"Using previously loaded file");
+            LOG_F(INFO,"Using previously loaded file for trajectory %s", fileName.c_str());
         }
         else {
             // Attempt to download an already processed runtime cache
