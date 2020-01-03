@@ -652,10 +652,12 @@ namespace agentsim {
                             simulation.SetSimId("prerun");
                         } break;
                         case SimulationMode::id_traj_file_playback: {
+                            this->m_fileMutex.lock();
                             simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             this->LogClientEvent(senderUid, "Playing back trajectory file");
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
+                            this->m_fileMutex.unlock();
                         } break;
                         }
                     } else {
@@ -862,6 +864,7 @@ namespace agentsim {
         }
 
         this->m_fileIoThread = std::thread([&simulation, this] {
+            this->m_fileMutex.lock();
             loguru::set_thread_name("File IO");
             LOG_F(INFO,"Loading trajectory file into runtime cache");
             std::size_t fn = 0;
@@ -876,6 +879,7 @@ namespace agentsim {
             {
                 simulation.UploadRuntimeCache();
             }
+            this->m_fileMutex.unlock();
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));

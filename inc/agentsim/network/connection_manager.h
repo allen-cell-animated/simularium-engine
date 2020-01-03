@@ -8,6 +8,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -188,6 +189,7 @@ namespace agentsim {
         std::thread m_heartbeatThread;
         std::thread m_simThread;
         std::thread m_fileIoThread;
+        std::mutex m_fileMutex;
     };
 
 } // namespace agentsim
