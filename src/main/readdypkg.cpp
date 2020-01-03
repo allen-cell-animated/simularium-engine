@@ -120,11 +120,19 @@ using OrientationDataMap = std::unordered_map<std::string,std::vector<std::pair<
 namespace aics {
 namespace agentsim {
 
+    struct ReaDDyConfigInfo {
+        float boxX, boxY, boxZ; // box size
+        float boxVolume;
+        float kbt;
+        bool pbcX, pbcY, pbcZ; // periodic boundary condition
+    };
+
     struct ReaDDyFileInfo {
         TimeTrajectoryH5Info trajectoryInfo;
         TimeTopologyH5Info topologyInfo;
         std::unordered_map<std::size_t, std::string> typeMapping;
         RotationH5Info rotationInfo;
+        ReaDDyConfigInfo configInfo;
     };
 
     ReaDDyPkg::ReaDDyPkg() {

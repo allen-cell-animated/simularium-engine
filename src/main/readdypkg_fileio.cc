@@ -1,4 +1,5 @@
 #include "agentsim/util/math_util.h"
+#define LOGURU_WITH_STREAMS 1
 #include "loguru/loguru.hpp"
 #include <json/json.h>
 
@@ -360,6 +361,9 @@ namespace agentsim {
             fileProps.numberOfFrames = traj.size();
             fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
             fileProps.typeMapping = this->m_fileInfo->typeMapping;
+            fileProps.boxX = this->m_fileInfo->configInfo.boxX;
+            fileProps.boxY = this->m_fileInfo->configInfo.boxY;
+            fileProps.boxZ = this->m_fileInfo->configInfo.boxZ;
         }
     }
 
@@ -442,7 +446,21 @@ void read_h5file(
         std::string message = test;
 
         jsonReader->parse(message.c_str(), message.c_str() + message.length(), &jsonMsg, &errs);
-        std::cout << "JSON Config: " << jsonMsg << std::endl;
+        
+        const Json::Value& boxSize = jsonMsg["box_size"];
+        std::vector<float> boxSizeVec;
+        for (Json::Value::const_iterator it = boxSize.begin(); it != boxSize.end(); ++it) {
+            boxSizeVec.push_back(it->asFloat());
+        }
+
+        if(boxSizeVec.size() >= 3) {
+            rfi->configInfo.boxX = boxSizeVec[0];
+            rfi->configInfo.boxY = boxSizeVec[1];
+            rfi->configInfo.boxZ = boxSizeVec[2];
+        }
+
+        rfi->configInfo.kbt = jsonMsg["kbt"].asFloat();
+        rfi->configInfo.boxVolume = jsonMsg["box_volume"].asFloat();
     } catch(...) {
         LOG_F(ERROR,"Config info not found in %s", file_name.c_str());
         return;
