@@ -810,7 +810,7 @@ namespace agentsim {
 
         if(simulation.HasFileInCache(fileName))
         {
-            LOG_F(INFO,"Using previously loaded file for trajectory %s", fileName.c_str());
+            LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
         }
         else {
             // Attempt to download an already processed runtime cache
@@ -866,13 +866,15 @@ namespace agentsim {
         this->m_fileIoThread = std::thread([&simulation, this] {
             this->m_fileMutex.lock();
             loguru::set_thread_name("File IO");
-            LOG_F(INFO,"Loading trajectory file into runtime cache");
+            std::string fileName = simulation.GetSimId();
+
+            LOG_F(INFO,"[%s] Loading trajectory file into runtime cache", fileName.c_str());
             std::size_t fn = 0;
 
             while (!simulation.HasLoadedAllFrames()) {
                 simulation.LoadNextFrame();
             }
-            LOG_F(INFO, "Finished loading trajectory into runtime cache");
+            LOG_F(INFO, "[%s] Finished loading trajectory into runtime cache", fileName.c_str());
 
             // Save the result so it doesn't need to be calculated again
             if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
