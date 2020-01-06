@@ -654,7 +654,7 @@ namespace agentsim {
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
-                            this->LogClientEvent(senderUid, "Playing back trajectory file");
+                            this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
                         } break;
                         }
@@ -814,6 +814,7 @@ namespace agentsim {
         if(simulation.HasFileInCache(fileName))
         {
             LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
+            this->SendDataToClient(simulation, connectionUID, 0, true);
         }
         else {
             // Attempt to download an already processed runtime cache
