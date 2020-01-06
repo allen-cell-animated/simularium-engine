@@ -652,12 +652,10 @@ namespace agentsim {
                             simulation.SetSimId("prerun");
                         } break;
                         case SimulationMode::id_traj_file_playback: {
-                            this->m_fileMutex.lock();
                             simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             this->LogClientEvent(senderUid, "Playing back trajectory file");
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
-                            this->m_fileMutex.unlock();
                         } break;
                         }
                     } else {
@@ -799,8 +797,13 @@ namespace agentsim {
         std::string fileName
     )
     {
+        this->m_fileMutex.lock();
+        LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
+
         if (fileName.empty()) {
             this->LogClientEvent(connectionUID, "Trajectory file not specified, ignoring request");
+            this->m_fileMutex.unlock();
+            LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
             return;
         }
 
@@ -818,13 +821,21 @@ namespace agentsim {
                 && simulation.DownloadRuntimeCache(fileName))
             {
                 simulation.PreprocessRuntimeCache(fileName);
+                this->SendDataToClient(simulation, connectionUID, 0, true);
             }
             else {
                 simulation.SetPlaybackMode(id_traj_file_playback);
                 simulation.Reset();
                 if(simulation.LoadTrajectoryFile(fileName))
                 {
+                    this->m_fileMutex.unlock();
+                    LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
+
                     this->SetupRuntimeCacheAsync(simulation, 500);
+                    this->SendDataToClient(simulation, connectionUID, 0, true);
+
+                    this->m_fileMutex.lock();
+                    LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
                 }
             }
         }
@@ -852,7 +863,8 @@ namespace agentsim {
         fprops["boxSizeZ"] = tfp.boxZ;
 
         this->SendWebsocketMessage(connectionUID, fprops);
-        this->SendDataToClient(simulation, connectionUID, 0, true);
+        this->m_fileMutex.unlock();
+        LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
     }
 
     void ConnectionManager::SetupRuntimeCacheAsync(
@@ -864,9 +876,11 @@ namespace agentsim {
         }
 
         this->m_fileIoThread = std::thread([&simulation, this] {
-            this->m_fileMutex.lock();
             loguru::set_thread_name("File IO");
             std::string fileName = simulation.GetSimId();
+
+            this->m_fileMutex.lock();
+            LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
 
             LOG_F(INFO,"[%s] Loading trajectory file into runtime cache", fileName.c_str());
             std::size_t fn = 0;
@@ -875,13 +889,14 @@ namespace agentsim {
                 simulation.LoadNextFrame();
             }
             LOG_F(INFO, "[%s] Finished loading trajectory into runtime cache", fileName.c_str());
+            this->m_fileMutex.unlock();
+            LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
 
             // Save the result so it doesn't need to be calculated again
             if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
             {
                 simulation.UploadRuntimeCache();
             }
-            this->m_fileMutex.unlock();
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));
