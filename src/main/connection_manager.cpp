@@ -838,6 +838,9 @@ namespace agentsim {
             typeMapping[id] = name;
         }
         fprops["typeMapping"] = typeMapping;
+        fprops["boxSizeX"] = tfp.boxX;
+        fprops["boxSizeY"] = tfp.boxY;
+        fprops["boxSizeZ"] = tfp.boxZ;
 
         this->SendWebsocketMessage(connectionUID, fprops);
         this->SendDataToClient(simulation, connectionUID, 0, true);

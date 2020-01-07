@@ -12,11 +12,15 @@ struct TrajectoryFileProperties{
     std::size_t numberOfFrames = 0;
     double timeStepSize = 100;
     std::unordered_map<std::size_t, std::string> typeMapping;
+    float boxX, boxY, boxZ;
 
     std::string Str() {
         return "TrajectoryFileProperties | File Name " + this->fileName +
             " | Number of Frames " + std::to_string(this->numberOfFrames) +
-            " | TimeStep Size " + std::to_string(this->timeStepSize);
+            " | TimeStep Size " + std::to_string(this->timeStepSize) +
+            " | Box Size [" + std::to_string(boxX) + "," +
+            std::to_string(boxY) + "," +
+            std::to_string(boxZ) + "]";
     }
 };
 
