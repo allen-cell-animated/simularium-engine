@@ -12,6 +12,8 @@ inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
     return !t.owner_before(u) && !u.owner_before(t);
 }
 
+static const std::string LIVE_SIM_IDENTIFIER = "live";
+
 namespace aics {
 namespace agentsim {
 
@@ -313,7 +315,7 @@ namespace agentsim {
         // Invalid frame, set to last frame
         if(currentFrame >= totalNumberOfFrames)
         {
-            if(netState.sim_identifier == "live") {
+            if(netState.sim_identifier == LIVE_SIM_IDENTIFIER) {
                 this->SetClientState(connectionUID, ClientPlayState::Waiting);
             } else {
                 this->LogClientEvent(connectionUID, "Finished Streaming");
@@ -334,7 +336,7 @@ namespace agentsim {
         // If the waited for frame has been loaded
         if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
         {
-            if(netState.sim_identifier != "live") {
+            if(netState.sim_identifier != LIVE_SIM_IDENTIFIER) {
                 this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
             }
             this->SetClientState(connectionUID, ClientPlayState::Playing);
@@ -629,9 +631,9 @@ namespace agentsim {
                         switch (runMode) {
                         case SimulationMode::id_live_simulation: {
                             this->LogClientEvent(senderUid, "Running Live Simulation");
-                            this->SetClientSimId(senderUid, "live");
+                            this->SetClientSimId(senderUid, LIVE_SIM_IDENTIFIER);
                             simulation.SetPlaybackMode(runMode);
-                            simulation.SetSimId("live");
+                            simulation.SetSimId(LIVE_SIM_IDENTIFIER);
                             simulation.Reset();
                         } break;
                         case SimulationMode::id_pre_run_simulation: {
