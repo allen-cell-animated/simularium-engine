@@ -123,7 +123,7 @@ namespace agentsim {
     struct ReaDDyConfigInfo {
         float boxX, boxY, boxZ; // box size
         float boxVolume;
-        float kbt;
+        float kbt; // Boltzmann's constant * Temperature; a measure of kinetic energy used by ReaDDy
         bool pbcX, pbcY, pbcZ; // periodic boundary condition
     };
 
