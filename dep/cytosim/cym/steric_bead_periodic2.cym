@@ -1,7 +1,7 @@
 
 
 
-set simul bead 
+set simul system
 {
     steric = 1, 500
     
@@ -9,28 +9,31 @@ set simul bead
     time_step = 0.001
     viscosity = 0.1
     precondition = 0
-    display = ( tiled=1 )
+    display = ( tile=1 )
 }
 
 set space cell
 {
-    geometry = ( periodic 2.5 3 4 )
+    shape = periodic
 }
 
-new space cell
-    
+new cell
+{
+    length = 5, 6, 8
+}
+
 set bead balls
 {
     steric = 1
     display = ( coloring=1; style=5 )
 }
 
-new 12 bead balls
+new 12 balls
 {
     radius = 1
 }
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 10

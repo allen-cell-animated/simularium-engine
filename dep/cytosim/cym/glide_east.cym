@@ -4,18 +4,22 @@
 
 set space cell
 {
-    geometry = ( periodic 5 5 )
+    shape = periodic
 }
 
-new space cell
-
-set simul GA
+new cell
 {
+    length = 10, 10, 2
+}
+
+set simul system
+{
+    dim = 2
     viscosity = 0.025
     time_step = 0.005
 %    random_seed = 87 
     display = {
-        tiled = 1, 1;
+        tile = 1, 1;
         zoom = 0.75;
         style = 2;
         delay = 10;
@@ -40,7 +44,7 @@ set hand kinesin
     stall_force = 6
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     display = {
         color = 0xE69F00FF;
         size = 5
@@ -56,7 +60,7 @@ set hand anti_kinesin
     stall_force = 6
     
     activity = move
-    max_speed = -1.5
+    unloaded_speed = -1.5
     display = {
         size = 5
         color = 0x0072B2FF;
@@ -77,7 +81,7 @@ set single graftedA
     activity = fixed
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 10
     position = ( 0 0 0 )
@@ -86,17 +90,15 @@ new 1 fiber microtubule
 
 % --------------
 
-new 300  single graftedA ( arc 9 0.5 turn angle 1.7 at 0 3.33 ) 
+new 300 graftedA ( arc 9 0.5 turn angle 1.7 at 0 3.33 )
 
-new 300  single graftedK ( arc 9 0.5 turn angle 1.7 at 0 0 ) 
+new 300 graftedK ( arc 9 0.5 turn angle 1.7 at 0 0 )
 
-new 300  single graftedA ( arc 9 0.5 turn angle 1.7 at 0 -3.33 ) 
+new 300 graftedA ( arc 9 0.5 turn angle 1.7 at 0 -3.33 ) 
 
-run simul *
+run system
 {
     nb_frames = 400
     nb_steps = 20000
 }
-
-
 

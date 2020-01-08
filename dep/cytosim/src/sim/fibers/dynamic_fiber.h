@@ -14,10 +14,10 @@ class DynamicFiberProp;
 /// A Fiber with discrete growth and dynamic instability at the PLUS_END
 /**
 
- This implements the 1D-model of microtubule dynamic instability proposed by Brun, Rupp et al.
- with a coupling parameter N=2 that cannot be changed.
+ This implements the microtubule dynamic instability model proposed by
+ Brun, Rupp et al. with a 'hard-coded' coupling parameter N=2.
  
- Assembly and disassembly follow discrete steps of size \a prop->unit_length.
+ Assembly and disassembly follow discrete steps of size `prop->unit_length`.
  The model keeps track of the discrete state of the two terminal units of tubulin.
  This leads to 4 different states, which are mapped to [STATE_GREEN, STATE_RED].
  
@@ -39,6 +39,7 @@ class DynamicFiberProp;
  </em>
  http://www.jcb.org/cgi/doi/10.1083/jcb.200301147
  
+ 
  If you use this model, please cite:\n
  <em>
  <b>A theory of microtubule catastrophes and their regulation</b>\n
@@ -46,14 +47,31 @@ class DynamicFiberProp;
  PNAS 106 (50) 21173-21178; 2009\n
  http://www.pnas.org/content/106/50/21173
  </em>
+
+ The predicted mean time until catastrophe is approximately
+
+     growing_rate = growing_speed / unit_length
+     real ctime = growing_rate / ( 3 * hydrolysis_rate * hydrolysis_rate );
  
+ The implemented model includes off-rate in the assembly state, as described in:\n
+ <em>
+ <b>Random Hydrolysis Controls the Dynamic Instability of Microtubules</b>\n
+ Ranjith Padinhateeri, Anatoly B Kolomeisky, and David Lacoste\n
+ Biophys J 102, 1274–1283 (2012)\n
+ http://dx.doi.org/10.1016/j.bpj.2011.12.059
+ </em>
+ 
+ 
+
  This is not implemented:
  - the MINUS_END is not dynamic,
- - assembly is not limited by free tubulin pool.
  - rescues are not included.
  .
  
  See the @ref DynamicFiberPar.
+
+ // @todo DynamicFiber detach_rate should depend on the state of the subunit
+ // @todo DynamicFiber should keep the entire state vector of the subunits
 
  Note: A Gillespie simulation method is used.
  This class is not fully tested (17. Feb 2011).
@@ -61,39 +79,44 @@ class DynamicFiberProp;
  */
 class DynamicFiber : public Fiber
 {
-public:
-    
-    /// the Property of this object
-    DynamicFiberProp const* prop;
-   
 private:
     
     /// assembly during last time-step
     real       mGrowthP;
     real       mGrowthM;
     
-    /// Gillespie times:
+    /// Gillespie countdown timers for PLUS_END:
     real       nextGrowthP;
     real       nextHydrolP;
+    real       nextShrinkP;
     
+    /// Gillespie countdown timers for MINUS_END:
     real       nextGrowthM;
     real       nextHydrolM;
+    real       nextShrinkM;
     
+    /// state of units near the PLUS_END: [0] is terminal, [1] is penultimate unit
+    unsigned   unitP[3];
     
-    /// state of units near the MinusEnd
-    int        unitM[2];
+    /// dynamic state of PLUS_END
+    state_t    mStateP;
     
-    int        stateP;
+    /// state of units near the MINUS_END
+    unsigned   unitM[3];
     
-    /// state of units near the PlusEnd: [0] is terminal, [1] is penultimate unit
-    int        unitP[2];
+    /// dynamic state of MINUS_END
+    state_t    mStateM;
+
+    /// calculate dynamic state from unit states near PLUS_END
+    state_t    calculateStateP() const;
     
-    int        stateM;
-    
-    int        calculateStateP() const;
-    int        calculateStateM() const;
-    
+    /// calculate dynamic state from unit states near MINUS_END
+    state_t    calculateStateM() const;
+   
 public:
+    
+    /// the Property of this object
+    DynamicFiberProp const* prop;
   
     /// constructor
     DynamicFiber(DynamicFiberProp const*);
@@ -103,39 +126,42 @@ public:
         
     //--------------------------------------------------------------------------
     
-    /// return assembly/disassembly state of the end \a which
-    int         dynamicState(FiberEnd which) const;
+    /// return assembly/disassembly state of MINUS_END
+    state_t     dynamicStateM() const;
     
-    /// set state of FiberEnd \a which to \a new_state
-    void        setDynamicState(FiberEnd which, int new_state);
+    /// return assembly/disassembly state of PLUS_END
+    state_t     dynamicStateP() const;
+    
+    /// change state of MINUS_END
+    void        setDynamicStateM(state_t s);
+    
+    /// change state of PLUS_END
+    void        setDynamicStateP(state_t s);
     
     /// the amount of freshly assembled polymer during the last time step
-    real        freshAssembly(FiberEnd which) const;
-    
+    real        freshAssemblyM() const;
+
+    /// the amount of freshly assembled polymer during the last time step
+    real        freshAssemblyP() const;
+
     //--------------------------------------------------------------------------
     
-    /// cut fiber at distance \a abs from MINUS_END
-    Fiber *     severM(real abs);
-    
-    /// join two fibers
-    void        join(Fiber * fib);
-    
     /// simulate dynamic instability of PLUS_END
-    int         stepPlusEnd(real growth_rate_dt);
+    int         stepPlusEnd();
     
     /// simulate dynamic instability of MINUS_END
-    int         stepMinusEnd(real growth_rate_dt);
+    int         stepMinusEnd();
     
     /// monte-carlo step
     void        step();
     
     //--------------------------------------------------------------------------
     
-    /// write to OutputWrapper
-    void        write(OutputWrapper&) const;
+    /// write to Outputter
+    void        write(Outputter&) const;
 
-    /// read from InputWrapper
-    void        read(InputWrapper&, Simul&);
+    /// read from Inputter
+    void        read(Inputter&, Simul&, ObjectTag);
     
 };
 

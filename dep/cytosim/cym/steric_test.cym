@@ -2,7 +2,7 @@
 % F. Nedelec, 23 Jan 2010
 
 
-set simul steric 
+set simul system
 {
     steric = 1, 100, 100
     viscosity = 100
@@ -10,18 +10,20 @@ set simul steric
     time_step = 0.001
     kT = 0.00042
     steric_max_range = 0.5
-    function_key=1,1 
     display = ( delay=10; period=4; )
 }
 
 set space cell
 {
-    geometry = ( sphere 1.0 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 1
+}
 
-set fiber tube
+set fiber filament
 {
     rigidity = 10
     confine = inside, 1000
@@ -32,48 +34,48 @@ set fiber tube
 }
 
 
-new 1 fiber tube { length = 0.6; position = 0  0.2  0; orientation = horizontal;  }
-new 1 fiber tube { length = 0.6; position = 0  0.15 0; orientation = horizontal;  }
+new filament { length = 0.6; position = 0  0.2  0; orientation = horizontal;  }
+new filament { length = 0.6; position = 0  0.15 0; orientation = horizontal;  }
 
 
-new 1 fiber tube { length = 0.6; position = 0 -0.1  0; orientation = horizontal;  }
-new 1 fiber tube { length = 0.6; position = 0 -0.25 0; orientation = horizontal;  }
+new filament { length = 0.6; position = 0 -0.1  0; orientation = horizontal;  }
+new filament { length = 0.6; position = 0 -0.25 0; orientation = horizontal;  }
 
 
-new 1 fiber tube { length = 0.5; position =  0.29 0.5 0; orientation =  1 0;  }
-new 1 fiber tube { length = 0.5; position = -0.29 0.5 0; orientation =  1 0;  }
+new filament { length = 0.5; position =  0.29 0.5 0; orientation =  1 0;  }
+new filament { length = 0.5; position = -0.29 0.5 0; orientation =  1 0;  }
 
-new 1 fiber tube { length = 0.5; position =  0.29 0.6 0; orientation = -1 0;  }
-new 1 fiber tube { length = 0.5; position = -0.29 0.6 0; orientation =  1 0;  }
+new filament { length = 0.5; position =  0.29 0.6 0; orientation = -1 0;  }
+new filament { length = 0.5; position = -0.29 0.6 0; orientation =  1 0;  }
 
-new 1 fiber tube { length = 0.5; position =  0.29 0.7 0; orientation = -1 0;  }
-new 1 fiber tube { length = 0.5; position = -0.29 0.7 0; orientation = -1 0;  }
+new filament { length = 0.5; position =  0.29 0.7 0; orientation = -1 0;  }
+new filament { length = 0.5; position = -0.29 0.7 0; orientation = -1 0;  }
 
 
-new 1 fiber tube { length = 0.5; position =  0.32 -0.5 0; orientation =  1 0;  }
-new 1 fiber tube { length = 0.5; position = -0.32 -0.5 0; orientation =  1 0;  }
+new filament { length = 0.5; position =  0.32 -0.5 0; orientation =  1 0;  }
+new filament { length = 0.5; position = -0.32 -0.5 0; orientation =  1 0;  }
 
-new 1 fiber tube { length = 0.5; position =  0.32 -0.6 0; orientation = -1 0;  }
-new 1 fiber tube { length = 0.5; position = -0.32 -0.6 0; orientation =  1 0;  }
+new filament { length = 0.5; position =  0.32 -0.6 0; orientation = -1 0;  }
+new filament { length = 0.5; position = -0.32 -0.6 0; orientation =  1 0;  }
 
-new 1 fiber tube { length = 0.5; position =  0.32 -0.7 0; orientation = -1 0;  }
-new 1 fiber tube { length = 0.5; position = -0.32 -0.7 0; orientation = -1 0;  }
+new filament { length = 0.5; position =  0.32 -0.7 0; orientation = -1 0;  }
+new filament { length = 0.5; position = -0.32 -0.7 0; orientation = -1 0;  }
 
 
 set bead ball
 {
     steric = 1
-    confine = all_inside, 100
+    confine = inside, 100
     display = ( style=5; coloring=1; )
 }
 
-new 0 bead ball
+new 0 ball
 {
     radius = 0.1
 }
 
 
-run 100000 simul *
+run 100000 system
 {
     nb_frames = 100
 }

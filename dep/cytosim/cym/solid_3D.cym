@@ -2,7 +2,7 @@
 % dumbell solids confined on a surface with steric
 % Made for 3D 
 
-set simul solid_3Dcym
+set simul system
 {
     time_step = 0.01
     viscosity = 0.01
@@ -11,27 +11,29 @@ set simul solid_3Dcym
 
 set space cell
 {
-    geometry = ( ellipse 12 10 10 )
+    shape = ellipse
 }
 
-new space cell
+new cell
+{
+    length = 24, 20, 20
+}
 
 
 set solid blob
 {
-    confine = all_inside, 1
+    confine = inside, 1
     steric = 1
-    display = ( coloring=1; style=7; visible=transparent; )
+    display = ( coloring=1; style=7; color=0xFFFFFF88; )
 }
 
-new 250 solid blob
+new 250 blob
 {
-    nb_points = 2
-    point0 = -1 0 0, 1
-    point1 =  1 0 0, 1
+    point1 = -1 0 0, 1
+    point2 =  1 0 0, 1
 }
 
-run simul *
+run system
 {
     nb_steps  = 10000
     nb_frames = 100

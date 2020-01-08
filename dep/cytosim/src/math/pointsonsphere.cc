@@ -1,58 +1,103 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "pointsonsphere.h"
-
-extern Random RNG;
-
+#include "random.h"
 
 //------------------------------------------------------------------------------
-PointsOnSphere::PointsOnSphere() : nPoints(0), mCoord(0, 0)
+PointsOnSphere::PointsOnSphere()
+: num_points_(0), coord_(nullptr)
 {
 }
 
-//------------------------------------------------------------------------------
-PointsOnSphere::PointsOnSphere( int nbp ) : nPoints(0), mCoord(0, 0)
+
+PointsOnSphere::PointsOnSphere(unsigned nbp, real precision, unsigned mx_nb_iterations)
+: num_points_(0), coord_(nullptr)
 {
-    distributePoints(nbp);
+    distributePoints(nbp, precision, mx_nb_iterations);
 }
 
-//------------------------------------------------------------------------------
+
+PointsOnSphere::PointsOnSphere(unsigned nbp)
+: num_points_(0), coord_(nullptr)
+{
+    distributePoints(nbp, 1e-4, 1<<14);
+}
+
+
 PointsOnSphere::~PointsOnSphere( )
 {
 }
 
-//------------------------------------------------------------------------------
-void PointsOnSphere::copyCoordinatesOfPoint( real x[3], const unsigned int ii )
+
+void PointsOnSphere::copyPoint( real x[3], const unsigned ii )
 {
-    x[0] = mCoord[3*ii+0];
-    x[1] = mCoord[3*ii+1];
-    x[2] = mCoord[3*ii+2];
+    x[0] = coord_[3*ii+0];
+    x[1] = coord_[3*ii+1];
+    x[2] = coord_[3*ii+2];
 }
 
-//------------------------------------------------------------------------------
-void PointsOnSphere::copyCoordinatesOfPoint( real* x, real* y, real* z, const unsigned int ii )
+
+void PointsOnSphere::copyPoint( real* x, real* y, real* z, const unsigned ii )
 {
-    *x = mCoord[3*ii+0];
-    *y = mCoord[3*ii+1];
-    *z = mCoord[3*ii+2];
+    *x = coord_[3*ii+0];
+    *y = coord_[3*ii+1];
+    *z = coord_[3*ii+2];
 }
 
-//------------------------------------------------------------------------------
-void PointsOnSphere::copyPositionsForAllPoints( real x[] )
+
+void PointsOnSphere::copyPoints( real x[], const unsigned x_size )
 {
-    for ( unsigned int ii = 0; ii < 3*nPoints; ++ii )
-        x[ii] = mCoord[ii];
+    for ( unsigned ii = 0; ii < 3*num_points_ && ii < x_size; ++ii )
+        x[ii] = coord_[ii];
 }
 
-//------------------------------------------------------------------------------
+
+void PointsOnSphere::scale(const real factor)
+{
+    for ( unsigned ii = 0; ii < 3*num_points_; ++ii )
+        coord_[ii] *= factor;
+}
+
+
 void PointsOnSphere::printAllPositions( FILE* file )
 {
-    for ( unsigned int ii = 0; ii < nPoints; ++ii )
-        fprintf( file, "%f %f %f\n", mCoord[3*ii], mCoord[3*ii+1], mCoord[3*ii+2]);
+    for ( unsigned ii = 0; ii < num_points_; ++ii )
+        fprintf( file, "%f %f %f\n", coord_[3*ii], coord_[3*ii+1], coord_[3*ii+2]);
+}
+
+
+real PointsOnSphere::distance3( const real P[], const real Q[] )
+{
+    return sqrt( (P[0]-Q[0])*(P[0]-Q[0]) + (P[1]-Q[1])*(P[1]-Q[1]) + (P[2]-Q[2])*(P[2]-Q[2]) );
+}
+
+
+real PointsOnSphere::distance3Sqr( const real P[], const real Q[] )
+{
+    return (P[0]-Q[0])*(P[0]-Q[0]) + (P[1]-Q[1])*(P[1]-Q[1]) + (P[2]-Q[2])*(P[2]-Q[2]);
 }
 
 //------------------------------------------------------------------------------
-/** hypercube rejection method, calling the Random Number Generator RNG */
+
+
+bool PointsOnSphere::project(const real S[3], real P[3])
+{
+    real n = S[0]*S[0] + S[1]*S[1] + S[2]*S[2];
+    if ( n > 0 )
+    {
+        n = sqrt(n);
+        P[0] = S[0] / n;
+        P[1] = S[1] / n;
+        P[2] = S[2] / n;
+        return false;
+    }
+    return true;
+}
+
+
+/**
+ hypercube rejection method
+ */
 void PointsOnSphere::randomize(real P[3])
 {
     real n;
@@ -63,7 +108,7 @@ void PointsOnSphere::randomize(real P[3])
         n = P[0]*P[0] + P[1]*P[1] + P[2]*P[2];
         if ( n == 0 )
         {
-            fprintf(stderr, "RNG may not be properly initialized");
+            fprintf(stderr, "The Random Number Generator may not be properly initialized");
         }
     } while ( n > 1.0 );
     
@@ -73,35 +118,6 @@ void PointsOnSphere::randomize(real P[3])
     P[2] /= n;
 }
 
-//------------------------------------------------------------------------------
-void PointsOnSphere::project(real P[3], const real S[3])
-{
-    real n = S[0]*S[0] + S[1]*S[1] + S[2]*S[2];
-    if ( n > 0 ) 
-    {
-        n = sqrt(n);
-        P[0] = S[0] / n;
-        P[1] = S[1] / n;
-        P[2] = S[2] / n;
-    }
-    else
-    {
-        randomize(P);
-    }
-}
-
-
-//------------------------------------------------------------------------------
-real PointsOnSphere::distance3( const real P[], const real Q[] )
-{
-    return sqrt( (P[0]-Q[0])*(P[0]-Q[0]) + (P[1]-Q[1])*(P[1]-Q[1]) + (P[2]-Q[2])*(P[2]-Q[2]) );
-}
-
-//------------------------------------------------------------------------------
-real PointsOnSphere::distance3Sqr( const real P[], const real Q[] )
-{
-    return (P[0]-Q[0])*(P[0]-Q[0]) + (P[1]-Q[1])*(P[1]-Q[1]) + (P[2]-Q[2])*(P[2]-Q[2]);
-}
 
 //------------------------------------------------------------------------------
 /**
@@ -109,42 +125,35 @@ real PointsOnSphere::distance3Sqr( const real P[], const real Q[] )
  each of ~2N triangles should occupy an area of S = 4*PI/2*N, 
  and the distance between points should be ~2 * sqrt(S/sqrt(3)).
  */
-real PointsOnSphere::expectedDistance(int n)
+real PointsOnSphere::expectedDistance(unsigned n)
 {
-    real surface = 2 * 3.14159 / n;
+    real surface = 2 * M_PI / n;
     return 2 * sqrt( surface / sqrt(3) );
 }
 
+
 real PointsOnSphere::minimumDistance()
 {
-    real dist, result = 4.;
-    for ( unsigned int ii = 1; ii < nPoints; ++ii )
+    real res = INFINITY;
+    for ( unsigned ii = 1; ii < num_points_; ++ii )
     {
-        for ( unsigned int jj = 0; jj < ii; ++jj )
+        for ( unsigned jj = 0; jj < ii; ++jj )
         {
-            dist = distance3Sqr( mCoord + 3 * ii, mCoord + 3 * jj );
-            if ( dist < result )
-                result = dist;
+            real dis = distance3Sqr(&coord_[3*ii], &coord_[3*jj]);
+            if ( dis < res )
+                res = dis;
         }
     }
-    return sqrt(result);
-}
-
-//------------------------------------------------------------------------------
-void PointsOnSphere::scale(const real factor)
-{
-    for ( unsigned int ii = 0; ii < 3*nPoints; ++ii )
-        mCoord[ii] *= factor;
+    return sqrt(res);
 }
 
 
-//------------------------------------------------------------------------------
 real PointsOnSphere::coulombEnergy( const real P[] )
 {
     real dist, result = 0;
-    for ( unsigned int ii = 1; ii < nPoints; ++ii )
+    for ( unsigned ii = 1; ii < num_points_; ++ii )
     {
-        for ( unsigned int jj = 0; jj < ii; ++jj )
+        for ( unsigned jj = 0; jj < ii; ++jj )
         {
             dist = distance3( P + 3 * ii, P + 3 * jj );
             if ( dist > 0 ) result += 1.0 / dist;
@@ -154,26 +163,27 @@ real PointsOnSphere::coulombEnergy( const real P[] )
 }
 
 //------------------------------------------------------------------------------
-void PointsOnSphere::calculateForces( real forces[], real threshold )
+
+void PointsOnSphere::setForces( real forces[], real threshold )
 {
     real dx[3];
     real dist;
     
     //--------- reset forces:
-    for ( unsigned int ii = 0; ii < 3 * nPoints; ++ii )
-        forces[ii] = 0;
+    for ( unsigned ii = 0; ii < 3 * num_points_; ++ii )
+        forces[ii] = 0.0;
     
-    //--------- calculate coulomb pair interactions:
+    //--------- calculate Coulomb pair interactions:
     // first particle is ii, second one is jj:
-    for ( unsigned int ii = 1; ii < nPoints; ++ii )
+    for ( unsigned ii = 1; ii < num_points_; ++ii )
     {
-        for ( unsigned int jj = 0; jj < ii; ++jj )
+        for ( unsigned jj = 0; jj < ii; ++jj )
         {
             //calculate vector and distance^2 between from jj to ii
             dist = 0;
             for ( int dd = 0; dd < 3 ; ++dd )
             {
-                dx[dd] = mCoord[3*ii+dd] - mCoord[3*jj+dd];
+                dx[dd] = coord_[3*ii+dd] - coord_[3*jj+dd];
                 dist += dx[dd] * dx[dd];
             }
             
@@ -192,7 +202,7 @@ void PointsOnSphere::calculateForces( real forces[], real threshold )
                 //force = vector / r^3, but here dist = r^2
                 dist = 1.0 / ( dist * sqrt(dist) );
                 //update forces for jj and ii:
-                for ( unsigned int dd = 0 ; dd < 3; ++dd )
+                for ( unsigned dd = 0 ; dd < 3; ++dd )
                 {
                     dx[dd] *= dist;
                     forces[3*ii+dd] += dx[dd];
@@ -205,44 +215,55 @@ void PointsOnSphere::calculateForces( real forces[], real threshold )
 
 #if ( 1 )
     /*
-     Remove centripede contribution of forces:
+     Remove centripetal contribution of forces:
      assuming here that points are already on the sphere (norm=1)
      ( the algorithm converge even without this, but slower )
      */
-    for ( unsigned int ii = 0; ii < nPoints; ++ii )
+    for ( unsigned ii = 0; ii < num_points_; ++ii )
     {
         dist = 0;
         for ( int dd = 0; dd < 3; ++dd )
-            dist += mCoord[3*ii+dd] * forces[3*ii+dd];
+            dist += coord_[3*ii+dd] * forces[3*ii+dd];
         
         for ( int dd = 0; dd < 3; ++dd )
-            forces[3*ii+dd] -= dist * mCoord[3*ii+dd];
+            forces[3*ii+dd] -= dist * coord_[3*ii+dd];
     }
 #endif
 }
-//------------------------------------------------------------------------------
-/** move the points in the direction of the forces, with scaling factor S */
-void PointsOnSphere::movePoints( real Pnew[], real Pold[], real forces[], real S )
+
+
+/**
+ Move the points in the direction of the forces, with scaling factor S 
+ */
+void PointsOnSphere::refinePoints( real Pnew[], const real Pold[], real forces[], real S )
 {
-    for ( unsigned int ii = 0; ii < nPoints; ++ii )
+    for ( unsigned ii = 0; ii < num_points_; ++ii )
     {
-        real tmp[3];
-        for ( int dd = 0; dd < 3; ++dd )
-            tmp[dd] = Pold[3*ii+dd] + S * forces[3*ii+dd];
+        real W[3];
         
-        project(Pnew+3*ii, tmp);
+        W[0] = Pold[3*ii+0] + S * forces[3*ii+0];
+        W[1] = Pold[3*ii+1] + S * forces[3*ii+1];
+        W[2] = Pold[3*ii+2] + S * forces[3*ii+2];
+        
+        if ( project(W, Pnew+3*ii) )
+            randomize(Pnew+3*ii);
     }
 }
 
 
-//------------------------------------------------------------------------------
-// creates a relatively even distribution of nbp points on the sphere
-// the coordinates are stored in real array mCoord
-int PointsOnSphere::distributePoints( unsigned int nbp, real precision )
+/**
+ create a relatively even distribution of nbp points on the sphere
+ the coordinates are stored in real array coord_[]
+ */
+unsigned PointsOnSphere::distributePoints(unsigned nbp, real precision, unsigned mx_nb_iterations)
 {
     //reallocate the array if needed:
-    mCoord.allocate(3*nbp);
-    nPoints = nbp;
+    if ( num_points_ != nbp || ! coord_ )
+    {
+        free_real(coord_);
+        coord_ = new_real(3*nbp);
+        num_points_ = nbp;
+    }
     
     // the precision is rescaled with the expected distance:
     real distance = expectedDistance(nbp);
@@ -252,58 +273,59 @@ int PointsOnSphere::distributePoints( unsigned int nbp, real precision )
      The best results are obtained for threshold > 2
      */
     real threshold = 10 * distance;
-    real mag = 0.1 * distance * distance * distance * distance / nPoints;
+    real mag = 0.1 * distance * distance * distance * distance / num_points_;
     precision *= mag;
 
     //------------ distribute the points randomly on the sphere:
-    for ( unsigned int ii = 0; ii < nPoints; ++ii )
-        randomize(mCoord+ii*3);
+    for ( unsigned ii = 0; ii < num_points_; ++ii )
+        randomize(coord_+ii*3);
     
     //--------- for one point only, we return:
-    if ( nPoints < 2 )
+    if ( num_points_ < 2 )
     {
-        mEnergy = 0;
+        energy_ = 0;
         return 0;
     }
     
     //------------ calculate the initial energy:
-    mEnergy = coulombEnergy(mCoord);
+    energy_ = coulombEnergy(coord_);
     
     // allocate forces and new coordinates:
-    Allot<real> forces(3*nPoints, 0);
-    Allot<real> coord(3*nPoints, 0);
+    real * coord = new_real(3*num_points_);
+    real * force = new_real(3*num_points_);
     
     //make an initial guess for the step size:
-    int history = 0;
+    unsigned history = 0;
     
-    unsigned int step = 0;
-    for ( step = 0; step < max_nb_iterations; ++step )
+    unsigned step = 0;
+    for ( step = 0; step < mx_nb_iterations; ++step )
     {
-        calculateForces(forces, threshold);
+        setForces(force, threshold);
         
         while ( 1 ) 
         {
-            movePoints(coord, mCoord, forces, mag);
+            refinePoints(coord, coord_, force, mag);
             
             // energy of new configuration:
             real energy = coulombEnergy(coord);
             
-            //printf("%3i : step %5i : mEnergy = %18.8f   mag = %8.5f %s\n",
-            //     nbp, step, mEnergy, mag, (energy_new<mEnergy?"yes":"no"));
+            //printf("%3i : step %5i : energy_ = %18.8f   mag = %8.5f %s\n",
+            //     nbp, step, energy_, mag, (energy_new<energy_?"yes":"no"));
 
-            if ( energy < mEnergy )
+            if ( energy < energy_ )
             {
-                // swapp pointers to accept configuration:
-                mCoord.swap(coord);                
-                mEnergy = energy;
+                // swap pointers to accept configuration:
+                real* m = coord_;
+                coord_  = coord;
+                coord   = m;
+                energy_ = energy;
                 
                 /*
-                 If we have done 'magic' successful moves at a given step size,
-                 then we try to increase the step size.
-                 Values for 'magic' below were tested in term of convergence:
-                 a few trials seemed to agree for magic = 7...
+                 After 'SEVEN' successful moves at a given step size, we increase
+                 the step size. Values for 'magic_seven' were tested in term of
+                 convergence, and 7 seems to work well.
                  */
-                if ( ++history >= magic )
+                if ( ++history >= SEVEN )
                 {
                     mag *= 1.4147;   //this value is somewhat arbitrary
                     history = 0;
@@ -321,10 +343,16 @@ int PointsOnSphere::distributePoints( unsigned int nbp, real precision )
                 
                 //exit when the desired precision is reached
                 if ( mag < precision )
+                {
+                    free_real(coord);
+                    free_real(force);
                     return step;
+                }
             }
         }
     }
+    free_real(coord);
+    free_real(force);
     return step;
 }
-//------------------------------------------------------------------------------
+

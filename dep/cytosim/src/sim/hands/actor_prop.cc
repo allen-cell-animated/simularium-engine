@@ -9,9 +9,9 @@
 #include "actor.h"
 
 //------------------------------------------------------------------------------
-Hand * ActorProp::newHand(HandMonitor* h) const
+Hand * ActorProp::newHand(HandMonitor* m) const
 {
-    return new Actor(this, h);
+    return new Actor(this, m);
 }
 
 //------------------------------------------------------------------------------
@@ -30,17 +30,16 @@ void ActorProp::read(Glossary& glos)
 }
 
 //------------------------------------------------------------------------------
-void ActorProp::complete(SimulProp const* sp, PropertyList* plist)
+void ActorProp::complete(Simul const& sim)
 {
-    HandProp::complete(sp, plist);
-    
+    HandProp::complete(sim);
 }
 
 //------------------------------------------------------------------------------
 
-void ActorProp::write_data(std::ostream & os) const
+void ActorProp::write_values(std::ostream& os) const
 {
-    HandProp::write_data(os);
-    write_param(os, "rate", rate);
+    HandProp::write_values(os);
+    write_value(os, "rate", rate);
 }
 

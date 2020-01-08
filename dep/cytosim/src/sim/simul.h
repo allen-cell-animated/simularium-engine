@@ -1,99 +1,108 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SIMUL_H
 #define SIMUL_H
 
 #include "assert_macro.h"
 #include <iostream>
+#include <string>
 #include <stack>
 #include <map>
 
 #include "single_set.h"
 #include "couple_set.h"
 #include "fiber_set.h"
+#include "fiber_grid.h"
 #include "bead_set.h"
 #include "solid_set.h"
 #include "sphere_set.h"
 #include "organizer_set.h"
 #include "field_set.h"
 #include "space_set.h"
-#include "fiber_grid.h"
+#include "event_set.h"
 #include "point_grid.h"
-#include "simul_prop.h"
 #include "property_list.h"
 #include "field_values.h"
-#include "field.h"
 #include "meca.h"
 
+class Meca1D;
+class SimulProp;
+
+/// default name for output trajectory file
+const char TRAJECTORY[] = "objects.cmo";
 
 
-/// the string that defines the start of a frame
-const static char FRAME_TAG[] = "#Cytosim ";
-
-
-/// Simulator class
+/// Simulator class containing all Objects
 class Simul
-{    
+{
+public:
+    
+    /// Meca used to set and integrate the equations of motion of Mecables
+    mutable Meca    sMeca;
+    
+    /// grid used for attachment of Hand to Fiber
+    mutable FiberGrid fiberGrid;
+    
+    /// grid used for steric interaction between Fiber/Solid/Bead/Sphere
+    mutable PointGrid pointGrid;
+    
+    /// Meca used to solve the system with option 'solve=horizontal'
+    Meca1D *        pMeca1D;
+
 private:
     
-    /// time in the simulated world
-    real               sTime;
+    /// signals that engine is ready to perform a step
+    bool            sReady;
+
+    /// preconditionning method used in last solve
+    unsigned int    precondMethod;
     
-    /// True if the simulation is ready to do a step
-    bool               sReady;
+    /// counter that is used to automatically set the preconditionning option
+    unsigned int    precondCounter;
     
-    /// the last Space defined in the simulation
-    Space *            sSpace;
+    /// stores cpu time to automatically set the preconditionning option
+    double          precondCPU[4];
     
-    /// The Meca used to set and integrate the equations of motion
-    mutable Meca       sMeca;
-    
-    /// grid used for attachment to Fiber
-    mutable FiberGrid  fiberGrid;
-    
-    /// grid used for steric interaction of Solid fat-points and Sphere
-    mutable PointGrid  stericGrid;
-    
-    //-------------------------------------------------------------------------------
-    
-    /// a copy of the properties that were stored to file
+    /// a copy of the properties as they were stored to file
     mutable std::string properties_saved;
-   
+
 public:
 
     /// Global cytosim parameters
-    SimulProp *  prop;
+    SimulProp *     prop;
     
-    /// holds all Property, except the SimulProp
-    PropertyList properties;
+    /// list of all Object Property (does not include the SimulProp)
+    PropertyList    properties;
     
     
-    /// list of Space
-    SpaceSet     spaces;
+    /// list of Space in the Simulation
+    SpaceSet        spaces;
     
-    /// list of Field
-    FieldSet     fields;
+    /// list of Field in the Simulation
+    FieldSet        fields;
     
-    /// list of Fiber
-    FiberSet     fibers;
+    /// list of Fiber in the Simulation
+    FiberSet        fibers;
     
-    /// list of Sphere
-    SphereSet    spheres;
+    /// list of Sphere in the Simulation
+    SphereSet       spheres;
     
-    /// list of Bead
-    BeadSet      beads;
+    /// list of Bead in the Simulation
+    BeadSet         beads;
     
-    /// list of Solid
-    SolidSet     solids;
+    /// list of Solid in the Simulation
+    SolidSet        solids;
     
-    /// list of Single
-    SingleSet    singles;
+    /// list of Single in the Simulation
+    SingleSet       singles;
     
-    /// list of Couple
-    CoupleSet    couples;
+    /// list of Couple in the Simulation
+    CoupleSet       couples;
     
-    /// list of organizers
-    OrganizerSet organizers;
+    /// list of Organizer in the Simulation
+    OrganizerSet    organizers;
+
+    /// list of Events in the Simulation
+    EventSet        events;
     
     //-------------------------------------------------------------------------------
     
@@ -105,212 +114,246 @@ public:
         
     //-------------------------------------------------------------------------------
     
-    /// link Object
-    void      add(Object *);
+    /// add Object to Simulation
+    void            add(Object *);
 
-    /// link Objects
-    int       add(ObjectList const&);
+    /// add all Objects from given list
+    void            add(ObjectList const&);
 
-    /// unlink Object
-    void      remove(Object *);
+    /// remove Object from Simulation
+    void            remove(Object *);
 
-    /// unlink Objects
-    void      remove(ObjectList const&);
+    /// remove all Objects from given list
+    void            remove(ObjectList const&);
     
-    /// unlink and delete object
-    void      erase(Object *);
+    /// remove and delete object
+    void            erase(Object *);
     
-    /// unlink and delete all objects in list
-    void      erase(ObjectList const&);
+    /// remove and delete all objects from given list
+    void            erase(ObjectList const&);
 
-    /// mark objects in list
-    static void mark(ObjectList const&, int);
+    /// mark objects from given list
+    static void     mark(ObjectList const&, ObjectMark);
 
-    /// erase simulation world (all sub-lists and variables)
-    void      erase();
+    /// reset simulation world (clear all sub-lists and variables)
+    void            erase();
     
     //-------------------------------------------------------------------------------
 
+    /// total number of objects in the Simulation
+    size_t          nbObjects() const;
+
     /// time in the simulated world
-    real      simTime()   const { return sTime; }
-   
-    /// set frame index
-    void      setTime(real t)   { sTime = t; }
+    real            time()   const;
     
     //-------------------------------------------------------------------------------
    
     /// perform basic initialization; register callbacks
-    void      initialize(Glossary&);
+    void            initialize(Glossary&);
     
-    /// initialize the simulation engine
-    void      prepare(Space * spc);
-  
-    /// initialize the simulation engine using the current space
-    void      prepare() { prepare(space()); }
-    
-    /// returns true is the simulation is ready to run (or appears so)
-    bool      isReady() const { return sReady; }
-    
-    /// call after a sequence of step() have been done
-    void      relax() { couples.relax(); }
-    
-    /// set current Space
-    void      space(Space * spc);
+    /// return first Space with given name
+    Space const*    findSpace(std::string const& name) const;
 
-    /// get current Space
-    Space *   space() const { return sSpace; }
-    
-    /// return first Space with this name
-    Space *   findSpace(const std::string& name) const;
-
-    /// call foldPosition() for all objects
-    void      foldPosition() const;
+    /// call foldPosition() for all objects (implements periodic boundary conditions)
+    void            foldPosition() const;
     
     //-------------------------------------------------------------------------------
     
-    /// perform the Monte-Carlo part of the simulation for one time_step
-    void      step();
+    /// ready the engine for a call to `step()` and `solve()`
+    void            prepare();
+    
+    /// perform one Monte-Carlo step, corresponding to `time_step`
+    void            step();
+    
+    /// this is called after a sequence of `step()` have been done
+    void            relax();
+    
+    /// this is called after a sequence of `step()` have been done
+    void            unrelax() { sReady = true; }
 
-    /// calculate the mechanics of the system and move objects accordingly, for one time_step
-    void      solve();
-    
-    /// calculate Forces and Lagrange multipliers, but do not move objects
-    void      computeForces() const;
+    /// true if engine is ready to go (between `prepare()` and `relax()`)
+    bool            ready() const { return sReady; }
 
-    /// dump matrix and vector from Meca
-    void      dump() const { sMeca.dump(); }
     
-    //-------------------------------------------------------------------------------
+    /// call setInteractions(Meca) for all objects (this is called before `solve()`
+    void            setInteractions(Meca&) const;
+
+    /// display Meca's links
+    void            drawLinks();
     
-    /// call setInteractions(meca) for all objects
-    void      setInteractions(Meca&) const;
+    /// simulate the mechanics of the system and move Mecables accordingly, corresponding to `time_step`
+    void            solve();
     
+    /// like 'solve' but automatically select the fastest preconditionning method
+    void            solve_auto();
+
+    /// do nothing
+    void            solve_not() {};
+    
+    /// calculate the motion of objects, but only in the X-direction
+    void            solveX();
+    
+    /// calculate Forces and Lagrange multipliers on the Mecables, but do not move them
+    void            computeForces() const;
+    
+    /// dump matrix and vector from Meca in a format that can be read in MATLAB
+    void            dump() const;
+    
+    /// dump system matrix in sparse text format
+    void            dump_system() const;
+
 private:
     
-    /// give an estimate for simul:binding_grid_step
-    real      estimateFiberGridStep() const;
+    /// give an estimate of the cell size of the FiberGrid
+    real            estimateFiberGridStep() const;
     
-    /// set fiberGrid and stericGrid over the given space
-    void      setFiberGrid(Space *) const;
+    /// set FiberGrid and StericGrid over the given space
+    void            setFiberGrid(Space const*) const;
     
-    /// calculate the range of the steric grid automatically
-    real      estimateStericRange() const;
+    /// give an estimate for the cell size of the PointGrid used for steric interactions
+    real            estimateStericRange() const;
     
-    /// initialize the grid for steric interaction (stericGrid)
-    void      setStericGrid(Space const*) const;
+    /// initialize the grid for steric interaction (pointGrid)
+    void            setStericGrid(Space const*) const;
     
-    /// add steric interactions between spheres, solids and fibers
-    void      setStericInteractions(Meca&) const;
+    /// add steric interactions between spheres, solids and fibers to Meca
+    void            setStericInteractions(Meca&) const;
     
     //-------------------------------------------------------------------------------
     /// Function used to parse the config file, and to read state from a file:
     //-------------------------------------------------------------------------------
 
     /// return the ObjectSet corresponding to this Tag in the simulation (used for IO)
-    ObjectSet* findSet(const Tag);
-
-    /// read sim-state from IO (low-level function)
-    int        readObjects(InputWrapper&);
+    ObjectSet*      findSetT(const ObjectTag);
     
 public:
     
-    /// return the ObjectSet corresponding to a class
-    ObjectSet* findSet(const std::string& kind);
+    /// convert Object to Mecable* if the conversion seems valid; returns 0 otherwise
+    static Mecable* toMecable(Object *);
     
     /// return the ObjectSet corresponding to a class
-    ObjectSet const* findSet(const std::string& kind) const { return const_cast<Simul*>(this)->findSet(kind); }
+    ObjectSet*      findSet(const std::string& cat);
     
-    /// find an object from the class-TAG and the inventory number
-    Object*   findObject(const Tag, long);
+    /// find a Mecable from a string specifying name and inventory number (e.g. 'fiber1')
+    Mecable*        findMecable(const std::string& spec) const;
     
-    /// find an object from the name of its class and the inventory number
-    Object*   findObject(const std::string&, long) const;
-    
-    /// find a fiber from the name of the fiber
-    Fiber*    findFiber(long num) const { return static_cast<Fiber*>(fibers.findObject(num)); }
-    
-    /// read an Object reference and return the corresponding Object (\c tag is set)
-    Object*   readReference(InputWrapper&, char& tag);
+    /// read an Object reference and return the corresponding Object (`tag` is set)
+    Object*         readReference(Inputter&, ObjectTag& tag);
 
-    /// check if the name corresponds to a property class
-    bool      isProperty(const std::string&) const;
+    /// check if `name` corresponds to a property class (eg. `simul`)
+    bool            isPropertyClass(const std::string& name) const;
     
-    /// get an existing property, or return zero
-    Property* findProperty(const std::string&, const std::string&) const;
+    /// return existing property of given class and name, or return zero
+    Property*       findProperty(const std::string&, const std::string&) const;
     
-    /// get an existing property, or return zero
-    Property* findProperty(const std::string&, const int index) const;
+    /// return existing property of given name, or return zero
+    Property*       findProperty(const std::string&) const;
 
-    /// find a SingleProp
-    SingleProp* findSingleProp(const std::string& nm) const;
-
-    /// return all existing propertis of required class
-    PropertyList findProperties(const std::string&) const;
+    /// return all existing properties of requested class
+    PropertyList    findAllProperties(const std::string&) const;
+    
+    /// return Property in the requested type, or throw an exception
+    template < typename T >
+    T* findProperty(std::string const& cat, unsigned ix) const
+    {
+        Property * p = properties.find(cat, ix);
+        if ( !p )
+            throw InvalidIO("could not find `"+cat+"' class with id "+std::to_string(ix));
+        return static_cast<T*>(p);
+    }
+    
+    /// return Property in the requested type, or throw an exception
+    template < typename T >
+    T* findProperty(std::string const& cat, std::string const& nom) const
+    {
+        Property * p = properties.find(cat, nom);
+        if ( !p )
+            throw InvalidIO("could not find "+cat+" class `"+nom+"'");
+        return static_cast<T*>(p);
+    }
 
     /// create a new property
     Property* newProperty(const std::string&, const std::string&, Glossary&);
     
-    /// write all properties
+    /// export all Properties to speficied file
     void      writeProperties(std::ostream&, bool prune) const;
     
-    /// write sim-state to a named file
-    void      writeProperties(std::string& file, bool prune) const;
+    /// export all Properties to a new file with specified name
+    void      writeProperties(char const* filename, bool prune) const;
 
     //-------------------------------------------------------------------------------
+    
+    /// current file format
+    const static int currentFormatID = 52;
+    
+    /// class for reading trajectory file
+    class     InputLock;
+    
+    /// load the properties contained in the standard output property file
+    void      loadProperties();
+    
+    /// read objects from file, and add them to the simulation state
+    int       readObjects(Inputter&, ObjectSet* subset);
 
-    /// read sim-state from InputWrapper
-    int       reloadObjects(InputWrapper&);
+    /// load objects from a file, adding them to the simulation state
+    int       loadObjects(Inputter&, ObjectSet* subset = nullptr);
+
+    /// load sim-world from the named file
+    int       loadObjects(char const* filename);
     
-    /// read sim-state from a named file
-    int       loadObjects(InputWrapper&);
+    /// import objects from file, and delete objects that were not referenced in the file
+    int       reloadObjects(Inputter&, ObjectSet* subset = nullptr);
+
+    /// write sim-world to specified file
+    void      writeObjects(Outputter&) const;
     
-    /// write simulation-state to specified file
-    void      writeObjects(OutputWrapper&) const;
-    
-    /// write simulation-state in binary or text mode, appending to the file or not
-    void      writeObjects(std::string const& file, bool binary, bool append) const;
+    /// write sim-world in binary or text mode, appending to existing file or creating new file
+    void      writeObjects(std::string const& filename, bool append, bool binary) const;
     
     //-------------------------------------------------------------------------------
-    
+
     /// call `Simul::report0`, adding lines before and after with 'start' and 'end' tags.
-    void      report(std::ostream&, std::string const&, Glossary&) const;
+    void      report(std::ostream&, std::string, Glossary&) const;
     
     /// call one of the report function
     void      report0(std::ostream&, std::string const&, Glossary&) const;
-    
+
     /// print time
     void      reportTime(std::ostream&) const;
-   
-    /// analyse the network connectivity to identify isolated sub-networks
-    void      analyzeClusters() const;
     
-    /// print size of clusters defined by connections with Couples
-    void      reportClusters(std::ostream&, bool) const;
+    /// give a short inventory of the simulation state, obtained from ObjectSet::report()
+    void      reportInventory(std::ostream&) const;
+ 
+    /// print the length and the points of each fiber
+    void      reportFiber(std::ostream&, FiberProp const*) const;
+    
+    /// print the length and the points of each fiber
+    void      reportFiber(std::ostream&, std::string const&) const;
     
     /// print the length and the points of each fiber
     void      reportFiber(std::ostream&) const;
     
-    /// print the length and the points of each fiber
-    void      reportFiber(std::ostream&, FiberProp const*) const;
-    
-    /// print the coordinates of the model-points of each fiber
+    /// print the coordinates of the vertices of each fiber
     void      reportFiberPoints(std::ostream&) const;
     
-    /// print the mean and standard deviation of model-points of all fibers
+    /// print the coordinates of the vertices of each fiber
+    void      reportFiberDisplacement(std::ostream&) const;
+    
+    /// print the mean and standard deviation of vertices of all fibers
     void      reportFiberMoments(std::ostream&) const;
 
-    /// print the coordinates and forces on the model-points of each fiber
-    void      reportFiberForces(std::ostream&) const;
-    
     /// print the positions and the states of the two ends of each fiber
     void      reportFiberEnds(std::ostream&) const;
     
+    /// print average age and standard deviation for each class of fiber
+    void      reportFiberAge(std::ostream&) const;
+
     /// print average length and standard deviation for each class of fiber
     void      reportFiberLengths(std::ostream&) const;
     
     /// print length distribution for each class of fiber
-    void      reportFiberLengthDistribution(std::ostream&, real delta, real max) const;
-    
+    void      reportFiberLengthDistribution(std::ostream&, Glossary&) const;
+
     /// print number of kinks in each class of Fiber
     void      reportFiberSegments(std::ostream&) const;
     
@@ -320,62 +363,149 @@ public:
     /// print number of fibers according to their dynamic states
     void      reportFiberDynamic(std::ostream&) const;
     
-    /// print coordinates of points along the length of all Fiber
-    void      reportFiberSpeckles(std::ostream&, real) const;
+    /// print coordinates of speckles that follow a frozen random sampling
+    void      reportFiberSpeckles(std::ostream&, Glossary&) const;
     
+    /// print coordinates of points randomly and freshly distributed
+    void      reportFiberSamples(std::ostream&, Glossary&) const;
+
     /// print dynamic states of Fiber
     void      reportFiberStates(std::ostream&) const;
     
+    /// print the coordinates and forces on the vertices of each fiber
+    void      reportFiberForces(std::ostream&) const;
+
     /// print Fiber tensions along certain planes defined in `opt`
-    void      reportFiberTension(std::ostream&, Glossary& opt) const;
+    void      reportFiberTension(std::ostream&, Glossary&) const;
     
+    /// print sum of all bending energy
+    void      reportFiberBendingEnergy(std::ostream&) const;
+    
+    /// print radial component of forces experienced by Fibers due to confinement
+    real      reportFiberConfinement(std::ostream& out) const;
+
+    /// print position of hands bound to fibers
+    void      reportFiberHands(std::ostream&) const;
+    
+    /// print position of bound hands that are associated with stiffness
+    void      reportFiberLinks(std::ostream&) const;
+
+    /// print summary of Fiber's lattice quantities
+    void      reportFiberLattice(std::ostream&, bool density) const;
+    
+    /// print positions of interection between two fibers
+    void      reportFiberIntersections(std::ostream&, Glossary&) const;
+
+
     /// print Organizer positions
     void      reportOrganizer(std::ostream&) const;
-    
+
     /// print Aster positions
     void      reportAster(std::ostream&) const;
     
-    /// print Bead positions
+    /// print Bead positions 
     void      reportBeadSingles(std::ostream&) const;
-    
+
     /// print Bead positions
     void      reportBeadPosition(std::ostream&) const;
-    
-    /// print Solid positions
-    void      reportSolid(std::ostream&) const;
-    
-    /// print state of Couples
+
+    /// print Solid positions 
+    void      reportSolidPosition(std::ostream&) const;
+
+    /// print Solid's anchored Hands
+    void      reportSolidHands(std::ostream&) const;
+
+    /// print state of Couples 
     void      reportCouple(std::ostream&) const;
     
-    /// print position of Couples
-    void      reportCouplePosition(std::ostream&) const;
+    /// print state of Couples
+    void      reportCoupleAnatomy(std::ostream&) const;
+    
+    /// print position of Couples 
+    void      reportCoupleState(std::ostream&) const;
     
     /// print position of Couples of a certain kind
-    void      reportCouplePosition(std::ostream&, std::string const&) const;
+    void      reportCoupleState(std::ostream&, std::string const&) const;
     
-    /// print info on doubly bound Couples 
+    /// print position of active Couples of a certain kind
+    void      reportCoupleActive(std::ostream&, std::string const&) const;
+    
+    /// print position and forces of doubly-attached Couples
     void      reportCoupleLink(std::ostream&, std::string const&) const;
     
-    /// print numbers of different types of link made by each couple
-    void    reportCoupleType(std::ostream&, std::string const&) const;
+    /// print configurations of doubly-attached Couples
+    void      reportCoupleConfiguration(std::ostream&, std::string const&, Glossary&) const;
+
+    /// print position and forces of Couples of a certain kind
+    void      reportCoupleForce(std::ostream&, Glossary&) const;
     
     /// print state of Singles
     void      reportSingle(std::ostream&) const;
     
     /// print position of Singles
-    void      reportSinglePosition(std::ostream&) const;
-    
-    /// print position of Singles
-    void      reportSingleForce(std::ostream&) const;
+    void      reportSingleState(std::ostream&) const;
     
     /// print position of Singles of a certain kind
+    void      reportSingleState(std::ostream&, std::string const&) const;
+
+    /// print position of Singles
     void      reportSinglePosition(std::ostream&, std::string const&) const;
-    
-    /// print state of Couples
-    void      reportSphere(std::ostream&) const;
-    
+   
+    /// print position of Singles
+    void      reportAttachedSinglePosition(std::ostream&, std::string const&) const;
+
+    /// print state of Couples 
+    void      reportSpherePosition(std::ostream&) const;
+
     /// print something about Spaces
     void      reportSpace(std::ostream&) const;
+  
+    /// print force on Spaces
+    void      reportSpaceForce(std::ostream&) const;
+
+    /// print something about Fields
+    void      reportField(std::ostream&) const;
+    
+    //-------------------------------------------------------------------------------
+    
+    /// flag fibers according to connectivity defined by Couple of given type
+    void      flagClustersCouples(Property const*) const;
+    
+    /// flag fibers according to connectivity defined by Couple
+    void      flagClustersCouples() const;
+    
+    /// flag fibers according to connectivity defined by Solids
+    void      flagClustersSolids() const;
+
+    /// order clusters in decreasing number of fibers
+    int       orderClusters(std::ostream&, size_t threshold, int details) const;
+    
+    /// print size of clusters defined by connections with Couples
+    void      reportClusters(std::ostream&, Glossary&) const;
+    
+    /// analyse the network connectivity to identify isolated sub-networks
+    void      flagClusters(bool order) const;
+
+    /// flag the fibers that appear to constitute a ring
+    size_t    flagRing() const;
+    
+    /// extract radius and length of ring
+    void      analyzeRing(ObjectFlag, real& length, real& radius) const;
+    
+    /// estimates if Fibers form a connected ring around the Z-axis
+    void      reportRing(std::ostream&) const;
+
+    /// custom report for Platelet project
+    void      reportPlatelet(std::ostream&) const;
+    
+    /// print Aster & Spindle indices
+    void      reportIndices(std::ostream&) const;
+
+    /// print number of Fibers pointing left and right that intersect plane YZ at different X positions
+    void      reportProfile(std::ostream&) const;
+
+    /// a special print for Romain Gibeaux
+    void      reportAshbya(std::ostream&) const;
     
     /// print something
     void      reportCustom(std::ostream&) const;
@@ -383,25 +513,25 @@ public:
     //-------------------------------------------------------------------------------
     
     /// custom function
-    void      custom0();
+    void      custom0(Glossary&);
     /// custom function
-    void      custom1();
+    void      custom1(Glossary&);
     /// custom function
-    void      custom2();
+    void      custom2(Glossary&);
     /// custom function
-    void      custom3();
+    void      custom3(Glossary&);
     /// custom function
-    void      custom4();
+    void      custom4(Glossary&);
     /// custom function
-    void      custom5();
+    void      custom5(Glossary&);
     /// custom function
-    void      custom6();
+    void      custom6(Glossary&);
     /// custom function
-    void      custom7();
+    void      custom7(Glossary&);
     /// custom function
-    void      custom8();
+    void      custom8(Glossary&);
     /// custom function
-    void      custom9();
+    void      custom9(Glossary&);
 };
 
 #endif

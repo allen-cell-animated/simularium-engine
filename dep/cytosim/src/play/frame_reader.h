@@ -2,31 +2,36 @@
 
 #include "iowrapper.h"
 #include <vector>
+
 class Simul;
 
 
-/// Class to read a particular frame in a trajectory file
+/// Helper class to access a particular frame in a trajectory file
 /** 
- FrameReader is used to find a particular frame (eg. frame 10) in a trajectory file,
- and it will handle basic IO failures.
- FrameReader will remember the starting points of all frames that were found,
- and will use this information to speed up future access to these and other frames.
+ FrameReader is used to find a particular frame (eg. frame 10) in a trajectory file.
+ FrameReader will handle basic IO failures and will remember the starting positions
+ of all frames that were sucessfully identified, using this information to speed up
+ future access to these and other frames in the same file. For example, if the 
+ position of frame 50 is known and frame 60 is requested, it will start searching
+ the file from the end of frame 50.
 
- FrameReader makes minimal assuptions on what constitutes a 'frame':
- - It looks for a string-tag present at the start of a frame (FRAME_TAG).
- - It calls Simul::reloadObjects() to actually read the simulation state.
+ FrameReader makes minimal assumptions on what constitutes a 'frame':
+ - seekFrame() looks for a string that identifies the beggining of a frame (Cytosim).
+ - loadFrame() calls Simul::reloadObjects() to read the content of the frame.
  .
+ 
+ Frames are recorded starting at index 0.
 */
 class FrameReader
-{    
+{
 private:
     
     /// accessory class to store a position in a file
     class file_pos 
     {
     public:
-        int    status;   ///< indicates that \a value is not valid
-        fpos_t value;
+        int    status;   ///< indicates if `position` is valid
+        fpos_t position; ///< starting position in the file
         file_pos() { status=0; }
     };
     
@@ -34,19 +39,22 @@ private:
     typedef  std::vector<file_pos> PosList;
     
     /// the stream from which input is made
-    InputWrapper inw;
+    Inputter inputter;
     
     /// starting position for each frame
     PosList  framePos;
     
-    /// index of frame stored currently in Simul
-    int      curFrame;
-
-    /// remember position \pos as the place where frame \a frm should start
-    void     savePos(int frm, const fpos_t& pos, int status);
+    /// index of frame stored currently
+    size_t   frameIndex;
+    
+    /// last frame loaded successfully
+    size_t   lastLoaded;
+    
+    /// remember position `pos` as the place where frame `frm` should start
+    void     savePos(size_t frm, const fpos_t& pos, int status);
    
-    /// go to a position where a frame close to \a frm is known to start
-    int      seekPos(int frm);
+    /// go to a position where a frame close to `frm` is known to start
+    size_t   seekPos(size_t frm);
     
     /// check file validity
     void     checkFile();
@@ -59,42 +67,45 @@ public:
     /// constructor, after which openFile() should be called
     FrameReader();
     
-    /// destructor
-    virtual ~FrameReader() {}
-    
     /// open file for input
-    void     openFile(std::string& file);
+    void     openFile(std::string const& file);
     
     /// clear the buffer
     void     clearPositions();
     
     /// last frame seen in the file
-    int      lastFrame() const;
+    size_t   lastKnownFrame() const;
     
-    /// true at end of file
-    bool     eof()      { return inw.eof();  }
+    /// return state of file object
+    bool     hasFile() { return inputter.file(); }
+    
+    /// true when end of file is reached
+    bool     eof() const  { return inputter.eof();  }
+    
+    /// rewind file
+    void     rewind() { inputter.rewind(); frameIndex=0; }
 
     /// true if everything looks correct for input
-    bool     good()     { return inw.good(); }
+    bool     good() const { return inputter.good(); }
 
-    /// rewind
-    void     rewind();
+    /// rewind file and clear position buffer
+    void     clear();
     
     /// return index of current frame 
-    int      frame() const { return curFrame; }
+    size_t   currentFrame() const { return frameIndex; }
+    
+    /// find the starting point of frame `frm` by brute force !
+    int      seekFrame(size_t frm);
+    
+    /// load specified frame into given Simul (the index of first frame is 1)
+    int      loadFrame(Simul&, size_t frm, bool reload = false);
+    
+    /// read the next frame in the file, return 0 for SUCCESS, 1 for EOF
+    int      loadNextFrame(Simul&);
+    
+    /// read the last frame in the file, return 0 for SUCCESS, 1 if no frame was found
+    int      loadLastFrame(Simul&, size_t cnt = 0);
 
-    /// find the starting point of frame by brute force !
-    int      seekFrame(int frm);
-    
-    /// read the frame specified by index, storing it in global variable 'sim'
-    int      readFrame(Simul&, int frm, bool reload = false);
-    
-    /// read the frame specified by index, storing it in global variable 'sim'
-    int      readFrameCatch(Simul&, int frm, bool reload = false);
-    
-    /// read the next frame in the file, return 1 for EOF
-    int      readNextFrame(Simul&);
-        
 };
 
 

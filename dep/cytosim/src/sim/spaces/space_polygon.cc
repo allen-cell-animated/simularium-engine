@@ -1,51 +1,29 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
 #include "space_polygon.h"
-#include "point_exact.h"
 #include "exceptions.h"
+#include "mecapoint.h"
+#include "glossary.h"
 #include "polygon.h"
 #include "meca.h"
 #include <fstream>
 
-//------------------------------------------------------------------------------
 
-SpacePolygon::SpacePolygon(SpaceProp const* p, std::string const& file)
-: Space(p), height(mLength[0])
+SpacePolygon::SpacePolygon(SpaceProp const* p)
+: Space(p)
 {
-    nPoints = 0;
-    mPoints = 0;
-    mVolume = 0;
+    surface_ = 0;
+    height_ = 0;
+    inf_.reset();
+    sup_.reset();
     
-    if ( DIM < 2 )
-        throw InvalidParameter("polygon is not usable in 1D.");
-    
-    std::ifstream in(file.c_str());
-    
-    if ( ! in.good() )
-        throw InvalidParameter("polygon:file `"+file+"' not found");
-
-    nPoints = Polygon::read(in, 0, 0);
-    
-    if ( nPoints < 3 )
-        throw InvalidParameter("polygon: too few points specified in `"+file+"'");
-    
-    mPoints = new Polygon::Point2D[nPoints+2];
-    
-    in.clear();
-    in.seekg(0);
-    Polygon::read(in, mPoints, nPoints);
-    in.close();
-    
-    resize();
+    if ( DIM == 1 )
+        throw InvalidParameter("polygon is not usable in 1D");
 }
 
 
 SpacePolygon::~SpacePolygon()
 {
-    if ( mPoints )
-        delete[] mPoints;
-    mPoints = 0;
 }
 
 
@@ -53,155 +31,192 @@ SpacePolygon::~SpacePolygon()
  recalculate bounding box, volume
  and points offsets that are used to project
  */
-void SpacePolygon::resize()
+void SpacePolygon::resize(Glossary& opt)
 {
-    if ( Polygon::prepare(mPoints, nPoints) )
+    int ord = 6;
+    std::string file;
+    
+    if ( opt.set(file, "file") )
+        poly_.read(file);
+    else if ( opt.has_key("points") )
+    {
+        // specify vertices directly:
+        unsigned nbp = opt.nb_values("points");
+        poly_.allocate(nbp);
+        for ( unsigned p = 0; p < nbp; ++p )
+        {
+            Vector2 vec(0,0);
+            if ( ! opt.set(vec, "points", p) )
+                throw InvalidParameter("polygon:points must be a list of comma-separated points: X Y, X Y, X Y, etc.");
+            poly_.setPoint(p, vec.XX, vec.YY);
+        }
+    }
+    else if ( opt.set(ord, "order") )
+    {
+        real rad = 1, ang = 0;
+        opt.set(rad, "radius");
+        opt.set(ang, "angle");
+        poly_.set(ord, rad, ang);
+    }
+    else
+        return;
+    
+    if ( poly_.surface() < 0 )
+    {
+        //std::clog << "flipping clockwise polygon `" << file << "'" << std::endl;
+        poly_.flip();
+    }
+
+    real x;
+    if ( opt.set(x, "scale") )
+        poly_.scale(x, x);
+
+    if ( opt.set(x, "inflate") )
+        poly_.inflate(x);
+    
+#if ( DIM == 3 )
+    x = height_;
+    if ( opt.set(x, "height") )
+        x *= 0.5;
+    if ( x < 0 )
+        throw InvalidParameter("polygon:height must be >= 0");
+    height_ = x;
+#endif
+
+    update();
+}
+
+
+void SpacePolygon::update()
+{
+    surface_ = poly_.surface();
+    assert_true( surface_ > 0 );
+    
+    if ( poly_.complete(REAL_EPSILON) )
         throw InvalidParameter("unfit polygon: consecutive points may overlap");
 
     real box[4];
-    Polygon::boundingBox(mPoints, nPoints, box);
-    real x = ( -box[0] > box[1] ) ? -box[0] : box[1];
-    real y = ( -box[2] > box[3] ) ? -box[2] : box[3];
-    boundingBox.set(x, y, height);
-    
-    mVolume = fabs(Polygon::surface(mPoints, nPoints));
-    std::cerr << "Surface of polygon is " << mVolume << std::endl;
-    
-#if ( DIM == 3 )
-    // total height = half_height
-    mVolume *= 2 * height;
-#endif
+    poly_.find_extremes(box);
+    inf_.set(box[0], box[2], 0);
+    sup_.set(box[1], box[3], 0);
 }
 
 
-bool SpacePolygon::inside( const real w[] ) const
+bool SpacePolygon::inside(Vector const& w) const
 {
-#if ( DIM == 3 )
-    if ( w[2] < -height  ||  w[2] > height )
+#if ( DIM > 2 )
+    if ( fabs(w.ZZ) > height_ )
         return false;
 #endif
-    return Polygon::inside(mPoints, nPoints, w[0], w[1], 1);
+#if ( DIM > 1 )
+    return poly_.inside(w.XX, w.YY, 1);
+#else
+    return false;
+#endif
 }
 
 
-void SpacePolygon::project( const real w[], real p[] ) const
-{    
+Vector SpacePolygon::randomPlace() const
+{
+    if ( surface_ <= 0 )
+        throw InvalidParameter("cannot pick point inside polygon of null surface");
+    return Space::randomPlace();
+}
+
+
+Vector SpacePolygon::project(Vector const& w) const
+{
+    Vector p;
 #if ( DIM == 1 )
     
-    p[0] = w[0];
+    p.XX = w.XX;
     
 #elif ( DIM == 2 )
     
-    real nX, nY;
-    Polygon::project(mPoints, nPoints, w[0], w[1], p[0], p[1], nX, nY);
+    int hit;
+    poly_.project(w.XX, w.YY, p.XX, p.YY, hit);
     
-#elif ( DIM == 3 )
+#elif ( DIM > 2 )
     
-    real nX, nY;
-    if ( fabs(w[2]) > height )
+    if ( fabs(w.ZZ) > height_ )
     {
-        if ( Polygon::inside(mPoints, nPoints, w[0], w[1], 1) )
+        if ( poly_.inside(w.XX, w.YY, 1) )
         {
             // too high or too low in the Z axis, but inside XY
-            p[0] = w[0];
-            p[1] = w[1];
+            p.XX = w.XX;
+            p.YY = w.YY;
         }
         else
         {
             // outside in Z and XY
-            Polygon::project(mPoints, nPoints, w[0], w[1], p[0], p[1], nX, nY);
+            int hit;
+            poly_.project(w.XX, w.YY, p.XX, p.YY, hit);
         }
-        p[2] = (w[2]>0) ? height : -height;
+        p.ZZ = std::copysign(height_, w.ZZ);
     }
     else
     {
-        Polygon::project(mPoints, nPoints, w[0], w[1], p[0], p[1], nX, nY);
-        
-        if ( Polygon::inside(mPoints, nPoints, w[0], w[1], 1) )
+        int hit;
+        poly_.project(w.XX, w.YY, p.XX, p.YY, hit);
+        if ( poly_.inside(w.XX, w.YY, 1) )
         {
-            // inside in the Z axis and the XY polygon: compare distances
-            
-            real hdis = (w[0]-p[0])*(w[0]-p[0]) + (w[1]-p[1])*(w[1]-p[1]);
-            
-            //we are inside in both the Z and XY sense, we compare the distances
-            //to the top/bottom planes, and to the sides of the polygon
-            //calculate the distance to the top/bottom planes:
-            real vdis = height - fabs(w[2]);
-            if ( vdis * vdis < hdis )
-            {
-                p[0] = w[0];
-                p[1] = w[1];
-                p[2] = (w[2]>0) ? height : -height;
-                return;
-            }
-            else
-            {
-                p[2] = w[2];
-            }
+            // inside in the Z axis and the XY polygon:
+            // to the polygonal edge in XY plane:
+            real hh = (w.XX-p.XX)*(w.XX-p.XX) + (w.YY-p.YY)*(w.YY-p.YY);
+            // to the top/bottom plates:
+            real v = height_ - fabs(w.ZZ);
+            // compare distances
+            if ( v * v < hh )
+                return Vector(w.XX, w.YY, std::copysign(height_, w.ZZ));
         }
-        else 
-        {
-            // outsize in XY, inside in Z
-            p[2] = w[2];
-        }
+        p.ZZ = w.ZZ;
     }
     
 #endif
+    return p;
 }
 
 
 /**
- The current procedure tests the model-points of fibers against the segments of the polygon.
+ The current procedure tests the vertices of fibers against the segments of the polygon.
  This fails for non-convext polygon since the re-entrant corners can intersect the fibers.
  
  @todo Also project re-entrant polygon corners on the segments of the Fiber.
  */
-void SpacePolygon::setInteraction(Vector const& pos, PointExact const& pe, Meca & meca, real stiff) const
+void SpacePolygon::setInteraction(Vector const& pos, Mecapoint const& pe, Meca & meca, real stiff) const
 {    
 #if ( DIM > 1 )
-    Matrix::index_type inx = DIM * pe.matIndex();
+    index_t inx = DIM * pe.matIndex();
     
-    real pX, pY, nX, nY;
-    int edg = Polygon::project(mPoints, nPoints, pos.XX, pos.YY, pX, pY, nX, nY);
+    int hit;
+    real pX, pY;
+    int edg = poly_.project(pos.XX, pos.YY, pX, pY, hit);
+    real nX = -poly_.pts_[hit].dy;
+    real nY =  poly_.pts_[hit].dx;
     
-#if ( DIM == 3 )
-    
-    if ( pos.ZZ >= height )
-    {
-        meca.mC(inx+2, inx+2) -= stiff;
-        meca.base(inx+2)      += stiff * height;
-        if ( Polygon::inside(mPoints, nPoints, pos.XX, pos.YY, 1) )
-            return;
-    }
-    else if ( pos.ZZ <= -height )
-    {
-        meca.mC(inx+2, inx+2) -= stiff;
-        meca.base(inx+2)      -= stiff * height;
-        if ( Polygon::inside(mPoints, nPoints, pos.XX, pos.YY, 1) )
-            return;
-    }
-    else
-    {
-        // Compare distance to top/bottom plate, and distance to edge in XY plane
-        real vdis = height - fabs(pos.ZZ);
-        real hdis = (pos.XX-pX)*(pos.XX-pX) + (pos.YY-pY)*(pos.YY-pY);
-        
-        if ( vdis * vdis < hdis  &&  Polygon::inside(mPoints, nPoints, pos.XX, pos.YY, 1) )
-        {
-            if ( pos.ZZ >= 0 )
-            {
-                meca.mC(inx+2, inx+2) -= stiff;
-                meca.base(inx+2)      += stiff * height;
-            }
-            else
-            {
-                meca.mC(inx+2, inx+2) -= stiff;
-                meca.base(inx+2)      -= stiff * height;
-            }
-            return;
-        }
-    }
+#if ( DIM > 2 )
+    bool in = poly_.inside(pos.XX, pos.YY, 1);
 
+    if ( fabs(pos.ZZ) >= height_ )
+    {
+        meca.mC(inx+2, inx+2) -= stiff;
+        meca.base(inx+2)      += stiff * std::copysign(height_, pos.ZZ);
+        if ( in ) return;
+    }
+    else if ( in )
+    {
+        // Compare distance to top/bottom plate:
+        real v = height_ - fabs(pos.ZZ);
+        // and distance to polygonal edge in XY plane:
+        real hh = (pos.XX-pX)*(pos.XX-pX) + (pos.YY-pY)*(pos.YY-pY);
+        
+        if ( v * v < hh )
+        {
+            meca.mC(inx+2, inx+2) -= stiff;
+            meca.base(inx+2)      += stiff * std::copysign(height_, pos.ZZ);
+        }
+        return;
+    }
 #endif
 
     if ( edg )
@@ -209,19 +224,19 @@ void SpacePolygon::setInteraction(Vector const& pos, PointExact const& pe, Meca 
         // projection on an edge of normal (nX, nY) already normalized
         const real pr = ( pX * nX + pY * nY ) * stiff;
         
-        meca.mC(inx, inx) -= nX * nX * stiff;
-        meca.base(inx)    += nX * pr;
-
+        meca.mC(inx  , inx  ) -= nX * nX * stiff;
         meca.mC(inx  , inx+1) -= nX * nY * stiff;
         meca.mC(inx+1, inx+1) -= nY * nY * stiff;
-        meca.base(inx+1)      += nY * pr;
+        
+        meca.base(inx  )  += nX * pr;
+        meca.base(inx+1)  += nY * pr;
     }
     else
     {
         // projection on a vertex:
 #if ( DIM == 2 )
         meca.mB(pe.matIndex(), pe.matIndex()) -= stiff;
-#elif ( DIM == 3 )
+#elif ( DIM > 2 )
         meca.mC(inx,   inx  ) -= stiff;
         meca.mC(inx+1, inx+1) -= stiff;
 #endif
@@ -232,10 +247,46 @@ void SpacePolygon::setInteraction(Vector const& pos, PointExact const& pe, Meca 
 }
 
 
-void SpacePolygon::setInteraction(Vector const& pos, PointExact const& pe, real rad, Meca & meca, real stiff) const
+void SpacePolygon::setInteraction(Vector const& pos, Mecapoint const& pe, real rad, Meca & meca, real stiff) const
 {
-    setInteraction(pos, pe, meca, stiff);
-    std::cerr << "unfinished SpacePolygon::setInteractions(with radius)\n";
+    //setInteraction(pos, pe, meca, stiff);
+    std::cerr << "unfinished SpacePolygon::setInteraction(with radius)\n";
+}
+
+#include "fiber_segment.h"
+#include "fiber_set.h"
+
+void SpacePolygon::setInteractions(Meca & meca, FiberSet const& fibers) const
+{
+#if ( 0 )
+    /// WORK IN PROGRESS
+    Polygon::Point2D const* pts = poly_.pts_;
+    const int n_pik = 2;
+    const int inx[n_pik] = { 0, 100 };
+    Vector pik[n_pik];
+    
+    for ( int i = 0; i < n_pik; ++i )
+        pik[i].set(pts[inx[i]].xx, pts[inx[i]].yy, 0);
+    
+    for ( Fiber * fib=fibers.first(); fib; fib=fib->next() )
+    {
+        real ls = fib->segmentation();
+        for ( unsigned seg = 0; seg < fib->nbSegments() ; ++seg )
+        {
+            FiberSegment loc(fib, seg);
+            for ( int i = 0; i < n_pik; ++i )
+            {
+                real dis;
+                real abs = loc.projectPoint(pik[i], abs, dis);
+                if ( 0 <= abs  &&  abs < ls )
+                {
+                    if ( !inside(loc.pos(abs)) || !inside(loc.pos1()) || !inside(loc.pos2()) )
+                        meca.addPointClamp(Interpolation(loc, abs), pik[i], 100);
+                }
+            }
+        }
+    }
+#endif
 }
 
 //------------------------------------------------------------------------------
@@ -246,53 +297,91 @@ void SpacePolygon::setInteraction(Vector const& pos, PointExact const& pe, real 
 #include "opengl.h"
 #include "gle.h"
 
-bool SpacePolygon::display() const
+bool SpacePolygon::draw() const
 {
+    const unsigned npts = poly_.nbPoints();
+    Polygon::Point2D const* pts = poly_.pts_;
+
+#if ( DIM == 2 )
+    
+    glEnable(GL_STENCIL_TEST);
+    glClearStencil(1);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glStencilFunc(GL_EQUAL, 1, ~0);
+    glStencilOp(GL_KEEP, GL_ZERO, GL_ZERO);
+    
+    //display points
+    GLfloat s = 1;
+    glGetFloatv(GL_LINE_WIDTH, &s);
+    glPointSize(s);
+    glBegin(GL_POINTS);
+    for ( unsigned n=0; n < npts; ++n )
+        gle::gleVertex(pts[n].xx, pts[n].yy);
+    glEnd();
+
+    //display polygon
+    glBegin(GL_LINE_LOOP);
+    for ( unsigned n=0; n < npts; ++n )
+        gle::gleVertex(pts[n].xx, pts[n].yy);
+    glEnd();
+    
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glDisable(GL_STENCIL_TEST);
+
+#elif ( DIM > 2 )
+    
+    // display bottom
+    glLineWidth(2);
+    glBegin(GL_LINE_LOOP);
+    for ( unsigned n=0; n < npts; ++n )
+        gle::gleVertex(pts[n].xx, pts[n].yy, -height_);
+    glEnd();
+    
+    // display top
+    glBegin(GL_LINE_LOOP);
+    for ( unsigned n=npts; n > 0; --n )
+        gle::gleVertex(pts[n].xx, pts[n].yy,  height_);
+    glEnd();
+    
+    // display sides
+    real Z = height_;
+    glBegin(GL_TRIANGLE_STRIP);
+    for ( unsigned n=0; n <= npts; ++n )
+    {
+        gle::gleVertex(pts[n].xx, pts[n].yy, Z);
+        gle::gleVertex(pts[n].xx, pts[n].yy,-Z);
+    }
+    glEnd();
+    
+#endif
+    
 #if ( 0 )
+    // display points:
+    glColor3f(1,1,1);
+    glPointSize(3);
+    glBegin(GL_POINTS);
+    for ( unsigned n=0; n < npts; ++n )
+        gle::gleVertex(pts[n].xx, pts[n].yy);
+    glEnd();
+#endif
+#if ( 0 )
+    // indicate index of each point:
     char tmp[8];
-    for ( unsigned int n=0; n < nPoints; n++ )
+    for ( unsigned n=0; n < npts; ++n )
     {
         snprintf(tmp, sizeof(tmp), "%i", n);
-        Vector p(mPoints[n].x, mPoints[n].y );
-        gle::gleDrawText(p, tmp, GLUT_BITMAP_HELVETICA_10);
+        Vector p(pts[n].xx, pts[n].yy, height_);
+        gle::gleDrawText(p, tmp, 0);
     }
 #endif
     
-    glBegin(GL_LINE_LOOP);
-    for ( unsigned int n=0; n < nPoints; n++ )
-    {
-#if ( DIM == 3 )
-        gle::gleVertex( mPoints[n].x, mPoints[n].y, -height );
-#else
-        gle::gleVertex( mPoints[n].x, mPoints[n].y );
-#endif
-    }
-    glEnd();
-    
-#if ( DIM == 3 )
-    //display top of generalized cylinder
-    glBegin(GL_LINE_LOOP);
-    for ( unsigned int n=0; n < nPoints; n++ )
-    {
-        gle::gleVertex( mPoints[n].x, mPoints[n].y,  height );
-    }
-    glEnd();
-    //display sides of generalized cylinder
-    glBegin(GL_LINES);
-    for ( unsigned int n=0; n < nPoints; n++ )
-    {
-        gle::gleVertex( mPoints[n].x, mPoints[n].y, -height );
-        gle::gleVertex( mPoints[n].x, mPoints[n].y,  height );
-    }
-    glEnd();
-#endif
-    
+
     return true;
 }
 
 #else
 
-bool SpacePolygon::display() const
+bool SpacePolygon::draw() const
 {
     return false;
 }

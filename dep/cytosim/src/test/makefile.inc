@@ -1,33 +1,27 @@
 # Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 
-TESTS:=test test_solve test_random test_math test_param test_quaternion\
-       test_thread test_sizeof test_blas test_simd
+TESTS:=test test_gillespie test_solve test_random test_math test_glos test_quaternion\
+       test_code test_matrix test_thread test_blas test_pipe
 
-
-TESTS_GL:=test_glapp test_rasterizer test_space test_grid test_sphere
+TESTS_GL:=test_opengl test_vbo test_glut test_glapp test_platonic\
+          test_rasterizer test_space test_grid test_sphere
 
 
 .PHONY: tests
 tests: $(TESTS) $(TESTS_GL)
-
 
 vpath %.cc src/test
 
 
 #--------------------macros----------------------------------------------------
 
+TEST_MAKE = $(COMPILE) $(addprefix -Isrc/, math base sim disp play) $(OBJECTS) $(LINK) -o bin/$@
 
-TEST_OBJ=$(filter %.cc, $^) $(addprefix build/, $(notdir $(filter-out %.cc, $^)))
-
-TEST_INC=$(addprefix -Isrc/, SFMT math base sim sim/spaces sim/fibers sim/singles sim/organizers gl play)
-
-TEST_MAKE=$(COMPILE) $(TEST_INC) $(TEST_OBJ) $(LINK) -o bin/$@
-
-TEST_MAKE_GL=$(COMPILE) $(TEST_INC) $(TEST_OBJ) $(LINK) $(LINKGL) -o bin/$@
+TEST_GL = -I src/disp $(GRAFIX) $(IMAGES)
 
 
-#----------------------------targets--------------------------------------------
+#----------------------------Targets--------------------------------------------
 
 test: test.cc random.o SFMT.o tictoc.o backtrace.o
 	$(TEST_MAKE)
@@ -39,35 +33,55 @@ test_blas: test_blas.cc random.o SFMT.o backtrace.o
 	$(DONE)
 vpath test_blas bin
 
-test_param: test_param.cc glossary.o tokenizer.o stream_func.o exceptions.o backtrace.o filepath.o
+test_code: test_code.cc random.o SFMT.o tictoc.o 
+	$(COMPILE) $(INC_BM) $(OBJECTS) $(LINK) -o bin/$@
+	$(DONE)
+vpath test_code bin
+
+test_matrix: test_matrix.cc matsparsesymblk.o matsparsesym.o matsparsesym1.o matsparsesym2.o matrix.o random.o SFMT.o tictoc.o backtrace.o
 	$(TEST_MAKE)
 	$(DONE)
-vpath test_param bin
+vpath test_matrix bin
 
-test_quartic: test_quartic.cc quartic.o random.o SFMT.o backtrace.o
+test_glos: test_glos.cc glossary.o filepath.o tokenizer.o stream_func.o exceptions.o backtrace.o ansi_colors.o
 	$(TEST_MAKE)
 	$(DONE)
-vpath test_quartic bin
+vpath test_glos bin
 
-test_quaternion: test_quaternion.cc libcytomath.a SFMT.o libcytobase.a
+test_quaternion: test_quaternion.cc cytomath.a SFMT.o cytobase.a 
 	$(TEST_MAKE)
 	$(DONE)
 vpath test_quaternion bin
 
-test_random: test_random.cc random.o SFMT.o exceptions.o filewrapper.o messages.o smath.o vecprint.o backtrace.o tictoc.o
+test_random: test_random.cc random.o SFMT.o exceptions.o filewrapper.o messages.o smath.o backtrace.o tictoc.o
 	$(TEST_MAKE)
 	$(DONE)
 vpath test_random bin
 
-test_simd: test_simd.cc tictoc.o
-	$(COMPILE) -Isrc/base src/base/tictoc.cc $< -o bin/test_simd
+test_asm: test_asm.cc
+	$(COMPILE) -restrict -S -c -m64 $^ -o build/test_asm.s
+	$(DONE)
+vpath test_asm.s build
+
+test_simd: test_simd.cc random.o SFMT.o tictoc.o
+	$(COMPILE) -Isrc/base -Isrc/math -Isrc/SFMT $(OBJECTS) -o bin/$@
 	$(DONE)
 vpath test_simd bin
+
+test_omp: test_omp.cc
+	$(COMPILE) -fopenmp $^ -o bin/test_omp
+	$(DONE)
+vpath test_omp bin
 
 test_sizeof: test_sizeof.cc
 	$(TEST_MAKE)
 	$(DONE)
 vpath test_sizeof bin
+
+test_pipe: test_pipe.cc gle_color.cc gle_color_list.cc
+	$(TEST_MAKE)
+	$(DONE)
+vpath test_pipe bin
 
 test_cxx: test_cxx.cc
 	$(TEST_MAKE)
@@ -89,36 +103,62 @@ test_string: test_string.cc
 	$(DONE)
 vpath test_string bin
 
-#----------------------------graphics targets-----------------------------------
+test_gillespie: test_gillespie.cc random.o SFMT.o backtrace.o
+	$(TEST_MAKE)
+	$(DONE)
+vpath test_gillespie bin
+
+#----------------------------Targets with Graphics------------------------------
+
+OBJGLAP := $(OBJ_DISPLAY) offscreen.o
 
 test_opengl: test_opengl.cc
-	$(CXX) $^ $(LINKGL) -o bin/$@
+	$(CXX) $^ $(GRAFIX) -o bin/$@
+	$(DONE)
 vpath test_opengl bin
 
+test_vbo: test_vbo.cc
+	$(CXX) $^ $(GRAFIX) -o bin/$@
+	$(DONE)
+vpath test_vbo bin
+
 test_glut: test_glut.cc
-	$(CXX) $^ $(LINKGL) -o bin/$@
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_glut bin
 
-test_glapp: test_glapp.cc libcytogl.a libcytobase.a libcytomath.a
-	$(TEST_MAKE_GL)
+test_glapp: test_glapp.cc $(OBJGLAP) cytobase.a cytomath.a
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_glapp bin
 
-test_sphere: test_sphere.cc libcytogl.a libcytomath.a libcytobase.a
-	$(TEST_MAKE_GL)
+test_sphere: test_sphere.cc $(OBJGLAP) cytomath.a cytobase.a
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_sphere bin
 
-test_rasterizer: test_rasterizer.cc rasterizerGL.o libcytomath.a libcytogl.a libcytobase.a
-	$(TEST_MAKE_GL)
+test_platonic: test_platonic.cc platonic.o $(OBJGLAP) cytomath.a cytobase.a
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
+vpath test_platonic bin
+
+test_rasterizer: test_rasterizer.cc rasterizerG.o cytomath.a $(OBJGLAP) cytobase.a
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_rasterizer bin
 
-test_space: test_space.cc libcytospace.a libcytosim.a libcytomath.a libcytogl.a libcytobase.a
-	$(TEST_MAKE_GL)
+test_space: test_space.cc cytosim.a cytomath.a $(OBJGLAP) cytobase.a
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_space bin
 
-test_grid: test_grid.cc tictoc.o libcytomath.a libcytobase.a libcytogl.a
-	$(TEST_MAKE_GL)
+test_grid: test_grid.cc tictoc.o cytomath.a cytobase.a $(OBJGLAP) grid_display.o
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_grid bin
 
-test_solve: test_solve.cc libcytomath.a libcytobase.a
-	$(TEST_MAKE_GL)
+test_solve: test_solve.cc cytomath.a cytobase.a
+	$(TEST_MAKE) $(TEST_GL)
+	$(DONE)
 vpath test_solve bin
+

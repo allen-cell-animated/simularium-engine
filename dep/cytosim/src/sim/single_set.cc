@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "single_set.h"
 #include "single_prop.h"
 #include "glossary.h"
@@ -13,344 +12,293 @@
 /**
  @copydetails SingleGroup
  */
-Property* SingleSet::newProperty(const std::string& kd, const std::string& nm, Glossary& opt) const
+Property* SingleSet::newProperty(const std::string& cat, const std::string& nom, Glossary& opt) const
 {
-    if ( kd == kind() )
-        return new SingleProp(nm);
+    if ( cat == "single" )
+        return new SingleProp(nom);
     else
-        return 0;
+        return nullptr;
 }
 
 //------------------------------------------------------------------------------
-void SingleSet::step(FiberSet const&, FiberGrid const& fgrid)
+
+void SingleSet::prepare(PropertyList const& properties)
 {
+    uni = uniPrepare(properties);
+}
+
+
+void SingleSet::step(FiberSet const& fibers, FiberGrid const& fgrid)
+{
+    // use alternate attachment strategy:
+    if ( uni )
+        uniAttach(fibers);
+
     /*
-     ATTENTION: we have multiple lists, and Objects are automatically 
-     transfered from one list to another if their Hand bind or unbind.
-     We avoid here calling step() twice for the same object, by relying on the
-     fact that a transfered node would be linked at the end of the new list.
-     This is done by stopping after the node, which was last in the list,
-     when the routine started.
+     ATTENTION: we have multiple lists, and Objects are automatically transfered
+     from one list to another if their Hands bind or unbind. We ensure here that
+     step() is called exactly once for each object. THe code relies on the fact
+     that a transfered node would be linked at the start of the new list.
+     We start always at the node, which was first before any transfer could occur.
      */
     
-    const Node *const fLast = fList.last();
-    const Node *const aLast = aList.last();
+    //Cytosim::log("SingleSet::step entry : F %5i A %5i\n", fList.size(), aList.size());
     
-    if ( fLast )
+    
+    Single *const fHead = firstF();
+    Single * obj, * nxt;
+    
+    obj = firstA();
+    while ( obj )
     {
-        Single * obj = firstF(), * nxt;
-        do {
-            nxt = obj->next();
-            obj->stepFree(fgrid);
-            if ( obj == fLast ) break;
-            obj = nxt->next();
-            nxt->stepFree(fgrid);
-        } while ( nxt != fLast );
+        nxt = obj->next();
+        obj->stepA();
+        if ( ! nxt ) break;
+        obj = nxt->next();
+        nxt->stepA();
     }
-
-    if ( aLast )
+    
+    obj = fHead;
+    while ( obj )
     {
-        Single * obj = firstA(), * nxt;
-        do {
-            nxt = obj->next();
-            obj->stepAttached();
-            if ( obj == aLast ) break;
-            obj = nxt->next();
-            nxt->stepAttached();
-        } while ( nxt != aLast );
+        nxt = obj->next();
+        obj->stepF(fgrid);
+        if ( ! nxt ) break;
+        obj = nxt->next();
+        nxt->stepF(fgrid);
     }
 }
 
-//------------------------------------------------------------------------------
-void SingleSet::erase()
-{
-    fList.erase();
-    aList.erase();
-    inventory.clear();
-}
 
 //------------------------------------------------------------------------------
-Object * SingleSet::newObjectT(const Tag tag, int ix)
-{
-    Property * p = simul.properties.find_or_die(kind(), ix);
-    SingleProp * sp = static_cast<SingleProp*>(p);
+#pragma mark -
 
-    if ( tag == Wrist::TAG )
-        return sp->newWrist(0,0);
-    
+
+Object * SingleSet::newObject(const ObjectTag tag, unsigned num)
+{
     if ( tag == Single::TAG )
-        return sp->newSingle();
-
-    return 0;
+    {
+        SingleProp * p = simul.findProperty<SingleProp>("single", num);
+        return p->newSingle();
+    }
+    else if ( tag == Wrist::TAG )
+    {
+        SingleProp * p = simul.findProperty<SingleProp>("single", num);
+        return p->newWrist(nullptr, 0);
+    }
+    return nullptr;
 }
 
 /**
  @addtogroup SingleGroup
  
  A newly created Single can be anchored to a Mecable:
- @code
- new single NAME {
-   base = CLASS_NAME, INTEGER_REF, INTEGER_INDEX
- }
- @endcode
+ 
+     new NAME {
+       base = OBJECT, POINT
+     }
+ 
  
  where:
- - CLASS_NAME is the name of the object class (eg. solid)
- - INTEGER_REF designates the object:
-     - 1 for first object
-     - 2 for second...
-     - 0 designates the last object,
-     - -1 is the penultimate one, etc.
+ - OBJECT is the concatenation of the class name with the serial number of the object:
+     - 'bead1' for the first bead
+     - 'bead2' for the second...
+     - 'bead0' designates the last bead made,
+     - 'bead-1' is the penultimate one, etc.
      .
- - INTEGER_INDEX designates a point on this object:
-     - 0 = first point
-     - 1 = second point...
+ - POINT designates a point on this object:
+     - point1 = first point
+     - point2 = second point...
      .
  .
- 
- if INTERGER1 is negative, the last object is used.
 
- You can directly attach the newly created Single to a fiber:
- @code
- new single protein
- {
-    attach = INTEGER, REAL
- }
- @endcode
+ You can attach a Single to a fiber:
+ 
+     new simplex
+     {
+        attach = FIBER, REAL, REFERENCE
+     }
  
  where:
- - INTEGER designates the fiber:
-    - 1 for the first fiber
-    - 2 for the second, etc
-    - a negative number indicates the last fiber created
- - REAL is the abscissa of the attachment point (0=MINUS_END)
+ - FIBER designates the fiber:
+     - `fiber1` of `fiber2` correspond to fibers directly
+     - `first` or `last` to the oldest and youngest fiber
+     - `fiber-1` the penultimate, etc.
+     .
+ - REAL is the abscissa of the attachment point.
+   If the abscissa is not specified, and random position along
+   along the fiber will be selected.
+ - REFERENCE can be `minus_end`, `center` or `plus_end` (default = `origin`).
+   This defines from which position the abscissa is measured.
  .
  */
-ObjectList SingleSet::newObjects(const std::string& kd, const std::string& nm, Glossary& opt)
+ObjectList SingleSet::newObjects(const std::string& name, Glossary& opt)
 {
-    ObjectList res;
-    if ( kd == kind() )
+    SingleProp * p = simul.findProperty<SingleProp>("single", name);
+    
+    Single * obj = nullptr;
+    std::string str;
+    if ( opt.set(str, "base") )
     {
-        Property * p = simul.properties.find_or_die(kd, nm);
-        SingleProp * sp = static_cast<SingleProp*>(p);
-        Object * obj = 0;
-        
-        std::string nam;
-        if ( opt.set(nam, "base") )
-        {
-            long io = 1;
-            unsigned ip = 0;
-            opt.set(io, "base", 1);  // object number
-            opt.set(ip, "base", 2);  // index of point
-            Mecable * mec = static_cast<Mecable*>(simul.findObject(nam, io));
-            if ( mec == 0 )
-                throw InvalidParameter("Could not find Mecable in single:base");
-            if ( ip >= mec->nbPoints() )
-                throw InvalidParameter("index out of range in single:base");
-            
-            obj = sp->newWrist(mec, ip);
-        }
-        else
-            obj = sp->newSingle();
-
-        res.push_back(obj);
-        
-        /*
-         This provides a way for the user to attach the Single to an existing fiber
-         */
-        long io = 0;
-        if ( opt.set(io, "attach") )
-        {
-            Fiber * fib = simul.findFiber(io);
-            if ( fib == 0 )
-                throw InvalidParameter("Could not find Fiber in single::attach");
-            
-            real abs = 0;
-            opt.set(abs, "attach", 1);
-            if ( !fib->within(abs) )
-                throw InvalidParameter("out of range abscissa in single:attach");
-            
-            static_cast<Single*>(obj)->attachTo(fib, abs, ORIGIN);
-        }
+        Mecable * mec = simul.findMecable(str);
+        if ( !mec )
+            throw InvalidParameter("Could not find Mecable specified in single:base");
+        // get index of point in second argument
+        unsigned ip = 0;
+        if ( opt.set(str, "base", 1) )
+            ip = Mecable::point_index(str, mec->nbPoints());
+         
+        obj = p->newWrist(mec, ip);
     }
+    else
+        obj = p->newSingle();
+
+    // Allow user to attach Hand to an existing fiber
+    if ( opt.has_key("attach") )
+        obj->attach(simul.fibers.someSite("attach", opt));
+    
+    // Allow user to attach Hand to an existing fiber
+    if ( opt.has_key("site") )
+        obj->attach(simul.fibers.someSite("site", opt));
+
+    ObjectList res;
+    res.push_back(obj);
     return res;
 }
 
 
 //------------------------------------------------------------------------------
-void SingleSet::link(Object * gh)
-{
-    assert_true( gh->tag()==Single::TAG  ||  gh->tag()==Wrist::TAG );
-    assert_true( !gh->linked() );
+#pragma mark -
 
-    if ( static_cast<Single*>(gh)->attached() )
-        aList.push_back(gh);
-    else
-        fList.push_back(gh);
+
+void SingleSet::relinkA(Single * obj)
+{
+    fList.pop(obj);
+    aList.push_front(obj);
 }
 
 
+void SingleSet::relinkD(Single * obj)
+{
+    aList.pop(obj);
+    fList.push_front(obj);
+}
 
-//------------------------------------------------------------------------------
-#pragma mark - Wrists
+
+void SingleSet::link(Object * obj)
+{
+    assert_true( !obj->objset() );
+    assert_true( obj->tag()==Single::TAG || obj->tag()==Wrist::TAG );
+
+    obj->objset(this);
+
+    if ( static_cast<Single*>(obj)->attached() )
+        aList.push_front(obj);
+    else
+        fList.push_front(obj);
+}
 
 /**
- This will create Wrists with `obj` as Base, following the specifications given in `str`.
- These Wrists will be anchored on points `fip` to `fip+nbp-1` of `obj`.
- 
- The syntax understood for `str` is as follows:
- @code
- [INTEGER] [NAME_OF_SINGLE] [each]
- @endcode
- 
- The first optional integer specifies the number of Singles to be attached.
- If 'each' is specified, this number is multiplied by the number of point `nbp`,
- and every point receives the same number of Singles.
- 
- This is used to decorate Solid and Sphere
+ This will also detach the Hand
  */
-ObjectList SingleSet::makeWrists(Mecable const* obj, unsigned fip, unsigned nbp, std::string& str)
+void SingleSet::unlink(Object * obj)
 {
-    ObjectList res;
-    unsigned num = 1;
+    assert_true( obj->objset() == this );
     
-    std::istringstream iss(str);
-    iss >> num;
+    Single * s = static_cast<Single*>(obj);
+  
+    if ( s->attached() )
+        s->detach();
     
-    if ( iss.fail() )
-    {
-        num = 1;
-        iss.clear();
-    }
-    
-    if ( num == 0 || nbp == 0 )
-        return res;
-    
-    std::string sip, mod;
-    iss >> sip >> mod;
-    
-    SingleProp * sp = simul.findSingleProp(sip);
-    
-    if ( mod == "each" )
-    {
-        for ( unsigned u = 0; u < num; ++u )
-        {
-            for ( unsigned i = 0; i < nbp; ++i )
-                res.push_back(sp->newWrist(obj, fip+i));
-        }
-    }
+    obj->objset(nullptr);
+
+    if ( s->attached() )
+        aList.pop(obj);
     else
+        fList.pop(obj);
+}
+
+
+void SingleSet::foldPosition(Modulo const* s) const
+{
+    Single * obj;
+    for ( obj=firstF(); obj; obj=obj->next() )  obj->foldPosition(s);
+    for ( obj=firstA(); obj; obj=obj->next() )  obj->foldPosition(s);
+}
+
+
+void SingleSet::shuffle()
+{
+    aList.shuffle();
+    fList.shuffle();
+}
+
+
+void SingleSet::erase()
+{
+    relax();
+    ObjectSet::erase(fList);
+    ObjectSet::erase(aList);
+    inventory.clear();
+}
+
+
+void SingleSet::freeze(ObjectFlag f)
+{
+    relax();
+    ObjectSet::flag(aList, f);
+    ObjectSet::flag(fList, f);
+}
+
+
+void SingleSet::deleteA(Single * s)
+{
+    s->hand()->detachHand();
+    inventory.unassign(s);
+    s->objset(nullptr);
+    aList.pop(s);
+    delete(s);
+}
+
+
+void SingleSet::prune(ObjectFlag f)
+{
+    /* After reading from file, the Hands should not
+     update any Fiber, Single or Couple as they will be deleted */
+    for (Single* s=firstA(), *n; s; s=n)
     {
-        for ( unsigned u = 0; u < num; ++u )
-        {
-            unsigned i = RNG.pint_exc(nbp);
-            res.push_back(sp->newWrist(obj, fip+i));
-        }
+        n = s->next();
+        if ( s->flag() == f )
+            deleteA(s);
     }
-    
-    return res;
+
+    //ObjectSet::prune(aList, f, 0);
+    ObjectSet::prune(fList, f, 0);
 }
 
 
-ObjectList SingleSet::collectWrists(Object * foot) const
+void SingleSet::thaw()
 {
-    ObjectList res;
-    
-    for ( Single * s=firstF(); s; s=s->next() )
-        if ( s->foot() == foot )
-            res.push_back(s);
-    
-    for ( Single * s=firstA(); s; s=s->next() )
-        if ( s->foot() == foot )
-            res.push_back(s);
-    
-    return res;
+    ObjectSet::flag(aList, 0);
+    ObjectSet::flag(fList, 0);
 }
 
 
-void SingleSet::removeWrists(Object * obj)
+void SingleSet::write(Outputter& out) const
 {
-    Single * ghi = firstF();
-    Single * gh  = ghi;
-    // check free list
-    while ( gh )
+    if ( sizeA() > 0 )
     {
-        ghi = ghi->next();
-        if ( gh->foot() == obj )
-            delete(gh);
-        gh = ghi;
+        out.put_line("\n#section single A", out.binary());
+        writeNodes(out, aList);
     }
-    
-    // check attached list
-    ghi = firstA();
-    gh  = ghi;
-    while ( gh )
+    if ( sizeF() > 0 )
     {
-        ghi = ghi->next();
-        if ( gh->foot() == obj )
-            delete(gh);
-        gh = ghi;
-    }
-}
-
-//------------------------------------------------------------------------------
-unsigned int SingleSet::size() const
-{
-    return aList.size() + fList.size();
-}
-
-void SingleSet::mix()
-{
-    aList.mix(RNG);
-    fList.mix(RNG);
-}
-
-void SingleSet::freeze()
-{
-    fIce.transfer(fList);
-    aIce.transfer(aList);
-}
-
-void SingleSet::thaw(bool erase)
-{
-    if ( erase )
-    {
-        forget(fIce);
-        forget(aIce);
-        fIce.erase();
-        aIce.erase();
-    }
-    else
-    {
-        fList.transfer(fIce);
-        aList.transfer(aIce);
+        out.put_line("\n#section single F", out.binary());
+        writeNodes(out, fList);
     }
 }
 
 
-ObjectList SingleSet::collect(bool (*func)(Object const*, void*), void* arg) const
-{
-    ObjectList res = ObjectSet::collect(fList, func, arg);
-    res.append( ObjectSet::collect(aList, func, arg) );
-    return res;
-}
-
-
-//------------------------------------------------------------------------------
-void SingleSet::foldPosition(const Modulo * s) const
-{
-    Single * gh;
-    for ( gh=firstF(); gh; gh=gh->next() )  gh->foldPosition(s);
-    for ( gh=firstA(); gh; gh=gh->next() )  gh->foldPosition(s);
-}
-
-void SingleSet::write(OutputWrapper & out) const
-{
-    ObjectSet::write(aList, out);
-    ObjectSet::write(fList, out);
-}
-
-//------------------------------------------------------------------------------
 int SingleSet::bad() const
 {
     int code = 0;
@@ -363,12 +311,328 @@ int SingleSet::bad() const
     }
     
     code = aList.bad();
-    if ( code ) return code;
-    for ( ghi = firstA();  ghi ; ghi=ghi->next() )
+    if ( !code )
     {
-        if ( !ghi->attached() ) return 101;
+        for ( ghi = firstA();  ghi ; ghi=ghi->next() )
+            if ( !ghi->attached() )
+                return 101;
     }
     
     return code;
+}
+
+//------------------------------------------------------------------------------
+#pragma mark -
+
+
+void SingleSet::report(std::ostream& os) const
+{
+    if ( size() > 0 )
+    {
+        os << '\n' << title();
+        PropertyList plist = simul.properties.find_all(title());
+        for ( Property * i : plist )
+        {
+            SingleProp * p = static_cast<SingleProp*>(i);
+            unsigned cnt = count(match_property, p);
+            os << '\n' << std::setw(10) << cnt << ' ' << p->name();
+            os << " ( " << p->hand << " )";
+        }
+        if ( plist.size() > 1 )
+            os << '\n' << std::setw(10) << size() << " total";
+    }
+}
+
+
+ObjectList SingleSet::collect() const
+{
+    ObjectList res = ObjectSet::collect(fList);
+    res.append( ObjectSet::collect(aList) );
+    return res;
+}
+
+
+ObjectList SingleSet::collect(bool (*func)(Object const*, void const*), void const* arg) const
+{
+    ObjectList res = ObjectSet::collect(fList, func, arg);
+    res.append( ObjectSet::collect(aList, func, arg) );
+    return res;
+}
+
+
+unsigned SingleSet::count(bool (*func)(Object const*, void const*), void const* arg) const
+{
+    unsigned f = ObjectSet::count(fList, func, arg);
+    unsigned a = ObjectSet::count(aList, func, arg);
+    return f + a;
+}
+
+//------------------------------------------------------------------------------
+#pragma mark - Wrists
+
+/**
+ This will create Wrists with `obj` as Base, following the specifications given in `arg`.
+ These Wrists will be anchored on points `fip` to `fip+nbp-1` of `obj`.
+ 
+ The syntax understood for `arg` is as follows:
+
+     [INTEGER] NAME_OF_SINGLE [each]
+
+ The first optional integer specifies the number of Singles to be attached.
+ Then follows the name of the Single to be created.
+ If 'each' is specified, this number is multiplied by the number of point `nbp`,
+ and every point receives the same number of Singles.
+ 
+ This is used to decorate Solid and Sphere
+ */
+ObjectList SingleSet::makeWrists(Mecable const* obj, unsigned fip, unsigned nbp, std::string& arg)
+{
+    ObjectList res;
+    unsigned num = 1;
+
+    std::istringstream iss(arg);
+    iss >> num;
+    
+    if ( iss.fail() )
+    {
+        num = 1;
+        iss.clear();
+    }
+    
+    if ( num == 0 || nbp == 0 )
+        return res;
+    
+    std::string str, mod;
+    iss >> str >> mod;
+    
+    SingleProp * sip = simul.findProperty<SingleProp>("single", str);
+
+    if ( mod == "each" )
+    {
+        for ( unsigned u = 0; u < num; ++u )
+        {
+            for ( unsigned i = 0; i < nbp; ++i )
+                res.push_back(sip->newWrist(obj, fip+i));
+        }
+    }
+    else
+    {
+        for ( unsigned u = 0; u < num; ++u )
+        {
+            res.push_back(sip->newWrist(obj, fip+RNG.pint(nbp)));
+        }
+    }
+    
+    return res;
+}
+
+
+SingleList SingleSet::collectWrists(Object const* arg) const
+{
+    SingleList res;
+    
+    for ( Single * s=firstF(); s; s=s->next() )
+        if ( s->base() == arg )
+            res.push_back(s);
+    
+    for ( Single * s=firstA(); s; s=s->next() )
+        if ( s->base() == arg )
+            res.push_back(s);
+    
+    return res;
+}
+
+
+void SingleSet::removeWrists(Object const* arg)
+{
+    Single *nxt, *obj;
+    
+    obj = firstF();
+    while ( obj )
+    {
+        nxt = obj->next();
+        if ( obj->base() == arg )
+            delete(obj);
+        obj = nxt;
+    }
+
+    obj = firstA();
+    while ( obj )
+    {
+        nxt = obj->next();
+        if ( obj->base() == arg )
+            delete(obj);
+        obj = nxt;
+    }
+}
+
+
+//------------------------------------------------------------------------------
+#pragma mark - Fast Diffusion
+
+
+/**
+ Distribute Singles on the sites specified in `loc`.
+ */
+void SingleSet::uniAttach(Array<FiberSite>& loc, SingleReserveList& reserve)
+{
+    for ( FiberSite & i : loc )
+    {
+        if ( reserve.empty() )
+            return;
+        Single * s = reserve.back();
+        Hand const* h = s->hand();
+        
+        if ( h->attachmentAllowed(i) )
+        {
+            Vector pos = i.pos();
+            Space const* spc = i.fiber()->prop->confine_space_ptr;
+
+            // Only attach if position is within the confining Space:
+            if ( spc && spc->outside(pos) )
+                continue;
+
+            if ( s->prop->fast_diffusion == 3 )
+            {
+                if ( ! spc )
+                    continue;
+                // Only attach if position is near the edge of the Space:
+                Vector prj = spc->project(pos);
+                if ( distanceSqr(pos, prj) > h->prop->binding_range_sqr )
+                    continue;
+                // Single will be placed on the edge of the Space:
+                pos = prj;
+            }
+            else
+            {
+#if ( DIM > 1 )
+                /*
+                 Place the Single in the line perpendicular to the attachment point,
+                 at a random distance within the range of attachment of the Hand.
+                 This simulates a uniform spatial distribution of Single.
+                 */
+                pos += i.dirFiber().randOrthoB(h->prop->binding_range);
+#endif
+            }
+
+            reserve.pop_back();
+            s->setPosition(pos);
+            s->attach(i);
+            link(s);
+        }
+    }
+}
+
+
+/**
+ Implements a Monte-Carlo approach for attachments of free Single, assumming that
+ diffusion is sufficiently fast to maintain a uniform spatial distribution,
+ and that the distribution of fibers is more-or-less uniform such that the
+ attachments are distributed randomly along the fibers.
+ 
+ Diffusing (free) Single are removed from the standard list, and thus the
+ random walk that is used for simulating diffusion will be skipped,
+ as well as the detection of neighboring fibers done for attachments.
+ 
+ Algorithm:
+ - Remove diffusing Single from the simulation, transfering them to a 'reserve'.
+ - Estimate the distance between binding sites occuring in one time-step, from:
+    - the total length of fibers,
+    - the volume of the Space,
+    - the binding parameters of the relevant Hand.
+    .
+ - Attach Singles from the reserve, at random positions along the Fibers
+ .
+ 
+ Note: there is a similar feature for Couple
+ */
+void SingleSet::uniAttach(FiberSet const& fibers)
+{
+    // transfer free Single that fast-diffuse to the reserve
+    Single * obj = firstF(), * nxt;
+    while ( obj )
+    {
+        nxt = obj->next();
+        SingleProp const* p = obj->prop;
+        if ( p->fast_diffusion )
+        {
+            unlink(obj);
+            assert_true((size_t)p->number() < uniLists.size());
+            uniLists[p->number()].push_back(obj);
+        }
+        obj = nxt;
+    }
+    
+    Array<FiberSite> loc(1024);
+    
+    // uniform attachment for the reserves:
+    for ( SingleReserveList & reserve : uniLists )
+    {
+        if ( !reserve.empty() )
+        {
+            SingleProp const* p = reserve.back()->prop;
+            
+            const real vol = p->spaceVolume();
+            const size_t cnt = reserve.size();
+            
+            if ( p->fast_diffusion == 2 )
+            {
+                real dis = vol / ( cnt * p->hand_prop->bindingSectionRate() );
+                fibers.newFiberSitesP(loc, dis);
+            }
+            else
+            {
+                real dis = vol / ( cnt * p->hand_prop->bindingSectionProb() );
+                fibers.uniFiberSites(loc, dis);
+            }
+            
+            uniAttach(loc, reserve);
+        }
+    }
+}
+
+
+/**
+ 
+ Return true if at least one single:fast_diffusion is true,
+ and in this case allocate uniLists.
+ 
+ The Volume of the Space is assumed to remain constant until the next uniPrepare()
+ */
+bool SingleSet::uniPrepare(PropertyList const& properties)
+{
+    bool res = false;
+    unsigned last = 0;
+
+    for ( Property const* i : properties.find_all("single") )
+    {
+        SingleProp const* p = static_cast<SingleProp const*>(i);
+        res |= p->fast_diffusion;
+        last = std::max(last, p->number());
+    }
+    
+    if ( res )
+        uniLists.resize(last+1);
+    
+    return res;
+}
+
+
+/**
+ empty uniLists, reversing all Singles in the normal lists.
+ This is useful if ( single:fast_diffusion == true )
+ */
+void SingleSet::uniRelax()
+{
+    for ( SingleReserveList & reserve : uniLists )
+    {
+        for ( Single * s : reserve )
+        {
+            assert_true(!s->attached());
+            s->randomizePosition();
+            link(s);
+        }
+        reserve.clear();
+    }
 }
 

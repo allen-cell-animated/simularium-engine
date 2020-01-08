@@ -4,7 +4,7 @@
  F. Nedelec, April 2013
 */
 
-set simul frap
+set simul system
 {
     time_step = 0.01
     viscosity = 0.1
@@ -13,48 +13,52 @@ set simul frap
 
 set space cell
 {
-    geometry = ( sphere 10 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 10
+}
 
 set hand motor
 {
     binding = 10, 0.05
     unbinding = 1, 1
-    display = ( size=8; color=green )
+    display = ( size=8; color=light_green )
 }
 
-set single protein
+set single simplex
 {
     hand = motor
     diffusion = 0.1
 }
 
-new 10000 single protein
+new 10000 simplex
 
-run simul *
+run 100 system
 {
-    nb_steps = 200
-    nb_frames = 10
+    nb_frames = 2
 }
 
 set space A
 {
-    geometry = ( square 3 3 3 )
+    shape = rectangle
 }
 
-new space A
+new A
+{
+    length = 6, 6, 6
+}
 
-delete single protein
+delete all simplex
 {
     position = inside, A
 }
 
 delete space A
 
-run simul *
+run 2000 system
 {
-    nb_steps = 2000
-    nb_frames = 100
+    nb_frames = 20
 }

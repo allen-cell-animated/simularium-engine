@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef VECPRINT_H
 #define VECPRINT_H
 
@@ -11,108 +10,168 @@
 /// Templated functions to print Vectors and Matrices with minimal formatting
 namespace VecPrint
 {
-    /// print a vector on a line
+    /// print 'm' components of 'vec' on a line
     template< typename T >
-    void vecPrint(std::ostream & os, unsigned m, const T* X, int digits = 3)
+    std::ostream& print(std::ostream& os, size_t m, const T* vec, int digits = 3)
     {
-        if ( X == 0 ) {
-            os << "void\n";
-            return;
-        }
-        
-        char str[32], fmt[32];
-        snprintf(fmt, sizeof(fmt), " %%%i.%if", digits+6, digits);
-        for ( unsigned ii = 0; ii < m; ++ii )
+        if ( !vec || m == 0 )
+            os << " void";
+        else
         {
-            snprintf(str, sizeof(str), fmt, X[ii]);
-            os << str;
-        }
-        os << std::endl;
-    }
-    
-    
-    /// print a vector in column format
-    template< typename T >
-    void vecDump(std::ostream & os, unsigned m, const T* X, int digits = 8)
-    {
-        if ( X == 0 ) {
-            os << "void\n";
-            return;
-        }
-        
-        char str[32], fmt[32];
-        snprintf(fmt, sizeof(fmt), " %%%i.%ie", digits+6, digits);
-        for ( unsigned ii = 0; ii < m; ++ii )
-        {
-            snprintf(str, sizeof(str), fmt, X[ii]);
-            os << str << std::endl;
-        }
-    }
-    
-    
-    /// print a matrix, aligning the numbers
-    template< typename T >
-    void matPrint(std::ostream & os, unsigned m, unsigned n, const T* X, int digits = 3)
-    {
-        if ( X == 0 ) {
-            os << "void\n";
-            return;
-        }
-        
-        char str[32], fmt[32];
-        snprintf(fmt, sizeof(fmt), " %%%i.%if", digits+6, digits);
-        for ( unsigned ii = 0; ii < m; ++ii )
-        {
-            for ( unsigned jj = 0; jj < n; ++jj )
+            char str[32], fmt[32];
+            snprintf(fmt, sizeof(fmt), " %%%i.%if", digits+5, digits);
+            for ( size_t i = 0; i < m; ++i )
             {
-                snprintf(str, sizeof(str), fmt, X[ii+m*jj]);
-                os << str;
+                snprintf(str, sizeof(str), fmt, vec[i]);
+                if ( i % 4 )
+                    os << str;
+                else
+                    os << "  " << str;
             }
-            os << std::endl;
         }
+        os.flush();
+        return os;
+    }
+    
+    /// print 'm' components of 'vec' on separate lines
+    template< typename T >
+    std::ostream& dump(std::ostream& os, size_t m, const T* vec, int digits = 8)
+    {
+        if ( !vec || m == 0  )
+            os << " void";
+        else
+        {
+            char str[32], fmt[32];
+            snprintf(fmt, sizeof(fmt), " %%%i.%ie", 9, digits);
+            for ( size_t i = 0; i < m; ++i )
+            {
+                snprintf(str, sizeof(str), fmt, vec[i]);
+                os << str << '\n';
+            }
+        }
+        os.flush();
+        return os;
     }
     
     
-    /// print a matrix in sparse format: line_index, column_index, value 
+    /// print matrix `mat` of size m*n, and leading dimension `ldd` with precision 'digits'
     template< typename T >
-    void matSparsePrint(std::ostream & os, unsigned m, unsigned n, const T* X, int digits = 8)
+    void print(std::ostream& os, size_t m, size_t n, const T* mat, size_t ldd, int digits = 3)
     {
-        if ( X == 0 ) {
-            os << "void\n";
-            return;
-        }
-        
-        char str[32], fmt[32];
-        snprintf(fmt, sizeof(fmt), " %%%i.%if\n", digits+6, digits);
-        for (unsigned ii = 0; ii < m; ++ii )
-            for (unsigned jj = 0; jj < n; ++jj )
-            {
-                snprintf(str, sizeof(str), fmt, X[ii+m*jj]);
-                os << ii << " " << jj << " " << str;
+        if ( !mat || m == 0 || n == 0  )
+            os << " void";
+        else
+        {
+            const T threshold = pow(0.1, digits);
+            char str[32] = { 0 }, zer[32] = { 0 }, fmt[32] = " %4.0f";
+            
+            { // build format strings:
+                snprintf(fmt, sizeof(fmt), " %%%i.%if", digits+5, digits);
+                snprintf(zer, sizeof(zer), fmt, 0.0);
+                bool dot = false; char * d = zer;
+                for ( char * c = zer; *c; ++c )
+                {
+                    if ( *c == '0' ) { *c = ' '; d = c; }
+                    dot |= ( *c == '.' );
+                }
+                if ( !dot ) *d = '.';
             }
-        os << std::endl;
+            
+            for ( size_t ii = 0; ii < m; ++ii )
+            {
+                for ( size_t jj = 0; jj < n; ++jj )
+                {
+                    T val = mat[ii+ldd*jj];
+                    if ( fabs(val) < threshold )
+                        os << zer;
+                    else
+                    {
+                        snprintf(str, sizeof(str), fmt, mat[ii+ldd*jj]);
+                        os << str;
+                    }
+                }
+                os << '\n';
+            }
+        }
+        std::endl(os);
+    }
+    
+    /// print matrix in sparse format: line_index, column_index, value
+    template< typename T >
+    void sparse(std::ostream& os, size_t m, size_t n, const T* mat, size_t ldd, int digits = 8, T threshold = 0)
+    {
+        if ( !mat || m == 0 || n == 0 )
+            os << " void";
+        else
+        {
+            char str[64], fmt[64];
+            snprintf(fmt, sizeof(fmt), " %%3i %%3i %%9.%if\n", digits);
+            for (size_t ii = 0; ii < m; ++ii )
+                for (size_t jj = 0; jj < n; ++jj )
+                {
+                    T val = mat[ii+ldd*jj];
+                    if ( fabs(val) > threshold )
+                    {
+                        snprintf(str, sizeof(str), fmt, ii, jj, val);
+                        os << str;
+                    }
+                }
+        }
+        std::endl(os);
     }
     
     
     /// print a matrix in sparse format, but adding `off` to all line and column indices
     template< typename T >
-    void matSparsePrintOffset(std::ostream & os, unsigned m, unsigned n, const T* X, int off, int digits = 8)
+    void sparse_off(std::ostream& os, size_t m, size_t n, const T* mat, size_t ldd, size_t off, int digits = 8)
     {
-        if ( X == 0 ) {
-            os << "void\n";
-            return;
+        if ( !mat || m == 0 || n == 0 )
+            os << " void";
+        else
+        {
+            char str[32], fmt[32];
+            snprintf(fmt, sizeof(fmt), " %%9.%if\n", digits);
+            for (size_t ii = 0; ii < m; ++ii )
+                for (size_t jj = 0; jj < n; ++jj )
+                {
+                    snprintf(str, sizeof(str), fmt, mat[ii+ldd*jj]);
+                    os << ii+off << " " << jj+off << str;
+                }
         }
-        
-        
-        char str[32], fmt[32];
-        snprintf(fmt, sizeof(fmt), " %%%i.%if\n", digits+6, digits);
-        for (unsigned ii = 0; ii < m; ++ii )
-            for (unsigned jj = 0; jj < n; ++jj )
+        std::endl(os);
+    }
+    
+    /// print matrix `mat` of size m*n, and leading dimension `ldd` with precision 'digits'
+    template< typename T >
+    void image(std::ostream& os, size_t m, size_t n, const T* mat, size_t ldd, T scale)
+    {
+        if ( !mat || m == 0 || n == 0 )
+            os << " void";
+        else
+        {
+            char str[] = ".:+*hTM$";
+            
+            const T threshold = 0.01 * scale;
+            for ( size_t ii = 0; ii < m; ++ii )
             {
-                snprintf(str, sizeof(str), fmt, X[ii+m*jj]);
-                os << ii+off << " " << jj+off << str;
+                os << '|';
+                for ( size_t jj = 0; jj < n; ++jj )
+                {
+                    T val = mat[ii+ldd*jj];
+                    if ( val != val )
+                        os << '@';
+                    else if ( val < threshold )
+                        os << ' ';
+                    else
+                    {
+                        int x = std::max(7, 2 + log10( fabs(val) / scale ));
+                        os << str[x];
+                    }
+                }
+                os << "|\n";
             }
-        os << std::endl;
+        }
+        std::endl(os);
     }
 }
 

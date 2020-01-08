@@ -7,31 +7,33 @@
 #include "vector.h"
 #include "array.h"
 #include "grid.h"
-#include <vector>
+//#include <vector>
 
-class FiberLocus;
-class Space;
+class Simul;
+class PropertyList;
+class FiberSegment;
+class FiberSet;
 class Modulo;
+class Space;
 class Fiber;
 class HandProp;
 class Hand;
 class Node;
-class Simul;
 
 
-/// Divide-and-Conquer method to find all FiberLocus located near a given point in space
+/// Divide-and-Conquer method to find all FiberSegment located near a given point in space
 /**
 A divide-and-conquer algorithm is used to find all segments of fibers close to a given point:
  
- -# It uses a grid 'mGrid' covering the space, initialized by setGrid().
-    After initialization, each cell of the grid has an empty SegmentList (a list of FiberLocus*).
+ -# It uses a grid 'fGrid' covering the space, initialized by setGrid().
+    After initialization, each cell of the grid has an empty SegmentList (a list of FiberSegment*).
  -# clear() resets all lists on the grid
  -# paintGrid() distributes the segments specified in the arguments to the cell-associated SegmentList.
-    One of the argument specifies a maximum distance to be queried (\a max_range).
+    One of the argument specifies a maximum distance to be queried (`max_range`).
     After the distribution, tryToAttach() is able to find any segment
-    located at a distance \a max_range or less from any given point, in linear time.
- -# The function tryToAttach(X, ...) finds the cell on mGrid that contain \a X. 
-    The associated SegmentList will then contains all the segments located at distance \a max_range or less from \a X. 
+    located at a distance `max_range` or less from any given point, in linear time.
+ -# The function tryToAttach(X, ...) finds the cell on fGrid that contain `X`. 
+    The associated SegmentList will then contains all the segments located at distance `max_range` or less from `X`. 
     tryToAttach() calls a function distanceSqr() sequentially for all the segments in this list,
     to calculate the exact Euclidian distance. 
     Finally, using a random number it tests the probability of attachment for the Hand given as argument.
@@ -49,70 +51,65 @@ class FiberGrid
 {
 public:
     
-    /// type for a list of FiberLocus
-    typedef Array<FiberLocus const*> SegmentList;
-    //typedef std::vector<FiberLocus const*> SegmentList;
+    /// type for a list of FiberSegment
+    typedef Array<FiberSegment> SegmentList;
+    //typedef std::vector<FiberSegment> SegmentList;
 
-    typedef Grid<DIM, SegmentList, unsigned int> grid_type;
+    /// type of grid
+    typedef Grid<SegmentList, DIM> grid_type;
+    
+    /// type of index
+    typedef grid_type::index_t index_t;
     
 private:
     
-    ///the maximum distance that can be found by the grid
-    real  gridRange;
+    /// grid for divide-and-conquer strategies:
+    grid_type fGrid;
     
-    ///grid for divide-and-conquer strategies:
-    grid_type mGrid;
-    
-    ///the modulo object
-    const Modulo * modulo;
-        
 public:
     
-    ///creator
-    FiberGrid()             { modulo = 0; gridRange = -1; }
-        
-    ///destructor
-    virtual ~FiberGrid()    { }
-    
-    
-    ///create a grid to cover the specified Space with cells of width \a max_step at most
-    int setGrid(const Space *, const Modulo *, real max_step, unsigned long max_nb_cells);
-    
-    ///true if the grid was initialized by calling setGrid()
-    bool hasGrid() const;
-    
-    ///clear the grid
-    void clear();
-    
-    ///paint the Fibers, to be able to find up to a distance max_range
-    void paintGrid(const Fiber * first, const Fiber * last, real max_range);
-        
-    ///given a position, find nearby Fiber segments and test attachement of the provided Hand
-    bool tryToAttach(Vector const&, Hand&) const;
-    
-    /// return all fiber segments located at a distance D or less from P, except those belonging to \a exclude
-    SegmentList nearbySegments(Vector const& P, real D, Fiber * exclude = 0);
+    /// constructor
+    FiberGrid()  { }
+   
+    /// number of cells in grid
+    index_t      nbCells() const { return fGrid.nbCells(); }
 
-    ///return the closest Segment to the given position, if it is closer than gridRange
-    FiberLocus  closestSegment(Vector const&);
+    /// set a grid to cover the specified Space with cells of width `max_step` at most
+    unsigned     setGrid(Space const*, real max_step);
     
-    ///test the results of tryToAttach(), at a particular position
-    void testAttach(FILE *, Vector place, Fiber * start, HandProp const*);
+    /// allocate memory for the grid, with the dimensions set by setGrid()
+    void         createCells();
+    
+    /// true if the grid was initialized by calling setGrid()
+    size_t       hasGrid() const;
+    
+    /// register the Fiber segments on the grid cells
+    void         paintGrid(const Fiber * first, const Fiber * last, real);
+    
+    /// given a position, find nearby Fiber segments and test attachement of the provided Hand
+    void         tryToAttach(Vector const&, Hand&) const;
     
     
-#ifdef DISPLAY
-    void display() const
+    /// return a list of all fiber segments located at a distance D or less from P, except those belonging to `exclude`
+    SegmentList  nearbySegments(Vector const&, real disSqr, Fiber * exclude = nullptr) const;
+
+    SegmentList& segments(Vector const& pos) const
     {
-        glPushAttrib(GL_LIGHTING_BIT);
-        glDisable(GL_LIGHTING);
-        glColor4f(0, 1, 1, 1);
-        glLineWidth(0.5);
-        drawEdges(mGrid);
-        glPopAttrib();
+        // get the cell index from the position in space:
+        const index_t indx = fGrid.index(pos, 0.5);
+        // get the list of rods associated with this cell:
+        return fGrid.icell(indx);
     }
-#endif
     
- };
+    /// Among the segments closer than grid:range, return the closest one
+    FiberSegment closestSegment(Vector const&) const;
+    
+    /// test the results of tryToAttach(), at a particular position
+    void         testAttach(FILE *, Vector place, FiberSet const&, HandProp const*) const;
+
+    /// OpenGL display function
+    void         draw() const;
+};
 
 
 #endif

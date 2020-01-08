@@ -14,13 +14,13 @@
 A Nucleus attaches Fibers to a Sphere:\n
  - organized(0) is the Sphere
  - organized(n) for n>0 is a Fiber attached to the sphere
- - prop->focus designate the end of each Fiber that is attached on the sphere.
  - prop->stiffness is the stiffness of the link.
  .
+
+ @ingroup OrganizerGroup
  */
 class Nucleus : public Organizer
 {
-    
 public:
     
     /// Properties for the Nucleus
@@ -30,18 +30,15 @@ public:
     /// constructor
     Nucleus(NucleusProp const* p) : prop(p) { }
 
-    /// construct all the dependent Objects of the Organizer
+    /// create a Nucleus and requested associated Objects
     ObjectList    build(Glossary&, Simul&);
-    
-    /// destructor
-    virtual      ~Nucleus() { prop = 0; }
     
     //------------------- simulation -------------------------------------------    
 
     /// monte-carlo simulation step
     void          step();
     
-    ///add interactions for this object to the Meca
+    ///add interactions for this object to a Meca
     void          setInteractions(Meca &) const;
 
     //------------------- querying the nucleus ---------------------------------    
@@ -52,35 +49,29 @@ public:
     ///the Sphere on which the nucleus is built
     Sphere *      sphere()   const { return static_cast<Sphere*>(organized(0)); }
     
-    ///the Sphere on which the nucleus is built
-    Fiber *       fiber(int ii) const { return static_cast<Fiber*>(organized(ii+1)); }
+    /// i-th fiber attached to the nucleus
+    Fiber *       fiber(int i) const { return static_cast<Fiber*>(organized(i+1)); }
     
     
-    ///number of connections between the sphere() and fiber()
-    unsigned int  nbLinks() const;
     
-    ///the position on the Sphere to which Fiber ii is attached
-    Vector        posLink1(unsigned int ii) const;
-    
-    ///the position of the Fiber ii which is attached
-    Vector        posLink2(unsigned int ii) const;
+    /// retrieve links end-points for display
+    bool          getLink(size_t, Vector&, Vector&) const;
     
     /// display parameters 
-    PointDisp *   pointDisp() const { return sphere()->prop->disp; }
+    PointDisp const* disp() const { if ( sphere() ) return sphere()->prop->disp; return nullptr; }
     
     //------------------------------ read/write --------------------------------
     
     /// a unique character identifying the class
-    static const Tag TAG = 'n';
+    static const ObjectTag TAG = 'n';
     
     /// return unique character identifying the class
-    Tag           tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
+    /// return associated Property
+    Property const* property() const { return prop; }
 
 };
-
 
 
 #endif

@@ -11,29 +11,29 @@ class ForkProp;
  The fork connect two fibers at an angle.
  It creates a torque between the two fibers, with a resting angle defined by 'ForkProp::angle',
  and a rotational stiffness which is 'ForkProp::angular_stiffness'.
-
+ 
+ Note that the Fork is unfinished and should not be used.
+ 
  @ingroup CoupleGroup
  */
 class Fork : public Couple
 {
-    /// direction for flipping (-1 or +1)
-    mutable int     flip;
     
-    /// Property
-    ForkProp const* prop;
-        
+    /// sinus of angle, with [up, down] sign in space for 2D
+    mutable real sinus;
+    
 public:
     
-    /// create following the specifications in the CoupleProp
+    /// property
+    ForkProp const* prop;
+    
+    /// constructor
     Fork(ForkProp const*, Vector const & w = Vector(0,0,0));
 
     /// destructor
     virtual ~Fork();
-    
-    /// simulation step for a free Couple, implementing CrosslinkProp::trans_activated
-    void    stepFF(const FiberGrid&);
-    
-    /// add interactions to the Meca
+
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
 
 };

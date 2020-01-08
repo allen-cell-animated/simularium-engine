@@ -1,68 +1,49 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "dim.h"
-#include "smath.h"
 #include "assert_macro.h"
 #include "classic_fiber.h"
 #include "classic_fiber_prop.h"
-#include "fiber_locus.h"
 #include "exceptions.h"
 #include "iowrapper.h"
 #include "simul.h"
 #include "space.h"
 
-extern Random RNG;
 
 //------------------------------------------------------------------------------
 
 ClassicFiber::ClassicFiber(ClassicFiberProp const* p) : Fiber(p), prop(p)
 {
-    mState = STATE_GREEN;
+    mStateM  = STATE_WHITE;
+    mStateP  = STATE_WHITE;
+    mGrowthM = 0;
+    mGrowthP = 0;
 }
+
 
 ClassicFiber::~ClassicFiber()
 {
-    prop = 0;
+    prop = nullptr;
 }
 
 
-//------------------------------------------------------------------------------
-#pragma mark -
-
-int ClassicFiber::dynamicState(const FiberEnd which) const
+void ClassicFiber::setDynamicStateM(state_t s)
 {
-    assert_true( which==PLUS_END || which==MINUS_END );
-
-    if ( which == PLUS_END )
-        return mState;
+    if ( s==STATE_WHITE || s==STATE_GREEN || s==STATE_RED )
+        mStateM = s;
     else
-        return 0;
-}
-
-void ClassicFiber::setDynamicState(FiberEnd which, const int state)
-{
-    assert_true( which==PLUS_END || which==MINUS_END );
-    
-    if ( state!=STATE_GREEN && state!=STATE_RED )
-        throw InvalidParameter("fiber:classic invalid AssemblyState ", state);
-    
-    if ( which == PLUS_END )
-    {
-        if ( state==STATE_GREEN || state==STATE_RED )
-            mState = (AssemblyState)state;
-    }
+        throw InvalidParameter("Invalid AssemblyState for ClassicFiber MINUS_END");
 }
 
 
-real ClassicFiber::freshAssembly(const FiberEnd which) const
+void ClassicFiber::setDynamicStateP(state_t s)
 {
-    assert_true( which==PLUS_END || which==MINUS_END );
-
-    if ( which == PLUS_END )
-        return mGrowth;
+    if ( s==STATE_WHITE || s==STATE_GREEN || s==STATE_RED )
+        mStateP = s;
     else
-        return 0;
+        throw InvalidParameter("Invalid AssemblyState for ClassicFiber PLUS_END");
 }
+
 
 //------------------------------------------------------------------------------
 #pragma mark -
@@ -71,126 +52,140 @@ real ClassicFiber::freshAssembly(const FiberEnd which) const
  The catastrophe rate depends on the growth rate of the corresponding tip,
  which is itself reduced by antagonistic force. 
  The correspondance is : 1/rate = a + b * growthSpeed.
- For no force on the growing tip: rate = catastrophe_rate[0]*dt
- For very large forces          : rate = catastrophe_rate[1]*dt
+ For no force on the growing tip: rate = catastrophe_rate[0]*time_step
+ For very large forces          : rate = catastrophe_rate_stalled[0]*time_step
  cf. `Dynamic instability of MTs is regulated by force`
  M.Janson, M. de Dood, M. Dogterom. JCB 2003, Figure 2 C.
  */
 void ClassicFiber::step()
 {
-    //we start by Fiber::step(), which may cut this fiber, but not destroy it!
-    Fiber::step();
-    
+    const real len = length();
 
-    if ( mState == STATE_GREEN )
+    if ( mStateM == STATE_GREEN )
     {
         // calculate the force acting on the point at the end:
-        real force = projectedForceOnEnd(PLUS_END);
+        real force = projectedForceEndM();
+        
+        // growth is reduced if free monomers are scarce:
+        real spd = prop->growing_speed_dt[1] * prop->free_polymer;
+        
+        // antagonistic force (< 0) decreases assembly rate exponentially
+        if ( force < 0  &&  prop->growing_force[1] < INFINITY )
+            mGrowthM = spd * exp(force/prop->growing_force[1]) + prop->growing_off_speed_dt[1];
+        else
+            mGrowthM = spd + prop->growing_off_speed_dt[1];
+        
+        
+        // catastrophe may be constant, or it may depend on the growth rate
+        real cata;
+        if ( prop->catastrophe_coef[1] > 0 )
+            cata = prop->catastrophe_rate_stalled_dt[1] / ( 1.0 + prop->catastrophe_coef[1] * mGrowthM );
+        else
+            cata = prop->catastrophe_rate_dt[1];
+
+        if ( RNG.test(cata) )
+            mStateM = STATE_RED;
+    }
+    else if ( mStateM == STATE_RED )
+    {
+        mGrowthM = prop->shrinking_speed_dt[1];
+        
+        if ( RNG.test(prop->rescue_prob[1]) )
+            mStateM = STATE_GREEN;
+    }
+    
+    
+    if ( mStateP == STATE_GREEN )
+    {
+        // calculate the force acting on the point at the end:
+        real force = projectedForceEndP();
         
         // growth is reduced if free monomers are scarce:
         real spd = prop->growing_speed_dt[0] * prop->free_polymer;
         
         // antagonistic force (< 0) decreases assembly rate exponentially
-        if ( force < 0  &&  prop->growing_force < INFINITY )
-            mGrowth = spd * exp(force/prop->growing_force) + prop->growing_speed_dt[1];
+        if ( force < 0  &&  prop->growing_force[0] < INFINITY )
+            mGrowthP = spd * exp(force/prop->growing_force[0]) + prop->growing_off_speed_dt[0];
         else
-            mGrowth = spd + prop->growing_speed_dt[1];
+            mGrowthP = spd + prop->growing_off_speed_dt[0];
         
-        // grow at PLUS_END
-        growP(mGrowth);
         
-        // 1 / catastrophe_rate depends linearly on growing speed
-        real cata = prop->catastrophe_rate_dt / ( 1 + prop->cata_coef * mGrowth );
-
+        // catastrophe may be constant, or it may depend on the growth rate
+        real cata;
+        if ( prop->catastrophe_coef[0] > 0 )
+            cata = prop->catastrophe_rate_stalled_dt[0] / ( 1.0 + prop->catastrophe_coef[0] * mGrowthP );
+        else
+            cata = prop->catastrophe_rate_dt[0];
         
-#ifdef NEW_LENGTH_DEPENDENT_CATASTROPHE
+#if NEW_LENGTH_DEPENDENT_CATASTROPHE
         /*
          Ad-hoc length dependence, used to simulate S. pombe with catastrophe_length=5
          Foethke et al. MSB 5:241 - 2009
          */
         if ( prop->catastrophe_length > 0 )
         {
-            MSG_ONCE("Using ad-hoc length-dependent catastrophe rate\n");
+            PRINT_ONCE("Using ad-hoc length-dependent catastrophe rate\n");
             cata *= length() / prop->catastrophe_length;
         }
 #endif
         
+#if NEW_CATASTROPHE_OUTSIDE
+        /*
+         Catastrophe will be triggered immediately if the PLUS_END is outside
+         */
+        if ( prop->catastrophe_outside && prop->confine_space_ptr->outside(posEndP()) )
+        {
+            mStateP = STATE_RED;
+            
+            if ( RNG.test(prop->rescue_prob[0]) )
+                mStateP = STATE_GREEN;
+        }
+#endif
+        
         if ( RNG.test(cata) )
-            mState = STATE_RED;
-        
+            mStateP = STATE_RED;
     }
-    else if ( mState == STATE_RED )
+    else if ( mStateP == STATE_RED )
     {
-        mGrowth = prop->shrinking_speed_dt;
-        
-        if ( length() + mGrowth <= prop->min_length )
-        {
-            // do something if the fiber is too short:
-            switch ( prop->fate )
-            {
-                case FATE_NONE:
-                    break;
-                    
-                case FATE_DESTROY:
-                    objset()->erase(this);
-                    // exit to avoid doing anything with a dead object:
-                    return;
-                    
-                case FATE_RESCUE:
-                    setDynamicState(PLUS_END, STATE_GREEN);
-                    break;
-            }
-        }
-        else
-        {
-            // shrink at PLUS_END ( shrinking_speed < 0 )
-            growP(mGrowth);
-        }
-        
-        if ( RNG.test(prop->rescue_rate_prob) )
-            mState = STATE_GREEN;
+        mGrowthP = prop->shrinking_speed_dt[0];
     }
     
-    /*
-     FiberNaked::adjustSegmentation and Fiber::updateBinder
-     should be called every time as needed from growP or growM,
-     but it is more efficient to call them here once per time-step.
-     */
-    adjustSegmentation();
-    updateBinders();
-}
-
-
-
-//------------------------------------------------------------------------------
-
-/**
- Calls Fiber::severM(abs)
- Set the dynamic state of newly created fiber tips:
- - PLUS_END to STATE_RED
- - MINUS_END to STATE_GREEN
- .
- */
-Fiber * ClassicFiber::severM(real abs)
-{
-    // the new part 'fib' will have the PLUS_END section
-    Fiber* fib = Fiber::severM(abs);
-    
-    if ( fib )
+    real inc = mGrowthP + mGrowthM;
+    if ( inc < 0  &&  len + inc < prop->min_length )
     {
-        assert_true( fib->prop == prop );
-
-        // new MINUS_END is stable
-        fib->setDynamicState(MINUS_END, STATE_GREEN);
-        
-        // old PLUS_END is transfered with the same state:
-        fib->setDynamicState(PLUS_END, dynamicState(PLUS_END));
-        
-        // new PLUS_END is unstable (shrinking state)
-        setDynamicState(PLUS_END, STATE_RED);
+        // the fiber is too short, we may delete it:
+        if ( !prop->persistent )
+        {
+            delete(this);
+            return;
+        }
+   
+        // we may regrow:
+        if ( mStateM == STATE_RED && RNG.test(prop->rebirth_prob[1]) )
+            mStateM = STATE_GREEN;
+    
+        if ( mStateP == STATE_RED && RNG.test(prop->rebirth_prob[0]) )
+            mStateP = STATE_GREEN;
+    }
+    else if ( len + inc < prop->max_length )
+    {
+        if ( mGrowthM ) growM(mGrowthM);
+        if ( mGrowthP ) growP(mGrowthP);
+    }
+    else if ( 0 < inc  &&  len < prop->max_length )
+    {
+        // the remaining possible growth is distributed to the two ends:
+        inc = ( prop->max_length - len ) / inc;
+        if ( mGrowthM ) growM(inc*mGrowthM);
+        if ( mGrowthP ) growP(inc*mGrowthP);
+    }
+    else
+    {
+        mGrowthM = 0;
+        mGrowthP = 0;
     }
     
-    return fib;
+    Fiber::step();
 }
 
 
@@ -198,26 +193,51 @@ Fiber * ClassicFiber::severM(real abs)
 #pragma mark -
 
 
-void ClassicFiber::write(OutputWrapper& out) const
+void ClassicFiber::write(Outputter& out) const
 {
-    if ( mState!=STATE_GREEN && mState!=STATE_RED )
-        throw InvalidParameter("fiber:classic invalid AssemblyState ", mState);
-    
-    out.writeUInt8(mState);
     Fiber::write(out);
+    
+    /// write variables describing the dynamic state of the ends:
+    writeHeader(out, TAG_DYNAMIC);
+    out.writeUInt16(mStateM);
+    out.writeUInt16(mStateP);
 }
 
 
-void ClassicFiber::read(InputWrapper & in, Simul& sim)
+void ClassicFiber::read(Inputter& in, Simul& sim, ObjectTag tag)
 {
-    try {
-        setDynamicState(PLUS_END, in.readUInt8());
+#ifdef BACKWARD_COMPATIBILITY
+    if ( tag == TAG_DYNAMIC || ( tag == TAG && in.formatID() < 44 ) )
+#else
+    if ( tag == TAG_DYNAMIC )
+#endif
+    {
+        unsigned m = 0, p = 0;
+#ifdef BACKWARD_COMPATIBILITY
+        if ( in.formatID() < 42 )
+            p = in.readUInt8();
+        else
+#endif
+        {
+            m = in.readUInt16();
+            p = in.readUInt16();
+        }
+
+#ifdef BACKWARD_COMPATIBILITY
+        if ( in.formatID() < 46 )
+            setDynamicStateP(p);
+        else
+#endif
+        {
+            setDynamicStateM(m);
+            setDynamicStateP(p);
+        }
     }
-    catch( Exception & e ) {
-        e << ", while importing " << reference();
-        throw;
-    }
-    
-    Fiber::read(in, sim);
+#ifdef BACKWARD_COMPATIBILITY
+    if ( tag != TAG_DYNAMIC || in.formatID() < 44 )
+#else
+    else
+#endif
+        Fiber::read(in, sim, tag);
 }
 

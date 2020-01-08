@@ -1,50 +1,48 @@
 % Francois Nedelec, July 28 2011 
 
 
-set simul smooth_muscle 
+set simul system
 {
     viscosity = 0.2
     time_step = 0.001
     steric = 1, 500
-    display = ( window_size=1200, 600; )
+    display = ( window_size=1025, 512; )
 }
 
 set space cell
 {
-    geometry = ( square 5 1 1 )
+    shape = rectangle
 }
 
-new space cell
+new cell
+{
+    length = 10, 2, 2
+}
 
 set fiber actin
 {
     rigidity = 1
-    segmentation = 0.1
+    segmentation = 0.2
     steric = 1, 0.015
     %squeeze = 1, 0.05, 1
     
-    display = { color=0xFFFFFFAA; interval=1.0; line_width=1; end_size=4,4; coloring=2 }
+    display = ( line=2; plus_end=7; )
 }
 
 set bundle actin_pair
 {
-    fibers = actin
-    nb_fibers = 2
     overlap   = 0.05
     stiffness = 5000
 }
 
-new 40 bundle actin_pair
+new 40 actin_pair
 { 
-    position = ( rectangle 5 0.1 );
+    fibers = 2, actin, ( length = 1 )
+    position = ( rectangle 4 0.1 );
     orientation = horizontal;
-    length = 1
 }
 
-
-
-run 100 simul *
- 
+run 100 system
 
 set hand myosin
 {
@@ -52,10 +50,10 @@ set hand myosin
     unbinding = 0.1, 3
         
     activity = move
-    max_speed = -0.5
+    unloaded_speed = -0.5
     stall_force = 6
 
-    display = { color=0xFFA50088; size=5 }
+    display = ( color=0xFFA50088; size=5; )
 }
 
 set couple motor
@@ -63,16 +61,13 @@ set couple motor
     hand1 = myosin
     hand2 = myosin
     stiffness = 200
-    diffusion = 20
-    fast_diffusion = 1
-
-    activity = bridge
+    diffusion = fast
     length = 0.03
 }
 
-new 2000 couple motor
+new 2000 motor
 
-run simul *
+run system
 {
     nb_steps  = 5000
     nb_frames = 100

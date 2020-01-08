@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
 #include "sim.h"
 #include "assert_macro.h"
@@ -12,12 +11,13 @@
 #include "modulo.h"
 #include "meca.h"
 
+extern Modulo const* modulo;
 
 //------------------------------------------------------------------------------
 Single::Single(SingleProp const* p, Vector const& w)
-: prop(p), sHand(0), sPos(w)
+: sPos(w), sHand(nullptr), prop(p)
 {
-    if ( p == 0 )
+    if ( !p )
         throw Exception("Null Single::prop");
     
     assert_true(prop->hand_prop);
@@ -29,56 +29,59 @@ Single::Single(SingleProp const* p, Vector const& w)
 Single::~Single()
 {
     if ( sHand  &&  sHand->attached() )
-        sHand->FiberBinder::detach();
-    
+        sHand->detach();
+
     if ( linked() )
-        list()->pop(this);    
+        objset()->remove(this);
     
     if ( sHand )
     {
         delete(sHand);
-        sHand = 0;
+        sHand = nullptr;
     }
     
-    prop = 0;
+    prop = nullptr;
 }
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Single::afterAttachment()
+void Single::afterAttachment(Hand const*)
 {
     assert_true( attached() );
-    if ( linked() )
-    {
-        //assert_true( objset() );
-        objset()->relink(this);
-    }
-}
-
-/**
- This sets the position to where the Hand detaches
- */
-void Single::beforeDetachment()
-{
-    assert_true( attached() );
-    sPos = sHand->pos();
-}
-
-void Single::afterDetachment()
-{
-    assert_false( attached() );
-    if ( linked() )
-    {
-        //assert_true( objset() );
-        objset()->relink(this);
-    }
+    // link into correct SingleSet sublist:
+    SingleSet * set = static_cast<SingleSet*>(objset());
+    if ( set )
+        set->relinkA(this);
 }
 
 
-real Single::interactionLength() const
+void Single::beforeDetachment(Hand const* h)
 {
-    return prop->length;
+    assert_true( h == sHand );
+    
+#if ( DIM < 2 )
+    /*
+     Relocate Single to the position where it is attached.
+     This is necessary to start the diffusion process from the correct location
+     */
+    sPos = h->posHand();
+#else
+    /*
+     Set position near the attachment point, but offset in the perpendicular
+     direction at a random distance within the range of attachment of the Hand.
+     
+     This is necessary to achieve detailed balance, which in particular implies
+     that rounds of binding/unbinding should not get the Singles closer to
+     the Filaments to which they bind.
+     */
+    sPos = h->posHand() + h->dirFiber().randOrthoB(h->prop->binding_range);
+#endif
+
+    // link into correct SingleSet sublist:
+    SingleSet * set = static_cast<SingleSet*>(objset());
+    if ( set )
+        set->relinkD(this);
 }
 
 
@@ -93,49 +96,57 @@ Vector Single::position() const
     return sPos;
 }
 
-void Single::foldPosition(const Modulo * s)
+void Single::foldPosition(Modulo const* s)
 {
     s->fold(sPos);
 }
 
+void Single::randomizePosition()
+{
+    sPos = prop->confine_space_ptr->randomPlace();
+}
 
-void Single::stepFree(const FiberGrid& grid)
+
+void Single::stepF(const FiberGrid& grid)
 {
     assert_false( sHand->attached() );
 
+#if NEW_MOBILE_SINGLE
+    // translation:
+    sPos += prop->speed_dt;
+#endif
+
     // diffusion:
-    sPos.addRand( prop->diffusion_dt );
+    sPos.addRand(prop->diffusion_dt);
     
-    // confinement
+    // confinement:
     if ( prop->confine == CONFINE_INSIDE )
     {
-        Space const* spc = prop->confine_space_ptr;
-        assert_true(spc);
-        if ( ! spc->inside(sPos) )
-            spc->bounce(sPos);
+        if ( !prop->confine_space_ptr->inside(sPos) )
+            sPos = prop->confine_space_ptr->bounce(sPos);
+        if ( modulo )
+            modulo->fold(sPos);
     }
-    else if ( prop->confine == CONFINE_SURFACE )
+    else if ( prop->confine == CONFINE_ON )
     {
-        Space const* spc = prop->confine_space_ptr;
-        assert_true(spc);
-        spc->project(sPos);
+        sPos = prop->confine_space_ptr->project(sPos);
     }
     
-    sHand->stepFree(grid, sPos);
+    sHand->stepUnattached(grid, sPos);
 }
 
 
-void Single::stepAttached()
+void Single::stepA()
 {
     assert_true( sHand->attached() );
+    assert_true( !hasForce() );
+
+#if NEW_MOBILE_SINGLE
+    // translation:
+    sPos += prop->speed_dt;
+#endif
     
-    sHand->stepLoaded(force());
-}
-
-
-bool Single::hasInteraction() const
-{
-    return false;
+    sHand->stepUnloaded();
 }
 
 /**
@@ -149,24 +160,34 @@ void Single::setInteractions(Meca & meca) const
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Single::write(OutputWrapper& out) const
+void Single::write(Outputter& out) const
 {
     sHand->write(out);
     out.writeFloatVector(sPos, DIM);
 }
 
 
-void Single::read(InputWrapper & in, Simul& sim)
+void Single::read(Inputter& in, Simul& sim, ObjectTag tag)
 {
-    try
+    const bool s = attached();
+    sHand->read(in, sim);
+    in.readFloatVector(sPos, DIM);
+    
+    /*
+     Because the SingleSet has 2 lists where Single are stored depending
+     on their bound/unbound state, we need to unlink and relink here, in
+     case the state stored on file is different from the current state.
+     */
+    if ( s != attached() )
     {
-        sHand->read(in, sim);
-        in.readFloatVector(sPos, DIM);
-    }
-    catch( Exception & e ) {
-        e << ", in Single::read()";
-        throw;
+        SingleSet * set = static_cast<SingleSet*>(objset());
+        if ( set )
+        {
+            if ( s )
+                set->relinkD(this);
+            else
+                set->relinkA(this);
+        }
     }
 }
-
 

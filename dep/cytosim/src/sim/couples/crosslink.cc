@@ -4,9 +4,11 @@
 #include "crosslink_prop.h"
 #include "exceptions.h"
 #include "random.h"
+#include "modulo.h"
 #include "space.h"
+#include "meca.h"
 
-extern Random RNG;
+extern Modulo const* modulo;
 
 //------------------------------------------------------------------------------
 Crosslink::Crosslink(CrosslinkProp const* p, Vector const& w)
@@ -17,83 +19,40 @@ Crosslink::Crosslink(CrosslinkProp const* p, Vector const& w)
 
 Crosslink::~Crosslink()
 {
-    prop = 0;
+    prop = nullptr;
 }
 
 
 //------------------------------------------------------------------------------
+#pragma mark -
+
 /**
- This will:
- - prevent binding twice to the same fiber, if ( prop:stiff = true )
- - check prop:specificity with respect to the configuration of the two fibers
+ Simulates:
+ - diffusive motion
+ - attachment
+ .
  */
-bool Crosslink::allowAttachment(const FiberBinder & fb)
+void Crosslink::stepFF(const FiberGrid& grid)
 {
-    const Hand * other = attachedHand();
+    diffuse();
     
-    if ( other == 0 )
-        return true;
+    // confinement:
+    if ( !prop->confine_space_ptr->inside(cPos) )
+        cPos = prop->confine_space_ptr->bounce(cPos);
     
-    if ( prop->stiff )
-    {
-        if ( other->fiber() == fb.fiber()
-            && fabs(fb.abscissa()-other->abscissa()) < 2*fb.fiber()->segmentation() )
-            return false;
-    }
+    if ( modulo )
+        modulo->fold(cPos);
     
-    switch( prop->specificity )
-    {
-        case CoupleProp::BIND_ALWAYS:
-            break;
-
-        case CoupleProp::BIND_PARALLEL:
-            if ( fb.dirFiber() * other->dirFiber() < 0 )
-                return false;
-            break;
-
-        case CoupleProp::BIND_ANTIPARALLEL:
-            if ( fb.dirFiber() * other->dirFiber() > 0 )
-                return false;
-            break;
-
-        default:
-            throw InvalidParameter("unknown crosslink:specificity");
-    }
-    return true;
+    // activity:
+    cHand1->stepUnattached(grid, cPos);
+    cHand2->stepUnattached(grid, cPos);
 }
 
 
-void Crosslink::stepFF(const FiberGrid& grid)
+void Crosslink::setInteractions(Meca & meca) const
 {
-    assert_true( !attached1() && !attached2() );
+    assert_true( attached1() && attached2() );
     
-    // diffusion:
-    cPos.addRand( prop->diffusion_dt );
-    
-    // confinement:
-    if ( prop->confine == CONFINE_INSIDE )
-    {
-        const Space* spc = prop->confine_space_ptr;
-        assert_true(spc);
-        if ( ! spc->inside(cPos) )
-            spc->bounce(cPos);
-    }
-    else if ( prop->confine == CONFINE_SURFACE )
-    {
-        const Space* spc = prop->confine_space_ptr;
-        assert_true(spc);
-        spc->project(cPos);        
-    }    
-    
-    // activity (attachment):
-    if ( prop->trans_activated )
-    {
-        cHand1->stepFree(grid, cPos);
-    }
-    else
-    {
-        cHand1->stepFree(grid, cPos);
-        cHand2->stepFree(grid, cPos);
-    }
+    meca.addLink(cHand1->interpolation(), cHand2->interpolation(), prop->stiffness);
 }
 

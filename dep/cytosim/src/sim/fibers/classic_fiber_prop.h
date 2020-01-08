@@ -6,11 +6,11 @@
 #include "fiber_prop.h"
 
 
-class Glossary;
+/// Enables support for an option to make catastrophe rate dependent on fiber length
+#define NEW_LENGTH_DEPENDENT_CATASTROPHE 0
 
-
-// This makes the catastrophe rate dependent on length of fiber
-//#define NEW_LENGTH_DEPENDENT_CATASTROPHE
+/// Enables support for an option that induces catastrophe if the PLUS_END is outside
+#define NEW_CATASTROPHE_OUTSIDE 0
 
 
 /// additional Property for ClassicFiber
@@ -27,6 +27,7 @@ public:
      @defgroup ClassicFiberPar Parameters of ClassicFiber
      @ingroup Parameters
      Inherits @ref FiberPar.
+     The first column of numbers applies to PLUS_END, and the second to MINUS_END
      @{
      */
     
@@ -34,81 +35,107 @@ public:
     
     /// Speed of assembly state
     /**
-     @code
-     growth_speed = monomer_fraction * growing_speed[0] * exp(force/growing_force) + growing_speed[1];
-     @endcode
-     
-     monomer_fraction in [0,1] reflect the amount of free monomers.
-     Antagonistic force is negative ( force < 0 ). 
-     Force directed in the same direction as assembly has no effect.
+     Antagonistic force decrease assembly rate exponentially if it is directed against the assembly:
+
+         if ( force < 0 )
+             speed = growing_speed * free_polymer * exp( force / growing_force ) + growing_off_speed;
+         else
+             speed = growing_speed * free_polymer + growing_off_speed;
      
      The parameters are:
-     - growing_speed[0] = force-dependent assembly rate.
-     - growing_speed[1] = constant term, which can be negative to represent spontaneous disassembly.
-     - growing_force = characteristic force
+     - `growing_speed`, the force-dependent and concentration-dependent assembly rate.
+     - `growing_off_speed`, a constant term, normally negative to represent spontaneous disassembly.
+     - `growing_force`, the characteristic force
      .
-     */    
+     In this equation, `free_polymer` represents the fraction of free monomers in [0,1].
+     Antagonistic force is negative ( force < 0 ) if it is directed against fiber assembly.
+     */
     real    growing_speed[2];
+
+    /// Constant term in the growing speed equation
+    real    growing_off_speed[2];
+
     
-    
-    /// Characteristic force of assembly state
+    /// Characteristic force of assembly state (default=+inf)
     /**
      Antagonistic force decrease assembly rate exponentially.
      */
-    real    growing_force;
+    real    growing_force[2];
     
     
     /// speed of disassembly state
-    real    shrinking_speed;
+    /**
+     Disassembly occurs always at the specified speed:
+
+         speed = shrinking_speed;
+
+     */
+    real    shrinking_speed[2];
     
     
-    /// Rate of stochastic switch from assembly to disassembly
+    /// Rate of stochastic switching from assembly to disassembly
     /**
      The catastrophe rate depends on the growth rate of the corresponding tip,
-     which is itself reduced by antagonistic force. \n
-     The correspondance is : 
-     @code
-     1/catastrophe_rate = a + b * growth_speed
-     @endcode
-     where \a growth_speed is calculated as explained in @ref growing_speed,
-     and parameters \a a and \a b are derived from:
-     - catastrophe_rate[0] = the catastrophe rate in the absence of force.
-     - catastrophe_rate[1] = the catastrophe rate of a stalled tip.
-     .
+     which is itself reduced by antagonistic force:
+
+         catastrophe_rate_real = catastrophe_rate_stalled / ( 1 + coef * growing_speed_real )
+
+     where `growth_speed_real` is calculated as explained in @ref growing_speed,
+     and `coef` is set to match the given `catastrophe_rate` in the absence of force:
+
+         coef = ( catastrophe_rate_stalled/catastrophe_rate - 1.0 ) / growing_speed_unloaded
+         growing_speed_unloaded = growing_speed + growing_off_speed;
      
+     Note that if `catastrophe_rate_stalled >> catastrophe_rate`, the equation simplies to
+
+         catastrophe_rate_real = catastrophe_rate * growing_speed_unloaded / growing_speed_real
+
      */
     real    catastrophe_rate[2];
 
+    /// Rate of catastrophe when the growth is stalled
+    /**
+     If this parameter is not set, the catastrophe rate will not depend on growth speed.
+     */
+    real    catastrophe_rate_stalled[2];
+
+#if NEW_CATASTROPHE_OUTSIDE
     
-    /// Rate of stochastic switch from disassembly to assembly
-    real    rescue_rate;
+    /// Flag to trigger immediate catastrophe if the PLUS_END is outside
+    bool    catastrophe_outside;
+
+#endif
     
-    
-    /// Action that is taken when the fiber shrinks below `min_length`
-    Fate    fate;
-    
-#ifdef NEW_LENGTH_DEPENDENT_CATASTROPHE
+#if NEW_LENGTH_DEPENDENT_CATASTROPHE
     
     /// Switch to enable the length-dependent catastrophe rate
     /**
      If this is defined, the catastrophe rate will depend on the length of the fiber:
-     @code
-     catastrophe_rate_real = catastrophe_rate * length() / catastrophe_length;
-     @endcode
+
+         catastrophe_rate_real = catastrophe_rate * length() / catastrophe_length;
+
      */
     real    catastrophe_length;
     
 #endif
-
+    
+    /// Rate of stochastic switching from disassembly to assembly
+    real    rescue_rate[2];
+    
+    /// switching rate to the growing state for a fiber shorter than `min_length` (default=0)
+    real    rebirth_rate[2];
+    
     /// @}
-    //------------------ derived variables below ----------------
     
 private:
     
-    real    shrinking_speed_dt;
+    real    shrinking_speed_dt[2];
     real    growing_speed_dt[2];
-    real    catastrophe_rate_dt, cata_coef;
-    real    rescue_rate_prob;
+    real    growing_off_speed_dt[2];
+    real    catastrophe_rate_dt[2];
+    real    catastrophe_rate_stalled_dt[2];
+    real    catastrophe_coef[2];
+    real    rescue_prob[2], rebirth_prob[2];
 
 public:
     
@@ -128,13 +155,13 @@ public:
     void read(Glossary&);
    
     /// check and derive parameter values
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new ClassicFiberProp(*this); }
 
     /// write
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
 
 };
 

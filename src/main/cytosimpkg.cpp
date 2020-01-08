@@ -1,3 +1,5 @@
+#include "simul_prop.h"
+
 #include "agentsim/simpkg/cytosimpkg.h"
 #include "agentsim/agents/agent.h"
 #include "loguru/loguru.hpp"
@@ -17,7 +19,7 @@ using std::endl;
 
 void killed_handler(int sig)
 {
-    Cytosim::MSG("killed\n");
+    LOG_F(WARNING, "Cytosim Killed");
     exit(sig);
 }
 
@@ -52,13 +54,13 @@ namespace agentsim {
             LOG_F(ERROR,"Could not register SIGTERM handler");
 
         glos.clear();
-        glos.set_values("config", input_file);
+        glos.define("config", input_file);
 
         try {
             simul.initialize(glos);
             Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
         } catch (Exception& e) {
-            LOG_F(FATAL,e.what());
+            LOG_F(FATAL,e.what().c_str());
             return;
         } catch (...) {
             LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
@@ -106,10 +108,10 @@ namespace agentsim {
             unsigned n_iterations = timeStep / max_time_step;
 
             simul.prop->time_step = max_time_step;
-            Parser(simul, 0, 0, 0, 1, 0).execute_run(glos, n_iterations, 0);
+            Parser(simul, 0, 0, 0, 1, 0).execute_run(n_iterations, glos);
         } else {
             simul.prop->time_step = timeStep;
-            Parser(simul, 0, 0, 0, 1, 0).execute_run(glos, 1, 0);
+            Parser(simul, 0, 0, 0, 1, 0).execute_run(1, glos);
         }
 
         GetFiberPositionsFromFrame(agents);
@@ -128,14 +130,12 @@ namespace agentsim {
         try {
             Parser(simul, 0, 0, 0, 1, 1).readConfig(input_file);
         } catch (Exception& e) {
-            LOG_F(FATAL,e.what());
+            LOG_F(FATAL,e.what().c_str());
             return;
         } catch (...) {
             LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
             return;
         }
-
-        Cytosim::close();
 
         LOG_F(INFO,"Cytosim PKG Run ended");
         this->m_hasAlreadyRun = true;
@@ -167,7 +167,7 @@ namespace agentsim {
             }
         }
 
-        if (0 == reader.readNextFrame(simul)) {
+        if (0 == reader.loadNextFrame(simul)) {
             GetFiberPositionsFromFrame(agents);
         } else {
             LOG_F(INFO,"Finished Streaming Cytosim Run from File");

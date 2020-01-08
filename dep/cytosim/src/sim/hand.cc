@@ -6,228 +6,290 @@
 #include "exceptions.h"
 #include "iowrapper.h"
 #include "fiber_prop.h"
+#include "fiber_grid.h"
 #include "simul.h"
 #include "sim.h"
-extern Random RNG;
 
 //------------------------------------------------------------------------------
 
-Hand::Hand(HandProp const* p, HandMonitor* m) : haMonitor(m), prop(p)
+Hand::Hand(HandProp const* p, HandMonitor* m)
+ : haNext(nullptr), haPrev(nullptr), haMonitor(m), prop(p)
 {
-    nextAttach = RNG.exponential();
-    nextDetach = RNG.exponential();
+    // initialize in unattached state:
+    nextDetach = 0;
 }
+
 
 Hand::~Hand()
 {
+    // the Hands should be detached in ~Couple and ~Single
+    assert_true(!fbFiber);
+    prop = nullptr;
+}
+
+
+Hand * Hand::otherHand() const
+{
+    return haMonitor->otherHand(this);
+}
+
+
+Vector Hand::otherPosition() const
+{
+    return haMonitor->otherPosition(this);
+}
+
+
+real Hand::interactionStiffness() const
+{
+    return haMonitor->interactionStiffness();
+}
+
+
+void Hand::resetTimers()
+{
+    // initialize the Gillespie counters:
     if ( attached() )
-        detach();
-    prop = 0;
-}
-
-//------------------------------------------------------------------------------
-#pragma mark -
-
-/**
- Tests if attachment at site \a fb is possible:
- - site is located within the MINUS_END and PLUS_END
- - binding_key are bitwise compatible: prop->binding_key & fb.fiber()->prop->binding_key 
- - HandMonitor::allowAttachment() returns true
- */
-bool Hand::attachmentAllowed(FiberBinder & fb)
-{
-    assert_true( fb.attached() );    
-    
-    /*
-     Check that the two binding keys match:
-     Allow binding if the BITWISE-AND of the two keys is true
-     */
-    if ( ! ( prop->binding_key & fb.fiber()->prop->binding_key ) )
-        return false;
-
-    
-    // check minus-end-binding:
-    if ( fb.abscissaFrom(MINUS_END) < 0 )
     {
-        if ( prop->bind_also_ends )
-            fb.moveToEnd(MINUS_END);
-        else
-            return false;
-    }
-    
-    // check plus-end binding:
-    if ( fb.abscissaFrom(PLUS_END) < 0 )
-    {
-        if ( prop->bind_also_ends )
-            fb.moveToEnd(PLUS_END);
-        else
-            return false;
-    }
- 
-    
-    // allowAttachment(fb) will return false if the Hand cannot bind
-    return haMonitor->allowAttachment(fb);
-}
-
-
-/**
- This also sets the Gillespie detachment time \a nextDetach
- */
-void Hand::attach(FiberBinder const & fb)
-{
-    assert_true( !attached() && !linked() );
-    assert_true( fb.attached() );    
-
-    FiberBinder::attach(fb);
-    haMonitor->afterAttachment();
-}
-
-
-void Hand::attachTo(Fiber * f, const real ab, const FiberEnd from)
-{
-    assert_true(f);
-    FiberBinder fb(f, f->abscissa(ab, from));
-    attach(fb);
-}
-
-
-void Hand::attachToEnd(Fiber * f, const FiberEnd end)
-{
-    assert_true(f);
-    FiberBinder fb(f, f->abscissa(end));
-    attach(fb);
-}
-
-
-void Hand::handleOutOfRange(FiberEnd end)
-{
-    assert_true( attached() );
-    assert_true( fbAbs < fbFiber->abscissaM() ||  fbAbs > fbFiber->abscissaP() );
-    
-    if ( fiber()->isShrinking(end) )
-    {
-        if ( prop->hold_shrinking_end )
-            moveToEnd(end);
-        else
-            detach();
+        nextDetach = RNG.exponential();
     }
     else
     {
-        // if the FiberEnd is not shrinking, it can be growing or static:
-        if ( prop->hold_growing_end )
-            moveToEnd(end);
-        else
-            detach();
+        nextDetach = 0;
     }
 }
 
+//------------------------------------------------------------------------------
+#pragma mark -
+
+void Hand::relocate(Fiber* f)
+{
+    assert_true(f);
+    if ( fbFiber )
+    {
+        fbFiber->removeHand(this);
+        fbFiber = f;
+#if FIBER_HAS_LATTICE
+        if ( fbLattice )
+            fbLattice = &f->lattice();
+#endif
+    }
+    f->addHand(this);
+    update();
+}
+
+
+void Hand::relocate(Fiber* f, const real a)
+{
+    assert_true(f);
+    if ( f != fbFiber )
+    {
+        if ( fbFiber )
+        {
+            fbFiber->removeHand(this);
+            fbFiber = f;
+#if FIBER_HAS_LATTICE
+            if ( fbLattice )
+                fbLattice = &f->lattice();
+#endif
+        }
+        f->addHand(this);
+    }
+    fbAbs = a;
+    update();
+}
+
+
+void Hand::moveToEnd(const FiberEnd end)
+{
+    assert_true(fbFiber);
+    assert_true(end==PLUS_END || end==MINUS_END);
+    
+    if ( end == PLUS_END )
+        FiberSite::relocateP();
+    else
+        FiberSite::relocateM();
+}
 
 //------------------------------------------------------------------------------
 #pragma mark -
+
+/**
+Checks that all the conditions required for attachment are met
+ */
+bool Hand::attachmentAllowed(FiberSite& sit) const
+{
+    assert_true( sit.attached() );
+    
+    /*
+     Check that the two binding keys match, allowing binding 
+     according to the BITWISE AND of the two keys:
+     */
+    if ( ! ( prop->binding_key & sit.fiber()->prop->binding_key ) )
+        return false;
+        
+    // check end-on binding:
+    if ( sit.abscissaFromM() < 0 )
+    {
+        if ( prop->bind_also_end & MINUS_END )
+            sit.relocateM();
+        else
+            return false;
+    }
+    else if ( sit.abscissaFromP() < 0 )
+    {
+        if ( prop->bind_also_end & PLUS_END )
+            sit.relocateP();
+        else
+            return false;
+    }
+    
+    FiberEnd end = NO_END;
+
+    switch ( prop->bind_only_end )
+    {
+        case NO_END:
+            break;
+        case MINUS_END:
+            if ( sit.abscissaFromM() > prop->bind_end_range )
+                return false;       // too far from fiber end
+            end = MINUS_END;
+            break;
+        case PLUS_END:
+            if ( sit.abscissaFromP() > prop->bind_end_range )
+                return false;       // too far from fiber end
+            end = PLUS_END;
+            break;
+        case BOTH_ENDS:
+        {
+            FiberEnd e = nearestEnd();
+        
+            if ( sit.abscissaFrom(e) > prop->bind_end_range )
+                return false;
+        
+            // also check the other fiber end:
+            FiberEnd o = ( e == PLUS_END ) ? MINUS_END : PLUS_END;
+        
+            // give equal chance to all ends within range:
+            if ( sit.abscissaFrom(o) < prop->bind_end_range  )
+                end = RNG.choice(MINUS_END, PLUS_END);
+            else
+                end = e;
+        }
+        default:
+            throw Exception("Illegal value of hand:bind_only_end");
+    }
+
+#if NEW_BIND_ONLY_FREE_END
+    // check occupancy near the end (should be done with FiberLattice)
+    if ( end != NO_END && prop->bind_only_free_end )
+    {
+        if ( 0 < sit.fiber()->nbHandsNearEnd(prop->bind_end_range, end) )
+            return false;
+    }
+#endif
+    
+    // also check the Monitor's permissions:
+    return haMonitor->allowAttachment(sit);
+}
+
+
+void Hand::locate(Fiber* f, real a)
+{
+    assert_true(f);
+    assert_true(!fbFiber);
+    //assert_true(f->abscissaM() <= a + REAL_EPSILON);
+    //assert_true(a <= f->abscissaP() + REAL_EPSILON);
+
+    fbAbs   = a;
+    fbFiber = f;
+    f->addHand(this);
+    update();
+    haMonitor->afterAttachment(this);
+    nextDetach = RNG.exponential();
+}
+
+
+void Hand::attach(FiberSite const& s)
+{
+    assert_true(s.attached());
+    assert_true(!fbFiber);
+
+    locate(s.fiber(), s.abscissa());
+#if FIBER_HAS_LATTICE
+    fbLattice = s.lattice();
+    fbSite = s.site();
+#endif
+}
+
 
 void Hand::detach()
 {
     assert_true( attached() );
-    
-    haMonitor->beforeDetachment();
-    FiberBinder::detach();
-    haMonitor->afterDetachment();
+    haMonitor->beforeDetachment(this);
+    fbFiber->removeHand(this);
+    fbFiber = nullptr;
+#if FIBER_HAS_LATTICE
+    fbLattice = nullptr;
+#endif
+}
+
+
+void Hand::detachHand()
+{
+    assert_true( attached() );
+    fbFiber->removeHand(this);
+    fbFiber = nullptr;
+#if FIBER_HAS_LATTICE
+    fbLattice = nullptr;
+#endif
 }
 
 //------------------------------------------------------------------------------
-/** 
- Test for spontaneous detachment using Gillespie approach.
- 
- @return true if the test has passed, and detach() was called.
- 
- see @ref Stochastic
- */
-bool Hand::testDetachment()
+#pragma mark -
+
+
+void Hand::checkFiberRange()
 {
-    assert_true( nextDetach >= 0 );
-    /* 
-     Attention: nextDetach should be set at each attachement.
-     */
+    assert_true( attached() );
     
-#if NEW_END_DEPENDENT_DETACHMENT
-    // Hands within 10nm can hold onto the plus end
-    if ( abscissaFrom(PLUS_END) < 0.010 )
-        nextDetach -= prop->unbinding_rate_end_dt;
+    if ( fbAbs < fbFiber->abscissaM() )
+        handleDisassemblyM();
+    else if ( fbAbs > fbFiber->abscissaP() )
+        handleDisassemblyP();
+}
+
+
+void Hand::handleDisassemblyM()
+{
+    if ( RNG.test(prop->hold_shrinking_end) )
+        relocateM();
     else
-#endif
-        
-    nextDetach -= prop->unbinding_rate_dt;
-    
-    if ( nextDetach <= 0 )
-    {
-        nextDetach = RNG.exponential();
         detach();
-        return true;
-    }
-    
-    return false;
 }
 
-
-/**
- Test for spontaneous detachment using Gillespie approach.
- 
- @return true if the test has passed, and detach() was called.
- 
- see @ref Stochastic
- */
-bool Hand::testKramersDetachment(const real force)
+void Hand::handleDisassemblyP()
 {
-    /*
-     mul can be infinite, because it is the exponential of force,
-     and we avoid the case ( rate==0 ) since zero * infinite is undefined
-     */
-    real rate = prop->unbinding_rate_dt;
-    
-#if NEW_END_DEPENDENT_DETACHMENT
-    // Hands within 10nm can hold onto the plus end
-    if ( abscissaFrom(PLUS_END) < 0.010 )
-        rate = prop->unbinding_rate_end_dt;
-#endif
-
-    
-    if ( rate > 0 )
-    {
-        nextDetach -= rate * exp(force*prop->unbinding_force_inv);
-        if ( nextDetach <= 0 )
-        {
-            nextDetach = RNG.exponential();
-            detach();
-            return true;
-        }
-    }
-    return false;
+    if ( RNG.test(prop->hold_shrinking_end) )
+        relocateP();
+    else
+        detach();
 }
-
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
 /**
- Test for attachment to nearby Fibers, using the Gillespie time nextAttach
+ Test for attachment to nearby Fibers
  */
-void Hand::stepFree(const FiberGrid& grid, Vector const & pos)
+void Hand::stepUnattached(const FiberGrid& grid, Vector const & pos)
 {
-    assert_true( !attached() );
-    assert_true( nextAttach >= 0 );
+    assert_true( unattached() );
 
-    nextAttach -= prop->binding_rate_dt;
-
-    if ( nextAttach <= 0 )
-    {
-        nextAttach = RNG.exponential();
-        if ( grid.tryToAttach(pos, *this) )
-            return;
-    }
+    grid.tryToAttach(pos, *this);
 }
 
 
-//------------------------------------------------------------------------------
 /**
  Test for spontaneous detachment at rate HandProp::unbinding_rate, 
  */
@@ -238,40 +300,61 @@ void Hand::stepUnloaded()
     testDetachment();
 }
 
-//------------------------------------------------------------------------------
+
 /**
  Test for force-induced detachment following Kramers' law,
  vith basal rate HandProp::unbinding_rate, 
  and characteristic force HandProp::unbinding_force
  */
-void Hand::stepLoaded(Vector const& force)
+void Hand::stepLoaded(Vector const& force, real force_norm)
 {
     assert_true( attached() );
+    assert_true( nextDetach >= 0 );
     
-    testKramersDetachment(force.norm());
+    if ( prop->unbinding_force_inv > 0 )
+        testKramersDetachment(force_norm);
+    else
+        testDetachment();
 }
-
 
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Hand::write(OutputWrapper& out) const
+
+void Hand::write(Outputter& out) const
 {
     /*
-     it is not necessary to write the property index here,
-     since it is set only when Hand is created in class Single or Couple.
+     it is not necessary to write the property number here,
+     since it is set when the Hand is created in class Single or Couple.
      */
-    FiberBinder::write(out);
+    FiberSite::write(out);
 }
 
 
-void Hand::read(InputWrapper & in, Simul& sim)
+void Hand::read(Inputter& in, Simul& sim)
 {
 #ifdef BACKWARD_COMPATIBILITY
     if ( in.formatID() < 32 )
-        prop = static_cast<HandProp*>(sim.properties.find("hand",in.readUInt16()));
+        prop = sim.findProperty<HandProp>("hand",in.readUInt16());
 #endif
     
-    FiberBinder::read(in, sim);
+    Fiber * fib = fbFiber;
+    FiberSite::read(in, sim);
+    resetTimers();
+    
+    // update fiber's lists:
+    if ( fib != fbFiber )
+    {
+        if ( fib )
+            fib->removeHand(this);
+        if ( fbFiber )
+            fbFiber->addHand(this);
+    }
+}
+
+std::ostream& operator << (std::ostream& os, Hand const& obj)
+{
+    os << "hand(" << obj.fiber()->reference() << ", " << obj.abscissa() << ")";
+    return os;
 }

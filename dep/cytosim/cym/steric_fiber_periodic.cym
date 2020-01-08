@@ -3,51 +3,48 @@
 % F. Nedelec, 23 Jan 2010
 
 
-set simul steric_fiber1 
+set simul system
 {
-    time_step = 0.005
-    steric = 1, 200
+    dim = 2
+    time_step = 0.01
+    steric = 1, 1000
     kT = 0.0002
     
-    display = { delay=8; point_value=0.01; window_size=1000, 800; tiled=2 }
+    display = { delay=8; point_value=0.01; window_size=1000, 800; tile=2 }
 }
 
 set space cell
 {
-    geometry = ( strip 4 4 4 )
+    shape = periodic
 }
 
-new space cell
-
-set bead ball
+new cell
 {
-    steric = 1
-    confine = all_inside, 100
+    length = 4, 4
 }
 
-new 1 bead ball
-{
-    radius = 1.5
-    position = ( 0 0 0 )
-}
-
-set fiber tube
+set fiber filament
 {
     rigidity = 20
     confine = inside, 100
-    segmentation = 1
+    segmentation = 0.1
     steric = 1, 0.05
-    display = { line=6,2; rainbow=0.25 }
+
+    activity = grow
+    growing_speed = 0.2
+    total_polymer = 250
+
+    display = { line=6,2; tension=4 }
 }
 
 
-new 500 fiber tube
+new 125 filament
 {
-    length = 1
+    length = 0.01
     orientation = horizontal
 }
 
-run simul *
+run system
 {
     nb_steps  = 10000
     nb_frames = 100

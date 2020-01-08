@@ -1,10 +1,8 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-//------------------------------------------------------------------------------
-//                                 reader.cc
-//
-//     this is mostly a test for the class defined in frame_reader.h
-//     but it can be used to navigate from frame to frame in a object-file
-//------------------------------------------------------------------------------
+/*
+ This is mostly a test for the class defined in frame_reader.h
+ but it can be used to navigate from frame to frame in a object-file
+*/
 
 #include <cstring>
 #include <cctype>
@@ -19,13 +17,13 @@
 
 //------------------------------------------------------------------------------
 
-void help(std::ostream & os = std::cout)
+void help(std::ostream& os)
 {
-    os << "Read cytosim trajectory file\n";
+    printf("Cytosim-reader %iD, file version %i\n", DIM, Simul::currentFormatID);
     os << "\n";
-    os << "Syntax:  reader [options] file_in file_out\n";
+    os << "Syntax:  reader [OPTIONS] INPUT_FILE_NAME output=FILE_NAME\n";
     os << "\n";
-    os << "options:\n";
+    os << "OPTIONS:\n";
     os << "     help       display this message\n";
     os << "     binary=0   write text coordinates in `file_out'\n";
     os << "     binary=1   write binary coordinates in `file_out'\n";
@@ -33,7 +31,7 @@ void help(std::ostream & os = std::cout)
     os << "\n";
 }
 
-void instructions(std::ostream & os = std::cout)
+void instructions(std::ostream& os = std::cout)
 {
     os << "Commands understood at prompt:\n";
     os << "  'q'      quit\n";
@@ -50,35 +48,38 @@ void instructions(std::ostream & os = std::cout)
 
 int main(int argc, char* argv[])
 {
-    Glossary glos;
-    glos.readStrings(argc, argv);
-    
-    if ( glos.use_key("help") )
+    Simul simul;
+    FrameReader reader;
+    Glossary arg;
+    char cmd[1024] = "\0";
+    size_t frm = 0;
+
+    if ( arg.read_strings(argc-1, argv+1) )
+        return EXIT_FAILURE;
+
+    if ( arg.use_key("help") )
     {
-        help();
+        help(std::cout);
         instructions();
         return EXIT_SUCCESS;
     }
     
-    std::string output = "objects2.cmo";
-    glos.set(output, "output");
+    std::string input = TRAJECTORY;
+    std::string output = "output.cmo";
     
-    bool binary = true;
-    glos.set(binary, "binary");
-    
-    int verbose = 0;
-    glos.set(verbose, "verbose");
-    Cytosim::setVerbose(verbose);
+    arg.set(output, "output");
+    arg.set(input, "input") || arg.set(input, ".cmo");
 
-    Simul simul;
-    FrameReader reader;
+    bool binary = true;
+    arg.set(binary, "binary");
+    
     try {
-        Parser(simul, 1, 1, 0, 0, 0).readProperties();
-        reader.openFile(simul.prop->trajectory_file);
+        simul.loadProperties();
+        reader.openFile(input);
     }
     catch( Exception & e )
     {
-        std::cerr << "Aborted: " << e.what() << std::endl;
+        std::clog << "Aborted: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
     
@@ -88,52 +89,50 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
     
-    int frame;
     
-    char user[1024] = "\0";
-    
-    printf("TestReader: read/write frame for cytosim. Enter (h) for help\n");
+    printf("Reader: enter (h) for help\n");
     while ( true )
     {
-        if ( reader.frame() < 0 )
-            printf("No frame in buffer\n");
-        else
-            printf("Frame %i in buffer: %9.6f s, %i Fibers, %i Couples\n", 
-                   reader.frame(), simul.simTime(), simul.fibers.size(), simul.couples.size());
+        printf("Frame %li, time %f", reader.currentFrame(), simul.time());
+        simul.reportInventory(std::cout);
         
-        printf(" ? ");
-        fgets(user, sizeof(user), stdin);
+        printf("\n? ");
+        fgets(cmd, sizeof(cmd), stdin);
         
-        if ( isdigit( user[0] ))
+        if ( isdigit(cmd[0]))
         {
-            if ( 1 == sscanf(user, "%i", &frame ) )
+            char * end;
+            frm = strtoul(cmd, &end, 10);
+            if ( errno )
+                printf("Reader: error reading: %s\n", cmd);
+            else if ( end > cmd )
             {
                 try {
-                    if ( 0 != reader.readFrame(simul, frame) )
-                        printf("frame not found: ");
+                    if ( 0 != reader.loadFrame(simul, frm) )
+                        printf("Reader: frame not found: ");
                 }
                 catch( Exception & e ) {
-                    printf("Error in frame %i: %s\n", frame, e.what());
+                    printf("Reader: exception in `read` %lu: %s\n", frm, e.msg());
                 }
             }
         }
         else
         {
-            switch( user[0] )
+            switch( cmd[0] )
             {
                 case '\n':
                 case 'n':
                     try {
-                        if ( 0 == reader.readNextFrame(simul) )
-                            printf("next: ");
+                        int err = reader.loadNextFrame(simul);
+                        if ( err ) printf("Reader error with `next`: %i\n", err);
                     }
                     catch( Exception & e ) {
-                        printf("IO Error: %s\n", e.what());
+                        printf("Reader: exception in `next`: %s\n", e.msg());
                     }
                     break;
                     
                 case 'w':
-                    simul.writeObjects(output, binary, true);
+                    simul.writeObjects(output, true, binary);
                     break;
                     
                 case 'e':
@@ -142,7 +141,7 @@ int main(int argc, char* argv[])
                     
                 case 'b':
                     binary = !binary;
-                    printf("binary = %i\n", binary);
+                    printf("Reader: binary = %i\n", binary);
                     break;
                     
                 case 'c':

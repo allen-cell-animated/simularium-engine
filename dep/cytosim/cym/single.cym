@@ -4,7 +4,7 @@
  F. Nedelec, February 2013
 */
 
-set simul single
+set simul system
 {
     time_step = 0.005
     viscosity = 0.1
@@ -12,10 +12,14 @@ set simul single
 
 set space cell
 {
-    geometry = ( capsule 5 1 )
+    shape = capsule
 }
 
-new space cell
+new cell
+{
+    length = 12
+    radius = 1
+}
 
 set fiber microtubule
 {
@@ -25,7 +29,7 @@ set fiber microtubule
     display = { line_width=2; }
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 10
 }
@@ -39,15 +43,15 @@ set hand motor
     display = { size=10; color=green }
 }
 
-set single protein
+set single simplex
 {
     hand = motor
     diffusion = 0.1
 }
 
-new 100 single protein
+new 100 simplex
 
-run simul *
+run system
 {
     nb_steps = 40000
     nb_frames = 50

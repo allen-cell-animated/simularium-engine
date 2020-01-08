@@ -2,42 +2,45 @@
 % cf. Bourdieu et al. PRL Vol 75/N 1/Page 176-179
 % the parameters for motor density are also taken from there
 
-set simul glide_spiral 
+set simul system
 {
+    dim = 2
     time_step = 0.0025
     viscosity = 0.2
     precondition = 1
-    display = (
-         style = 2;
-         label = (Gliding spiral -);
-         delay = 5;
-         period = 4;
-         point_size = 8;
-         line_width = 8;
-         %single_select = 2;
-         tiled = 0, 1;
-        )
+}
+
+set system display
+{
+    style = 2;
+    label = (Gliding spiral -);
+    delay = 5;
+    period = 4;
+    point_size = 5;
+    line_width = 8;
+    %single_select = 2;
 }
 
 set space cell
 {
-    geometry = ( periodic 2 2 )
+    shape = periodic
     display = ( width = 2 )
 }
 
-new space cell
-
-
-set hand popeye
+new cell
 {
-    unbinding_rate = 0
-    unbinding_force = 1e6
+    length = 4, 4
+}
+
+set hand holder
+{
+    unbinding = 0, inf
     display = ( color=white; )
 }
 
 set single pivot
 {
-    hand = popeye
+    hand = holder
     stiffness = 10000
     activity = fixed
 }
@@ -46,15 +49,15 @@ set fiber microtubule
 {
     rigidity = 20
     segmentation = 0.1
-    display = ( line=5, 2; rainbow=0.02; )
+    display = ( line=10, 2; tension=-20; )
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 5
-    position = ( 2.5 0 0 )
-    orientation = ( 1 0 0 )
-    single = pivot, minus_end
+    position = 2.5 0 0
+    orientation = 1 0 0
+    attach = pivot, 0, minus_end
     placement = anywhere
 }
 
@@ -66,7 +69,7 @@ set hand kinesin
     unbinding_force = 2.5
     
     activity = move
-    max_speed = 0.5
+    unloaded_speed = 0.5
     stall_force = 5
     display = ( color=gray; )
 }
@@ -78,12 +81,12 @@ set single grafted
     activity = fixed
 }
 
-new 10000 single grafted
+new 10000 grafted
 {
     position = ( disc 2 )
 }
 
-run 100000 simul *
+run 100000 system
 {
     nb_frames = 50
 }

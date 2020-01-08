@@ -1,28 +1,27 @@
 % Microtubules in interphase S.pombe
-% Francois Nedelec, Aug. 4, 2009
+% Francois Nedelec, 2007-12-17
 % NOTE: parameters use units of picoNewton, micrometer, second
 
 
-set simul pombe 
+set simul system
 {
     time_step  = 0.01
     kT         = 0.0042
     viscosity  = 0.9
     precondition = 0
-    display = ( window_size=800,400 )
+    display = ( window_size=1024,384; delay=2; )
 }
 
-set space pombe
+set space cell
 {
-    geometry = ( capsule 3.5 1.6 )
-    display = ( color=0xFFFFFF55; )
+    shape = capsule
+    display = ( color=0x7777772F, black; visible=3; width=10; )
 }
 
-new space pombe
 
 set fiber microtubule
 {
-    rigidity       = 30
+    rigidity       = 20
     segmentation   = 0.5
     confine        = inside, 200
     
@@ -32,7 +31,8 @@ set fiber microtubule
     shrinking_speed = -0.15
     hydrolysis_rate = 0.058
     growing_force   = 1.7
-    fate            = rescue
+    persistent      = 1
+    rebirth_rate    = 1
     min_length      = 0.5
     display = ( line_width=5; plus_end=15; minus_end=15; )
 }
@@ -43,33 +43,35 @@ set sphere envelope
     confine        = all_inside, 200
     piston_effect  = 1
     
-    display = ( color=0xFFFFFF55; size=12; style=12 )
+    display = ( color=0x0000FF88; size=12; style=15 )
 }
 
-set bundle microtubule_bundle
+set bundle bunch
 {
-    fibers    = microtubule
-    nb_fibers = 4
     overlap   = 0.5
     stiffness = 1000
 }
 
-set nucleus nucleus
+set nucleus noyau
 {
-    sphere     = envelope
-    nb_bundles = 4 
-    bundles    = microtubule_bundle
     stiffness  = 200
 }
 
-new nucleus nucleus
+new cell
 {
-    radius       = 1.3
-    position     =  ( 3.5 0 0 )
-    fiber_length = 0.5
+    length = 10
+    radius = 1.62
 }
 
-run simul *
+new noyau
+{
+    sphere     = envelope
+    bundles    = 4, bunch, (fibers=2, microtubule, (length=0.5))
+    radius     = 1.1
+    position   = 3.5 0 0
+}
+
+run system
 {
     nb_steps   = 50000
     nb_frames  = 100

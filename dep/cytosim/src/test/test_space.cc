@@ -1,37 +1,42 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-// Francois Nedelec, nedelec@embl.de, started in October 2002
-// test_space provides a visual test of Cytosim's Space
+/*
+ test_space provides a visual test of Cytosim's Space
+*/
 
 #include <ctime>
 #include "dim.h"
 #include "exceptions.h"
+#include "iowrapper.h"
 #include "glossary.h"
 #include "real.h"
-#include "smath.h"
 #include "vector.h"
 #include "random.h"
-extern Random RNG;
 
 #include "space_prop.h"
 #include "space.h"
 #include "space_set.h"
 #include "glapp.h"
+#include "glut.h"
 #include "gle.h"
+
 using namespace gle;
+
+// List of options
+Glossary opt;
 
 // property
 SpaceProp prop("test_space");
 
 // Space to be tested:
-Space * spc = 0;
+Space * spc = nullptr;
 
 // number of points
-const int maxpts = 65536;
+const int maxpts = 1<<17;
 int nbpts  = 1024;
 int scan   = 100;
 
 // INFLATION of the rectangle containing point to be projected
-const real INFLATION = 2;
+const real INFLATION = 1;
 
 // regular or random distribution of the test-points
 bool regular_distribution = false;
@@ -86,22 +91,26 @@ const GLfloat COL = 0.8;
 
 //------------------------------------------------------------------------------
 
-void generatePoints()
+void generatePoints(real len)
 {
-    Vector range = spc->extension() + INFLATION * Vector(1, 1, 1);
+    Vector inf, sup;
+    spc->boundaries(inf, sup);
+    inf -= Vector(len, len, len);
+    Vector dif = sup - inf + Vector(len, len, len);
     
     if ( regular_distribution )
     {
+        dif /= scan;
         int kk = 0;
         nbpts = 0;
         //follow a regular lattice:
-        for ( int ii = -scan; ii <= scan; ++ii )
-            for ( int jj = -scan; jj <= scan; ++jj )
-#if ( DIM == 3 )
-                for ( kk = -scan; kk <= scan; ++kk )
+        for ( int ii = 0; ii <= scan; ++ii )
+            for ( int jj = 0; jj <= scan; ++jj )
+#if ( DIM >= 3 )
+                for ( kk = 0; kk <= scan; ++kk )
 #endif
                 {
-                    point[nbpts++] = range.e_mul(Vector(ii, jj, kk) / scan);
+                    point[nbpts++] = inf + dif.e_mul(Vector(ii, jj, kk));
                     if ( nbpts >= maxpts )
                         return;
                 }
@@ -109,35 +118,35 @@ void generatePoints()
     else
     {
         for ( int ii = 0; ii <= nbpts; ++ii )
-            point[ii] = range.e_mul(Vector::randBox());
-        //point[ii] = Vector::randUnit(1);
+            point[ii] = inf + dif.e_mul(Vector::randP());
+        //point[ii] = Vector::randU();
         //point[ii] = spc->randomPlaceNearEdge(0.1);
     }
 }
 
 
-void distributePoints()
+void distributePoints(real len = INFLATION)
 {
-    if ( spc == 0 ) return;
+    if ( !spc ) return;
     
-    generatePoints();
+    generatePoints(len);
     max_error_projection = 0;
     
     for ( int ii = 0; ii < nbpts; ++ii )
     {
         //see if space finds it inside:
-        inside[ii] = spc->inside( point[ii] );
+        inside[ii] = spc->inside(point[ii]);
         //calculate the projection:
-        spc->project( point[ii], project[ii] );
+        project[ii] = spc->project(point[ii]);
         
         //calculate the projection of the projection:
-        //spc->project( project[ii], project2[ii] );
+        //project2[ii] = spc->project(project[ii]);
         project2[ii] = project[ii];
         
         if ( showNormals )
             normal[ii] = spc->normalToEdge(project[ii]);
         else
-            normal[ii].set(0,0,0);
+            normal[ii].reset();
         
         edge[ii] = spc->randomPlaceOnEdge(1);
         
@@ -146,7 +155,9 @@ void distributePoints()
     }
     max_error_projection = sqrt( max_error_projection );
     
-    glApp::displayLabel(" error=%5.2e (press s)", max_error_projection);
+    char tmp[128];
+    snprintf(tmp, sizeof(tmp), "error %.6f", max_error_projection);
+    glApp::setMessage(tmp);
 }
 
 //------------------------------------------------------------------------------
@@ -161,34 +172,55 @@ void timerFunction(int)
 }
 
 //------------------------------------------------------------------------------
-void setSpace()
+void setGeometry()
 {
-    std::cerr << "Space:geometry=" << prop.geometry << "\n";
+    prop.read(opt);
     
     try {
-        prop.complete(0, 0);
-        if ( spc )
+        delete(spc);
+        spc = prop.newSpace(opt);
+        if ( 1 )
         {
-            delete(spc);
-            spc = 0;
+            fprintf(stdout, " >>> ");
+            Outputter out(stdout, false);
+            spc->write(out);
+            fprintf(stdout, "\n");
+
         }
-        spc = prop.newSpace();
     }
     catch( Exception & e )
     {
-        printf("Error: `%s'\n", e.what());
+        printf("Error: `%s'\n", e.msg());
     }
     
     try {
         if ( spc )
-            distributePoints();
+            distributePoints(INFLATION);
     }
     catch( Exception & e )
     {
-        printf("Error: `%s'\n", e.what());
+        printf("Error: `%s'\n", e.msg());
     }
 
     glutPostRedisplay();
+}
+
+
+void checkVolume()
+{
+    size_t cnt = 1<<22;
+    real e1 = spc->estimateVolume(cnt);
+    real e2 = spc->estimateVolume(cnt);
+    
+    printf("Monte-Carlo estimated volume of `%s` is", spc->prop->shape.c_str());
+    printf("  %.6f +/- %.6f\n", e1, fabs(e2-e1));
+    
+    real v = spc->volume();
+    
+    real err = fabs( e1 - v ) / v;
+    
+    if ( err > 1e-3 )
+        printf("    but given volume is %f  (difference %.2f %%)\n", v, 100*err);
 }
 
 //------------------------------------------------------------------------------
@@ -241,7 +273,7 @@ void initMenus()
 {
     int gm = glApp::buildMenu();
     glutCreateMenu(processMenu);
-    glutAddSubMenu("glApp", gm);
+    glutAddSubMenu("Control", gm);
     
     glutAddMenuEntry("Reset",                MENU_RESETVIEW);
     glutAddMenuEntry("Quit",                 MENU_QUIT);
@@ -359,6 +391,13 @@ void processNormalKey(unsigned char c, int x=0, int y=0)
             distributePoints();
             break;
             
+        case 'd':
+        {
+            real val[] = { -2, -1, 0, 1, 2, 5 };
+            opt.define("inflate", 0, val[ RNG.pint(6) ]);
+            setGeometry();
+        } break;
+            
         case 't':
             timerOn = ! timerOn;
             if ( timerOn )
@@ -403,9 +442,11 @@ bool showPoint(int i)
 }
 
 
-void display()
+void display(View&, int)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+    spc->draw();
     
     //plot a gren dot for points inside, a red dot for point outside:
     glPointSize(2.0);
@@ -415,9 +456,9 @@ void display()
         if ( showPoint(ii) )
         {
             if ( inside[ii] )
-                glColor3f( 0.0, COL, 0.0 );
+                glColor3f(0.0, COL, 0.0);
             else
-                glColor3f( 0.0, 0.0, COL );
+                glColor3f(0.0, 0.0, COL);
             gleVertex( point[ii] );
         }
     }
@@ -433,10 +474,9 @@ void display()
             if ( showPoint(ii) )
             {
                 if ( inside[ii] )
-                    glColor3f( 0.0, COL, 0.0 );
+                    glColor3f(0.0, COL, 0.0);
                 else
-                    glColor3f( 0.0, 0.0, COL );
-
+                    glColor3f(0.0, 0.0, COL);
                 gleVertex( point[ii] );
                 gleVertex( project[ii] );
             }
@@ -450,10 +490,10 @@ void display()
         glBegin(GL_LINES);
         for ( int ii = 0; ii < nbpts; ++ii )
         {
-            glColor4f( 1.0, 1.0, 1.0, 1.0 );
-            gleVertex( project[ii] );
-            glColor4f( 1.0, 1.0, 1.0, 0.0 );
-            gleVertex( project[ii] + normal[ii] );
+            glColor4f(1.0, 1.0, 1.0, 1.0);
+            gleVertex(project[ii]);
+            glColor4f(1.0, 1.0, 1.0, 0.0);
+            gleVertex(project[ii] + normal[ii]);
         }
         glEnd();
     }
@@ -466,9 +506,9 @@ void display()
         {
             if ( showPoint(ii) )
             {
-                glColor3f( COL, 0.0, 0.0 );
-                gleVertex( project[ii] );
-                gleVertex( project2[ii] );
+                glColor3f(COL, 0.0, 0.0);
+                gleVertex(project[ii]);
+                gleVertex(project2[ii]);
             }
         }
         glEnd();
@@ -478,29 +518,15 @@ void display()
     {
         glPointSize(2.0);
         glBegin(GL_POINTS);
-        glColor3f( 1.0, COL, COL );
+        glColor3f(1.0, COL, COL);
         for ( int ii = 0; ii < nbpts; ++ii )
-            gleVertex( edge[ii] );
+            gleVertex(edge[ii]);
         glEnd();
         glBegin(GL_POINTS);
-        glColor3f( 0.0, COL, 0.0 );
+        glColor3f( 0.0, COL, 0.0);
         for ( int ii = 0; ii < nbpts; ++ii )
-            gleVertex( project[ii] );
+            gleVertex(project[ii]);
         glEnd();
-    }
-}
-
-void checkVolume()
-{
-    real ev = spc->estimateVolume(1000000);
-    real v = spc->volume();
-    
-    real err = fabs( ev - v ) / v;
-    
-    if ( err > 1e-3 )
-    {
-        printf("Analytical volume = %f\n", v);
-        printf("   difference 2 methods = %.6f %%\n", 100*err);
     }
 }
 
@@ -508,32 +534,33 @@ void checkVolume()
 int main(int argc, char* argv[])
 {
     glutInit(&argc, argv);
-    glApp::init(display, DIM);
-    glApp::setScale(10);
-    
+    glApp::setDimensionality(DIM);
+    glApp::normalKeyFunc(processNormalKey);
+    glApp::specialKeyFunc(processSpecialKey);
+    glApp::createWindow(display);
+    glApp::setScale(20);
+
     initMenus();
+    RNG.seed();
+
     if ( argc > 1 )
     {
-        prop.geometry = argv[1];
-        setSpace();
+        if ( opt.read_strings(argc-1, argv+1) )
+            return EXIT_FAILURE;
+        setGeometry();
     }
     
     if ( ! spc )
     {
         printf("A geometry should be given in the command line, for example:\n");
-        printf("    test_space 'capsule 1 2'\n");
+        printf("    test_space shape=ellipse length=2,3,4\n");
         exit(EXIT_SUCCESS);
     }
 
-    for ( int n = 0; n < 3; ++n )
-        checkVolume();
-    
-    glutKeyboardFunc(processNormalKey);
-    glutSpecialFunc(processSpecialKey);
+    checkVolume();
     
     glutMainLoop();
     
     return EXIT_SUCCESS;
 }
-
 

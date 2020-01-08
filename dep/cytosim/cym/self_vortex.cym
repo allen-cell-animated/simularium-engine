@@ -1,7 +1,7 @@
 % One of the oldest simulation
 % F. Nedelec, July 2009
 
-set simul self_vortex 
+set simul system
 {
     time_step = 0.01
     viscosity = 0.05
@@ -10,10 +10,13 @@ set simul self_vortex
 
 set space cell
 {
-    geometry = ( circle 16 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 16
+}
 
 set fiber microtubule
 {
@@ -30,7 +33,7 @@ set hand kinesin
     unbinding_force = 3
     
     activity = move
-    max_speed = 0.8
+    unloaded_speed = 0.8
     stall_force = 5
 }
 
@@ -42,20 +45,20 @@ set couple complex
     diffusion = 10
 }
 
-new 80 fiber microtubule
+new 80 microtubule
 {
     length = 14
 }
 
-new 2000 couple complex
+new 2000 complex
 
-set simul:display *
+set system display
 {
     label = (Nedelec et al. 1998 -)
 }
 
 
-run simul *
+run system
 {
     nb_frames  = 100
     nb_steps   = 10000

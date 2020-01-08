@@ -6,7 +6,7 @@
 #include "display.h"
 class PointDisp;
 
-///Cytosim display class - style 2
+///Cytosim display class for style=2
 /**
  This style produces a fast 2D display.
  Some of the parameters in PointDisp are ignored.
@@ -16,11 +16,11 @@ class PointDisp;
  */
 class Display2 : public Display
 {
-    ///display a ball
-    void displayBall(Vector const&, real radius);
+    /// draw a fine spherical object
+    void drawBall(Vector const&, real radius);
     
-    ///display a point
-    void displayPoint(Vector const&, PointDisp const*);
+    /// draw a point
+    void drawPoint(Vector const&, PointDisp const*);
     
 public:
     
@@ -31,62 +31,47 @@ public:
     ~Display2() {}
     
      
-    ///display the given simulation state using OpenGL commands
-    void display(Simul const&);
+    /// draw the given simulation state using OpenGL commands
+    void drawSimul(Simul const&);
+   
+    /// draw Fibers with offset
+    void drawFiber(Fiber const&);
     
-    ///display MINUS_END of a Fiber
-    void displayMinusEnd(int style, Fiber const&, real width) const;
-    
-    ///display PLUS_END of a Fiber
-    void displayPlusEnd(int style, Fiber const&, real width) const;
-    
-    ///display a Fiber
-    void displayFiberMinusEnd(Fiber const&);
-    
-    ///display a Fiber
-    void displayFiberPlusEnd(Fiber const&);
-    
-    ///display a Fiber
-    void displayFiber(Fiber const&);
-    
-    ///display Fibers
-    void displayFibers(FiberSet const&);
-    
-    ///display the Solids
-    void displaySolid(Solid const&);
+    /// draw the Solids
+    void drawSolid(Solid const&);
  
-    ///display the transparent part for the Solids
-    void displayTSolid(Solid const&, unsigned int);
+    /// draw the transparent part for the Solids
+    void drawSolidT(Solid const&, unsigned int);
     
-    ///display a Bead
-    void displayBead(Bead const&);
+    /// draw a Bead
+    void drawBead(Bead const&);
     
-    ///display transparent membrane of Bead
-    void displayTBead(Bead const&);
+    /// draw transparent membrane of Bead
+    void drawBeadT(Bead const&);
     
-    ///display a Sphere
-    void displaySphere(Sphere const&);
+    /// draw a Sphere
+    void drawSphere(Sphere const&);
     
-    ///display transparent membrane of Sphere
-    void displayTSphere(Sphere const&);
+    /// draw transparent membrane of Sphere
+    void drawSphereT(Sphere const&);
     
-    ///display an Organizer
-    void displayOrganizer(Organizer const&);
-    
-    ///display the free Couples
-    void displayFCouples(CoupleSet const&);
-    
-    ///display the attached Couples
-    void displayACouples(CoupleSet const&);
+    /// draw the free Singles
+    void drawSinglesF(SingleSet const&) const;
 
-    ///display the bridging Couples
-    void displayBCouples(CoupleSet const&);
+    /// draw the attached Singles
+    void drawSinglesA(SingleSet const&) const;
 
-    ///display the free Singles
-    void displayFSingles(SingleSet const&);
+    /// draw the free Couples
+    void drawCouplesF(CoupleSet const&) const;
 
-    ///display the attached Singles
-    void displayASingles(SingleSet const&);
+    /// draw the attached Couples
+    void drawCouplesA(CoupleSet const&) const;
+
+    /// draw the bridging Couples
+    void drawCouplesB(CoupleSet const&) const;
+    
+    /// draw an Organizer
+    void drawOrganizer(Organizer const&) const;
 };
 
 #endif

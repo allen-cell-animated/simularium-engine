@@ -1,14 +1,16 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
+// Created by Francois Nedelec on 24/04/2010.
+
 
 #include "backtrace.h"
 
-
-// Backtrace is disabled since it is not necessary to run Cytosim
+// enable/disable backtrace with the '#if' below:
 #if 0
 
-
-#include <stdlib.h>
 #include <execinfo.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
 /**
  * print the current call-stack using functions from the GNU C Library:
@@ -17,25 +19,29 @@
  * .
  * provided by <execinfo.h>
  */
-
-void print_backtrace(FILE * out)
+void print_backtrace(int out)
 {
-    void* callstack[128];
-    size_t frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
+    void* buffer[128];
+    int size = backtrace(buffer, 128);
+#if ( 1 )
+    char** strs = backtrace_symbols(buffer, size);
 
-    fprintf(out, "Execution stack:\n");
-    for ( size_t ii = 0; ii < frames; ++ii )
-        fprintf(out, "    %s\n", strs[ii]);
-    
+    (void) write(out, "Cytosim execution stack:\n", 25);
+    for ( int ii = 0; ii < size; ++ii )
+    {
+        (void) write(out, strs[ii], strlen(strs[ii]));
+        (void) write(out, "\n", 1);
+    }
     free(strs);
+#else
+    backtrace_symbols_fd(buffer, size, out);
+#endif
 }
 
 #else
 
-void print_backtrace(FILE * out)
+void print_backtrace(int out)
 {
-    fprintf(out, "Execution stack unavailable\n");
 }
 
 #endif

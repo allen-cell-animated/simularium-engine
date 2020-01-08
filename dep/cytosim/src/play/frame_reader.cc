@@ -5,26 +5,30 @@
 #include "iowrapper.h"
 #include "simul.h"
 
-//#define VERBOSE_READER
+
+// Use the second definition to get some verbose reports:
+#define VLOG(ARG) ((void) 0)
+//#define VLOG(ARG) std::clog << ARG;
 
 //------------------------------------------------------------------------------
 
-FrameReader::FrameReader() : inw(0)
+FrameReader::FrameReader() : inputter(DIM)
 {
+    frameIndex = 0;
+    lastLoaded = ~0;
+}
+
+
+void FrameReader::clear()
+{
+    inputter.rewind();
     clearPositions();
 }
 
-void FrameReader::rewind()
-{
-    inw.rewind();
-    clearPositions();
-}
 
-void FrameReader::openFile(std::string& file)
+void FrameReader::openFile(std::string const& file)
 {
-    clearPositions();
-    
-    int error = inw.open(file.c_str(), "rb");
+    int error = inputter.open(file.c_str(), "rb");
     
     if ( error )
     {
@@ -33,35 +37,37 @@ void FrameReader::openFile(std::string& file)
         FILE* fp = fopen(tmp.c_str(), "r");
         if ( fp )
         {
-            fclose( fp );
+            fclose(fp);
             tmp = "gunzip " + tmp;
-            std::cerr << tmp << std::endl;
+            std::clog << tmp << std::endl;
             
             if ( 0 == system(tmp.c_str()) )
-                inw.open(file.c_str(), "rb");
+                inputter.open(file.c_str(), "rb");
         }
     }
     
-    if ( !inw.file() )
+    if ( !inputter.file() )
         throw InvalidIO("file `"+file+"' not found");
 
-    if ( inw.error() )
+    if ( inputter.error() )
         throw InvalidIO("file `"+file+"' is invalid");
-    
-    //std::cerr << "FrameReader: has openned " << obj_file << std::endl;
+ 
+    inputter.vectorSize(DIM);
+    clearPositions();
+    //std::clog << "FrameReader: has openned " << obj_file << std::endl;
 }
 
 
 int FrameReader::badFile()
 {
-    if ( 0 == inw.file() )
-        return 1;
+    if ( !inputter.file() )
+        return 8;
     
-    if ( inw.eof() )
-        inw.clearerr();
+    if ( inputter.eof() )
+        inputter.clear();
     
-    if ( ! inw.good() )
-        return 2;
+    if ( ! inputter.good() )
+        return 7;
     
     return 0;
 }
@@ -69,13 +75,13 @@ int FrameReader::badFile()
 
 void FrameReader::checkFile()
 {
-    if ( 0 == inw.file() )
+    if ( !inputter.file() )
         throw InvalidIO("No open file");
     
-    if ( inw.eof() )
-        inw.clearerr();
+    if ( inputter.eof() )
+        inputter.clear();
     
-    if ( ! inw.good() )
+    if ( ! inputter.good() )
         throw InvalidIO("File has errors");
 }
 
@@ -84,72 +90,67 @@ void FrameReader::checkFile()
 
 void FrameReader::clearPositions()
 {
-#ifdef VERBOSE_READER
-    std::cerr << "FrameReader: clear" << std::endl;
-#endif
+    VLOG("FrameReader: clear\n");
     
-    curFrame = -1;
+    frameIndex = 0;
     framePos.clear();
     framePos.reserve(1024);
+    framePos.resize(1);
+    // store info for frame 0:
+    fpos_t pos;
+    if ( 0 == inputter.get_pos(pos) )
+    {
+        framePos[0].status = 1;
+        framePos[0].position = pos;
+    }
 }
 
 
-void FrameReader::savePos(int frm, const fpos_t& pos, int s)
+void FrameReader::savePos(size_t frm, const fpos_t& pos, int confidence)
 {
-    if ( frm < 0 )
-        return;
-    
-    unsigned inx = frm;
-    
-    if ( inx >= framePos.capacity() )
+    if ( frm >= framePos.capacity() )
     {
-        const unsigned chunk = 1024;
-        unsigned sz = ( inx + chunk - 1 ) & -chunk;
+        constexpr size_t chunk = 1024;
+        size_t sz = ( frm + chunk - 1 ) & ~( chunk -1 );
         framePos.reserve(sz);
     }
     
-    if ( inx >= framePos.size() )
+    if ( frm >= framePos.size() )
     {
         size_t i = framePos.size();
-        framePos.resize(inx+1);
-        while ( i <= inx )
+        framePos.resize(frm+1);
+        while ( i <= frm )
             framePos[i++].status = 0;
     }
     
-    if ( framePos[inx].status < s )
+    if ( framePos[frm].status < confidence )
     {
-        framePos[inx].status = s;
-        framePos[inx].value = pos;
+        framePos[frm].status = confidence;
+        framePos[frm].position = pos;
     
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: learned position of frame " << frm << std::endl;
-#endif
+        //VLOG("FrameReader: position of frame " << frm << " is " << pos << '\n');
+        VLOG("FrameReader: found position of frame "<<frm<<" ("<<confidence<<")\n");
     }
 }
 
 
 /**
- This uses the current knowledge to move to a position
- in the file where we should find frame \a frm.
+ This uses the info stored in `framePos[]` to move to a position
+ in the file where frame `frm` should start.
 */
-int FrameReader::seekPos(int frm)
+size_t FrameReader::seekPos(size_t frm)
 {
-    if ( inw.eof() )
-        inw.clearerr();
+    if ( inputter.eof() )
+        inputter.clear();
     
-    if ( frm < 1 || framePos.size() < 1 )
+    if ( frm < 1 || framePos.empty() )
     {
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: rewind 0" << std::endl;
-#endif
-        inw.rewind();
+        VLOG("FrameReader: seekPos rewind\n");
+        inputter.rewind();
         return 0;
     }
     
-    unsigned int inx = frm;
-    
-    if ( inx >= framePos.size() ) 
-        inx = framePos.size() - 1;
+    size_t inx = std::min(frm, framePos.size()-1);
 
     while ( inx > 0  &&  framePos[inx].status == 0 )
         --inx;
@@ -157,25 +158,23 @@ int FrameReader::seekPos(int frm)
     //check if we know already were the frame starts:
     if ( 0 < inx )
     {
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: using known position of frame " << inx << std::endl;
-#endif
-        inw.set_pos(framePos[inx].value);
+        VLOG("FrameReader: using known position of frame " << inx << '\n');
+        inputter.set_pos(framePos[inx].position);
         return inx;
     }
     else {
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: rewind " << std::endl;
-#endif
-        inw.rewind();
+        VLOG("FrameReader: rewind\n");
+        inputter.rewind();
         return 0;
     }
 }
 
 
-int FrameReader::lastFrame() const
+size_t FrameReader::lastKnownFrame() const
 {
-    int res = framePos.size() - 1;
+    if ( framePos.empty() )
+        return 0;
+    size_t res = framePos.size()-1;
     while ( 0 < res  &&  framePos[res].status < 2 )
         --res;
     return res;
@@ -184,184 +183,187 @@ int FrameReader::lastFrame() const
 //------------------------------------------------------------------------------
 #pragma mark -
 
+
+/// return code
+enum FrameReaderCode { SUCCESS = 0, END_OF_FILE = 1, NOT_FOUND = 2, BAD_FILE = 4 };
+
 /**
- scan file forward from current position to find the next occurence of FRAME_TAG
- @return 0 if the frame was found
+ scan file forward from current position to find the next Cytosim frame
+ @return 0 if no frame was found
 */
-int FrameReader::seekFrame(const int frm)
-{        
-#ifdef VERBOSE_READER
-    std::cerr << "FrameReader: seekFrame("<< frm <<")" << std::endl;
-#endif
+int FrameReader::seekFrame(size_t frm)
+{
+    VLOG("FrameReader: seekFrame("<< frm <<")\n");
     
-    int inx = seekPos(frm);
+    size_t inx = seekPos(frm);
     
     if ( inx == frm )
-        return 0;
+        return SUCCESS;
     
-    fpos_t pos;
-    std::string line;
-
-    while ( ! inw.eof() )
+    while ( ! inputter.eof() )
     {
-        do {
+        fpos_t pos;
+        bool has_pos = false;
+        std::string line;
 
-            inw.get_pos(pos);
-            inw.get_line(line);
+        do {
+            has_pos = !inputter.get_pos(pos);
+            line = inputter.get_line();
             
-            if ( inw.eof() )
-                return 1;
+            if ( inputter.eof() )
+                return END_OF_FILE;
             
-#ifdef BACKWARD_COMPATIBILITY
+#ifdef BACKWARD_COMPATIBILITY // 2012
             if ( 0 == line.compare(0, 7, "#frame ") )
                 break;
 #endif
             
-        } while ( line.compare(0, sizeof(FRAME_TAG)-1, FRAME_TAG) );
+        } while ( line.compare(0, 9, "#Cytosim ") );
+        
+        //std::clog << "******\n";
+        VLOG("           : " << line << '\n');
 
-        if ( ! inw.eof() )
+        if ( ! inputter.eof() )
         {
-            savePos(inx, pos, 2);
+            if ( has_pos ) savePos(inx, pos, 2);
             if ( inx == frm )
             {
-                inw.set_pos(pos);
-                return 0;
+                if ( has_pos ) inputter.set_pos(pos);
+                return SUCCESS;
             }
             ++inx;
         }
     }
     
-#ifdef VERBOSE_READER
-    std::cerr << "FrameReader: seekFrame("<< frm <<") encountered EOF" << std::endl;
-#endif
-    return 1;
+    VLOG("FrameReader: seekFrame("<< frm <<") reached EOF\n");
+    return END_OF_FILE;
 }
 
 //------------------------------------------------------------------------------
-/** 
+/**
  returns 0 for success, an error code, or throws an exception
  */
-int FrameReader::readFrame(Simul& sim, int frm, const bool reload)
+int FrameReader::loadFrame(Simul& sim, size_t frm, const bool reload)
 {
     if ( badFile() )
-        return 1;
+        return BAD_FILE;
 
-#ifdef VERBOSE_READER
-    std::cerr << "FrameReader: readFrame("<<frm<<", "<<reload <<")" << std::endl;
-#endif
-    
-    // a negative index is counted from the end
-    if ( frm < 0 )
-    {
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: counting down from frame "<< lastFrame() << std::endl;
-#endif
-        frm += 1 + lastFrame();
-        if ( frm < 0 )
-            frm = 0;
-    }
+    VLOG("FrameReader: loadFrame(frame="<<frm<<", reload="<<reload<<")\n");
     
     // what we are looking for might already be in the buffer:
-    if ( frm == curFrame && ! reload )
-        return 0;
+    if ( frm == lastLoaded && ! reload )
+        return SUCCESS;
     
     // it might be the next one in the buffer:
-    if ( frm == 1+curFrame )
-        return readNextFrame(sim);
-
-    //---------------------try to find the start tag from there:
+    if ( frm > 0  &&  frm-1 == lastLoaded )
+        return loadNextFrame(sim);
     
-    if ( 0 != seekFrame(frm) )
-        return 1;
+    // otherwise, try to find the start tag from there:
+    if ( SUCCESS != seekFrame(frm) )
+        return NOT_FOUND;
     
-    //--------------------read the sim-state from there:
-    
-#ifdef VERBOSE_READER
-    std::cerr << "FrameReader: reading frame "<< frm << std::endl;
-#endif
-    
+    // store the position in the file:
     fpos_t pos;
-    inw.get_pos(pos);
-
-    if ( 0 == sim.reloadObjects(inw) )
-    {
+    bool has_pos = !inputter.get_pos(pos);
     
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader:readFrame("<< frm <<") successful" << std::endl;
-#endif
-        curFrame = frm;
-        savePos(curFrame, pos, 3);
-
+    VLOG("FrameReader: reading frame " << frm << " from " << pos << '\n');
+    //VLOG("FrameReader: reading frame " << frm << '\n');
+    
+    // ask cytosim to read the file:
+    if ( !sim.reloadObjects(inputter) )
+    {
+        VLOG("FrameReader: loadFrame("<< frm <<") successful\n");
+        frameIndex = frm;
+        lastLoaded = frameIndex;
+        if ( has_pos )
+            savePos(frameIndex, pos, 4);
         // the next frame should start at the current position:
-        inw.get_pos(pos);
-        savePos(curFrame+1, pos, 1);
-        return 0;
+        if ( 0 == inputter.get_pos(pos) )
+            savePos(frameIndex+1, pos, 1);
+        return SUCCESS;
     }
     else
     {
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: readFrame("<< frm <<") EOF at frame " << frm << std::endl;
-#endif
-        return 1;
-    }
-}
-
-//------------------------------------------------------------------------------
-int FrameReader::readFrameCatch(Simul& sim, const int frm, const bool reload)
-{
-    try {
-        
-        return readFrame(sim, frm, reload);
-    
-    }
-    catch( Exception & e ) {
-        
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: Error in frame " << frm <<" : " << e.what() << std::endl;
-#endif
-        // the next frame should start after this position,
-        // but there was an error, and the position might not be reliable
-
-        return 6;
-        
+        VLOG("FrameReader: loadFrame("<< frm <<") EOF at frame " << frm << '\n');
+        return END_OF_FILE;
     }
 }
 
 
-//------------------------------------------------------------------------------
-/** 
+/**
  returns 0 for success, an error code, or throws an exception
  */
-int FrameReader::readNextFrame(Simul& sim)
+int FrameReader::loadNextFrame(Simul& sim)
 {
     if ( badFile() )
-        return 1;
+        return BAD_FILE;
     
     fpos_t pos;
-    inw.get_pos(pos);
+    bool has_pos = !inputter.get_pos(pos);
 
-    if ( 0 == sim.reloadObjects(inw) )
+    if ( !sim.reloadObjects(inputter) )
     {
-        ++curFrame;
+        if ( lastLoaded == frameIndex )
+            ++frameIndex;
+        lastLoaded = frameIndex;
+
+        VLOG("FrameReader: loadNextFrame() has read frame " << currentFrame() << '\n');
         
         // the position we used was good, to read this frame
-        savePos(curFrame, pos, 3);
-
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: readNextFrame() read frame " << frame() << std::endl;
-#endif
-        
+        if ( has_pos )
+            savePos(frameIndex, pos, 4);
+       
         // the next frame should start from the current position:
-        inw.get_pos(pos);
-        savePos(curFrame+1, pos, 1);
-        return 0;
-    } 
+        if ( !inputter.get_pos(pos) )
+            savePos(frameIndex+1, pos, 1);
+        return SUCCESS;
+    }
     else
     {
-#ifdef VERBOSE_READER
-        std::cerr << "FrameReader: readNextFrame() EOF after frame " << frame() << std::endl;
-#endif
-        return 1;
+        VLOG("FrameReader: loadNextFrame() EOF while seeking frame " << currentFrame() << '\n');
+        return END_OF_FILE;
     }
 }
 
+
+/**
+ returns 0 for success, an error code, or throws an exception
+ */
+int FrameReader::loadLastFrame(Simul& sim, size_t cnt)
+{
+    if ( badFile() )
+        return BAD_FILE;
+    
+    /// seek last known position:
+    size_t frm = lastKnownFrame();
+    if ( frm > 1 )
+        inputter.set_pos(framePos[frm].position);
+    else
+        inputter.rewind();
+    
+    /// go from here to last frame:
+    int res = NOT_FOUND;
+    while ( !sim.reloadObjects(inputter) )
+    {
+        frameIndex = frm++;
+        lastLoaded = frameIndex;
+        res = SUCCESS;
+    }
+    
+    if ( res == SUCCESS && cnt > 0 )
+    {
+        frm = frm - 1 - cnt;
+        // go back up by 'cnt' frames:
+        if ( SUCCESS != seekFrame(frm) )
+            return NOT_FOUND;
+        
+        if ( !sim.reloadObjects(inputter) )
+            return NOT_FOUND;
+
+        frameIndex = frm;
+        lastLoaded = frameIndex;
+        VLOG("FrameReader: loadFrame("<< frm <<") successful\n");
+    }
+    
+    return res;
+}

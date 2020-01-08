@@ -5,7 +5,7 @@
  F. Nedelec, April 2010
 */
 
-set simul hand_move
+set simul system
 {
     time_step = 0.005
     viscosity = 0.02
@@ -13,20 +13,23 @@ set simul hand_move
 
 set space cell
 {
-    geometry = ( sphere 10 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 10
+}
 
 set fiber microtubule
 {
     rigidity = 30
     segmentation = 0.5
     confine = inside, 500
-    display = { line_width=2; minus_end=4, 8; }
+    display = { line_width=2; minus_end=8; }
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 19
     position = ( 0 0 0 )
@@ -41,20 +44,20 @@ set hand motor
     hold_growing_end = 1
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     stall_force = 5
     display = { width=3; size=12; color=green }
 }
 
-set single protein
+set single simplex
 {
     hand = motor
     diffusion = 0.1
 }
 
-new 100 single protein
+new 100 simplex
 
-run simul *
+run system
 {
     nb_steps = 40000
     nb_frames = 50

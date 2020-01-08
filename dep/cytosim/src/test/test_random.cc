@@ -1,15 +1,12 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "random.h"
+#include <cstdio>
 #include <cstring>
 #include "tictoc.h"
 
-extern Random RNG;
 
-
-
-
-void printBits(FILE * f, const void * v, const int size)
+void print_bits(FILE * f, const void * v, const int size)
 {
     for ( int ii=0; ii < size; ++ii )
     {
@@ -22,16 +19,15 @@ void printBits(FILE * f, const void * v, const int size)
 }
 
 
-
 void speed_test()
 {
-    const unsigned int cnt = 1 << 30;
+    const size_t cnt = 1 << 30;
     TicToc::tic();
     uint32_t u = 10;
-    for (uint32_t j=0; j<cnt; ++j)
+    for (size_t j=0; j<cnt; ++j)
     {
-        u = RNG.pint_inc(1024);
-        RNG.pint_inc(u);
+        u = RNG.pint(1024);
+        RNG.pint(u);
     }
     TicToc::toc("int");
 }
@@ -39,37 +35,59 @@ void speed_test()
 
 void test_int()
 {
-    int j;
-    
-    for (j=0; j<21; j++)
-        printf(" %10u%s", RNG.pint(), (j%7)==6 ? "\n" : "");
-    
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<8; ++k)
+            printf(" %12u", RNG.pint());
+        printf("\n");
+    }
     printf("\n");
     
-    for (j=0; j<90; j++)
-        printf(" %2u%s", RNG.pint_inc(99), (j%30)==29 ? "\n" : "");
-    
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<8; ++k)
+            printf(" %+12i", RNG.sint());
+        printf("\n");
+    }
+    printf("\n");
+
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<32; ++k)
+            printf(" %2u", RNG.pint(100));
+        printf("\n");
+    }
     printf("\n");
     
-    for (j=0; j<90; j++)
-        printf(" %2u%s", RNG.pint_inc2(99), (j%30)==29 ? "\n" : "");
-    
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<32; ++k)
+            printf(" %2u", RNG.pint_fair(100));
+        printf("\n");
+    }
     printf("\n");
-    
-    for (j=0; j<100; j++)
-        printf(" %3i%s", RNG.sint_inc(99), (j%20)==19 ? "\n" : "");
-    
+
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<32; ++k)
+            printf(" %2u", RNG.pint_slow(99));
+        printf("\n");
+    }
     printf("\n");
+}
+
+
+void silly_test()
+{
+    const uint32_t up = 1 << 30;
     
-    for (j=0; j<42; j++)
-        printf(" %10.7f%s", RNG.sreal(), (j%7)==6 ? "\n" : "");
+    const uint32_t cnt = 1 << 24;
+    uint32_t hit = 0;
     
-    printf("\n");
-    
-    for (j=0; j<42; j++)
-        printf(" %8f%s", RNG.preal(), (j%7)==6 ? "\n" : "");
-    
-    printf("\n");
+    for (uint32_t j=0; j<cnt; ++j)
+        hit += ( RNG.pint() < up );
+
+    printf(" prob( pint() < 1^30 ) = %f\n", hit/(float)cnt);
 }
 
 
@@ -84,7 +102,6 @@ float convertFix(uint32_t x)
 }
 
 
-
 void testbits()
 {
     const int SCALE=2;
@@ -93,10 +110,10 @@ void testbits()
     {
         x = ii / float(SCALE);
         printf(" %f :", x);
-        printBits(stdout, &x, 4);
+        print_bits(stdout, &x, 4);
         // x = -ii / float(SCALE);
         // printf("%f :", x);
-        // printBits(stdout, &x, 4);
+        // print_bits(stdout, &x, 4);
     }
     
     double y;
@@ -104,16 +121,16 @@ void testbits()
     {
         y = convertFix( RNG.pint() );
         printf(" %f :", y);
-        printBits(stdout, &y,8);
+        print_bits(stdout, &y,8);
     }
 }
 
 
 #define TEST test
-void test_test( const real prob, const int MAX )
+void test_test( const real prob, const size_t MAX )
 {
     int cnt = 0, a, b, c;
-    for ( int jj=0; jj < MAX; ++jj )
+    for ( size_t jj=0; jj < MAX; ++jj )
     {
         a = RNG.TEST(prob) + RNG.TEST(prob) + RNG.TEST(prob) + RNG.TEST(prob);
         b = RNG.TEST(prob) + RNG.TEST(prob) + RNG.TEST(prob) + RNG.TEST(prob);
@@ -123,9 +140,9 @@ void test_test( const real prob, const int MAX )
     printf("prob = %f measured = %f cnt = %i\n", prob, cnt / double(12*MAX), cnt);
 }
 
-void test_RNG(const int MAX)
+void test_RNG(const size_t MAX)
 {
-    for ( int jj=0; jj < MAX; ++jj )
+    for ( size_t jj=0; jj < MAX; ++jj )
     {
         RNG.preal();RNG.preal();RNG.preal();RNG.preal();RNG.preal();
         RNG.preal();RNG.preal();RNG.preal();RNG.preal();RNG.preal();
@@ -135,18 +152,59 @@ void test_RNG(const int MAX)
 
 void test_float()
 {
-    double d;
-    printf("preal:      ");
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<8; ++k)
+            printf(" %10f", RNG.sreal());
+        printf("\n");
+    }
+
+    printf("\n");
+    
+    for (int j=0; j<8; ++j)
+    {
+        for (int k=0; k<8; ++k)
+            printf(" %10f", RNG.preal());
+        printf("\n");
+    }
+
+    printf("\n");
+
+    printf("pfloat:     ");
+    float x;
     for ( int kk=0; kk < 10; ++kk )
     {
-        d = RNG.preal();
+        x = RNG.pfloat();
+        printf(" %+f", x);
+    }
+    printf("\n");
+    printf("sfloat:     ");
+    for ( int kk=0; kk < 10; ++kk )
+    {
+        x = RNG.sfloat();
+        printf(" %+f", x);
+    }
+    printf("\n");
+    
+    double d;
+    printf("pdouble:    ");
+    for ( int kk=0; kk < 10; ++kk )
+    {
+        d = RNG.pdouble();
         printf(" %+f", d);
     }
     printf("\n");
-    printf("sreal:      ");
+    printf("sdouble:    ");
     for ( int kk=0; kk < 10; ++kk )
     {
-        d = RNG.sreal();
+        d = RNG.sdouble();
+        printf(" %+f", d);
+    }
+    printf("\n");
+    printf("sflip:      ");
+    for ( int kk=0; kk < 10; ++kk )
+    {
+        d = RNG.sflip();
         printf(" %+f", d);
     }
     printf("\n");
@@ -154,13 +212,92 @@ void test_float()
 
 //==========================================================================
 
-void testPoisson(real E, unsigned int N)
+void test_uniform()
 {
-    real x = 0;
-    for ( unsigned int i = 0; i < N; ++i )
-        x += RNG.poisson(E);
-    x /= N;
-    printf("%f - %f = %f\n", x, E, x-E);
+    size_t cnt = 1<<28;
+    real avg = 0;
+    real var = 0;
+    for ( size_t i = 0; i < cnt; ++i )
+    {
+        real x = RNG.sreal();
+        real y = RNG.sreal();
+        real z = RNG.sreal();
+        real t = RNG.sreal();
+        avg += x + y + z + t;
+        var += x*x + y*y + z*z + t*t;
+    }
+    cnt *= 4;
+    avg /= (real)cnt;
+    var = var/(real)cnt - avg * avg;
+    printf("UNIFORM      avg = %.12e   var = %.12e\n", avg, var);
+}
+
+
+void test_gauss()
+{
+    printf("Gauss\n");
+    size_t cnt = 0;
+    real avg = 0;
+    real var = 0;
+    const size_t n_max = 1<<6;
+    real vec[n_max] = { 0 };
+    for ( size_t i = 0; i < 10000000; ++i )
+    {
+        size_t n = RNG.pint(n_max);
+        RNG.gauss_set(vec, n);
+        cnt += n;
+        for ( size_t u = 0; u < n; ++u )
+        {
+            avg += vec[u];
+            var += vec[u] * vec[u];
+        }
+    }
+    avg /= (real)cnt;
+    var = var/(real)cnt - avg * avg;
+    printf("GAUSS      avg = %.12e   var = %.12e\n", avg, var);
+
+}
+
+
+void test_prob()
+{
+    size_t avg = 0;
+    size_t cnt = 1 << 28;
+    for ( size_t i = 0; i < cnt; ++i )
+        avg += RNG.flip_8th();
+
+    printf("8th      prob = %.6f\n", avg/(double)cnt);
+}
+
+
+void test_exponential()
+{
+    size_t cnt = 1 << 29;
+    real avg = 0;
+    real var = 0;
+    for ( size_t i = 0; i < cnt; ++i )
+    {
+        real x = RNG.exponential();
+        real y = RNG.exponential();
+        real z = RNG.exponential();
+        real t = RNG.exponential();
+        avg += x + y + z + t;
+        var += x*x + y*y + z*z + t*t;
+    }
+    cnt *= 4;
+    avg /= (real)cnt;
+    var = var/(real)cnt - avg * avg;
+    printf("EXPONENTIAL  avg = %.12e   var = %.12e\n", avg, var);
+}
+
+
+void test_poisson(size_t sup)
+{
+    for ( size_t n = 0; n < sup; ++n )
+    {
+        int x = (int)(RNG.gauss() * sqrt(n) + n);
+        printf("%10lu %9i %9i %9i\n", n, RNG.poisson_knuth(n), RNG.poisson(n), x);
+    }
 }
 
 
@@ -183,7 +320,7 @@ int method2(const int maxTime, const real rate[])
 {
     for ( int ii=0; ii<maxTime; ++ii )
     {
-        if ( RNG.preal() < (1.-exp(-rate[ii])) )
+        if ( RNG.preal() < -std::expm1(-rate[ii]) )
             return ii;
     }
     return maxTime;
@@ -254,7 +391,6 @@ int testGillespie(const int method)
             return result;
     }
     
-    
     FILE* file = fopen("test.out", "w");
     for ( int ii=0; ii<=maxTime; ++ii )
         fprintf(file, "%4i   %6i %6i %6i\n", ii, bins[0][ii], bins[1][ii], bins[2][ii]);
@@ -264,45 +400,218 @@ int testGillespie(const int method)
 
 
 //==========================================================================
+
+
+/**
+ Fill array `vec[]` with Gaussian values ~ N(0,1).
+ the size of `vec` should be a multiple of 2, and sufficient to hold `end-src` values
+ @Return the number of values that were stored in `vec`
+ */
+real * gauss_fill_0(real dst[], const int32_t src[], int32_t const*const end)
+{
+    while ( src < end )
+    {
+        real x = src[0] * TWO_POWER_MINUS_31;
+        real y = src[1] * TWO_POWER_MINUS_31;
+        real w = x * x + y * y;
+        if ( w <= 1 && 0 < w )
+        {
+            w = sqrt( -2 * log(w) / w );
+            *dst++ = w * x;
+            *dst++ = w * y;
+        }
+        src += 2;
+    }
+    return dst;
+}
+
+#if defined(__INTEL_COMPILER) && defined(__AVX__)
+
+#include "simd.h"
+
+template < typename T >
+void print(T const* vec, T const*const end)
+{
+#if ( 1 )
+    for ( T const* f = vec; f < end; ++f )
+    {
+        for ( int i = 0; i < 8 && f < end; ++i )
+            printf(" %10.6f", *f++);
+            printf("\n");
+    }
+#else
+    for ( T const* f = vec; f < end; ++f )
+        printf(" %10.6f\n", *f);
+#endif
+}
+
+
+// pack array by removing 'nan' values
+template < typename T >
+T * remove_nans(T * s, T * e)
+{
+    while ( s < e )
+    {
+        --e;
+        // find the next `nan` going upward:
+        while ( *s == *s )
+        {
+            if ( ++s > e )
+                return s;
+        }
+        // skip `nan` values going downward:
+        while ( *e != *e )
+        {
+            if ( --e <= s )
+                return s;
+        }
+        // copy number over:
+        *s++ = *e;
+    }
+    return s;
+}
+
+
+/**
+ Calculates Gaussian-distributed, single precision random number,
+ using SIMD AVX instructions
+ Array `dst` should be able to hold as many 32-bit numbers as `src`.
+ if 'real==float', for 256 bits of input, this produces ~64*PI bits of numbers.
+ if 'real==double', this produces more output bits than input!
+
+ The function used to calculate logarithm on SIMD data is part of the
+ Intel SVML library, and is provided by the Intel compiler.
+
+ F. Nedelec 02.01.2017
+ */
+real * gauss_fill(real dst[], const __m256i src[], __m256i* src_end)
+{
+    const vec8f fac = set8f(TWO_POWER_MINUS_31);
+    const vec8f two = set8f(-2.0);
+    
+    real * d = dst;
+    while ( src < src_end )
+    {
+        vec8f x = mulf(fac, cvt8i(load8si(src++)));
+        vec8f y = mulf(fac, cvt8i(load8si(src++)));
+        vec8f n = addf(mulf(x,x), mulf(y,y));
+        /*
+         The function used to calculate logarithm on SIMD data is part of the
+         Intel SVML library, and is provided by the Intel compiler.
+         */
+        //w = sqrt( -2 * log(w) / n );
+        n = rsqrtf(divf(n, mulf(two, _mm256_log_ps(n))));
+        // the 16 single-precision values are converted to double-precision:
+#if REAL_IS_DOUBLE
+        x = mulf(n, x);
+        y = mulf(n, y);
+        store4(d   , cvt4f(getlof(x)));
+        store4(d+4 , cvt4f(getlof(y)));
+        store4(d+8 , cvt4f(gethif(x)));
+        store4(d+12, cvt4f(gethif(y)));
+#else
+        store8f(d  , mulf(n, x));
+        store8f(d+8, mulf(n, y));
+#endif
+        d += 16;
+    }
+    _mm_empty();
+    return remove_nans(dst, d);
+}
+
+#endif
+
+void test_gaussian(int cnt)
+{
+    int32_t * buf = (int32_t*)RNG.data();
+
+    if ( 1 )
+    {
+        TicToc::tic();
+        for ( int i = 0; i < cnt; ++i )
+            RNG.refill();
+        TicToc::toc("RNG.refill  ");
+        //print(vec, end);
+    }
+    if ( 1 )
+    {
+        real *end, vec[SFMT_N32] = { 0 };
+        TicToc::tic();
+        for ( int i = 0; i < cnt; ++i )
+        {
+            end = gauss_fill_0(vec, buf, buf+SFMT_N32);
+            RNG.refill();
+        }
+        TicToc::toc("gauss double");
+        //print(vec, end);
+    }
+#if defined(__INTEL_COMPILER) && defined(__AVX__)
+    __m256i * mem = (__m256i*)buf;
+    if ( 1 )
+    {
+        real *end, vec[SFMT_N32] = { 0 };
+        TicToc::tic();
+        for ( int i = 0; i < cnt; ++i )
+        {
+            end = gauss_fill(vec, mem, mem+SFMT_N256);
+            RNG.refill();
+        }
+        TicToc::toc("gauss avx   ");
+        //print(vec, end);
+    }
+#endif
+}
+
+
+//==========================================================================
 int main(int argc, char* argv[])
 {
-    
-    
-#if ( 0 )  // 1 = test modified Gillespie method
-    if ( argc == 1 )
-        testGillespie(0);
-    else
-        testGillespie(atoi(argv[1]));
-    
-    printf(" done Gillespie with variable rate\n");
-    return EXIT_SUCCESS;
-#endif
-    
-#if ( 0 )
-    for ( int i = 0; i < 20; ++i )
-        testPoisson(RNG.preal_exc(), 1000000);
-    return EXIT_SUCCESS;
-#endif
-    
-    printf("sizeof(uint32_t) = %lu\n", sizeof(uint32_t));
-    if ( argc == 1 )
+    RNG.seed();
+
+    real rate = 0;
+    if ( argc > 1 )
+        rate = strtod(argv[1], 0);
+
+    switch ( 4 )
     {
-        for ( int kk=0; kk < 11; ++kk )
-        {
-            real rate = kk/10.0;
-            test_test(rate, 5000000);
-            //test_RNG(50000);
-        }
-    }
-    else
-    {
-        //seed with the given number (hopefully a number!)
-        RNG.seed( atoi(argv[1]) );
-        test_int();
-        speed_test();
-        test_float();
-    }
+        case 0:
+            test_poisson(1024);
+            test_prob();
+            break;
+            
+        case 1:
+            test_exponential();
+            test_uniform();
+            test_gauss();
+            break;
     
+        case 2:
+            testGillespie(rate);
+            break;
+
+        case 3:
+            for ( int kk=0; kk < 11; ++kk )
+                test_test(rate*kk, 5000000);
+            break;
+            
+        case 4:
+            printf("sizeof(uint32_t) = %lu\n", sizeof(uint32_t));
+            test_int();
+            test_float();
+            break;
+            
+        case 5:
+            speed_test();
+            break;
+            
+        case 6:
+            silly_test();
+            break;
+            
+        case 7:
+            test_gaussian(1<<18);
+            break;
+    }
     
     printf("done\n");
     return EXIT_SUCCESS;

@@ -1,7 +1,7 @@
 % F. Nedelec, Saarbrucken 26 June 2013
 % This illustrates how to assemble objects
 
-set simul needles 
+set simul system
 {
     steric = 1, 100
     
@@ -13,10 +13,13 @@ set simul needles
 
 set space cell
 {
-    geometry = ( sphere 5 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 5
+}
 
 set fiber rod
 {
@@ -50,13 +53,18 @@ set single link
     stiffness = 1000
 }
 
-run 10000 simul *
+new event
 {
-    event = 10, (
-        new rod  { length=0.25; end_state=green; }
-        new solid ball { point0=center, 0.25; point1=0.25 0 0 }
-        new link { base=solid, 0, 0; attach=0, 0 }
-        new link { base=solid, 0, 1; attach=0, 0.25 }
+    rate = 10;
+    code = (
+        new rod  { length=0.25; plus_end=grow; }
+        new ball { point1=center, 0.25; point2=0.24 0 0; point3=0.49 0 0 }
+        new link { base=solid0, point2; attach=fiber0, 0 }
+        new link { base=solid0, point3; attach=fiber0, 0.25 }
     )
+}
+
+run 10000 system
+{
     nb_frames = 100
 }

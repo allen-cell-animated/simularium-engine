@@ -26,18 +26,6 @@ public:
      */
     
     
-    /// Specificity of binding to a pair a Fiber
-    /**
-     Could be:
-     - `none` (default)
-     - `parallel`
-     - `antiparallel`
-     */
-    Specificity  specificity;
-    
-    /// if ( trans_activated == 1 ), hand2 is active only if hand1 is bound
-    bool         trans_activated;
-    
     /// @}
 
 public:
@@ -49,7 +37,7 @@ public:
     ~CrosslinkProp() { }
     
     /// return a Crosslink or a CrosslinkLong with this property
-    Couple * newCouple(Glossary * opt) const;
+    Couple * newCouple(Glossary*) const;
     
     /// set default values
     void clear();
@@ -58,13 +46,13 @@ public:
     void read(Glossary&);
     
     /// compute values derived from the parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new CrosslinkProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

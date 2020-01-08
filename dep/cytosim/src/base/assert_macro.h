@@ -12,13 +12,13 @@
 #include <cstring>
 
 /**
- defining NDEBUG disables: 
+ Assertions are used extensively to check the validity of the arguments.
+ Defining NDEBUG disables:
  - the standard assert() macro and
- - the assert macros defined below, 
- it makes the executable faster but less safe:
+ - the custom assert_true and assert_false macros defined below,
+ This makes the executable faster.
  */
 //#define NDEBUG
-
 
 
 /// strips the full pathname for a file name
@@ -31,7 +31,7 @@
 
 //-------------------------------  TRACE  ---------------------------------------
 
-#define TRACE fprintf(stderr, "      while executing '%s'\n      in file %s line %d\n", SFUNC, SFILE, __LINE__);
+#define TRACE fprintf(stderr, "      while executing `%s'\n      in %s:%d\n", SFUNC, SFILE, __LINE__);
 
 //------------------------------- ASSERT ---------------------------------------
 /** 
@@ -47,42 +47,37 @@
 
 #else
 
-  #include "backtrace.h"
-
   #define assert_true(expression)\
         if (!(expression)) {\
-            fprintf(stderr, "* * * * * * *\n");\
-            fprintf(stderr, "Cytosim failed assertion `%s'\n", #expression);\
+            fprintf(stderr, "*  *  *  *  *  *  *  *  *  *  *  *  *  *\n");\
+            fprintf(stderr, "Cytosim failed assert(%s)\n", #expression);\
             TRACE;\
-            fprintf(stderr, "* * * * * * *\n");\
-            print_backtrace(stderr);\
+            fprintf(stderr, "*  *  *  *  *  *  *  *  *  *  *  *  *  *\n");\
             abort();\
         }
 
   #define assert_false(expression)\
         { int e = expression;\
         if (e) {\
-            fprintf(stderr, "* * * * * * *\n");\
+            fprintf(stderr, "*  *  *  *  *  *  *  *  *  *  *  *  *  *\n");\
             fprintf(stderr, "Cytosim failed assert_false(%s) with value %i\n", #expression, e);\
             TRACE;\
-            fprintf(stderr, "* * * * * * *\n");\
-            print_backtrace(stderr);\
+            fprintf(stderr, "*  *  *  *  *  *  *  *  *  *  *  *  *  *\n");\
             abort();\
         } }
 
   #define assert_small(expression)\
-        { real e = expression;\
-        if ( e > REAL_EPSILON || e < -REAL_EPSILON ) {\
-            fprintf(stderr, "- - - - -\n");\
+        { real e = expression; real m = 1e-03;\
+        if ( e < -m || m < e ) {\
+            fprintf(stderr, "- - - - - - - - - - - - - - - - - - - - - - - - - -\n");\
             fprintf(stderr, "Cytosim failed assert_small(%s) with value %e\n", #expression, e);\
-            TRACE;\
+            fprintf(stderr, "      while executing `%s' in %s:%d\n", SFUNC, SFILE, __LINE__);\
         } }
 
 #endif
 
 
 //-------------------------- ERROR HANDLING MACROS -----------------------------
-
 
 /// macro to abort after printing an error message
 #define ABORT_NOW(message)\
@@ -91,6 +86,5 @@
     TRACE;\
     exit(EXIT_FAILURE);\
     }
-
 
 #endif

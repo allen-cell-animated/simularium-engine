@@ -18,14 +18,14 @@ class ClassicFiberProp;
  This implements the 'classical' two-state model of dynamic instability:
  - a growing state, affected by force,
  - stochastic catastrophes, affected by force,
- - a shrinking state at constant speed,
+ - a shrinking state characterized by a constant speed,
  - stochastic rescues.
  .
  
  Only the PLUS_END can grow/shrink and does not have any granularity.
  The length is incremented at each time step by <em> time_step * tip_speed </em>.
  
- The speed of the tip \a tip_speed is a fraction of \a prop->growing_speed,
+ The speed of the tip `tip_speed` is a fraction of `prop->growing_speed`,
  because the growth speed is reduced under antagonistic force by an exponential factor:
  <em>
  <b>Measurement of the Force-Velocity Relation for Growing Microtubules</b>\n
@@ -52,21 +52,25 @@ class ClassicFiberProp;
  @ingroup FiberGroup
  */
 class ClassicFiber : public Fiber
-{
+{   
+private:
+    
+    /// state of MINUS_END
+    state_t    mStateM;
+    
+    /// length increment at MINUS_END during last time-step
+    real       mGrowthM;
+
+    /// state of PLUS_END
+    state_t    mStateP;
+    
+    /// length increment at PLUS_END during last time-step
+    real       mGrowthP;
+     
 public:
     
     /// the Property of this object
     ClassicFiberProp const* prop;
-   
-private:
-    
-    /// state of PlusEnd
-    AssemblyState  mState;
-    
-    /// increment to length at PlusEnd during last time-step
-    real           mGrowth;
-    
-public:
   
     /// constructor
     ClassicFiber(ClassicFiberProp const*);
@@ -76,30 +80,36 @@ public:
         
     //--------------------------------------------------------------------------
     
-    /// return assembly/disassembly state of the tip \a which
-    int         dynamicState(FiberEnd which) const;
+    /// return assembly/disassembly state of MINUS_END
+    state_t     dynamicStateM() const { return mStateM; }
+
+    /// return assembly/disassembly state of PLUS_END
+    state_t     dynamicStateP() const { return mStateP; }
+
     
-    /// set state of FiberEnd 'which' to \a new_state
-    void        setDynamicState(FiberEnd which, int new_state);
+    /// length increment at MINUS_END during last time-step
+    real        freshAssemblyM() const { return mGrowthM; }
     
-    /// the amount of freshly assembled polymer during the last time step
-    real        freshAssembly(FiberEnd which) const;
+    /// length increment at PLUS_END during last time-step
+    real        freshAssemblyP() const { return mGrowthP; }
+
     
-    //--------------------------------------------------------------------------
+    /// change state of MINUS_END
+    void        setDynamicStateM(state_t s);
     
-    /// cut fiber at distance \a abs from MINUS_END
-    Fiber *     severM(real abs);
+    /// change state of PLUS_END
+    void        setDynamicStateP(state_t s);
 
     /// monte-carlo step
     void        step();
     
     //--------------------------------------------------------------------------
     
-    /// write to OutputWrapper
-    void        write(OutputWrapper&) const;
+    /// write to Outputter
+    void        write(Outputter&) const;
 
-    /// read from InputWrapper
-    void        read(InputWrapper&, Simul&);
+    /// read from Inputter
+    void        read(Inputter&, Simul&, ObjectTag);
     
 };
 

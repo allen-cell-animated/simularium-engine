@@ -1,44 +1,38 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-//------------------just read and write coordinate file----------------------
-//    mostly for testing, but can also make some modifications on state
-//    F. Nedelec, EMBL 2002
 
 #include "simul.h"
 #include "parser.h"
 #include "glossary.h"
 #include "iowrapper.h"
 #include "exceptions.h"
+#include "simul_prop.h"
+
 
 void help()
 {
-    printf("Synopsis: Copy a trajectory file.\n");
-    printf(" The file is written in the latest format, either binary or text-based.\n");
-    printf(" A category of objects can be removed with option skip=WHAT\n\n");
-    
+    printf("Cytosim-sieve %iD\n", DIM);
+    printf("    file version %i built on %s\n", Simul::currentFormatID, __DATE__);
+    printf("Synopsis:\n");
+    printf("   `sieve` let you to manipulate cytosim trajectory file.\n");
+    printf("   It reads a trajectory files, and loads the objects in memory\n");
+    printf("\n");
+    printf("   The system is written in the latest format, in either binary or text.\n");
+    printf("   A category of objects can be removed with option skip=WHAT.\n");
+    printf("   If the specified output file already exists, data is appended to it.\n");
+    printf("\n");
     printf("Usage:\n");
-    printf("    sieve input output [options]\n\n");
-    printf("possible options are:\n");
-    printf("    binary=0   generate a text file\n");
-    printf("    binary=1   generate a binary file\n");
-    printf("    verbose=?  set the verbose level\n");
-    printf("    skip=WHAT  remove all objects of class WHAT\n");
+    printf("    sieve input_file output_file [options]\n\n");
+    printf("Possible options:\n");
+    printf("    binary=0     generate output in text format\n");
+    printf("    binary=1     generate output in binary format\n");
+    printf("    skip=WHAT    remove all objects of class WHAT\n");
+    printf("    frame=INDEX  process only specified frame\n");
+    printf("\n");
+    printf("Example:\n");
+    printf("    sieve objects.cmo objects.txt binary=0\n");
+    printf("    sieve objects.cmo objects.txt binary=0 skip=couple\n");
 }
 
-
-void inventory(std::ostream& os, Simul& sim, int cnt)
-{
-    os << "Frame " << cnt << " written with:" << std::endl;
-    if ( sim.spaces.size() )     os << std::setw(8) << sim.spaces.size()  << " spaces\n";
-    if ( sim.fibers.size() )     os << std::setw(8) << sim.fibers.size()  << " fibers\n";
-    if ( sim.beads.size() )      os << std::setw(8) << sim.beads.size()   << " beads\n";
-    if ( sim.solids.size() )     os << std::setw(8) << sim.solids.size()  << " solids\n";
-    if ( sim.spheres.size() )    os << std::setw(8) << sim.spheres.size() << " spheres\n";
-    if ( sim.singles.size() )    os << std::setw(8) << sim.singles.size() << " singles\n";
-    if ( sim.couples.size() )    os << std::setw(8) << sim.couples.size() << " couples\n";
-    if ( sim.organizers.size() ) os << std::setw(8) << sim.organizers.size() << " organizers\n";
-}
-
-//------------------------------------------------------------------------------
 
 int main(int argc, char* argv[])
 {
@@ -47,69 +41,73 @@ int main(int argc, char* argv[])
         help();
         return EXIT_SUCCESS;
     }
+
+    Simul simul;
+    Glossary arg;
     
     std::string input  = argv[1];
     std::string output = argv[2];
-
-    Simul simul;
-    Glossary glos;
+    if ( arg.read_strings(argc-3, argv+3) )
+        return EXIT_FAILURE;
     
-    glos.readStrings(argc-2, argv+2);
-    
-    int verbose = 0;
-    glos.set(verbose, "verbose");
-    
+    ObjectSet * skip_set = nullptr;
     std::string skip;
-    glos.set(skip, "skip");
+    if ( arg.set(skip, "skip") )
+       skip_set = simul.findSet(skip);
     
     bool binary = true;
-    glos.set(binary, "binary");
-
+    arg.set(binary, "binary");
+    arg.set(simul.prop->skip_free_couple, "skip_free_couple");
     
-    InputWrapper in;
+    Inputter in(DIM);
     try {
-        Parser(simul, 1, 1, 0, 0, 0).readProperties();
+        simul.loadProperties();
         in.open(input.c_str(), "rb");
     }
     catch( Exception & e ) {
-        std::cerr<<"Error opening input file `" << input << "' :" << std::endl;
-        std::cerr<< e.what() << std::endl;
+        std::cerr << "Error opening input file `" << input << "' :" << std::endl;
+        std::cerr << e.what() << "\n";
         return EXIT_FAILURE;
     }
     
-    std::cerr << ">>>>>> Copying `" << input << "' -> `" << output << "'" << std::endl;
-
-    int cnt = 0;
-
+    std::clog << ">>>>>> Sieve `" << input << "' -> `" << output << "'" << std::endl;
+    
+    size_t frm = 0, frame = 0;
+    
+    // a frame index can be specified:
+    bool has_frame = arg.set(frame, "frame");
+    
     while ( in.good() )
     {
         try {
-            if ( 0 == simul.reloadObjects(in) )
-            {
-                if ( skip.size() )
-                {
-                    ObjectSet * set = simul.findSet(skip);
-                    if ( set )
-                        set->erase();
-                }
-
-                //inventory(std::cout, simul, cnt);
-                ++cnt;
-                
-                try {
-                    simul.writeObjects(output, binary, true);
-                }
-                catch( Exception & e ) {
-                    std::cerr<<"could not write to `" << output << "' :" << e.what() << std::endl;
-                    return EXIT_FAILURE;
-                }
-            }
+            if ( simul.reloadObjects(in) )
+                return EXIT_SUCCESS;
         }
         catch( Exception & e ) {
-            std::cerr << "Error in frame: " << e.what() << std::endl;
+            std::clog << "Error in frame " << frm << ":\n";
+            std::clog << "    " << e.what() << std::endl;
         }
+
+        if ( skip_set )
+            skip_set->erase();
+            
+        /*
+        simul.reportInventory(std::cout);
+        std::clog << "\b\b\b\b\b" << std::setw(5) << cnt;
+        */
+        
+        try {
+            if ( !has_frame || ( frm == frame ) )
+                simul.writeObjects(output, true, binary);
+        }
+        catch( Exception & e ) {
+            std::clog << "Error writing `" << output << "' :\n";
+            std::clog << "    " << e.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+        if ( has_frame && frm == frame )
+            break;
+        ++frm;
     }
-    
-    std::cerr << ">>>>>> " << cnt << " frames written to `" << output << "'" << std::endl;
     return 0;
 }

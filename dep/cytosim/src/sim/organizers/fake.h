@@ -6,16 +6,19 @@
 #include "object.h"
 #include "organizer.h"
 #include "fake_prop.h"
-#include "point_exact.h"
-class Solid;
+#include "mecapoint.h"
+#include "solid.h"
 
 //------------------------------------------------------------------------------
 
 ///a set of two asters held together by a Solid 
 /**
  This object cannot handle the destruction of the Asters
+ 
+ The Fake should just link two Solid, without reference to the Asters
+ 
+ @ingroup OrganizerGroup
  */
-
 class Fake : public Organizer
 {
 
@@ -24,43 +27,49 @@ private:
     /// Property
     FakeProp const* prop;
     
-    /// connections
-    std::vector<PointExact> asterPoints, solidPoints;
-
-    /// central Solid
-    Solid *  mSolid;
+    /// Display parameters
+    PointDisp const* disp_ptr;
     
+    /// connections
+    std::vector<Mecapoint> asterPoints, solidPoints;
+    
+    /// find aster
+    Aster *    findAster(std::string const&, Simul&);
+
 public:
     
     /// constructor
-    Fake(FakeProp const* p) : prop(p), mSolid(0) { }
+    Fake(FakeProp const* p) : prop(p), disp_ptr(nullptr) { }
  
     /// construct all the dependent Objects of the Organizer
     ObjectList build(Glossary&, Simul&);
- 
-    /// destructor  
-    virtual   ~Fake();
 
     /// perform one Monte-Carlo step
     void       step();
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void       setInteractions(Meca &) const;
     
     /// return pointer to central Solid
-    Solid *    solid() const { return mSolid; }
-    
+    Solid *    solid() const { return static_cast<Solid*>(organized(0)); }
+
     //------------------------------ read/write --------------------------------
+    
+    /// retrieve links end-points for display
+    bool       getLink(size_t, Vector&, Vector&) const;
+    
+    /// return PointDisp of Solid
+    PointDisp const* disp() const { return disp_ptr; }
 
     /// a unique character identifying the class
-    static const Tag TAG = 'k';
+    static const ObjectTag TAG = 'k';
     
     /// return unique character identifying the class
-    Tag        tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
-    
+    /// return associated Property
+    Property const* property() const { return prop; }
+
  };
 
 

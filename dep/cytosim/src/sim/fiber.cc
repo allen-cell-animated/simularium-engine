@@ -1,50 +1,106 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
+#include <algorithm>
+
 #include "fiber.h"
+#include "field.h"
 #include "messages.h"
 #include "glossary.h"
 #include "iowrapper.h"
-#include "fiber_locus.h"
-#include "fiber_binder.h"
+#include "fiber_segment.h"
 #include "fiber_prop.h"
 #include "simul_prop.h"
-#include "simul.h"
+#include "meca.h"
+#include "hand.h"
 #include "sim.h"
-#include <algorithm>
 
-#define SEVER_KINKED_FIBERS 0
 
-extern bool functionKey[];
+#pragma mark - Step
+
+
+void Fiber::step()
+{
+    assert_small( length1() - length() );
+
+    //add single that act like glue
+    if ( prop->glue )
+    {
+        setGlue(frGlue, PLUS_END, prop->confine_space_ptr);
+    }
+    
+    
+#if ( 0 )
+    // Cut kinked filaments
+    unsigned p = hasKink(0);
+    if ( p )
+    {
+        PRINT_ONCE("SEVER_KINKED_FIBERS\n");
+        objset()->add(severPoint(p));
+    }
+#endif
+#if ( 0 )
+    // Delete kinked filaments
+    if ( hasKink(0) )
+    {
+        PRINT_ONCE("DELETE_KINKED_FIBERS\n");
+        delete(this);
+        return;
+    }
+#endif
+
+    // perform the cuts that were registered by sever()
+    if ( pendingCuts.size() )
+        severNow();
+    
+    // delete self if shorter than 'FiberProp::min_length'
+    if ( length() < prop->min_length && ! prop->persistent )
+    {
+        delete(this);
+        return;
+    }
+    
+    if ( needUpdate )
+    {
+        needUpdate = false;
+        adjustSegmentation();
+        update();
+    }
+}
+
 
 //------------------------------------------------------------------------------
+
 /**
- The rest of the initialization is done in FiberProp::newFiber(), 
+ The rest of the initialization is done in FiberProp::newFiber(),
  and other newFiber() functions where the initial length is known.
  */
 Fiber::Fiber(FiberProp const* p)
-: frBinders(0), prop(p), disp(0)
+: handListFront(nullptr), handListBack(nullptr), frGlue(nullptr), prop(p), disp(nullptr)
 {
     if ( prop )
     {
         segmentation(prop->segmentation);
+        if ( prop->lattice )
+        {
+#if FIBER_HAS_LATTICE
+            //Cytosim::log << reference() <<  " new Lattice" << std::endl;
+            frLattice.setUnit(prop->lattice_unit);
+#else
+            //throw InvalidParameter("Cytosim does not support fiber:lattice");
+#endif
+        }
     }
-    
-    frGlue = 0;
 }
 
-//------------------------------------------------------------------------------
+
 Fiber::~Fiber()
 {
-    detachBinders();
-    
-    // if linked in SingleSet, frGlue could be deleted twice
-    // when the simulation ends and all objects are deleted. 
+    detachHands();
+
     if ( frGlue )
     {
-        if ( frGlue->linked() )
-            prop->glue_set->remove(frGlue);
         delete(frGlue);
-        frGlue = 0;
+        frGlue = nullptr;
     }
     
     if ( disp )
@@ -54,48 +110,116 @@ Fiber::~Fiber()
          if LineDisp is a trivial type that does not allocate resources
          */
         free(disp);
-        disp = 0;
+        disp = nullptr;
     }
     
-    prop = 0;
+    prop = nullptr;
 }
 
-#pragma mark -
 
-//------------------------------------------------------------------------------
-unsigned int Fiber::allocatePoints(const unsigned int nbp)
+real Fiber::projectPoint(Vector const& w, real & dis) const
 {
-    unsigned int ms = RigidFiber::allocatePoints(nbp);
-    /*
-     if RigidFiber::allocatePoints() allocated memory, it will return the 
-     size of the new array, and we allocate the same size for other arrays.
-     */
-    if ( ms )
+    // initialize with the minus-end:
+    dis = distanceSqr(w, posP(0));
+    real abs = 0, len = segmentation();
+    
+    // try all segments
+    for ( unsigned int ii = 0; ii < nbSegments(); ++ii )
     {
-        //std::cerr << "Fiber::allocatePoints " << ms << std::endl;
-        frRods.resize(ms);
-        for ( unsigned int ii = 0; ii < ms-1; ++ii )
-            frRods[ii] = FiberLocus(this, ii);
+        //check the segment:
+        FiberSegment s(this, ii);
+        real d = INFINITY;
+        real a = s.projectPoint0(w, d);
+        if ( len < a )
+        {
+            // test exact point
+            real e = distanceSqr(w, posP(ii+1));
+            if ( e < dis ) {
+                abs = abscissaPoint(ii+1);
+                dis = e;
+            }
+        }
+        else if ( 0 <= a  &&  d < dis )
+        {
+            //the projection is the best found so far
+            abs = abscissaPoint(ii) + a;
+            dis = d;
+        }
     }
-    return ms;
-}
-
-//------------------------------------------------------------------------------
-FiberLocus & Fiber::segment(const unsigned int pos) const
-{
-    assert_true( pos < nbSegments() );
-    assert_true( frRods.size() >= nbSegments() );
-    assert_true( frRods[pos].fiber() == this );
     
-    return frRods[pos];
+    return abs;
+}
+
+//------------------------------------------------------------------------------
+#pragma mark - Modifying
+
+void Fiber::flipPolarity()
+{
+    // flip all the points:
+    Chain::flipPolarity();
+    
+    /* update abscissa of Hands to keep them in place:
+     new_abs - minus = plus - old_abs
+     new_abs = plus + minus - old_abs
+     */
+    real mid = abscissaM() + abscissaP();
+    Hand * ha = handListFront;
+    while ( ha )
+    {
+        Hand * nx = ha->next();
+        ha->moveTo(mid-ha->abscissa());
+        ha = nx;
+    }
 }
 
 
-//------------------------------------------------------------------------------
+/**
+ A portion of size `len` that includes the MINUS_END is removed.
+ The Hands bound within the deleted portion are detached.
+ */
+void Fiber::cutM(real len)
+{
+    const real abs = abscissaM() + len;
+    
+    Chain::cutM(len);
+    
+    Hand * ha = handListFront;
+    while ( ha )
+    {
+        Hand * nx = ha->next();
+        if ( ha->abscissa() < abs )
+            ha->detach();
+        ha = nx;
+    }
+}
+
+
+/**
+ A portion of size `len` that includes the PLUS_END is removed.
+ The Hands bound within the deleted portion are detached.
+ */
+void Fiber::cutP(real len)
+{
+    const real abs = abscissaP() - len;
+    
+    Chain::cutP(len);
+    
+    Hand * ha = handListFront;
+    while ( ha )
+    {
+        Hand * nx = ha->next();
+        if ( ha->abscissa() > abs )
+            ha->detach();
+        ha = nx;
+    }
+}
+
+
 /**
  The Fiber is cut at point P
- - A new Fiber is created from the section [ P - PLUS_END ],
- - all FiberBinder attached to this section are transferred to the new Fiber,
+ - A new Fiber is created from the section [ P , PLUS_END ],
+ - all FiberSite attached to this section are transferred to the new Fiber,
+ - Lattice content is also transferred,
  - a pointer to the new Fiber is returned, which should be added to the Simul
  .
  @return zero, if `pti` is not an internal point
@@ -103,215 +227,329 @@ FiberLocus & Fiber::segment(const unsigned int pos) const
 Fiber* Fiber::severPoint(unsigned int pti)
 {
     if ( pti == 0  ||  pti >= lastPoint() )
-        return 0;
+        return nullptr;
     
-    real abs = abscissaP(pti);
+    const real abs = abscissaPoint(pti);
 
-    // create a new Fiber of the same kind:
+    // create a new Fiber of the same class:
     Fiber* fib = prop->newFiber();
     assert_true( fib->prop == prop );
     
-    // copy the FiberNaked part of the object:
-    *(static_cast<FiberNaked*>(fib)) = *this;
+    // copy the vertices:
+    *(static_cast<Chain*>(fib)) = *this;
+    
+    // the signature on both pieces should be conserved:
+    fib->signature(signature());
+    fib->birthTime(birthTime());
 
     assert_true( fib->abscissaM() == abscissaM() );
     // remove MINUS_END portion on new piece:
     fib->truncateM(pti);
     assert_true(fib->abscissaM() == abs);
-    
+
     // remove PLUS_END portion on self
     truncateP(pti);
-
     
-    // transfer FiberBinders above point P
-    // their abscissa should not change in the transfer
-    Node * nd = frBinders.first();
-    while( nd )
+    // transfer Hands above point P, at same abscissa
+    Hand * ha = handListFront;
+    while ( ha )
     {
-        FiberBinder* ha = static_cast<FiberBinder*>(nd);
-        nd = nd->next();
+        Hand * nx = ha->next();
         if ( ha->abscissa() > abs )
             ha->relocate(fib);
         else
-            ha->updateBinder();
+            ha->update();
+        ha = nx;
     }
     
+    resetLattice();
+    fib->resetLattice();
+
     return fib;
 }
 
 
-//------------------------------------------------------------------------------
 /**
-The Fiber is cut at distance \a abs from its MINUS_END:
- - current Fiber is truncated to keep only the section [ MINUS_END - abs ]
- - A new Fiber is created from the section [ abs - PLUS_END ],
- - all FiberBinder attached to the section are transfered to the new Fiber,
- - a pointer to the new Fiber is returned, and it should be added to the Simul
+The Fiber is cut at distance `abs` from its MINUS_END:
+ - current Fiber is truncated to keep only the section [ MINUS_END , abs ],
+ - A new Fiber is created representing the other section [ abs , PLUS_END ],
+ - Hands are transfered to the new Fiber if appropriate,
+ - lattice substances are also transfered,
  .
- The return value is zero, if `abs` is not within the valid range of abscissa.
+ A pointer to the new Fiber is returned (containing the PLUS_END), but this
+ pointer may be zero, if `abs` was not within the valid range of abscissa.
+ If a new Fiber was created, it should be added to the FiberSet.
  */
-Fiber* Fiber::severM(real abs)
+Fiber* Fiber::severP(real abs)
 {
-    if ( abs <= 0 || abs >= length() )
-        return 0;
+    if ( abs <= REAL_EPSILON || abs + REAL_EPSILON >= length() )
+        return nullptr;
     
-    // create a new Fiber of the same kind:
+    //std::clog << "severP " << reference() << " at " << abscissaM()+abs << "\n";
+
+    // create a new Fiber of the same class:
     Fiber* fib = prop->newFiber();
     assert_true( fib->prop == prop );
 
-    // copy the FiberNaked part of the object:
-    *(static_cast<FiberNaked*>(fib)) = *this;
-    
+    // copy the vertices:
+    *(static_cast<Chain*>(fib)) = *this;
+    *(static_cast<Object*>(fib)) = *this;
+
+    // the signature on both pieces should be conserved:
+    assert_true(fib->signature() == signature());
+    assert_true(fib->birthTime() == birthTime());
+
     assert_small(fib->abscissaM() - abscissaM());
     // remove MINUS_END portion on new piece
-    fib->cutM(abs);
+    fib->Chain::cutM(abs);
     
     assert_small(fib->abscissaM()-abs-abscissaM());
     
     // remove PLUS_END portion on self
-    cutP(length()-abs);
+    Chain::cutP(length()-abs);
     
     assert_small(fib->abscissaM()-abscissaP());
 
-    // transfer all FiberBinders above cut to new piece
+    // transfer all Hands above cut to new piece
     // their abscissa should not change in this transfer
-    const real edge = abs + abscissaM();
-    Node * nd = frBinders.first();
-    while( nd )
+    abs += abscissaM();
+    Hand * ha = handListFront;
+    while ( ha )
     {
-        FiberBinder* ha = static_cast<FiberBinder*>(nd);
-        nd = nd->next();
-        if ( ha->abscissa() >= edge )
+        Hand * nx = ha->next();
+        if ( ha->abscissa() >= abs )
             ha->relocate(fib);
         else
-            ha->updateBinder();
+            ha->update();
+        ha = nx;
     }
+
+    resetLattice();
+    fib->resetLattice();
+
     return fib;
 }
 
 
 /**
- Performs the delayed severing events.
- This is called at the end of the time-step.
- Multiple cuts can occur. Fiber parts are added to \a set.
- */
-void Fiber::delayedSevering()
+ Perform all cuts registered in `pendingCuts`, and clear that list.
+ This deletes Fibers that are shorter than FiberProp::min_length
+*/
+void Fiber::severNow()
 {
-    if ( delayedCuts.empty() )
-        return;
-    
-    // sort cuts in descending order
-    std::sort(delayedCuts.rbegin(), delayedCuts.rend());
-    
-    // cut starting from highest abscissa
-    for ( std::vector<real>::iterator s = delayedCuts.begin(); s < delayedCuts.end(); ++s )
+    /**
+     The std::set keeps its objects always in order of descending abscissa,
+     which is essential here to avoid data loss:
+     cut from high to low abscissa
+     */
+    for ( SeverPos const& cut : pendingCuts )
     {
-        Fiber * fib = severNow(*s);
-        
-        if ( fib )
+        if ( cut.abs - abscissaM() <= prop->min_length )
         {
-            objset()->add(fib);
+            // we check the range again, since the fiber tip may have changed:
+            if ( cut.abs > abscissaM() )
+                cutM(cut.abs-abscissaM());
+            /*
+             since we have deleted the MINUS_END section,
+             the following cuts in the list, which will be of lower abscissa,
+             should not be processed.
+             */
+            break;
+        }
+        else if ( abscissaP() - cut.abs <= prop->min_length )
+        {
+            // we check the range again, since the fiber tip may have changed:
+            if ( cut.abs < abscissaP() )
+                cutP(abscissaP()-cut.abs);
+        }
+        else
+        {
+            Fiber * frag = severP(cut.abs-abscissaM());
+            
+            // special case where the PLUS_END section is simply deleted
+            if ( cut.stateM == STATE_BLACK )
+            {
+                delete(frag);
+                continue;
+            }
+
+            //add new fragment to simulation:
+            objset()->add(frag);
+
+            if ( frag )
+            {
+                // check that ends spatially match:
+                assert_small((frag->posEndM() - posEndP()).norm());
+                
+                try {
+                    // old PLUS_END converves its state:
+                    frag->setDynamicStateP(dynamicStateP());
+                    
+                    // new ends are set as wished:
+                    this->setDynamicStateP(cut.stateP);
+                    frag->setDynamicStateM(cut.stateM);
+                }
+                catch ( Exception & e )
+                {
+                    e << "while cutting fiber " << reference();
+                    throw;
+                }
+            
 #ifdef LOGGING
-            std::cout<<"severed "<<reference()<<" *s "<<std::setprecision(2)<<abs;
-            std::cout<<" creating "<<part->reference();
-            std::cout<<" position "<<part->posEnd(MINUS_END)<<std::endl;
+                Cytosim::log << "severed " << reference() << " at abscissa " << s->abs;
+                Cytosim::log << "   creating " << frag->reference();
+                Cytosim::log << "   position " << frag->posEndM() << std::endl;
 #endif
+                //Cytosim::log << " severed at X = " << frag->posEndM().XX << std::endl;
+            }
+            else
+            {
+                Cytosim::log << " sever abscissa " << cut.abs << " is out of range";
+                Cytosim::log << " [ " << abscissaM() << "   " << abscissaP() << " ]" << std::endl;
+            }
         }
     }
-    
-    delayedCuts.clear();
+    pendingCuts.clear();
 }
 
 
 /**
- This function tests the angle between consecutive segments on the Fiber.
- The Fiber is severed at points where the angle is such that ( cosine < 0 ),
- ie. if the angle 90 degrees or less.
- Multiple cuts can occur. Fiber parts are added to \a set.
+ returns index of first point for which ( cos(angle) < max_cosine ),
+ or zero
  */
-void Fiber::severKinks()
+unsigned Fiber::hasKink(const real max_cosine) const
 {
-    ObjectSet * set = objset();
-    // we sweep down, because severPoint() removes the distal part
-    for ( unsigned int p = lastPoint()-1; p > 1 ; --p )
+    unsigned end = nPoints - 2;
+    for ( unsigned p = 0; p < end; ++p )
     {
-        if ( diffPoints(p-1) * diffPoints(p) < 0 )
-            set->add(severPoint(p));
+        if ( dot(diffPoints(p), diffPoints(p+1)) < max_cosine )
+            return p+1;
     }
+    return 0;
 }
 
-//------------------------------------------------------------------------------
 
-void Fiber::cutAlongPlane(FiberSet * set, Vector const& n, const real a)
+void Fiber::planarCut(Vector const& n, const real a, state_t stateP, state_t stateM)
 {
     Array<real> cuts;
-    // check intersection in order of decreasing abscissa
+    
+    /*
+     The cuts should be processed in order of decreasing abscissa,
+     hence we check intersections from PLUS_END to MINUS_END
+    */
     for ( int s = lastSegment(); s >=0 ; --s )
     {
-        real abs;
-        FiberLocus const& seg = segment(s);
-        if ( seg.intersectPlane(n, a, abs) )
-            cuts.push_back(abs);
+        real abs = planarIntersect(s, n, a);
+        if ( 0 <= abs  &&  abs < 1 )
+            cuts.push_back(abscissaPoint(s+abs));
     }
-    // process the cuts in order of decreasing abscissa
-    for ( real * s = cuts.begin(); s < cuts.end(); ++s )
+    
+    for ( real s : cuts )
     {
-        Fiber * fib = severNow(*s);
-        if ( fib ) set->add(fib);
+        Fiber * fib = severNow(s);
+        if ( fib )
+        {
+            // old PLUS_END converves its state:
+            fib->setDynamicStateP(dynamicStateP());
+            // dynamic of new ends are set as usual:
+            setDynamicStateP(stateP);
+            fib->setDynamicStateM(stateM);
+            //assert_true(!fib->linked());
+            objset()->add(fib);
+        }
     }
 }
 
-//------------------------------------------------------------------------------
+
+/**
+ The given `fib` is added past the PLUS_END of `*this`,
+ Hands bound to `fib` are transfered to *this.
+ The dynamic state of the PLUS_END is also transferred.
+ `fib` is enventually deleted
+*/
 void Fiber::join(Fiber * fib)
 {
     assert_true( fib );
-    // make sure that the two fibers are of the same kind:
+    // the two fibers should be of the same class:
     assert_true( prop == fib->prop );
     
-    // join the points
-    FiberNaked::join(fib);
+    // shift in abscissa must be calculated before joining
+    real shift = abscissaP() - fib->abscissaM();
+
+    // join backbones
+    Chain::join(fib);
     
-    // transfer all FiberBinder
-    real shift = abscissaM() - fib->abscissaP();
-    Node * nd = fib->frBinders.first();
-    while( nd )
+    //transfer dynamic state of PLUS_END:
+    setDynamicStateP(fib->dynamicStateP());
+
+    // transfer all Hands
+    Hand * ha = fib->handListFront;
+    while ( ha )
     {
-        FiberBinder* ha = static_cast<FiberBinder*>(nd);
-        nd = nd->next();
-        fib->removeBinder(ha);
+        Hand * nx = ha->next();
         ha->relocate(this, ha->abscissa()+shift);
-        addBinder(ha);
+        ha = nx;
     }
+    delete(fib);
+
+    resetLattice();
 }
 
 
 //------------------------------------------------------------------------------
-#pragma mark -
+#pragma mark - Mobility
 
-/** 
- Fiber::setDragCoefficientVolume() calculates the mobility for the entire fiber, 
+/**
+ From "Random Walks in Biology" by HC. Berg, Princeton University Press,
+ drag coefficients for an ellipsoid are,
+
+     drag_transverse = 2*drag_parallel = 4*PI*L*visc / log(length/radius)
+
+ We should average the mobility coefficients:  speed = mu * f
+     mu_X = mu_parallel   = 2 * mu
+     mu_Y = mu_transverse = mu
+     mu_Z = mu_transverse = mu
+ Hence:
+     mu_averaged = ( mu + mu + 2*mu ) / 3 = 4/3 * mu.
+ drag_averaged = 3*PI*length*viscosity / log(length/radius)
+
+APPROXIMATE FORMULA FOR ELLIPSOIDAL PARTICLE
+Clift R, Grace JR, Weber ME. Bubbles, drops, and particles: Courier Corporation; 2005.
+
+     aspect = length / diameter;
+     drag = 3.0 * M_PI * viscosity * diameter * ( 3 + 2 * length/diameter ) / 5.0;
+
+ */
+
+
+/**
+ dragCoefficientVolume() calculates the mobility for the entire fiber,
  considering that the cylinder is straight and moving in a infinite fluid.
  fiber:hydrodynamic_radius[1] is a hydrodynamic cutoff that makes the
- drag coefficient proportional to length for length longer than the cutoff.
+ drag coefficient proportional to length beyond the cutoff.
  
- The formula for a cylinder is taken from:\n
- <em>
- Tirado and de la Torre. J. Chem. Phys 71(6) 1979 \n
- http://link.aip.org/link/doi/10.1063/1.438613 \n
- </em>
+ The drag is determined by the viscosity and the length and diameter of the
+ filament. The aspect ratio is defined by:
 
- We calculate the translational drag coefficient averaged over all possible configurations:
- @code
- cylinder_drag = 3*PI*length*viscosity / ( log(length/diameter) + 0.312 )
- @endcode
- 
- If the length is shorter than the diameter, the formula above fails and may even give negative result.
- Hence we also calculate the drag of a sphere with the same radius as the cylinder:
- @code
- sphere_drag = 6*PI*visc*R
- @endcode
- We use the maximum of these two coefficients.
- */
+    shape = length / diameter;
+
+The formula for a cylinder were calculated numerically in:
+> Tirado and de la Torre. J. Chem. Phys 71(6) 1979
+> http://doi.org/10.1063/1.438613
+> Page 2584, Table 1, last column, last line for infinite aspect ratio
+
+The translational drag coefficient is averaged over all possible configurations:
+
+    drag_cylinder = 3 * PI * viscosity * length / ( log(shape) + 0.312 );
+
+If the length is shorter than the diameter, the formula above fails and may
+even give negative result. Hence we also calculate the drag of a sphere with
+the same radius as the cylinder:
+
+    drag_sphere = 6 * PI * viscosity * radius
+
+We use the maximum value between 'drag_sphere' and 'drag_cylinder'.
+*/
 real Fiber::dragCoefficientVolume()
 {
     real len = length();
@@ -320,61 +558,74 @@ real Fiber::dragCoefficientVolume()
     // hydrodynamic cut-off on length:
     real lenc = len;
     assert_true( prop->hydrodynamic_radius[1] > 0 );
+    
     if ( lenc > prop->hydrodynamic_radius[1] )
         lenc = prop->hydrodynamic_radius[1];
+    
+    if ( lenc < prop->hydrodynamic_radius[0] )
+        lenc = prop->hydrodynamic_radius[0];
     
     //Stoke's for a sphere:
     assert_true( prop->hydrodynamic_radius[0] > 0 );
     real drag_sphere = 6 * prop->hydrodynamic_radius[0];
     
-    const real pref = 3;
+    constexpr real pref = 3;
 
 #if ( 0 )
     /*
-     For an ellipsoid,  
+     For an ellipsoid,
      drag_transverse = 2*drag_parallel = 4*PI*L*visc / log(length/radius)
      We should average the mobility coefficients:  speed = mu * f
-     mu_X = mu_parallel   = 2 * mu
-     mu_Y = mu_transverse = mu
-     mu_Z = mu_transverse = mu
+           mu_X = mu_parallel   = 2 * mu
+           mu_Y = mu_transverse = mu
+           mu_Z = mu_transverse = mu
      Hence:
-     mu_averaged = ( mu + mu + 2*mu ) / 3 = 4/3 * mu.
+           mu_averaged = ( mu + mu + 2*mu ) / 3 = 4/3 * mu.
      drag_averaged = 3*PI*length*viscosity / log(length/radius)
      See for example "Random Walks in Biology" by HC. Berg, Princeton University Press.
      */
     
+    // length below which the formula is not valid:
+    real min_len = exp( 1 + log(prop->hydrodynamic_radius[0]) );
+
     real drag_cylinder = pref * len / log( lenc / prop->hydrodynamic_radius[0] );
 #else
     /*
      Tirado and de la Torre. J. Chem. Phys 71(6) 1979
      give the averaged translational friction coefficient for a cylinder:
-     3*PI*length*viscosity / ( log( length/diameter ) + 0.312 )
+     3*PI*length*viscosity / ( log(length/diameter) + 0.32 )
+     (Page 2584, Table 1, last column, last line for infinite aspect ratio)
      */
-    real drag_cylinder = pref * len / ( log( 0.5 * lenc / prop->hydrodynamic_radius[0] ) + 0.312 );
+    
+    // length below which the formula is not valid:
+    real min_len = exp( 1 - 0.32 + log(2*prop->hydrodynamic_radius[0]) );
+
+    real drag_cylinder = pref * len / ( log( 0.5 * lenc / prop->hydrodynamic_radius[0] ) + 0.32 );
 #endif
 
-    // use largest drag coefficient
-    real drag = M_PI * prop->viscosity * ( drag_cylinder > drag_sphere ? drag_cylinder : drag_sphere );
+    real drag = drag_sphere;
+    
+    if ( len > min_len )
+    {
+        // use largest drag coefficient
+        drag = std::max(drag_cylinder, drag_sphere);
+    }
+    
+    //Cytosim::log("Drag coefficient of Fiber in infinite fluid = %.1e\n", drag);
+    //Cytosim::log << "Fiber L = " << len << "  bulk_drag = " << drag << std::endl;
 
-    //Cytosim::MSG("Drag coefficient of Fiber in infinite fluid = %.1e\n", drag);
-    //std::clog << "Fiber " << reference() << " has drag " << drag << "\n";
-
-    return drag;
+    return M_PI * prop->viscosity * drag;
 }
 
 
-
 /**
- Fiber::setDragCoefficientSurface() uses a formula calculated by F. Gittes in:\n
- <em>
- Hunt et al. Biophysical Journal (1994) v 67 pp 766-781 \n
- http://dx.doi.org/10.1016/S0006-3495(94)80537-5 \n
- </em>
+ dragCoefficientSurface() uses a formula calculated by F. Gittes in:\n
+ > Hunt et al. Biophysical Journal (1994) v 67 pp 766-781
+ > http://dx.doi.org/10.1016/S0006-3495(94)80537-5
  
  It applies to a cylinder moving parallel to its axis and near an immobile surface:
- @code
- drag-per-unit-length = 2 &pi &eta / acosh(h/r)
- @endcode
+
+       drag_per_unit_length = 2 &pi &eta / acosh(h/r)
  
  With:
  - r = cylinder radius,
@@ -387,20 +638,20 @@ real Fiber::dragCoefficientVolume()
  but for gliding assays, the parallel drag coefficient is the appropriate choice.  
  
  Note that this is usually equivalent to the approximate formula:
- @code
- drag-per-unit-length = 2 &pi &eta / log(2*h/r)
- @endcode
- because `acosh(x) = ln[ x + sqrt(x^2-1)) ] ~ ln[2x] if x >> 1`
 
- Hunt et al. also credit this reference for the formula:\n
- <em>
- The slow motion of a cylinder next to a plane wall.
- Jeffrey, D.J. & Onishi, Y. (1981) Quant. J. Mech. Appl. Math. 34, 129-137.
- </em>
+       drag_per_unit_length = 2 &pi &eta / log(2*h/r)
+
+ because
+
+       acosh(x) = ln[ x + sqrt(x^2-1)) ] ~ ln[2x] if x >> 1
+
+ Hunt et al. also credit this reference for the formula:
+ > The slow motion of a cylinder next to a plane wall.
+ > Jeffrey, D.J. & Onishi, Y. (1981) Quant. J. Mech. Appl. Math. 34, 129-137.
 */
 real Fiber::dragCoefficientSurface()
 {
-    real len = length();    
+    real len = length();
     
     if ( prop->cylinder_height <= 0 )
         throw InvalidParameter("fiber:surface_effect[1] (height above surface) must set and > 0!");
@@ -408,22 +659,21 @@ real Fiber::dragCoefficientSurface()
     // use the higher drag: perpendicular to the cylinder (factor 2)
     real drag = 2 * M_PI * prop->viscosity * len / acosh( 1 + prop->cylinder_height/prop->hydrodynamic_radius[0] );
     
-    //Cytosim::MSG("Drag coefficient of Fiber near a planar surface = %.1e\n", drag);
-    //std::cerr << "Drag coefficient of Fiber near a planar surface = " << drag << std::endl;
+    //Cytosim::log("Drag coefficient of Fiber near a planar surface = %.1e\n", drag);
+    //Cytosim::log << "Drag coefficient of Fiber near a planar surface = " << drag << std::endl;
 
     return drag;
 }
 
 
-
 /**
  Calculate drag coefficient from two possible formulas
-@code
- if ( fiber:surface_effect )
-    setDragCoefficientSurface();
- else
-    setDragCoefficientVolume();
-@endcode
+
+     if ( fiber:surface_effect )
+        drag = dragCoefficientSurface();
+     else
+        drag = dragCoefficientVolume();
+
  */
 void Fiber::setDragCoefficient()
 {
@@ -432,226 +682,465 @@ void Fiber::setDragCoefficient()
     if ( prop->surface_effect )
     {
         drag = dragCoefficientSurface();
-        if ( 0 )
-        {
-            real d = dragCoefficientVolume();
-            std::cerr << "Drag coefficient of Fiber near a planar surface amplified by " << drag/d << std::endl;
-        }
+#if ( 0 )
+        real d = dragCoefficientVolume();
+        Cytosim::log << "Drag coefficient of Fiber near a planar surface amplified by " << drag/d << std::endl;
+#endif
     }
     else
         drag = dragCoefficientVolume();
 
-    //the forces are distributed equally on all points, hence we multiply by nbPoints()
-    assert_true( nbPoints() > 0 );
-    rfMobility = nbPoints() / drag;
+    //the forces are distributed equally on all points, hence we multiply by nPoints
+    assert_true( nPoints > 0 );
+    rfPointMobility = nPoints / drag;
+    
+#if ( 0 )
+    Cytosim::log << "Fiber L = " << std::setw(7) << length();
+    Cytosim::log << " drag = " << drag << " point_mobility " << rfPointMobility << std::endl;
+#endif
 }
 
 
 void Fiber::prepareMecable()
 {
     setDragCoefficient();
-    storeDifferences();
+    storeDirections();
     makeProjection();
 
-    assert_true( rfMobility > REAL_EPSILON );
+    assert_true( rfPointMobility > REAL_EPSILON );
 
     // the scaling of the bending elasticity depends on the length of the segments
-    rfRigidity  = prop->rigidity / segmentationCub();
+    rfRigidity = prop->rigidity / segmentationCube();
+#if NEW_FIBER_LOOP
+    rfRigidityLoop = prop->loop;
+#endif
+#if ( 0 )
+    real energy = bendingEnergy();
+    real euler = M_PI * M_PI * prop->rigidity / ( length() * length() );
+    Cytosim::log << "Euler buckling = " << euler << "    ";
+    Cytosim::log << "Bending energy = " << energy << std::endl;
+#endif
 }
+
 
 //------------------------------------------------------------------------------
 
 void Fiber::setInteractions(Meca & meca) const
 {
-    switch ( prop->confine )
+#if OLD_SQUEEZE_FORCE
+    if ( prop->squeeze == 1 )
     {
-        case CONFINE_NOT:
-            break;
-            
-        case CONFINE_INSIDE:
+        // squeezing force in the YZ-plane:
+        const real f = prop->squeeze_force;
+        const real r = prop->squeeze_range;
+        for ( unsigned pp = 0; pp < nPoints; ++pp )
         {
-            Space const* spc = prop->confine_space_ptr;
-            
-            for ( unsigned int pp = 0; pp < nbPoints(); ++pp )
+#if ( DIM == 2 )
+            unsigned ii = DIM * ( matIndex() + pp ) + 1;
+            real p = posP(pp).YY;
+            if ( fabs(p) > r )
+                meca.base(ii) -= std::copysign(f, p);
+            else
+                meca.mC(ii, ii) -= f / r;
+#elif ( DIM == 3 )
+            unsigned jj = DIM * ( matIndex() + pp );
+            Vector p = posP(pp);
+            if ( p.norm() < r )
             {
-                Vector pos = posPoint(pp);
-                if ( spc->outside(pos) )
-                    spc->setInteraction(pos, PointExact(this, pp), meca, prop->confine_stiff);
+                meca.mC(jj+1, jj+1) -= f / r;
+                meca.mC(jj+2, jj+2) -= f / r;
             }
-        } break;
-            
-        case CONFINE_OUTSIDE:
-        {
-            Space const* spc = prop->confine_space_ptr;
-            
-            for ( unsigned int pp = 0; pp < nbPoints(); ++pp )
+            else
             {
-                Vector pos = posPoint(pp);
-                if ( spc->inside(pos) )
-                    spc->setInteraction(pos, PointExact(this, pp), meca, prop->confine_stiff);
+                Vector n = p.normalized(f);
+                meca.base(jj+1) -= n.YY;
+                meca.base(jj+2) -= n.ZZ;
             }
-        } break;
-            
-        case CONFINE_SURFACE:
-        {
-            Space const* spc = prop->confine_space_ptr;
-            
-            for ( unsigned int pp = 0; pp < nbPoints(); ++pp )
-                spc->setInteraction(posPoint(pp), PointExact(this, pp), meca, prop->confine_stiff);
-        } break;
-            
-        case CONFINE_MINUS_END:
-        {
-            Space const* spc = prop->confine_space_ptr;
-            
-            unsigned int pp = 0;
-            spc->setInteraction(posPoint(pp), PointExact(this, pp), meca, prop->confine_stiff);
-        } break;
-            
-        case CONFINE_PLUS_END:
-        {
-            Space const* spc = prop->confine_space_ptr;
-            
-            unsigned int pp = lastPoint();
-            spc->setInteraction(posPoint(pp), PointExact(this, pp), meca, prop->confine_stiff);
-        } break;
-            
-        default:
-            throw InvalidParameter("Invalid bead::confine");
+#endif
+        }
     }
-}
-
-
-void Fiber::step()
-{
-#if SEVER_KINKED_FIBERS
-    assert_true(linked());
-    // sever fiber at joints that make an angle above 90 degrees:
-    severKinks();
 #endif
     
-    // perform the cuts that were registered by sever()
-    delayedSevering();
     
-    //add single that act like glue
-    if ( prop->glue )
+#if NEW_COLINEAR_FORCE
+    /*
+     Add a length-dependent force acting parallel to the filament.
+     A force proportional to the length of the segments is distributed
+     to the vertices.
+     */
+    if ( prop->colinear_force )
     {
-        assert_true(prop->confine_space_ptr);
-        setGlue(frGlue, PLUS_END, prop->confine_space_ptr, prop->glue);
-    }    
-}
-
-//------------------------------------------------------------------------------
-#pragma mark -
-
-void Fiber::addBinder(FiberBinder * fb)
-{
-    frBinders.push_back(fb);
-}
-
-
-void Fiber::removeBinder(FiberBinder * fb)
-{
-    frBinders.pop(fb);
-}
-
-
-FiberBinder * Fiber::firstBinder() const
-{
-    return static_cast<FiberBinder*>(frBinders.first());
-}
-
-
-void Fiber::updateBinders()
-{
-    //we iterate one step forward, because updating might lead to detachment:
-    //the loop can be unrolled, or parallelized
-    Node * hi = frBinders.first();
-    while ( hi )
+        real s = 0.5 * prop->colinear_force * segmentation();
+        for ( unsigned i = 0; i < nbSegments(); ++i )
+        {
+            Vector f = s * dirSegment(i);
+            meca.addForce(Mecapoint(this, i  ), f);
+            meca.addForce(Mecapoint(this, i+1), f);
+        }
+    }
+#endif
+    
+    if ( prop->confine != CONFINE_OFF )
     {
-        FiberBinder * ha = static_cast<FiberBinder*>(hi);
-        hi = hi->next();
-        ha->updateBinder();
-        ha->checkFiberRange();
+        Space const* spc = prop->confine_space_ptr;
+        switch ( prop->confine )
+        {
+            case CONFINE_INSIDE:
+                for ( unsigned i = 0; i < nPoints; ++i )
+                {
+                    Vector pos = posP(i);
+                    if ( spc->outside(pos) )
+                        spc->setInteraction(pos, Mecapoint(this, i), meca, prop->confine_stiffness);
+                }
+                break;
+                
+            case CONFINE_OUTSIDE:
+                for ( unsigned i = 0; i < nPoints; ++i )
+                {
+                    Vector pos = posP(i);
+                    if ( spc->inside(pos) )
+                        spc->setInteraction(pos, Mecapoint(this, i), meca, prop->confine_stiffness);
+                }
+                break;
+                
+            case CONFINE_ON:
+                for ( unsigned i = 0; i < nPoints; ++i )
+                    spc->setInteraction(posP(i), Mecapoint(this, i), meca, prop->confine_stiffness);
+                break;
+                
+            case CONFINE_MINUS_END:
+                spc->setInteraction(posP(0), Mecapoint(this, 0), meca, prop->confine_stiffness);
+                break;
+
+            case CONFINE_PLUS_END:
+            {
+                unsigned L = lastPoint();
+                spc->setInteraction(posP(L), Mecapoint(this, L), meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_BOTH_ENDS:
+            {
+                spc->setInteraction(posP(0), Mecapoint(this, 0), meca, prop->confine_stiffness);
+                const unsigned L = lastPoint();
+                spc->setInteraction(posP(L), Mecapoint(this, L), meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_PLUS_OUT:
+            {
+                unsigned L = lastPoint();
+                Vector pos = posP(L);
+                if ( spc->inside(pos) )
+                    spc->setInteraction(pos, Mecapoint(this, L), meca, prop->confine_stiffness);
+            } break;
+            default:
+                throw InvalidParameter("Invalid fiber::confine");
+        }
     }
 }
 
 
-void Fiber::detachBinders()
+//------------------------------------------------------------------------------
+#pragma mark - list of bound Hands
+
+/**
+Link the hand at the front of the list.
+
+Keeping track of the bound Hands is needed to run Cytosim if the filaments are
+dynamic, so that a Fiber that has changed can update all the Hands bound to it.
+The list is also used in reports, or to quickly count Hands bound to the fiber.
+*/
+void Fiber::addHand(Hand * n) const
 {
-    //we iterate one step forward, because updating might lead to detachment:
-    Node * hi = frBinders.first();
-    while ( hi )
+    n->prev(nullptr);
+    n->next(handListFront);
+    if ( handListFront )
+        handListFront->prev(n);
+    else
+        handListBack = n;
+    handListFront = n;
+}
+
+
+void Fiber::removeHand(Hand * n) const
+{
+    Hand * x = n->next();
+    if ( n->prev() )
+        n->prev()->next(x);
+    else {
+        assert_true( handListFront == n );
+        handListFront = x;
+    }
+    
+    if ( x )
+        x->prev(n->prev());
+    else {
+        assert_true( handListBack == n );
+        handListBack = n->prev();
+    }
+}
+
+
+void Fiber::updateHands() const
+{
+    for ( Hand * ha = handListFront; ha; ha = ha->next() )
+        ha->update();
+}
+
+
+void Fiber::detachHands() const
+{
+    // we must iterate one step ahead, because detach() will unlink
+    Hand * ha = handListFront;
+    while ( ha )
     {
-        FiberBinder * ha = static_cast<FiberBinder*>(hi);
-        hi = hi->next();
+        Hand * nx = ha->next();
         ha->detach();
+        ha = nx;
     }
 }
 
-
-int Fiber::nbBinders(unsigned int (*count)(const FiberBinder &)) const
+/**
+Sort in ascending order
+*/
+int comp_abscissa(const void* a, const void* b)
 {
-    unsigned int result = 0;
-    
-    Node * hi = frBinders.first();
-    while ( hi ) {
-        FiberBinder * ha = static_cast<FiberBinder*>(hi);
-        hi = hi->next();
-        result += count(*ha);
-    }
-    
-    //printf("countBinders(%p) = %i\n", count, result);
-    return result;
+    real aa = static_cast<Hand const*>(a)->abscissa();
+    real bb = static_cast<Hand const*>(b)->abscissa();
+    if ( aa < bb )
+        return -1;
+    if ( bb < aa )
+        return 1;
+    return 0;
 }
 
-
-int Fiber::nbBindersInRange(const real aMin, const real aMax, const FiberEnd from) const
+/**
+ This sorts the Hands in order of increasing abscissa
+ Sorting is done by copying to temporary array space, using std::qsort
+ */
+void Fiber::sortHands() const
 {
-    int result = 0;
-    
-    ///\todo: Convert aMin and aMax instead of converting each Binder abscissa
-    Node * hi = frBinders.first();
-    while ( hi )
+    size_t cnt = nbHands();
+    if ( cnt > 1 )
     {
-        FiberBinder * ha = static_cast<FiberBinder*>(hi);
-        hi = hi->next();
-        real abs = ha->abscissaFrom(from);
-        if ( aMin <= abs  &&  abs <= aMax )
-            ++result;
+        Hand ** tmp = new Hand*[cnt];
+        
+        size_t i = 0;
+        Hand * n = handListFront;
+        
+        while ( n )
+        {
+            tmp[i++] = n;
+            n = n->next();
+        }
+        
+        qsort(tmp, cnt, sizeof(Hand*), comp_abscissa);
+        
+        n = tmp[0];
+        handListFront = n;
+        n->prev(nullptr);
+        for ( i = 1; i < cnt; ++i )
+        {
+            n->next(tmp[i]);
+            tmp[i]->prev(n);
+            n = tmp[i];
+        }
+        n->next(nullptr);
+        handListBack = n;
+        
+        delete[] tmp;
     }
-    
-    //printf("nbBinderssInRange(%8.2f, %8.2f)=%i\n", aMin, aMax, result);
-    return result;
 }
 
 
-int Fiber::nbBindersNearEnd(const real len, const FiberEnd from) const
+unsigned Fiber::nbHands() const
 {
-    int result = 0;
+    unsigned res = 0;
     
-    Node * hi = frBinders.first();
-    while ( hi ) {
-        FiberBinder * ha = static_cast<FiberBinder*>(hi);
-        hi = hi->next();
-        result += ( ha->abscissaFrom(from) < len );
-    }
+    for ( Hand const* ha = handListFront; ha; ha = ha->next() )
+        ++res;
     
-    //printf("nbBindersNearEnd(%8.2f)=%i\n", len, result);
-    return result;
+    return res;
 }
 
+
+int Fiber::nbHands(int (*count)(Hand const*)) const
+{
+    int res = 0;
+    
+    for ( Hand const* ha = handListFront; ha; ha = ha->next() )
+        res += count(ha);
+    
+    //printf("nbHands(%p) = %u\n", count, res);
+    return res;
+}
+
+
+unsigned Fiber::nbHandsInRange(real a, real b, const FiberEnd ref) const
+{
+    unsigned res = 0;
+    if ( b > a )
+    {
+        // Convert to absolute abscissa:
+        a = abscissaFrom(a, ref);
+        b = abscissaFrom(b, ref);
+        if ( b < a )
+            std::swap(a, b);
+        
+        for ( Hand const* ha = handListFront; ha; ha = ha->next() )
+            res += ( a <= ha->abscissa()  &&  ha->abscissa() <= b );
+    }
+    //printf("nbHandsInRange(%8.2f, %8.2f) = %u\n", a, b, res);
+    return res;
+}
+
+
+unsigned Fiber::nbHandsNearEnd(const real len, const FiberEnd ref) const
+{
+    unsigned res = 0;
+    real i = -INFINITY, s = INFINITY;
+    
+    if ( len > 0 )
+    {
+        if ( ref == PLUS_END )
+            i = abscissaP() - len;
+        else if ( ref == MINUS_END )
+            s = abscissaM() + len;
+        else
+            throw("invalid argument value to nbHadsNearEnd()");
+        
+        for ( Hand const* ha = handListFront; ha; ha = ha->next() )
+            res += ( i <= ha->abscissa() && ha->abscissa() <= s );
+    }
+    //printf("nbHandsNearEnd(%8.2f) = %u\n", len, res);
+    return res;
+}
 
 //------------------------------------------------------------------------------
-#pragma mark -
+#pragma mark - Dynamic ends
 
-///setGlue1 creates a pushing force from the cortex
-void Fiber::setGlue1(Single* glue, const FiberEnd which, const Space * spc)
+state_t Fiber::dynamicState(FiberEnd end) const
+{
+    if ( end == PLUS_END )
+        return dynamicStateP();
+    if ( end == MINUS_END )
+        return dynamicStateM();
+    ABORT_NOW("invalid argument value");
+    return 0;
+}
+
+
+void Fiber::setDynamicState(const FiberEnd end, const state_t s)
+{
+    if ( end == PLUS_END )
+        setDynamicStateP(s);
+    else if ( end == MINUS_END )
+        setDynamicStateM(s);
+}
+
+
+real Fiber::freshAssembly(const FiberEnd end) const
+{
+    if ( end == PLUS_END )
+        return freshAssemblyP();
+    if ( end == MINUS_END )
+        return freshAssemblyM();
+    ABORT_NOW("invalid argument value");
+    return 0;
+}
+
+
+/**
+ Assuming that the length has changed, or that the abscissa of the ends have changed,
+ this updates the segmentation of the fiber if needed, the position of the Hands,
+ and the boundaries of the Lattice if present.
+ */
+void Fiber::update()
+{
+#if ( 0 )
+    Cytosim::log << reference() << " update [ "  << std::setw(9) << std::left << abscissaM();
+    Cytosim::log << " "  << std::setw(9) << std::left << abscissaP() << " ]" << std::endl;
+#endif
+    
+    /*
+     Update all bound Hands.
+     Some Hands may be updated more than once in a time-step,
+     but that is only a small performance penalty.
+
+     We must iterate one step ahead, because `checkFiberRange()` may lead to detachment.
+     The loop could be unrolled, or parallelized
+     */
+    Hand * ha = handListFront;
+    while ( ha )
+    {
+        Hand * nx = ha->next();
+        assert_true(ha->fiber()==this);
+        ha->update();
+        ha->checkFiberRange();
+        ha = nx;
+    }
+    
+#if FIBER_HAS_LATTICE
+    // this will allocate the Lattice's site to cover the range of Abscissa:
+    if ( frLattice.ready() )
+    {
+        frLattice.setRange(abscissaM(), abscissaP());
+    }
+#endif
+}
+
+//------------------------------------------------------------------------------
+#pragma mark - Lattice
+
+
+void Fiber::printLattice(std::ostream& os, FiberLattice const& lat) const
+{
+    using std::setw;
+    const auto inf = lat.indexM();
+    const auto sup = lat.indexP();
+    os << "Lattice for " << reference() << ":\n";
+    os << "    inf  " << inf << "  " << abscissaM() << "\n";
+    os << "    sup  " << sup << "  " << abscissaP() << "\n";
+    for ( auto h = inf; h < sup; ++h )
+        os << setw(8) << h << "  " << setw(10) << lat.abscissa(h) << setw(10) << lat.data(h) << "\n";
+    os << "\n";
+}
+
+
+void Fiber::infoLattice(real& len, unsigned& cnt, real& sm, real& mn, real& mx) const
+{
+#if FIBER_HAS_LATTICE
+    FiberLattice const& lat = frLattice;
+    if ( lat.ready() )
+    {
+        len += length();
+        const auto sup = lat.indexP();
+        for ( auto i = lat.indexM(); i <= sup; ++i )
+        {
+            ++cnt;
+            sm += lat.data(i);
+            real x = lat.data(i);
+            mn = std::min(mn, x);
+            mx = std::max(mx, x);
+        }
+    }
+#endif
+}
+
+//------------------------------------------------------------------------------
+#pragma mark - Glue
+
+/**
+ fiber:glue=1 creates a Single if the tip of the Fiber goes outside the Space.
+ The Single's hand is managed to always be attached at the tip of the Fiber.
+ The Single detaches if the Fiber tip is pulled inside.
+ This generates mostly a pushing force from the cortex
+ */
+void Fiber::setGlue1(Single* glue, const FiberEnd end, Space const* spc)
 {
     assert_true(spc);
-    if ( spc->inside(posEnd(which)) )
+    if ( spc->inside(posEnd(end)) )
     {
-        //detach immediately if the tip is inside the box
+        //detach immediately if the tip is inside the Space
         if ( glue->attached() )
             glue->detach();
     }
@@ -660,58 +1149,53 @@ void Fiber::setGlue1(Single* glue, const FiberEnd which, const Space * spc)
         if ( glue->attached() )
         {
             //always keep tracking the tip:
-            glue->hand()->moveToEnd(which);
+            glue->moveToEnd(end);
         }
         else {
-            //reposition the grafted base if the MT is freshly outside:
-            Vector P;
-            spc->project(posEnd(which), P);
-            glue->setPosition(P);
+            //reposition the Single base:
+            glue->setPosition(spc->project(posEnd(end)));
             //attach to the MT-tip:
-            glue->attachToEnd(this, which);
-        }
-    }
-}
-
-///setGlue2 creates a pulling force from the cortex
-void Fiber::setGlue2(Single* glue, const FiberEnd which, const Space * spc)
-{    
-    assert_true(spc);
-    //reposition the grafted base if the MT is freshly outside:
-    if ( ! glue->attached()  &&  spc->outside(posEnd(which)) )
-    {
-        /*
-         Attach to the MT position that crosses the edge of the Space:
-         */
-        //find indx such that P[indx] is inside and P_{indx+1} is outside:
-        int indx = lastPoint();
-        do {
-            --indx;
-        } while ( indx >= 0  &&  spc->outside(posPoint(indx)) );
-        
-        if ( indx >= 0 )
-        {
-            Vector P1 = posPoint(indx);     //this point is inside
-            Vector P2 = posPoint(indx+1);   //this point is outside
-            
-            //we interpolate using the distances of P1 and P2 to the edge
-            real d1 = spc->distanceToEdge(P1);
-            real d2 = spc->distanceToEdge(P2);
-            if ( d1 + d2 > REAL_EPSILON )
-            {
-                // we find the intersection, assuming the edge is straight 
-                FiberBinder fs(this, abscissaP(indx+d1/(d2+d1)));
-                glue->attach(fs);
-                glue->setPosition(fs.pos());
-            }
+            glue->attachEnd(this, end);
         }
     }
 }
 
 
-///setGlue3 creates pulling and pushing force from the cortex
-void Fiber::setGlue3(Single* glue, const Space * spc)
+/**
+ fiber:glue=2
+ The Single's hand is managed to always be attached at the tip of the Fiber.
+ The Single's hand detaches only spontaneously.
+ This creates both pulling and pushing force from the cortex
+ */
+void Fiber::setGlue2(Single* glue, const FiberEnd end, Space const* spc)
 {
+    assert_true(spc);
+    if ( glue->attached() )
+    {
+        //keep tracking the tip of the fiber while attached
+        glue->moveToEnd(end);
+    }
+    else
+    {
+        // Attach a new grafted if MT-tip is outside and growing:
+        if ( isGrowing(end) && spc->outside(posEnd(end)) )
+        {
+            //reposition the Single base:
+            glue->setPosition(spc->project(posEnd(end)));
+            //attach to the MT-tip:
+            glue->attachEnd(this, end);
+        }
+    }
+}
+
+
+/**
+ fiber:glue=3 creates a Single at the position where the Fiber crosses the Space's edge.
+ This makes an anchor point exactly at the cortex.
+ The Single's Hand behaves and detaches normally.
+ */
+void Fiber::setGlue3(Single* glue, Space const* spc)
+{    
     assert_true(spc);
     /*
      If the glue is not already attached, we first check if the fiber intersects
@@ -719,26 +1203,26 @@ void Fiber::setGlue3(Single* glue, const Space * spc)
      */
     if ( ! glue->attached() )
     {
-        bool in = spc->inside(posEnd(MINUS_END));
+        bool in = spc->inside(posEndM());
         
-        if ( in == spc->inside(posEnd(PLUS_END)) )
+        if ( in == spc->inside(posEndP()) )
             return;
         
-        // find a model point that is on the other side of the Space edge:
-        for ( int pp = 1; pp < nbPoints(); ++pp )
+        // find a vertex that is on the other side of the Space edge:
+        for ( unsigned i = 1; i < nPoints; ++i )
         {
-            if ( spc->inside(posPoint(pp)) != in )
+            if ( spc->inside(posP(i)) != in )
             {
                 // the abscissa is interpolated using the distances of P1 and P2 to the edge
-                real d1 = spc->distanceToEdge(posPoint(pp-1));
-                real d2 = spc->distanceToEdge(posPoint(pp));
+                real d1 = spc->distanceToEdge(posP(i-1));
+                real d2 = spc->distanceToEdge(posP(i));
                 if ( d1 + d2 > REAL_EPSILON )
                 {
                     /* we find the abscissa corresponding to the intersection,
                      assuming that the edge is locally straight */
-                    FiberBinder fs(this, abscissaP(pp-1+d1/(d2+d1)));
-                    glue->attach(fs);
+                    FiberSite fs(this, abscissaPoint(i-1+d1/(d2+d1)));
                     glue->setPosition(fs.pos());
+                    glue->attach(fs);
                     break;
                 }
             }
@@ -747,126 +1231,172 @@ void Fiber::setGlue3(Single* glue, const Space * spc)
 }
 
 
-void Fiber::setGlue(Single*& glue, const FiberEnd which, const Space * space, int glue_type)
+/**
+ Search for a glue in the list of bound HandSingle
+ this is useful when a simulation is restarted from file
+ */
+void Fiber::makeGlue(Single*& glue)
 {
-    if ( glue == 0 )
+    SingleSet& set = simul().singles;
+
+    for ( Single * gh = set.firstA(); gh; gh=gh->next() )
     {
-        /*
-         search for a glue in the list of bound HandSingle
-         this is useful when a simulation is restarted from file
-         */
-        for ( Single * gh = prop->glue_set->firstA(); gh; gh=gh->next() )
+        if ( gh->hand()->fiber() == this  &&  gh->mark() == identity() )
         {
-            if ( gh->hand()->fiber() == this )
-            {
-                glue = gh;
-                //std::cerr << "found Fiber:glue for " << reference() << "\n";
-                break;
-            }
+            glue = gh;
+            //Cytosim::log << "found Fiber:glue for " << reference() << std::endl;
+            return;
         }
-        
-        // create the Single if needed
-        if ( glue == 0 )
-            glue = prop->glue_prop->newSingle();
     }
     
-    // creates Single when MT interact with the cortex:
-    switch( glue_type )
+    // create the Single if needed
+    if ( !glue )
     {
-        case 1:  setGlue1(glue, which, space);  break;
-        case 2:  setGlue2(glue, which, space);  break;
-        case 3:  setGlue3(glue, space);  break;
+        glue = prop->glue_prop->newSingle();
+        glue->mark(identity());
+        set.add(glue);
+    }
+}
+
+
+/**
+ setGlue() creates Single when MT interact with the edge of the Space
+*/
+void Fiber::setGlue(Single*& glue, const FiberEnd end, Space const* space)
+{
+    assert_true(space);
+    
+    if ( !glue )
+        makeGlue(glue);
+    
+    switch( prop->glue )
+    {
+        case 1:  setGlue1(glue, end, space);  break;
+        case 2:  setGlue2(glue, end, space);  break;
+        case 3:  setGlue3(glue, space);       break;
         default: throw InvalidParameter("invalid value of fiber:glue");
     }
     
 #if ( 1 )
-    // we keep the Single linked only if it is attached:
+    // we keep the Single linked in the simulation only if it is attached:
     if ( glue->attached() )
     {
         if ( !glue->linked() )
-            prop->glue_set->add(glue);
+            simul().singles.link(glue);
     }
     else
     {
         if ( glue->linked() )
-            prop->glue_set->remove(glue);
+            simul().singles.unlink(glue);
     }
 #endif
 }
 
-//------------------------------------------------------------------------------
-#pragma mark -
 
-real Fiber::projectPoint(Vector const& w, real & dist) const
+//------------------------------------------------------------------------------
+#pragma mark - I/O
+
+void Fiber::write(Outputter& out) const
 {
-    // initialize with the minus-end:
-    dist = w.distanceSqr(posPoint(0));
-    real abs = 0, len = segmentation();
-    
-    // try all segments
-    for ( unsigned int ii = 0; ii < nbSegments(); ++ii )
+    Chain::write(out);
+
+#if FIBER_HAS_LATTICE
+    if ( frLattice.ready() )
     {
-        //check the segment:
-        FiberLocus s(this, ii);
-        real a, d;
-        s.projectPoint0(w, a, d);
-        if ( len < a )
-        {
-            // test exact point
-            real e = w.distanceSqr(posPoint(ii+1));
-            if ( e < dist ) {
-                abs  = abscissaP(ii+1);
-                dist = e;
-            }
-        }
-        else if ( 0 <= a  &&  d < dist )
-        {
-            //the projection is the best found so far
-            abs  = abscissaP(ii) + a;
-            dist = d;
-        }
+        writeHeader(out, TAG_LATTICE);
+        // frLattice.write(out);
+        // only write information corresponding to actual Fiber abscissa range:
+        frLattice.write(out, frLattice.indexM(), frLattice.indexP()+1);
     }
-
-    return abs;
-}
-
-//------------------------------------------------------------------------------
-#pragma mark -
-
-void Fiber::write(OutputWrapper& out) const
-{
-    FiberNaked::write(out);
+#endif
 }
 
 
-void Fiber::read(InputWrapper & in, Simul& sim)
+void Fiber::read(Inputter& in, Simul& sim, ObjectTag tag)
 {
-    try {
+    //std::clog << this << " Fiber::read(" << tag << ")\n";
 #ifdef BACKWARD_COMPATIBILITY
         
-        if ( in.formatID() == 33 )
-            mark(in.readUInt32());
-
-        if ( tag()=='m'  &&  in.formatID()==31 )
+    if ( in.formatID() == 33 )
+        mark(in.readUInt32());
+    
+    if ( tag == 'm' )
+    {
+        if ( in.formatID()==31 )
         {
-            unsigned int p = in.readUInt16();
-            prop = static_cast<FiberProp*>(sim.properties.find("fiber",p));
+            unsigned p = in.readUInt16();
+            prop = sim.findProperty<FiberProp>("fiber", p);
         }
-
-        if ( in.formatID() < 31 )
-        {
-            setDynamicState(MINUS_END, in.readUInt8());
-            setDynamicState(PLUS_END, in.readUInt8());
-        }
-#endif
-        
-        FiberNaked::read(in, sim);
-        
+        //tag = TAG;
     }
-    catch( Exception & e ) {
-        //std::cerr << "prop="<<prop<<"\n";
-        e << ", while importing " << reference();
-        throw;
+    
+    if ( in.formatID() < 31 )
+    {
+        setDynamicStateM(in.readUInt8());
+        setDynamicStateP(in.readUInt8());
+    }
+    
+#endif
+    
+    if ( tag == TAG )
+    {
+        Chain::read(in, sim, tag);
+        
+#ifdef BACKWARD_COMPATIBILITY
+        if ( in.formatID() > 47 && in.formatID() < 50 ) // 4.7.2018 added birthTime
+            fnBirthTime = in.readFloat();
+#endif
+
+        update();
+
+        if ( length() + REAL_EPSILON < prop->min_length )
+        {
+            Cytosim::log << "Warning: fiber length < fiber:min_length";
+            Cytosim::log << " ( " << length() << " < " << prop->min_length << " )" << std::endl;
+        }
+
+        frGlue = nullptr;
+    }
+    else if ( tag == TAG_LATTICE )
+    {
+        try {
+#if FIBER_HAS_LATTICE
+            frLattice.read(in);
+#else
+            FiberLattice dummy;
+            dummy.read(in);
+            // store unit, to get digits at the right abscissa
+            const_cast<FiberProp*>(prop)->lattice_unit = dummy.unit();
+#endif
+        }
+        catch( Exception & e ) {
+            e << "reading Lattice for " << reference();
+            throw;
+        }
+    }
+#ifdef BACKWARD_COMPATIBILITY
+    else if ( tag == TAG_DYNAMIC )
+    {
+        static bool virgin = true;
+        // that is for Fiber class we do not know...
+        if ( virgin )
+        {
+            virgin = false;
+            std::cerr << "INCIDENT: skipping dynamic states for unknown fiber class\n";
+        }
+        in.readUInt32();
+        in.readUInt32();
+    }
+    else if ( tag == 'm' )
+    {
+        Chain::read(in, sim, tag);
+        update();
+    }
+#endif
+    else
+    {
+        Cytosim::log << "unknown Fiber TAG `" << (char)tag << "'" << std::endl;
     }
 }
+
 

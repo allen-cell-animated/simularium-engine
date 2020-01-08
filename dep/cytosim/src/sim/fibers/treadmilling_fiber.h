@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef TREADMILLING_FIBER_H
 #define TREADMILLING_FIBER_H
 
@@ -21,27 +20,25 @@ class TreadmillingFiberProp;
  @ingroup FiberGroup
  */
 class TreadmillingFiber : public Fiber
-{
-public:
-    
-    /// the Property of this object
-    TreadmillingFiberProp const* prop;
-   
+{   
 private:
     
     /// state of PLUS_END
-    int        stateP;
+    state_t    mStateP;
     
     /// assembly during last time-step
     real       mGrowthP;
     
     /// state of MINUS_END
-    int        stateM;
+    state_t    mStateM;
     
     /// assembly during last time-step
     real       mGrowthM;
     
 public:
+    
+    /// the Property of this object
+    TreadmillingFiberProp const* prop;
   
     /// constructor
     TreadmillingFiber(TreadmillingFiberProp const*);
@@ -51,39 +48,37 @@ public:
         
     //--------------------------------------------------------------------------
     
-    /// return assembly/disassembly state of the end \a which
-    int         dynamicState(FiberEnd which) const;
+    /// return assembly/disassembly state of MINUS_END
+    state_t     dynamicStateM() const;
     
-    /// set state of FiberEnd \a which to \a new_state
-    void        setDynamicState(FiberEnd which, int new_state);
+    /// change state of MINUS_END
+    void        setDynamicStateM(state_t s);
     
     /// the amount of freshly assembled polymer during the last time step
-    real        freshAssembly(FiberEnd which) const;
+    real        freshAssemblyM() const;
+
+    
+    /// return assembly/disassembly state of PLUS_END
+    state_t     dynamicStateP() const;
+
+    /// change state of PLUS_END
+    void        setDynamicStateP(state_t s);
+    
+    /// the amount of freshly assembled polymer during the last time step
+    real        freshAssemblyP() const;
     
     //--------------------------------------------------------------------------
-    
-    /// cut fiber at distance \a abs from MINUS_END
-    Fiber *     severM(real abs);
-    
-    /// join two fibers
-    void        join(Fiber * fib);
-    
-    /// simulate dynamic instability of PLUS_END
-    int         stepPlusEnd();
-    
-    /// simulate dynamic instability of MINUS_END
-    int         stepMinusEnd();
     
     /// monte-carlo step
     void        step();
     
     //--------------------------------------------------------------------------
     
-    /// write to OutputWrapper
-    void        write(OutputWrapper&) const;
+    /// write to Outputter
+    void        write(Outputter&) const;
 
-    /// read from InputWrapper
-    void        read(InputWrapper&, Simul&);
+    /// read from Inputter
+    void        read(Inputter&, Simul&, ObjectTag);
     
 };
 

@@ -3,47 +3,119 @@
 #ifndef  MESSAGES_H
 #define  MESSAGES_H
 
-#include <cstdarg>
+#include <iostream>
+#include <fstream>
 
 
 /// This facility provides some control over output
-/** F. Nedelec, 17.03.2018 */
+/** F. Nedelec, 16.03.2018 */
 namespace Cytosim
 {
-    
-    ///verbose level, PRINT has a option specifying a level which is compared to mVerbose
-    extern int mVerbose;
-    
-    /// suppress all output by setting Verbose to -1
-    inline void silent()          { mVerbose = -1; }
+    /// a class representing an output stream
+    class Output
+    {
+        /// prefix to all messages
+        std::string   pref_;
 
-    ///suppresses most output by setting Verbose to 0
-    inline void quiet()           { mVerbose = 0; }
-    
-    /// set verbose to level m
-    inline void setVerbose(int m) { mVerbose = m; }
+        /// pointer to the current destination of output
+        std::ostream* out_;
         
-    ///convenient access to print() with the () operator
-    void    MSG(const char* fmt, ...);
+        /// file stream, if open
+        std::ofstream ofs_;
+
+        /// alias to /dev/null
+        std::ofstream nul_;
+
+        /// remaining number of output that will be performed
+        unsigned cnt_;
+
+    public:
+        
+        /// create stream directed to given stream with `max_output` allowed
+        Output(std::ostream& os, unsigned n_out = 1<<16, std::string const& p = "") : pref_(p), out_(&os), cnt_(n_out)
+        {
+            nul_.open("/dev/null");
+        }
+        
+        /// redirect output to given file
+        void open(std::string const& filename)
+        {
+            ofs_.open(filename.c_str());
+            out_ = &ofs_;
+        }
+        
+        /// close file
+        void close()
+        {
+            if ( ofs_.is_open() )
+                ofs_.close();
+            out_ = &std::cout;
+        }
+        
+        /// return current output stream
+        std::ostream* stream() const
+        {
+            return out_;
+        }
+        
+        /// return current output
+        operator std::ostream&()
+        {
+            return *out_;
+        }
+        
+        /// flush
+        void flush()
+        {
+            if ( out_ != &nul_ )
+                out_->flush();
+        }
+
+        /// direct output to /dev/null
+        void silent()
+        {
+            out_ = &nul_;
+        }
+        
+        /// direct output to given stream
+        void redirect(Output const& x)
+        {
+            out_ = x.stream();
+        }
+        
+        /// std::ostream style output operator
+        template < typename T >
+        std::ostream& operator <<(T const& x)
+        {
+            if ( out_->good() && cnt_ )
+            {
+                --cnt_;
+                (*out_) << pref_ << x;
+                return *out_;
+            }
+            return nul_;
+        }
+        
+        /// printf() style formatting
+        void operator()(const char* fmt, ...);
+        
+    };
     
-    ///convenient access to print() with the () operator
-    void    MSG(int, const char* fmt, ...);
-    
-    ///warning() is equivalent to print() with "Warning:" in front
-    void    warning(const char* fmt, ...);
+    /// for usual output
+    extern Output out;
 
-    /// open file for output
-    void    open(char const* filename);
-    
-    /// close output file
-    void    close();
+    /// for logs
+    extern Output log;
 
-    /// flush file
-    void    flush();
-};
+    /// for warnings
+    extern Output warn;
+
+    /// suppress all output
+    void all_silent();
+}
 
 
-/// a macro to print a message only once
-#define MSG_ONCE(a) { static bool virgin=true; if (virgin) { virgin=false; Cytosim::MSG(a); } }
+/// a macro to print some text only once
+#define PRINT_ONCE(a) { static bool virgin=true; if (virgin) { virgin=false; Cytosim::out << a; } }
 
 #endif

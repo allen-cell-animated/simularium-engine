@@ -23,33 +23,53 @@ public:
      */
     
     
-    /// force at which speed becomes zero
+    /// force at which speed reaches zero (must be > 0)
+    /**
+     For kinesin, see for example:
+     http://dx.doi.org/10.1016/0092-8674(94)90060-4
+     http://www.ncbi.nlm.nih.gov/pmc/articles/PMC42784/
+     For dynein, see:
+     
+     For myosin, see:
+     http://dx.doi.org/10.1038/368113a0
+     */
     real    stall_force;
     
-    /// speed if force=0
-    real    max_speed;
     
-    /// if true, speed is limited to [0, 2*max_speed]
+    /// speed of the motor when its load is zero
     /**
-     With ( limit_speed = 1 ), a plus-end directed motor will not move towards the minus-end,
-     and also will not exceed 2x its max speed.
-     For a minus-end directed motor, the permitted range is [2*max_speed, 0],
-     thus also excluding backward steps.
+     A positive value specifies a plus-end directed motor.
+     A negative value specifies a minus-end directed motor.
+     */
+    real    unloaded_speed;
+    
+    
+    /// if true, the speed is limited to the range [0, 2*unloaded_speed]
+    /**
+     With ( limit_speed = 1 ), a plus-end directed motor will never move towards
+     the minus-end, and will not exceed 2x its unloaded speed.
+     For a minus-end directed motor, the permitted range is [2*unloaded_speed, 0],
+     thus also excluding backward steps and excessive speed.
      */
     bool    limit_speed;
     
-    /// density of detachment associated with active motion
+    
+    /// movement-induced probability of detaching
+    /**
+     This is a positive number specifying the probability of detaching
+     per unit-length of movement
+     */
     real    unbinding_density;
-    
-    /// @}
-    //------------------ derived variables below ----------------
-    
-    /// limits for a displacement in one time_step apply if ( limit_speed = true )
-    real    min_dabs, max_dabs;
 
+    /// @}
+    
 private:
     
-    real max_speed_dt, abs_speed_dt, var_speed_dt;
+    /// limits for a displacement in one time_step apply if ( limit_speed = true )
+    real    min_dab, max_dab;
+    
+    /// variables derived from `unloaded_speed`
+    real    set_speed_dt, abs_speed_dt, var_speed_dt;
 
 public:
         
@@ -60,7 +80,7 @@ public:
     ~MightyProp() { }
     
     /// return a Hand with this property
-    virtual Hand * newHand(HandMonitor* h) const;
+    virtual Hand * newHand(HandMonitor*) const;
 
     /// set default values
     void clear();
@@ -69,16 +89,16 @@ public:
     void read(Glossary&);
     
     /// compute values derived from the parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
-    /// perform more checks, knowing the elasticity
+    /// perform additional tests for the validity of parameters, given the elasticity
     void checkStiffness(real stiff, real len, real mul, real kT) const;
     
     /// return a carbon copy of object
     Property* clone() const { return new MightyProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

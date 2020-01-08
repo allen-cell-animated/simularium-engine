@@ -1,7 +1,7 @@
 % Two asters interacting with hetero-complexes
 % F. Nedelec, April 2010
 
-set simul aster_couple 
+set simul system
 {
     time_step = 0.005
     viscosity = 0.1
@@ -9,10 +9,13 @@ set simul aster_couple
 
 set space cell
 {
-    geometry = ( circle 7 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 7
+}
 
 set fiber microtubule
 {
@@ -28,7 +31,7 @@ set hand dynein
     unbinding_force = 3
     
     activity = move
-    max_speed = -1
+    unloaded_speed = -1
     stall_force = 6
 
     display = { size=8; color=0xFF00FFFF; }
@@ -42,7 +45,7 @@ set hand kinesin
     unbinding_force = 3
     
     activity = move
-    max_speed = 0.8
+    unloaded_speed = 0.8
     stall_force = 6
     display = { size=8; color=0x00FF00FF; }
 }
@@ -63,21 +66,20 @@ set solid core
 
 set aster centrosome
 {
-    solid = core
-    fibers = microtubule
     stiffness = 1000, 500
 }
 
-new 2 aster centrosome
+new 2 centrosome
 {
+    solid = core
     radius = 1
-    nb_fibers = 32
-    length = 7
+    point1 = center, 1
+    fibers = 32, microtubule, ( plus_end=grow; length = 7; )
 }
 
-new 5001 couple complex
+new 5001 complex
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 50

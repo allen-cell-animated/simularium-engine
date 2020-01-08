@@ -3,105 +3,117 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
-#include "assert_macro.h"
+#include <string>
 #include <iostream>
 #include "real.h"
+
+
+/// type of an index into a matrix (unsigned)
+typedef unsigned index_t;
+
 
 /// The interface for all the large matrices
 class Matrix
 {
 public:
     
-    /// type of an index into the matrix
-    typedef unsigned int index_type;
+protected:
+
+    /// size of matrix
+    index_t   size_;
     
 private:
     
-    ///\todo add Matrix copy constructor and copy assignment
-    
-    /// Disabled copy constructor
+    /// Disabled copy constructor (@todo: write copy constructor)
     Matrix(Matrix const&);
     
-    /// Disabled copy assignment
+    /// Disabled copy assignment (@todo: write copy assignement)
     Matrix& operator=(Matrix const&);
-    
+
 public:
     
-    /// empty constructor
-    Matrix() {}
+    /// constructor
+    Matrix() { size_ = 0; }
+
+    /// constructor
+    Matrix(index_t s) { size_ = s; }
     
-    /// empty destructor
-    virtual ~Matrix() {}
+    /// return the size of the matrix
+    index_t size() const { return size_; }
     
+    /// change the size of the matrix
+    void resize(index_t s) { allocate(s); size_=s; }
+
     //----------------------------------------------------------------------
     
-    
-    /// allocate the matrix to hold ( sz * sz ), all values are lost
-    virtual void   allocate( unsigned int sz ) = 0;
+    /// allocate the matrix to hold ( sz * sz ), all values may be lost
+    virtual void allocate(size_t alc) = 0;
         
     /// returns the address of element at (x, y), no allocation is done
-    virtual real*  addr( index_type x, index_type y ) const = 0;
+    virtual real*  addr(index_t x, index_t y) const = 0;
     
     /// returns the address of element at (x, y), allocating if necessary
-    virtual real&  operator()( index_type x, index_type y ) = 0;
+    virtual real&  operator()(index_t x, index_t y) = 0;
     
     /// returns the value of element at (x, y) or zero if not allocated
-    real value( index_type x, index_type y ) const;
+    real value(index_t x, index_t y) const;
     
     //----------------------------------------------------------------------
     
-    /// returns the size of the matrix
-    virtual unsigned int size() const = 0;
-    
     /// set all the elements to zero
-    virtual void makeZero() = 0;
+    virtual void reset() = 0;
     
     /// scale the matrix by a scalar factor
-    virtual void scale( real ) = 0;
+    virtual void scale(real) = 0;
     
-    /// copy the block ( x, y, x+sx, y+sy ) from this matrix into M
-    void copyBlock(real* M, index_type x, unsigned int sx, index_type y, unsigned int sy) const;
+    /// copy the block ( x, y, x+sx, y+sy ) into `mat`
+    void copyBlock(real* mat, unsigned ldd, index_t sx, unsigned nx, index_t sy, unsigned ny) const;
     
-    /// add the block ( x, x, x+sx, x+sx ) from this matrix to M
-    virtual void addDiagonalBlock(real* M, index_type x, unsigned int sx) const;
+    /// add the block ( x, x, x+sx, x+sx ) from this matrix to `mat`
+    virtual void addDiagonalBlock(real* mat, index_t ldd, index_t si, unsigned nb) const;
     
-    /// add the upper triangular half of the block ( x, x, x+sx, x+sx ) from this matrix to M
-    virtual void addTriangularBlock(real* M, index_type x, unsigned int sx) const;
+    /// add upper triangular half of ( idx, idx, idx+siz, idx+siz ) to `mat`
+    virtual void addTriangularBlock(real* mat, index_t ldd, index_t si, unsigned nb, unsigned dim) const;
     
     //----------------------------------------------------------------------
     
     /// Optional optimization to accelerate multiplications below
-    virtual void prepareForMultiply() {}
+    virtual void prepareForMultiply(int dim) {}
     
     /// Vector multiplication: Y <- Y + M * X, size(X) = size(Y) = size(M)
     virtual void vecMulAdd(const real* X, real* Y) const = 0;
+    
     /// Vector multiplication: Y <- M * X, size(X) = size(Y) = size(M)
     virtual void vecMul(const real* X, real* Y) const;
 
     /// isotropic vector multiplication: Y = Y + M * X, size(X) = size(Y) = 2 * size(M)
     virtual void vecMulAddIso2D(const real*, real*) const = 0;
+    
     /// isotropic vector multiplication: Y = Y + M * X, size(X) = size(Y) = 3 * size(M)
     virtual void vecMulAddIso3D(const real*, real*) const = 0;
     
     //----------------------------------------------------------------------
     
-    /// maximum absolute value considering all the elements
-    virtual real maxNorm() const;
+    /// maximum absolute value among all the elements
+    virtual real norm_inf() const;
     
     /// true if the matrix is non-zero
     virtual bool nonZero() const;
     
-    /// number of element which are non-zero
-    virtual unsigned int nbNonZeroElements() const;
+    /// number of element which are not null
+    virtual size_t nbElements(index_t start, index_t stop) const;
     
+    /// number of blocks which are not null
+    size_t nbElements() const { return nbElements(0, size_); }
+
     /// returns a string which a description of the type of matrix
     virtual std::string what() const = 0;
     
     /// printf debug function in sparse mode: i, j : value
-    virtual void printSparse(std::ostream &) const;
+    virtual void printSparse(std::ostream&) const;
     
     /// printf debug function in full lines, all columns
-    virtual void printFull(std::ostream &) const;
+    virtual void printFull(std::ostream&) const;
     
 };
 

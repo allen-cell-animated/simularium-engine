@@ -4,112 +4,127 @@
 #include "bead_prop.h"
 #include "iowrapper.h"
 #include "glossary.h"
-#include "single_prop.h"
 #include "wrist.h"
 #include "simul.h"
 
-//------------------------------------------------------------------------------
-void BeadSet::erase()
+
+Property* BeadSet::newProperty(const std::string& cat, const std::string& nom, Glossary&) const
 {
-    ObjectSet::erase();
+    if ( cat == "bead" )
+        return new BeadProp(cat, nom);
+    return nullptr;
 }
 
-//------------------------------------------------------------------------------
-Property* BeadSet::newProperty(const std::string& kd, const std::string& nm, Glossary&) const
-{
-    if ( kd == kind() )
-        return new BeadProp(nm);
-    return 0;
-}
 
-//------------------------------------------------------------------------------
-Object * BeadSet::newObjectT(const Tag tag, int idx)
+Object * BeadSet::newObject(const ObjectTag tag, unsigned num)
 {
-    assert_true( tag == Bead::TAG );
-    Property * p = simul.properties.find_or_die(kind(), idx);
-    return new Bead(static_cast<BeadProp*>(p), Vector(0,0,0), 0);
+    if ( tag == Bead::TAG )
+    {
+        BeadProp * p = simul.findProperty<BeadProp>("bead", num);
+        return new Bead(p, Vector(0,0,0), 0);
+    }
+    return nullptr;
 }
 
 /**
- @defgroup NewBead How to create a Bead
  @ingroup NewObject
 
- By definition, a Bead has one point, but you can vary the radius of the Bead:
+ By definition, a Bead has one point, and one can only set the radius of the Bead:
 
- @code
- new bead NAME
- {
-   radius = REAL
- }
- @endcode
+     new bead NAME
+     {
+       radius = REAL
+     }
 
- <h3> Singles can be attached at the center of the Bead </h3>
+ <h3> How to add Single </h3>
 
- @code
- new bead NAME
- {
-   radius = REAL
-   singles = SINGLE_SPEC [, SINGLE_SPEC] ...
- }
- @endcode
+ Singles can only be attached at the center of the Bead:
+
+     new bead NAME
+     {
+       radius = REAL
+       attach = SINGLE_SPEC [, SINGLE_SPEC] ...
+     }
  
- `SINGLE_SPEC` is an optional number (1 by default) followed by the name of the Single,
- for example `grafted` or `10 grafted`, if this is the name of a Single.
+ Where `SINGLE_SPEC` is string containing at most 3 words: `[INTEGER] NAME`,
+ where the `INTEGER` specifies the number of Singles, `NAME` specifies their name.
  
+ For example if `grafted` is the name of a Single, one can use:
+ 
+     new bead NAME
+     {
+       attach = 10 grafted
+     }
+
  */
 
-ObjectList BeadSet::newObjects(const std::string& kd, const std::string& nm, Glossary& opt)
+ObjectList BeadSet::newObjects(const std::string& name, Glossary& opt)
 {
     ObjectList res;
-    Object * obj = 0;
-    if ( kd == kind() )
+    // get sphere radius:
+    real rad = -1;
+    unsigned inx = 2;
+
+    std::string var = "point1";
+    if ( opt.has_key(var) )
     {
-        real rad = -1;
+        if ( opt.value(var, 0) != "center" )
+            throw InvalidParameter("the position of `point1` must be `center'");
+        opt.set(rad, var, 1);
+    }
+    else
+    {
+        inx = 0;
+        var = "attach";
         opt.set(rad, "radius");
         
-        if ( rad < 0 )
-            throw InvalidParameter("bead:radius must be specified and > 0");
-        
-        Property * p = simul.properties.find_or_die(kind(), nm);
-        obj = new Bead(static_cast<BeadProp*>(p), Vector(0,0,0), rad);
- 
-        res.push_back(obj);
-        Bead * bid = static_cast<Bead*>(obj);
-        
-        std::string sn;
-        unsigned inx = 0;
-
-        /// attach different kinds of SINGLE
-        while ( opt.set(sn, "attach", inx) || opt.set(sn, "single", inx) )
+        // possibly add some variability in the radius:
+        real dev = 0;
+        if ( opt.set(dev, "radius", 1) )
         {
-            unsigned cnt = 1;
-            Tokenizer::split_integer(sn, cnt);
-            Property * p = simul.properties.find_or_die("single", sn);
-            SingleProp * sp = static_cast<SingleProp*>(p);
-            for ( unsigned s = 0; s < cnt; ++s )
-                res.push_back(sp->newWrist(bid, 0));
-            ++inx;
+            real r;
+            do
+                r = rad + dev * RNG.gauss();
+            while ( r < REAL_EPSILON );
+            rad = r;
         }
     }
+    
+    if ( rad <= 0 )
+        throw InvalidParameter("bead:radius must be specified and > 0");
+
+    BeadProp * p = simul.findProperty<BeadProp>("bead", name);
+    Bead * obj = new Bead(p, Vector(0,0,0), rad);
+    
+    res.push_back(obj);
+    
+    std::string str;
+    // attach different kinds of SINGLE
+    while ( opt.set(str, var, inx++) )
+        res.append(simul.singles.makeWrists(obj, 0, 1, str));
+
     return res;
 }
 
-//------------------------------------------------------------------------------
-void BeadSet::add(Object * obj)
+
+void BeadSet::write(Outputter& out) const
 {
-    assert_true(obj->tag() == Bead::TAG);
-    ObjectSet::add(obj);
+    if ( size() > 0 )
+    {
+        out.put_line("\n#section "+title(), out.binary());
+        writeNodes(out, nodes);
+    }
 }
+
 
 void BeadSet::remove(Object * obj)
 {
     ObjectSet::remove(obj);
     simul.singles.removeWrists(obj);
-    assert_true(obj->tag() == Bead::TAG);
 }
 
-//------------------------------------------------------------------------------
-void BeadSet::foldPosition(const Modulo * s) const
+
+void BeadSet::foldPosition(Modulo const* s) const
 {
     for ( Bead * o=first(); o; o=o->next() )
         o->foldPosition(s);

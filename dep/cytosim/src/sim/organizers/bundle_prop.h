@@ -5,10 +5,10 @@
 
 #include "real.h"
 #include "property.h"
-#include "fiber_naked.h"
+#include "common.h"
 
-class FiberProp;
-class Glossary;
+class FiberSet;
+
 
 /// Property for Bundle
 /**
@@ -25,14 +25,7 @@ public:
      @ingroup Parameters
      @{
      */
-    
-    
-    /// name of Fiber in the Bundle
-    std::string   fibers;
-    
-    /// number of fibers in the Bundle
-    unsigned int  nb_fibers;
-
+ 
     /// stiffness of the links that connect the overlapping fibers
     real          stiffness;
     
@@ -42,16 +35,19 @@ public:
     /// designates which end of the fiber is towards the center
     FiberEnd      focus;
     
-    /// if true, any missing fiber is replaced by a new one
-    bool          nucleate;
+    /// rate for creating fiber in empty slots
+    real          fiber_rate;
     
+    /// name of Fiber in the Bundle
+    std::string   fiber_type;
+    
+    /// name of Fiber in the Bundle
+    std::string   fiber_spec;
+
     /// @}
-    //------------------ derived variables below ----------------
     
-private:
-    
-    FiberProp *   fiber_prop;
-    
+    /// probability of nucleation
+    real          fiber_prob;
 
 public:
  
@@ -62,7 +58,7 @@ public:
     ~BundleProp() { }
     
     /// identifies the property
-    std::string kind() const { return "bundle"; }
+    std::string category() const { return "bundle"; }
     
     /// set default values
     void clear();
@@ -71,14 +67,14 @@ public:
     void read(Glossary&);
     
     /// check and derive parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     
     /// return a carbon copy of object
     Property* clone() const { return new BundleProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

@@ -6,7 +6,6 @@
 #include "real.h"
 #include "property.h"
 class AsterProp;
-class Glossary;
 
 /// Property for a Fake
 /**
@@ -24,19 +23,10 @@ public:
      @{
      */
     
-    
-    /// name of the two asters composing the fake
-    std::string   asters;
-    
     /// stiffness of assembly links
     real          stiffness;
     
     /// @}
-    //------------------ derived variables below ----------------
-    
-private:
-    
-    AsterProp *   aster_prop;
 
 public:
  
@@ -47,7 +37,7 @@ public:
     ~FakeProp() { }
     
     /// identifies the property
-    std::string kind() const { return "fake"; }
+    std::string category() const { return "fake"; }
     
     /// set default values
     void clear();
@@ -56,14 +46,13 @@ public:
     void read(Glossary&);
     
     /// check and derive parameters
-    void complete(SimulProp const*, PropertyList*);
-    
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new FakeProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

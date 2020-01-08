@@ -1,19 +1,21 @@
 % Fiber under compression to measure buckling force
-% F. Nedelec, 23.05.2017
+% F. Nedelec, 23.05.2017, 21.02.2018
 
-set simul buckling 
+set simul system
 {
     time_step = 0.001
     viscosity = 0.01
-    precondition = 1
 }
 
 set space cell
 {
-    geometry = ( sphere 5 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 5
+}
 
 set fiber filament
 {
@@ -22,42 +24,45 @@ set fiber filament
     display = ( point=6,1; line=10,2; )
 }
 
-new 1 fiber filament
-{
-    length = 10
-    position = 0 0 0
-    orientation = 1 0 0
-}
-
-set hand holder
+set hand binder
 {
     binding = 10, 0.05
     unbinding = 0, inf
+    bind_also_end = 1
  
     display = ( width=3; size=12; color=green )
 }
 
 set single link
 {
-    hand = holder
+    hand = binder
     activity = fixed
     stiffness = 1000
 }
 
-new single link
+new filament
 {
-    position = -4.8 0 0 
-    attach = 0, 0
-}
-new single link
-{
-    position = +4.8 0 0 
-    attach = 0, 10
+    length = 10
+    position = 0 0 0
+    orientation = 1 0 0
 }
 
-run 5000 simul *
+new link
+{
+    position = -4.5 0 0 
+    attach = fiber1, 0
+}
+
+new link
+{
+    position = +4.5 0 0 
+    attach = fiber1, 10
+}
+
+run 10000 system
 {
     nb_frames = 10
 }
 
-report single:force *
+report single:force force.txt { verbose=0; }
+report fiber:tension tension.txt { verbose=0; plane = 1 0 0, 0; }

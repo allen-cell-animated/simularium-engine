@@ -4,151 +4,186 @@
 #include "iowrapper.h"
 #include "exceptions.h"
 #include "property.h"
+#include "object_set.h"
 #include "sim.h"
 
 
-//------------------------------------------------------------------------------
-/**
- The ASCII reference has the format XP:N or XP:N:M, where:
- - X=tag is one ascii character.
- - P=pi is the index of the property (P>=0).
- - N=nb is a serial-number (N>0).
- - M=mk is an integer (the mark is added only if it is non-zero)
- .
- 
- For example 'f0:21' is the fiber of property 0, number 21
-*/ 
-std::string Object::strReference(char tag, int pi, Number nb, int mk)
+Simul& Object::simul() const
 {
-    assert_true( pi >= 0 );
+    return set_->simul;
+}
+
+
+Object::~Object()
+{
+    //std::clog << "~Object " << this << '\n';
+
+    if ( set_ )
+    {
+        //std::clog << "unlinking deleted Object " << this << '\n';
+        set_->remove(this);
+    }
+}
+
+//------------------------------------------------------------------------------
+#pragma mark -
+
+
+/**
+ This is an accessory function used in ObjectSet::collect()
+ */
+bool match_all(Object const*, void const*)
+{
+    return true;
+}
+
+/**
+ This is an accessory function used in ObjectSet::collect()
+ */
+bool match_mark(Object const* obj, void const* mrk)
+{
+    return ( obj->mark() == *((ObjectMark*)mrk) );
+}
+
+/**
+ This is an accessory function used in ObjectSet::collect()
+ */
+bool match_property(Object const* obj, void const* prop)
+{
+    return ( obj->property() == prop );
+}
+
+
+//------------------------------------------------------------------------------
+#pragma mark -
+
+/**
+ The ASCII reference has the format `XP:N` where:
+ - X is one ascii character, indicating the category (tag),
+ - P > 0 is the index of the property, indicating the type of object,
+ - N > 0 is the ID of the object within its category.
+ .
+
+ For example 'f0:021' is the fiber number 21 of class 0 (ie. property index = 0),
+ For example 'f1:010' is the fiber number 10 of class 1 (ie. property index = 1)
+*/
+std::string Object::reference(ObjectTag tag, unsigned pix, ObjectID id)
+{
+    assert_true( pix >= 0 );
     char tmp[32];
-    if ( mk == 0 )
-        snprintf(tmp, sizeof(tmp), "%c%i:%lu", tag, pi, nb);
-    else
-        snprintf(tmp, sizeof(tmp), "%c%i:%lu:%i", tag, pi, nb, mk);
+    snprintf(tmp, sizeof(tmp), "%c%u:%04u", tag, pix, id);
     return std::string(tmp);
 }
 
 
-//------------------------------------------------------------------------------
 /**
- The ASCII reference has the format XP:N or XP:N:M, where:
- - X=tag() is one ascii character.
- - P=property->index() is the index of the property (P>=0).
- - N=number() is a serial-number (N>0).
- - M=mark() is an integer (the mark is added only if it is not zero)
+ The ASCII reference has the format `XP:N` where:
+ - X is one ascii character, indicating the category (ObjectSet::tag()),
+ - P > 0 is the index of the property, indicating the type of object,
+ - N > 0 is the ID of the object within its category.
  .
  
  For example 'f0:21' is the fiber of property 0, number 21
- */ 
+ For example 'f1:10:1' is the fiber of property 1, number 10, and it is marked as '1'
+ */
 std::string Object::reference() const
 {
-    return strReference(tag(), property()->index(), number(), mark());
+    if ( property() )
+        return reference(tag(), property()->number(), identity());
+    else
+        return reference(tag(), 0, identity());
 }
 
-//------------------------------------------------------------------------------
+
 /**
  Two binary formats are used:
- - A short format:
+ - A slim format:
+     - 1 byte for the tag()
+     - 2 bytes for the identity
+     .
+ - A fat format:
+     - 1 byte containing tag() + 128
+     - 4 bytes for the identity
+     .
+ .
+ The ascii based format always the same.
+ All formats are read by Simul::readReference()
+ */
+void Object::writeReference(Outputter& out, ObjectTag g) const
+{
+    assert_true( property() );
+    assert_true( property()->number() > 0 );
+    assert_true( identity() > 0 );
+
+    if ( identity() > 65535 )
+    {
+        // long format (5 bytes)
+        // set the highest bit of the byte, which is not used by ASCII codes
+        out.writeChar(g, 128);
+        out.writeUInt32(identity(), 0);
+    }
+    else
+    {
+        // short format (3 bytes)
+        out.put_char(g);
+        out.writeUInt16(identity(), 0);
+    }
+}
+
+
+void Object::writeNullReference(Outputter& out)
+{
+    out.put_char(TAG);
+}
+
+
+/**
+Writes the info that is common to all objects to file
+ Two binary formats are used:
+ - A slim format:
      - 1 byte for the tag()
      - 1 byte for the index of the property
-     - 2 bytes for the Number
+     - 2 bytes for the identity
      .
- - A long format:
-     - the character '$'
+ - A fat format:
+     - the character '$' in binary mode
      - 1 byte for the tag()
      - 2 bytes for the index of the property
-     - 4 bytes for the Number
+     - 4 bytes for the identity
      - 4 bytes for the mark
      .
  .
- There is only one ascii based format, as returned by reference().
- All formats are read by ObjectSet::readReference()
+ The ascii based format is always the same.
+ This header is read by ObjectSet::readObject()
  */
-void Object::writeReference(OutputWrapper & out) const
+void Object::writeHeader(Outputter& out, ObjectTag g) const
 {
-    writeReference(out, tag());
-}
-
-/**
- Same as writeReference(OutputWrapper&), excepts that tag() is replaced by 'g' given as argument.
- */
-void Object::writeReference(OutputWrapper & out, Tag g) const
-{
-    assert_true( number() > 0 );
-    assert_true( property() );
-    assert_true( property()->index() >= 0 );
-    
-    if ( number() <= 65535  &&  property()->index() <= 255  &&  mark() == 0 )
+    if ( ! out.binary() )
+        out.put_char('\n');
+    if ( identity() > 65535 || property()->number() > 255 || mark() )
     {
-        // short format
-        out.write(g);
-        out.writeUInt8(property()->index(), 0);
-        out.writeUInt16(number(), ':');
+        // set the highest bit of the byte, which is not used by ASCII codes
+        out.writeChar(g, 128);
+        out.writeUInt16(property()->number(), 0);
+        out.writeUInt32(identity(), ':');
+        out.writeUInt32(mark(), ':');
     }
     else
     {
-        // long format with a pretag = '$'
-        out.write('$');
-        out.write(g);
-        out.writeUInt16(property()->index(), 0);
-        out.writeUInt32(number(), ':');
-        out.writeInt32(mark(), ':');
+        out.put_char(g);
+        out.writeUInt8(property()->number(), 0);
+        out.writeUInt16(identity(), ':');
     }
 }
 
-//------------------------------------------------------------------------------
-void Object::writeNullReference(OutputWrapper & out)
+
+/// print a list of objects
+std::ostream& operator << (std::ostream& os, ObjectList const& list)
 {
-    out.write(TAG);
+    os << "ObjectList " << &list << " of size " << list.size() << "\n{\n";
+    for ( Object * obj : list )
+        os << "   " << obj->property()->name() << " " << obj->reference() << '\n';
+    os << "}" << '\n';
+    return os;
 }
-
-/**
- This must be able to read the formats written by Object::writeReference()
- */
-void Object::readReference(InputWrapper& in, int& pi, Number& nb, int& mk, const char pretag)
-{
-    pi = 0; 
-    nb = 0;
-    mk = 0;
-
-    if ( pretag == '$' )
-    {
-        // long format
-        pi = in.readUInt16();
-        if ( ! in.binary() )
-        {
-            if ( in.getUL() != ':' )
-                throw InvalidSyntax("missing ':'");
-        }
-        nb = in.readUInt32();
-#ifdef BACKWARD_COMPATIBILITY
-        if ( in.formatID() < 34 )
-            return;
-#endif
-        if ( ! in.binary() )
-        {
-            if ( in.getUL() != ':' )
-                throw InvalidSyntax("missing ':'");
-        }
-#ifdef BACKWARD_COMPATIBILITY
-        if ( in.formatID() < 39 )
-            mk = in.readUInt16();
-        else
-#endif
-        mk = in.readInt32();
-    }
-    else
-    {
-        // short format
-        pi = in.readUInt8();
-        if ( ! in.binary() )
-        {
-            if ( in.getUL() != ':' )
-                throw InvalidSyntax("missing ':'");
-        }
-        nb = in.readUInt16();
-    }
-}
-
 

@@ -7,7 +7,7 @@
  F. Nedelec, February 2011
 */
 
-set simul fiber_glue
+set simul system
 {
     time_step = 0.01
     viscosity = 0.1
@@ -16,10 +16,13 @@ set simul fiber_glue
 
 set space cell
 {
-    geometry = ( sphere 5 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 5
+}
 
 set hand strong_hand
 {
@@ -42,18 +45,19 @@ set fiber microtubule
     rigidity = 30
     segmentation = 0.5
     confine = inside, 100
-    glue = 3, cortical_glue
+    glue = 2, cortical_glue
 
-    activity         = classic
-    growing_speed    = 0.2
-    shrinking_speed  = -0.8
-    catastrophe_rate = 0.02
-    rescue_rate      = 0
-    fate             = rescue
-    growing_force    = 1.7
-    min_length       = 0.5
+    activity        = dynamic
+    unit_length     = 0.008
+    growing_speed   = 0.16
+    shrinking_speed = -0.25
+    hydrolysis_rate = 0.06
+    growing_force   = 1.7
+    persistent      = 1
+    rebirth_rate    = 1
+    min_length      = 0.5
     
-    display = { line=8, 2; point=1; speckles=2, 0.25; rainbow=-0.1 }
+    display = { line=8, 2; point=1; speckles=7, 2, 0.25; tension=-10 }
 }
 
 set solid core
@@ -63,22 +67,19 @@ set solid core
 
 set aster centrosome
 {
-    solid = core
-    fibers = microtubule
     stiffness = 1000, 500
 }
 
-new 1 aster centrosome
+new centrosome
 {
+    solid = core
     radius = 0.5
-    nb_fibers = 20
-    fiber_length = 2
+    fibers = 20, microtubule, ( length = 2; plus_end = grow; )
     position = 0 0 0
 }
 
 
-run simul *
+run 100000 system
 {
-    nb_steps = 10000
-    nb_frames = 50
+    nb_frames = 100
 }

@@ -3,7 +3,7 @@
 % F. Nedelec, 23 Jan 2010
 
 
-set simul steric_fiber2 
+set simul system
 {
     steric = 1, 500
     precondition = 0
@@ -15,12 +15,15 @@ set simul steric_fiber2
 
 set space cell
 {
-    geometry = ( sphere 3 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 3
+}
 
-set fiber tube
+set fiber filament
 {
     rigidity = 1
     confine = inside, 100
@@ -39,15 +42,15 @@ set fiber tube
 }
 
 
-new 5 fiber tube
+new 5 filament
 {
     length = 0.05
+    plus_end = grow
 }
 
-run simul *
+run 40000 system
 {
-    nb_steps  = 40000
     nb_frames = 100
-    event = 0.5, ( new fiber tube { length=0.012 } )
+    event = 0.5, ( new filament { length=0.012; plus_end=grow; } )
 }
 

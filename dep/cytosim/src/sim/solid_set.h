@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SOLID_SET_H
 #define SOLID_SET_H
 
@@ -16,25 +15,27 @@ public:
     /// creator
     SolidSet(Simul& s) : ObjectSet(s) {}
     
-    /// destructor
-    virtual ~SolidSet() {}
-    
     //--------------------------
     
     /// identifies the class
-    std::string kind() const { return "solid"; }
-
-    /// create a new property for class \a kind with given name
-    Property*   newProperty(const std::string& kind, const std::string& name, Glossary&) const;
+    static std::string title() { return "solid"; }
+    
+    /// create a new property of category `cat` for a class `name`
+    Property *  newProperty(const std::string& cat, const std::string& name, Glossary&) const;
+    
+    /// create objects of class `name`, given the options provided in `opt`
+    ObjectList  newObjects(const std::string& name, Glossary& opt);
+    
+    /// create a new object (used for reading trajectory file)
+    Object *    newObject(ObjectTag, unsigned);
+    
+    /// write all Objects to file
+    void        write(Outputter& out) const;
+        
+    /// print a summary of the content (nb of objects, class)
+    void        report(std::ostream& out) const { writeAssets(out, title()); }
 
     //--------------------------
-  
-    /// create a new object directly from a glossary
-    ObjectList  newObjects(const std::string& kind, const std::string& prop, Glossary&);
-
-    /// construct object
-    Object *    newObjectT(const Tag tag, int prop_index);
-    
     
     /// register a Solid into the list
     void        add(Object *);
@@ -42,26 +43,41 @@ public:
     /// remove from the list
     void        remove(Object *);
     
-    /// erase all Object and all Property
-    void        erase();
-    
     /// first Solid
     Solid *     first() const
     {
-        return static_cast<Solid*>(nodes.first());
+        return static_cast<Solid*>(nodes.front());
     }
-        
-    /// return pointer to the Object of given Number, or zero if not found
-    Solid *     find(Number n) const
+    
+    /// last Solid
+    Solid *     last() const
+    {
+        return static_cast<Solid*>(nodes.back());
+    }
+    
+    /// first Solid in inventory
+    Solid *     firstID() const
+    {
+        return static_cast<Solid*>(inventory.first());
+    }
+
+    /// next Solid in inventory
+    Solid *     nextID(Solid const* obj) const
+    {
+        return static_cast<Solid*>(inventory.next(obj));
+    }
+
+    /// return pointer to the Object of given ID, or zero if not found
+    Solid *     findID(ObjectID n) const
     {
         return static_cast<Solid*>(inventory.get(n));
     }
     
     /// modulo the position (periodic boundary conditions)
-    void        foldPosition(const Modulo *) const;
+    void        foldPosition(Modulo const*) const;
     
     /// Monte-Carlo simulation step for every Object
-    void        step();
+    void        step() {}
 };
 
 

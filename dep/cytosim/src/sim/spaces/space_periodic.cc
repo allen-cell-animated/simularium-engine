@@ -1,151 +1,143 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
 #include "space_periodic.h"
 #include "exceptions.h"
+#include "iowrapper.h"
+#include "glossary.h"
 
 
-
-SpacePeriodic::SpacePeriodic(const SpaceProp* p)
+SpacePeriodic::SpacePeriodic(SpaceProp const* p)
 : Space(p)
 {
-    assert_true(p->shape=="periodic");
+    for ( int d = 0; d < 3; ++d )
+        length_[d] = 0;
 }
 
-void SpacePeriodic::resize()
+
+void SpacePeriodic::resize(Glossary& opt)
 {
-    checkLengths(DIM, true);
-    
     for ( int d = 0; d < DIM; ++d )
     {
-        if ( length(d) <= 0 )
-            throw InvalidParameter("periodic:dimension must be > 0");
+        real len = length_[d];
+        if ( opt.set(len, "length", d) )
+            len *= 0.5;
+        if ( len <= 0 )
+            throw InvalidParameter("periodic:length[] must be > 0");
+        length_[d] = len;
     }
 }
 
 
-Vector SpacePeriodic::extension() const
+Modulo * SpacePeriodic::makeModulo() const
 {
-    return Vector(length(0), length(1), length(2));
+    Modulo * mod = new Modulo();
+    for ( int d = 0; d < DIM; ++d )
+        mod->enable(d, length_[d]);
+    return mod;
 }
 
+
+void SpacePeriodic::boundaries(Vector& inf, Vector& sup) const
+{
+    inf.set(-length_[0],-length_[1],-length_[2]);
+    sup.set( length_[0], length_[1], length_[2]);
+}
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-#if (DIM == 1)
+#if ( DIM == 1 )
 
 real SpacePeriodic::volume() const
 {
-    return length2(0);
+    return 2.0 * length_[0];
 }
 
-bool  SpacePeriodic::inside( const real point[] ) const
+bool  SpacePeriodic::inside(Vector const& point) const
 {
     return true;
 }
 
 
-void SpacePeriodic::project( const real point[], real proj[] ) const
+Vector SpacePeriodic::project(Vector const&) const
+{
+    throw InvalidParameter("A periodic space has no edge!");
+    return Vector(0, 0, 0);
+}
+
+#endif
+
+
+//------------------------------------------------------------------------------
+
+#if ( DIM == 2 )
+
+real SpacePeriodic::volume() const
+{
+    return 4.0 * length_[0] * length_[1];
+}
+
+bool  SpacePeriodic::inside(Vector const& point) const
+{
+    return true;
+}
+
+
+Vector SpacePeriodic::project(Vector const&) const
 {
     throw InvalidParameter("A periodic space has no edge!");
 }
 
 #endif
 
-
 //------------------------------------------------------------------------------
 
-#if (DIM == 2)
+#if ( DIM >= 3 )
 
 real SpacePeriodic::volume() const
 {
-    return length2(0) * length2(1);
+    return 8.0 * length_[0] * length_[1] * length_[2];
 }
 
-bool  SpacePeriodic::inside( const real point[] ) const
+bool  SpacePeriodic::inside(Vector const& point) const
 {
     return true;
 }
 
-
-void SpacePeriodic::project( const real point[], real proj[] ) const
+Vector SpacePeriodic::project(Vector const&) const
 {
     throw InvalidParameter("A periodic space has no edge!");
+    return Vector(0, 0, 0);
 }
 
 #endif
 
 //------------------------------------------------------------------------------
 
-#if (DIM == 3)
-
-real SpacePeriodic::volume() const
+void SpacePeriodic::write(Outputter& out) const
 {
-    return length2(0) * length2(1) * length2(2);
-}
-
-bool  SpacePeriodic::inside( const real point[] ) const
-{
-    return true;
-}
-
-void SpacePeriodic::project( const real point[], real proj[] ) const
-{
-    throw InvalidParameter("A periodic space has no edge!");
-}
-
-#endif
-
-
-//------------------------------------------------------------------------------
-#pragma mark -
-
-Vector SpacePeriodic::period(int d)   const
-{
-    Vector off(0, 0, 0);
-    if ( d < DIM )
-        off[d] = length2(d);
-    return off;
+    out.put_characters("periodic", 16);
+    out.writeUInt16(4);
+    out.writeFloat(length_[0]);
+    out.writeFloat(length_[1]);
+    out.writeFloat(length_[2]);
+    out.writeFloat(0.f);
 }
 
 
-//------------------------------------------------------------------------------
-void  SpacePeriodic::fold( real point[] ) const
+void SpacePeriodic::setLengths(const real len[])
 {
-    //periodic in all dimensions
-    point[0] = remainder( point[0], length2(0) );
-#if ( DIM > 1 )
-    point[1] = remainder( point[1], length2(1) );
-#endif
-#if ( DIM > 2 )
-    point[2] = remainder( point[2], length2(2) );
-#endif
+    length_[0] = len[0];
+    length_[1] = len[1];
+    length_[2] = len[2];
 }
 
 
-//------------------------------------------------------------------------------
-void SpacePeriodic::fold( real x[], const real o[] ) const
+void SpacePeriodic::read(Inputter& in, Simul&, ObjectTag)
 {
-    for ( int dd = 0; dd < DIM; ++dd )
-        x[dd] -= o[dd];
-    
-    fold(x);
-    
-    for ( int dd = 0; dd < DIM; ++dd )
-        x[dd] += o[dd];
-}
-
-//------------------------------------------------------------------------------
-void SpacePeriodic::foldOffset( real x[], real div[] ) const
-{
-    for ( int dd = 0; dd < DIM; ++dd )
-        div[dd] = x[dd];
-    
-    fold(x);
-    
-    for ( int dd = 0; dd < DIM; ++dd )
-        div[dd] -= x[dd];
+    real len[8] = { 0 };
+    read_data(in, len, "periodic");
+    setLengths(len);
 }
 
 //------------------------------------------------------------------------------
@@ -158,13 +150,13 @@ void SpacePeriodic::foldOffset( real x[], real div[] ) const
 #include "gle.h"
 using namespace gle;
 
-bool SpacePeriodic::display() const
+bool SpacePeriodic::draw() const
 {
-    const real X = length(0);
-    const real Y = ( DIM > 1 ) ? length(1) : 1;
-    const real Z = ( DIM > 2 ) ? length(2) : 0;
+    const real X = length_[0];
+    const real Y = ( DIM > 1 ) ? length_[1] : 10;
+    const real Z = ( DIM > 2 ) ? length_[2] : 0;
     
-    glLineStipple(1, 0x0303);
+    glLineStipple(1, 0x000F);
     glEnable(GL_LINE_STIPPLE);
 
 #if ( DIM == 1 )
@@ -173,17 +165,18 @@ bool SpacePeriodic::display() const
     gleVertex(  X,  Y, 0 );
     gleVertex( -X,  Y, 0 );
     gleVertex( -X, -Y, 0 );
-    glEnd();    
-    return true;
+    glEnd();
 #endif
     
+#if ( DIM > 1 )
     glBegin(GL_LINE_LOOP);
     gleVertex(  X,  Y, Z );
     gleVertex(  X, -Y, Z );
     gleVertex( -X, -Y, Z );
     gleVertex( -X,  Y, Z );
     glEnd();
-    
+#endif
+
 #if ( DIM > 2 )
     glBegin(GL_LINE_LOOP);
     gleVertex(  X,  Y, -Z );
@@ -199,7 +192,7 @@ bool SpacePeriodic::display() const
 
 #else
 
-bool SpacePeriodic::display() const
+bool SpacePeriodic::draw() const
 {
     return false;
 }

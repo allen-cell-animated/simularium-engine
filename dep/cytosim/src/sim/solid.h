@@ -1,20 +1,19 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SOLID_H
 #define SOLID_H
 
 #include "dim.h"
 #include "array.h"
 #include "object.h"
-#include "point_set.h"
+#include "mecable.h"
+#include "matrix33.h"
 #include "solid_prop.h"
 
 class Meca;
-class Glossary;
 
-/// Undeformable cloud of points
+/// Undeformable set of points
 /**
- This is a PointSet behaving like a undeformable cloud of points.
+ This is a Mecable behaving like a undeformable cloud of points.
  Each point can have its own radius and together they define the viscous drag
  of the Solid in the medium.
  
@@ -46,15 +45,15 @@ class Glossary;
  Solid is an extension of Bead. 
  A Solid with only one point is equivalent to a Bead, but slower to simulate.
 */
-class Solid : public PointSet
+class Solid : public Mecable
 {
-public:
-    
-    /// Property
-    SolidProp const* prop;
-
 private:
     
+#if ( DIM > 2 )
+    /// matrix containing the reduced momentum of inertia for 3D
+    Matrix33       soMomentum;
+#endif
+
     /// the mean of the the points weighted by their drag coefficients
     Vector         soCenter;
     
@@ -70,43 +69,52 @@ private:
     /// a counter used in reshape()
     unsigned int   soReshapeTimer;
     
-    /// the total drag coefficient for translation
+    /// the reduced total (all points summed) drag coefficient for translation
     real           soDrag;
     
-    /// the total drag coefficient for rotation
+    /// the reduced total drag coefficient for rotation
     real           soDragRot;
-    
-    /// matrix containing the momentum of inertia
-    real           soMom[DIM*DIM], soMom2D;
-    
+
     /// second momentum of the reference shape
     real           soShapeSqr;
     
+    /// reset private variables
+    void           reset();
+    
 public:
     
-    /// allocate memory to hold 'size' points
-    virtual unsigned int allocatePoints(unsigned int size);
+    /// Property
+    SolidProp const* prop;
     
-    /// free all memory allocated by allocatePoints()
-    void        deallocatePoints();
+    /// allocate memory
+    size_t      allocateMecable(size_t);
     
-    /// initialize points
+    /// free allocated memory
+    void        release();
+
+    /// initialize according to options given in Glossary
     ObjectList  build(Glossary&, Simul&);
     
-    /// create following the specifications in the SolidProp
+    /// constructor
     Solid(SolidProp const*);
+    
+    /// Copy constructor
+    Solid(const Solid&);
+    
+    /// Assignement operator
+    Solid& operator =(const Solid&);
 
     /// destructor
     virtual    ~Solid();
     
-    //--------------------------------------------------------------------------
+    //------------------------------- Mecable ----------------------------------
     
     /// sets the mobility
     void        setDragCoefficient();
 
-    /// the total drag-coefficient of object (force = drag * speed)
-    real        dragCoefficient()  const  { return soDrag; }
-    
+    /// total translation drag-coefficient (force = drag * speed)
+    real        dragCoefficient() const;
+
     /// prepare for Meca
     void        prepareMecable();
 
@@ -114,22 +122,21 @@ public:
     void        makeProjection();
     
     /// calculates the speed of points in Y, for the forces given in X
-    void        setSpeedsFromForces(const real* X, real* Y, real, bool) const;
+    void        projectForces(const real* X, real* Y) const;
     
     /// add contribution of Brownian forces
-    real        addBrownianForces(real* rhs, real sc) const;
+    real        addBrownianForces(real const* rnd, real sc, real* rhs) const;
     
     /// monte-carlo step
     void        step();
     
-    //--------------------------------------------------------------------------
+    //------------------------------- Shaping ----------------------------------
 
     /// set the reference shape as a copy of the current one
     void        fixShape();
     
     /// scale the reference shape
-    void        scaleShape(real, real, real);
-    
+    void        scaleShape(const real[DIM]);
     
     /// scale current shape to match the reference set in fixShape()
     void        rescale();
@@ -137,54 +144,76 @@ public:
     /// restore the reference shape in the place and orientation of the current one
     void        reshape();
     
-    /// set position
-    void        getPoints(const real * x);
+    /// change coordinate values
+    void        getPoints(real const*);
+
+    /// add a new point with a sphere (extends Mecable::addPoint)
+    unsigned    addSphere(Vector const&, real radius);
+    
+    /// change radius of the sphere around point `i`
+    void        radius(unsigned i, real radius);
+
+    /// add DIM points separated by `len`, to make a coordinate system around the last point
+    unsigned    addTriad(real len);
 
     //--------------------------------------------------------------------------
 
     /// add the interactions due to confinement
     void        setInteractions(Meca &) const;
     
-    /// the radius of the sphere attached at point pp
-    real        radius(const unsigned int pp) const { return soRadius[pp]; }
+    /// radius of the sphere around point `i`
+    real        radius(const unsigned i) const { return soRadius[i]; }
     
-    /// set the radius of the sphere which is attached at point index pos
-    void        radius(unsigned int pp, real radius);
-    
-    /// the sum of the radiuses of all spheres
-    real        sumRadius();
-        
     /// mean of all spheres weighted with their drag coefficients (or equivalently radius)
-    Vector      centroid();
-        
-    /// add a new point with a sphere
-    unsigned    addSphere(Vector const& w, real radius);
+    Vector      centroid() const;
     
-    //---------------------------- next / prev ---------------------------------
+    /// Position of center of gravity
+    Vector      position() const { return centroid(); }
+
+#if NEW_SOLID_CLAMP
+    Vector      clampForce() const { return prop->clamp_stiff * ( prop->clamp_pos - posPoint(0) ); }
+#endif
     
+    //--------------------------------------------------------------------------
+
     /// a static_cast<> of Node::next()
     Solid *     next()  const { return static_cast<Solid*>(nNext); }
     
     /// a static_cast<> of Node::prev()
     Solid *     prev()  const { return static_cast<Solid*>(nPrev); }
     
-    //------------------------------ read/write --------------------------------
+    //--------------------------------------------------------------------------
 
     /// a unique character identifying the class
-    static const Tag TAG = 'd';
+    static const ObjectTag TAG = 'd';
     
     /// return unique character identifying the class
-    Tag         tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
+    /// return associated Property
+    Property const* property() const { return prop; }
     
-    ///read from file
-    void        read(InputWrapper&, Simul&);
-    
-    ///write to file
-    void        write(OutputWrapper&) const;
+    /// convert pointer to Solid* if the conversion seems valid; returns 0 otherwise
+    static Solid* toSolid(Object * obj)
+    {
+        if ( obj  &&  obj->tag() == TAG )
+            return static_cast<Solid*>(obj);
+        return nullptr;
+    }
 
+    //--------------------------------------------------------------------------
+
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+    
+    /// write to file
+    void        write(Outputter&) const;
+
+    /// Human friendly ouput
+    void        print(std::ostream&, bool write_shape = false) const;
 };
+
+/// output operator:
+std::ostream& operator << (std::ostream& os, Solid const&);
 
 #endif

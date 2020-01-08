@@ -8,7 +8,6 @@
 #include "assert_macro.h"
 #include <string>
 #include <sstream>
-#include <cstdarg>
 
 
 /// This is used to align text in the error messages
@@ -16,49 +15,65 @@ extern const char PREF[];
 
 
 /// A mechanism to handle errors (see C++ manual)
-/** 
-Throw an Exception (not a pointer), and catch a reference to an exception.
-This ensures proper memory managment (coordinated calls of constructor / destructor)
+/**
+ The exception carry a 'message' and associated 'info', which are both strings.
+ The message is set by the constructor, and the info is set by the << operator.
+ 
+ Usage: Throw an Exception (not a pointer), and catch a reference to an exception.
+ This ensures proper memory managment (coordinated calls of constructor / destructor)
 */
 class Exception 
 {
-    
 protected:
     
-    /// message associated with the exception
-    std::string msg;
+    /// brief description of the issue
+    std::string msg_;
+
+    /// background information
+    std::string info_;
     
 public:
     
     /// Creator with empty message
     Exception()
     {
-        msg = "\0";
     }
     
     /// constructor with given message
-    Exception(const std::string m)
+    Exception(std::string const& m)
     {
-        msg = m;
+        msg_ = m;
         //printf("Exception(%s)\n", msg.c_str());
     }
     
-    /// Destructor (exceptions should have empty destructors)
-    virtual ~Exception()
+    /// return the message
+    std::string brief()
     {
-        //printf("~Exception(%s)\n", msg.c_str());
+        return msg_;
     }
     
-    /// return the message
-    const char* what() const
+    /// return supplementary messare
+    std::string info() const
     {
-        return msg.c_str();
+        return info_;
+    }
+
+    /// return copy of the message
+    std::string what() const
+    {
+        return msg_ + info_;
+    }
+
+    /// return copy of the message
+    char const* msg() const
+    {
+        return msg_.c_str();
     }
     
     /// change the message
-    void  what(const std::string& m)
+    void message(const std::string& m)
     {
-        msg = m;
+        msg_ = m;
     }
     
     /// concatenate `s` and `a` to build message
@@ -67,7 +82,7 @@ public:
     {
         std::ostringstream oss;
         oss << s << a;
-        msg = oss.str();
+        msg_ = oss.str();
     }
     
     /// concatenate `s`, `a` and `b` to build message
@@ -76,7 +91,7 @@ public:
     {
         std::ostringstream oss;
         oss << s << a << b;
-        msg = oss.str();
+        msg_ = oss.str();
     }
 
     /// concatenate `s`, `a`, `b` and `c` to build message
@@ -85,7 +100,7 @@ public:
     {
         std::ostringstream oss;
         oss << s << a << b << c;
-        msg = oss.str();
+        msg_ = oss.str();
     }
 
     /// concatenate `s`, `a`, `b`, `c` and `d` to build message
@@ -94,23 +109,29 @@ public:
     {
         std::ostringstream oss;
         oss << s << a << b << c << d;
-        msg = oss.str();
+        msg_ = oss.str();
     }
 
-    /// append `m` to message
-    Exception&  operator << (const std::string m)
+    /// append string to info
+    Exception& operator << (const std::string arg)
     {
-        msg.append(m);
+        if ( arg.size() > 0 && isalnum(arg[0]) )
+        {
+            std::string s = msg_ + info_;
+            if ( s.empty() || isalnum(s.back()) )
+                info_.push_back(' ');
+        }
+        info_.append(arg);
         return *this;
     }
     
-    /// append `x` to message
+    /// append string-representation of `x` to info
     template<typename T>
-    Exception&  operator << (const T& x)
+    Exception& operator << (const T& x)
     {
         std::ostringstream oss;
         oss << x;
-        msg.append(oss.str());
+        *this << oss.str();
         return *this;
     }
 };
@@ -150,9 +171,6 @@ public:
     /// concatenate all arguments to build message
     template <typename A, typename B, typename C, typename D>
     InvalidParameter(const std::string& s, const A& a, const B& b, const C& c, const D& d) : Exception(s,a,b,c,d) {}
-    
-    /// destructor
-    virtual ~InvalidParameter() {};
 };
 
 
@@ -161,16 +179,13 @@ public:
 class InvalidSyntax : public Exception 
 {
     
-    public :
+public :
     
     /// constructor
     InvalidSyntax(std::string const& m) : Exception(m)
     {
         //printf("new InvalidSyntax [%s]\n", m.c_str());
     }
-    
-    /// destructor
-    virtual ~InvalidSyntax() {};
 };
 
 //------------------------------------------------------------------------------
@@ -185,9 +200,6 @@ public :
     {
         //printf("new InvalidIO [%s]\n", m.c_str());
     }
-
-    /// destructor
-    virtual ~InvalidIO() {};
 };
 
 

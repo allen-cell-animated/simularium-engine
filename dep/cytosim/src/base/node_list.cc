@@ -3,165 +3,168 @@
 // some additions to manipulate the list: sorting, unsorting, etc.
 
 #include "node_list.h"
+#include "assert_macro.h"
 #include "random.h"
+#include <stdlib.h>
 
-//------------------------------------------------------------------------------
+
 void NodeList::push_front(Node * n)
 {
-    assert_true( n->nList == 0 );
-    //Cytosim::MSG("NodeList: pushFirst   %p in   %p\n", n, this);
+    //Cytosim::log("NodeList: push_front   %p in   %p\n", n, this);
 
-    n->nPrev = 0;
-    n->nNext = nFirst;
-    if ( nFirst )
-        nFirst->nPrev = n;
+    n->nPrev = nullptr;
+    n->nNext = nFront;
+    if ( nFront )
+        nFront->nPrev = n;
     else
-        nLast = n;
-    nFirst = n;
-    n->nList = this;
+        nBack = n;
+    nFront = n;
     ++nSize;
 }
 
-//------------------------------------------------------------------------------
+
 void NodeList::push_back(Node * n)
 {
-    assert_true( n->nList == 0 );
-    //Cytosim::MSG("NodeList: pushLast   %p in   %p\n", n, this);
+    //Cytosim::log("NodeList: push_back   %p in   %p\n", n, this);
     
-    n->nPrev = nLast;
-    n->nNext = 0;
-    if ( nLast )
-        nLast->nNext = n;
+    n->nPrev = nBack;
+    n->nNext = nullptr;
+    if ( nBack )
+        nBack->nNext = n;
     else
-        nFirst = n;
-    nLast = n;
-    n->nList = this;
+        nFront = n;
+    nBack = n;
     ++nSize;
 }
 
-//------------------------------------------------------------------------------
-void NodeList::transfer(NodeList& list)
+
+/**
+ Transfer objects in `list` to the end of `this`, until `list` is empty.
+ */
+void NodeList::merge(NodeList& list)
 {
-    Node * n = list.nFirst;
-    
-    if ( nLast )
-        nLast->nNext = n;
-    else
-        nFirst = n;
+    Node * n = list.nFront;
     
     if ( n )
     {
-        n->nPrev = nLast;
-        nLast = list.nLast;
+        if ( nBack )
+            nBack->nNext = n;
+        else
+            nFront = n;
+        
+        n->nPrev = nBack;
+        nBack = list.nBack;
+        nSize += list.nSize;
+        
+        list.nSize  = 0;
+        list.nFront = nullptr;
+        list.nBack  = nullptr;
     }
-    
-    while ( n )
-    {
-        n->nList = this;
-        n = n->nNext;
-    }
-    nSize += list.nSize;
-    
-    list.nSize  = 0;
-    list.nFirst = 0;
-    list.nLast  = 0;
 }
 
-//------------------------------------------------------------------------------
+
 void NodeList::push_after(Node * p, Node * n)
 {
-    assert_true( p->nList == this );
-    assert_true( n->nList == 0 );
-
     n->nPrev = p;
     n->nNext = p->nNext;
     if ( p->nNext )
         p->nNext->nPrev = n;
     else
-        nLast = n;
+        nBack = n;
     p->nNext = n;
-    n->nList = this;
     ++nSize;
 }
 
-//------------------------------------------------------------------------------
+
 void NodeList::push_before(Node * p, Node * n)
 {
-    assert_true( p->nList == this );
-    assert_true( n->nList == 0 );
-
     n->nNext = p;
     n->nPrev = p->nPrev;
     if ( p->nPrev )
         p->nPrev->nNext = n;
     else
-        nFirst = n;
+        nFront = n;
     p->nPrev = n;
-    n->nList = this;
     ++nSize;
 }
 
-//------------------------------------------------------------------------------
-Node * NodeList::pop_front()
+
+void NodeList::pop_front()
 {
-    assert_true( nFirst );
+    assert_true( nFront );
  
-    Node * n = nFirst;
-    n->nList = 0;
-    nFirst = nFirst->nNext;
-    if ( nFirst )
-        nFirst->nPrev = 0;
+    Node * n = nFront->nNext;
+    nFront = n;
+    n->nNext = nullptr;  // unnecessary?
+
+    if ( nFront )
+        nFront->nPrev = nullptr;
     else
-        nLast = 0;
+        nBack = nullptr;
     --nSize;
-    return n;
 }
 
-//------------------------------------------------------------------------------
+
+void NodeList::pop_back()
+{
+    assert_true( nBack );
+    
+    Node * n = nBack->nPrev;
+    nBack = n;
+    n->nPrev = nullptr;  // unnecessary?
+    
+    if ( nBack )
+        nBack->nNext = nullptr;
+    else
+        nFront = nullptr;
+    --nSize;
+}
+
+
 void NodeList::pop(Node * n)
 {
-    assert_true( n->nList == this );
     assert_true( nSize > 0 );
+    Node * x = n->nNext;
 
     if ( n->nPrev )
-        n->nPrev->nNext = n->nNext;
+        n->nPrev->nNext = x;
     else {
-        assert_true( nFirst == n );
-        nFirst = n->nNext;
+        assert_true( nFront == n );
+        nFront = x;
     }
     
-    if ( n->nNext )
-        n->nNext->nPrev = n->nPrev;
+    if ( x )
+        x->nPrev = n->nPrev;
     else {
-        assert_true( nLast == n );
-        nLast = n->nPrev;
+        assert_true( nBack == n );
+        nBack = n->nPrev;
     }
     
-    n->nPrev = 0;
-    n->nNext = 0;
-    n->nList = 0;
+    n->nPrev = nullptr; // unnecessary?
+    n->nNext = nullptr; // unnecessary?
     --nSize;
 }
 
 
-//------------------------------------------------------------------------------
 void NodeList::clear()
 {
-    Node * n = nFirst;
+    Node * p, * n = nFront;
     while ( n )
     {
-        n->nList = 0;
-        n = n->nNext;
+        n->nPrev = nullptr; // unnecessary?
+        p = n->nNext;
+        n->nNext = nullptr; // unnecessary?
+        n = p;
     }
-    nFirst = 0;
-    nLast  = 0;
+    nFront = nullptr;
+    nBack  = nullptr;
     nSize  = 0;
 }
 
-//------------------------------------------------------------------------------
+
 void NodeList::erase()
 {
-    Node * n = nFirst;
+    Node * n = nFront;
     Node * p;
     while ( n )
     {
@@ -169,88 +172,170 @@ void NodeList::erase()
         delete(n);
         n = p;
     }
-    nFirst = 0;
-    nLast  = 0;
+    nFront = nullptr;
+    nBack  = nullptr;
     nSize  = 0;
 }
 
 
-//------------------------------------------------------------------------------
 /**
- Rearrange (first--P-Pnext--last) as (Pnext--last-first--P)
+This is a bubble sort?
+comp(a,b) = -1 if (a<b) and 1 if (a>b) or 0
+*/
+void NodeList::sort(int (*comp)(const void*, const void*))
+{
+    Node * ii = front();
+    
+    if ( ii == nullptr )
+        return;
+    
+    ii = ii->next();
+    
+    while ( ii )
+    {
+        Node * kk = ii->next();
+        Node * jj = ii->prev();
+        
+        if ( comp(ii, jj) > 0 )
+        {
+            jj = jj->prev();
+            
+            while ( jj && comp(ii, jj) > 0 )
+                jj = jj->prev();
+            
+            pop(ii);
+            
+            if ( jj )
+                push_after(jj, ii);
+            else
+                push_front(ii);
+        }
+        ii = kk;
+    }
+}
+
+
+/**
+This copies the data to a temporary space to use the standard library qsort()
+comp(a,b) = -1 if (a<b) and 1 if (a>b) or 0
+*/
+void NodeList::quicksort(int (*comp)(const void*, const void*))
+{
+    const size_t cnt = nSize;
+    Node ** tmp = new Node*[cnt];
+    
+    size_t i = 0;
+    Node * n = nFront;
+    
+    while( n )
+    {
+        tmp[i++] = n;
+        n = n->next();
+    }
+    
+    qsort(tmp, cnt, sizeof(Node*), comp);
+    
+    n = tmp[0];
+    nFront = n;
+    n->nPrev = nullptr;
+    for( i = 1; i < nSize; ++i )
+    {
+        n->nNext = tmp[i];
+        tmp[i]->nPrev = n;
+        n = tmp[i];
+    }
+    n->nNext = nullptr;
+    nBack = n;
+    
+    delete[] tmp;
+}
+
+
+/**
+ Rearrange [F--P][Q--L] into [Q--L][F--P]
  */
- void NodeList::swap(Node * p)
+void NodeList::permute(Node * p)
 {
     if ( p  &&  p->nNext )
     {
-        nLast->nNext   = nFirst;
-        nFirst->nPrev  = nLast;
-        nFirst         = p->nNext;
-        nLast          = p;
-        nLast->nNext   = 0;
-        nFirst->nPrev  = 0;
+        nBack->nNext   = nFront;
+        nFront->nPrev  = nBack;
+        nFront         = p->nNext;
+        nBack          = p;
+        nBack->nNext   = nullptr;
+        nFront->nPrev  = nullptr;
     }
     assert_false( bad() );
 }
 
-//------------------------------------------------------------------------------
+
 /**
- Rearrange (first--P-Pnext--Qprev-Q--last) as (Pnext--Qprev-first--P-Q--last)
+ Rearrange [F--P][X--Y][Q--L] into [X--Y][F--P][Q--L]
  
- If q is between nFirst and p, this will destroy the list,
+ If Q is between nFront and P, this will destroy the list,
  but there is no way to check such condition here.
  */
-void NodeList::shuffle1(Node * p, Node * q)
+void NodeList::shuffle_up(Node * p, Node * q)
 {
     assert_true( p  &&  p->nNext );
     assert_true( q  &&  q->nPrev );
     
     if ( q != p->nNext )
     {
-        p->nNext->nPrev = 0;
-        nFirst->nPrev   = q->nPrev;
-        q->nPrev->nNext = nFirst;
-        nFirst          = p->nNext;
+        nFront->nPrev   = q->nPrev;
+        q->nPrev->nNext = nFront;
+        nFront          = p->nNext;
+        nFront->nPrev   = nullptr;
         p->nNext        = q;
         q->nPrev        = p;
     }
     assert_false( bad() );
 }
 
+
 /**
- Rearrange (first--P-Pnext--Qprev-Q--last) as (first--P-Q--last-Pnext--Qprev)
+ Rearrange [F--P][X--Y][Q--L] into [F--P][Q--L][X--Y]
  
- If q is between nFirst and p, this will destroy the list,
+ If Q is between nFront and P, this will destroy the list,
  but there is no way to check such condition here.
  */
-void NodeList::shuffle2(Node * p, Node * q)
+void NodeList::shuffle_down(Node * p, Node * q)
 {
     assert_true( p  &&  p->nNext );
     assert_true( q  &&  q->nPrev );
     
     if ( q != p->nNext )
     {
-        nLast->nNext    = p->nNext;
-        p->nNext->nPrev = nLast;
+        nBack->nNext    = p->nNext;
+        p->nNext->nPrev = nBack;
         p->nNext        = q;
-        nLast           = q->nPrev;
-        q->nPrev->nNext = 0;
+        nBack           = q->nPrev;
+        nBack->nNext    = nullptr;
         q->nPrev        = p;
     }
     assert_false( bad() );
 }
 
-//------------------------------------------------------------------------------
-void NodeList::mix(Random& rng)
+
+void NodeList::shuffle()
 {
     if ( nSize < 2 )
         return;
     
-    unsigned int pp = rng.pint_exc(nSize);
-    unsigned int qq = rng.pint_exc(nSize);
+    size_t pp, qq;
+    if ( nSize > UINT32_MAX )
+    {
+        pp = RNG.plong(nSize);
+        qq = RNG.plong(nSize);
+    }
+    else
+    {
+        pp = RNG.pint(nSize);
+        qq = RNG.pint(nSize);
+    }
 
-    unsigned int n = 0;
-    Node *p = nFirst, *q;
+    size_t n = 0;
+    Node *p = nFront, *q;
 
     if ( pp+1 < qq )
     {
@@ -259,7 +344,7 @@ void NodeList::mix(Random& rng)
         for ( q = p; n < qq; ++n )
             q = q->nNext;
         
-        shuffle1(p, q);
+        shuffle_up(p, q);
     }
     else if ( qq+1 < pp )
     {
@@ -268,39 +353,64 @@ void NodeList::mix(Random& rng)
         for ( q = p; n < pp; ++n )
             q = q->nNext;
         
-        shuffle2(p, q);
+        shuffle_down(p, q);
     }
     else
     {
         for ( ; n < qq; ++n )
             p = p->nNext;
 
-        swap(p);
+        permute(p);
     }
 }
 
-void NodeList::mix5(Random& rng)
+
+void NodeList::shuffle3()
 {
-    mix(rng);
-    mix(rng);
-    mix(rng);
-    mix(rng);
-    mix(rng);
+    shuffle();
+    shuffle();
+    shuffle();
 }
 
-//------------------------------------------------------------------------------
-int NodeList::bad() const
+
+unsigned int NodeList::count() const
 {
     unsigned int cnt = 0;
-    Node * p = first(), * q;
+    Node * p = nFront;
+    while ( p )
+    {
+        ++cnt;
+        p = p->nNext;
+    }
+    return cnt;
+}
+
+
+bool NodeList::check(Node const* n) const
+{
+    Node * p = nFront;
+    while ( p )
+    {
+        if ( p == n )
+            return true;
+        p = p->nNext;
+    }
+    return false;
+}
+
+
+int NodeList::bad() const
+{
+    size_t cnt = 0;
+    Node * p = nFront, * q;
     
-    if ( p  &&  p->nPrev != 0 )
+    if ( p  &&  p->nPrev != nullptr )
         return 71;
     while ( p )
     {
         q = p->nNext;
-        if ( q == 0 ) {
-            if ( p != nLast )
+        if ( q == nullptr ) {
+            if ( p != nBack )
                 return 73;
         }
         else {

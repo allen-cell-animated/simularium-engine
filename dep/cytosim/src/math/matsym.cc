@@ -1,72 +1,66 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "matsym.h"
+#include "assert_macro.h"
 #include "cblas.h"
 
 
 //------------------------------------------------------------------------------
 MatrixSymmetric::MatrixSymmetric()
 {
-    mxSize      = 0;
-    mxAllocated = 0;
-    val       = 0;
-    do_not_delete_array = 0;
+    allocated_ = 0;
+    val        = nullptr;
+    in_charge  = 1;
 }
 
 //------------------------------------------------------------------------------
-void MatrixSymmetric::allocate( unsigned int sz )
+void MatrixSymmetric::allocate(size_t alc)
 {
-    mxSize = sz;
-    if ( mxSize > mxAllocated ) {
-        mxAllocated = mxSize;
-        if ( val ) delete[] val;
-        val = new real[mxSize*mxSize];
+    if ( alc > allocated_ )
+    {
+        allocated_ = alc;
+        free_real(val);
+        val = new_real(alc*alc);
     }
 }
 
 //------------------------------------------------------------------------------
 void MatrixSymmetric::deallocate()
 {
-    if ( do_not_delete_array ) return;
-    if ( val ) delete[] val;
-    mxAllocated = 0;
-    val = 0;
+    if ( in_charge )
+        free_real(val);
+    allocated_ = 0;
+    val = nullptr;
 }
 
 //------------------------------------------------------------------------------
-void MatrixSymmetric::makeZero()
+void MatrixSymmetric::reset()
 {
-    for ( index_type ii = 0; ii < mxSize * mxSize; ++ii )
-        val[ii] = 0;
+    for ( index_t i = 0; i < size_ * size_; ++i )
+        val[i] = 0;
 }
 
 //------------------------------------------------------------------------------
-void MatrixSymmetric::scale( real a )
+void MatrixSymmetric::scale( real alpha )
 {
-    for ( index_type ii = 0; ii < mxSize * mxSize; ++ii )
-        val[ii] *= a;
+    for ( index_t i = 0; i < size_ * size_; ++i )
+        val[i] *= alpha;
 }
 
 //------------------------------------------------------------------------------
-real& MatrixSymmetric::operator()( index_type x, index_type y)
+real& MatrixSymmetric::operator()( index_t x, index_t y)
 {
-    assert_true( x < mxSize );
-    assert_true( y < mxSize );
-    if ( x < y )
-        return val[ x+mxSize*y ];
-    else
-        return val[ y+mxSize*x ];
+    assert_true( x < size_ );
+    assert_true( y < size_ );
+    return val[ std::max(x,y) + msLDD * std::min(x,y) ];
 }
 
 //------------------------------------------------------------------------------
-real* MatrixSymmetric::addr( index_type x, index_type y) const
+real* MatrixSymmetric::addr( index_t x, index_t y) const
 {
-    assert_true( x < mxSize );
-    assert_true( y < mxSize );
-    if ( x < y )
-        return &val[ x+mxSize*y ];
-    else
-        return &val[ y+mxSize*x ];
+    assert_true( x < size_ );
+    assert_true( y < size_ );
+    return val + ( std::max(x,y) + msLDD * std::min(x,y) );
 }
 
 //------------------------------------------------------------------------------
@@ -76,9 +70,12 @@ bool MatrixSymmetric::nonZero() const
 }
 
 //------------------------------------------------------------------------------
-unsigned int MatrixSymmetric::nbNonZeroElements() const
+size_t MatrixSymmetric::nbElements(index_t start, index_t stop) const
 {
-    return mxSize * mxSize;
+    assert_true( start <= stop );
+    assert_true( stop <= size_ );
+
+    return size_ * ( stop - start );
 }
 
 //------------------------------------------------------------------------------
@@ -90,22 +87,22 @@ std::string MatrixSymmetric::what() const
 //------------------------------------------------------------------------------
 void MatrixSymmetric::vecMulAdd( const real* X, real* Y ) const
 {
-    blas_xsymv( 'U', mxSize, 1.0, val, mxSize, X, 1, 1.0, Y, 1 );
+    blas::xsymv('L', size_, 1.0, val, size_, X, 1, 1.0, Y, 1);
 }
 
 //------------------------------------------------------------------------------
 void MatrixSymmetric::vecMulAddIso2D( const real* X, real* Y ) const
 {
-    blas_xsymv( 'U', mxSize, 1.0, val, mxSize, X+0, 2, 1.0, Y+0, 2 );
-    blas_xsymv( 'U', mxSize, 1.0, val, mxSize, X+1, 2, 1.0, Y+1, 2 );
+    blas::xsymv('L', size_, 1.0, val, size_, X+0, 2, 1.0, Y+0, 2);
+    blas::xsymv('L', size_, 1.0, val, size_, X+1, 2, 1.0, Y+1, 2);
 }
 
 //------------------------------------------------------------------------------
 void MatrixSymmetric::vecMulAddIso3D( const real* X, real* Y ) const
 {
-    blas_xsymv( 'U', mxSize, 1.0, val, mxSize, X+0, 3, 1.0, Y+0, 3 );
-    blas_xsymv( 'U', mxSize, 1.0, val, mxSize, X+1, 3, 1.0, Y+1, 3 );
-    blas_xsymv( 'U', mxSize, 1.0, val, mxSize, X+2, 3, 1.0, Y+2, 3 );
+    blas::xsymv('L', size_, 1.0, val, size_, X+0, 3, 1.0, Y+0, 3);
+    blas::xsymv('L', size_, 1.0, val, size_, X+1, 3, 1.0, Y+1, 3);
+    blas::xsymv('L', size_, 1.0, val, size_, X+2, 3, 1.0, Y+2, 3);
 }
 
 

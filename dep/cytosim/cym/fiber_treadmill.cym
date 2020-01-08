@@ -6,7 +6,7 @@
 */
 
 
-set simul demo
+set simul system
 {
     time_step = 0.001
     viscosity = 1
@@ -14,15 +14,19 @@ set simul demo
 
 set space cell
 {
-    geometry = ( capsule 2 2 )
+    shape = capsule
 }
 
-new space cell
+new cell
+{
+    length = 8
+    radius = 2
+}
 
 set fiber microtubule
 {
     rigidity     = 20
-    segmentation = 0.5
+    segmentation = 0.25
     confine      = inside, 200
     
     activity        = treadmill
@@ -30,34 +34,34 @@ set fiber microtubule
     shrinking_speed = -0.05, -0.1
     growing_force   =     2,  2
 
-    display = ( speckles=1, 0.1; line_width=4; line_style=2; )
+    display = ( speckles=6, 1, 0.1; lines=4, 4; )
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 3
     end_state = 1, 4
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 1
     end_state = 1, 1
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 3
     end_state = 4, 1
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 6
     end_state = 4, 4
 }
 
-run simul *
+run system
 {
     nb_steps = 100000
     nb_frames = 10

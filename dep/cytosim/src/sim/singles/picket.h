@@ -4,7 +4,7 @@
 #define PICKET_H
 
 #include "single.h"
-class FiberGrid;
+
 
 /// a Single attached at a fixed position.
 /**
@@ -15,7 +15,13 @@ class FiberGrid;
  */
 class Picket : public Single
 {
-        
+public:
+    
+    /// sPos should never change
+    void    beforeDetachment(Hand const*);
+    /// stiffness of the interaction
+    real    interactionStiffness() const { return prop->stiffness; }
+
 public:
 
     /// constructor
@@ -27,28 +33,25 @@ public:
     ///return the position in space of the object
     Vector  position()           const  { return sPos; }
 
-    /// true if object accepts translations
-    bool    translatable()       const  { return true; }
+    /// Picket accepts translation
+    int     mobile()             const  { return 1; }
     
     /// translate object's position by the given vector
     void    translate(Vector const& w)  { sPos += w; }
-
-    /// sPos should never changed
-    void    beforeDetachment() {}
+    
+    /// true if Single creates an interaction
+    bool    hasForce() const { return true; }
 
     /// tension in the link = stiffness * ( posFoot() - posHand() )
     Vector  force() const;
 
     /// Monte-Carlo step for a free Single
-    void    stepFree(const FiberGrid&);
+    void    stepF(const FiberGrid&);
     
     /// Monte-Carlo step for a bound Single
-    void    stepAttached();
+    void    stepA();
     
-    /// true if Single creates an interaction
-    bool    hasInteraction() const { return true; }
-    
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

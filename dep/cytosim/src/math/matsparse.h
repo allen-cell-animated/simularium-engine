@@ -3,22 +3,25 @@
 #ifndef MATSPARSE_H
 #define MATSPARSE_H
 
-#include <cstdio>
+#include "real.h"
 #include "matrix.h"
+#include <cstdio>
+#include <string>
 
 /// a real (non-symmetric) sparse Matrix
-class MatrixSparse : public Matrix
+/**
+ This class is not used currently in Cytosim
+ */
+class MatrixSparse
 {
-    
 private:
     
-    /// size of the matrix
-    unsigned int mxSize;
-    
+    /// size of matrix
+    index_t size_;
+
     /// size of memory which has been allocated
-    unsigned int mxAllocated;
-    
-    
+    size_t  allocated_;
+
     // array [ size ][ ? ] holding the values for each column
     real ** mxCol;
     
@@ -26,12 +29,15 @@ private:
     int  ** mxRow;
     
     // allocate column to hold nb values
-    void allocateColumn( index_type column_index, unsigned int nb_values );
+    void allocateColumn(index_t column_index, size_t nb_values);
     
 public:
     
-    //size of (square) matrix
-    unsigned int size() const { return mxSize; }
+    /// return the size of the matrix
+    index_t size() const { return size_; }
+    
+    /// change the size of the matrix
+    void resize(index_t s) { allocate(s); size_=s; }
 
     /// base for destructor
     void deallocate();
@@ -43,25 +49,25 @@ public:
     virtual ~MatrixSparse()  { deallocate(); }
     
     /// set all the element to zero
-    void makeZero();
+    void reset();
     
     /// allocate the matrix to hold ( sz * sz )
-    void allocate( unsigned int sz );
+    void allocate(size_t sz);
         
     /// returns the address of element at (x, y), no allocation is done
-    real* addr( index_type x, index_type y ) const;
+    real* addr( index_t x, index_t y ) const;
     
     /// returns the address of element at (x, y), allocating if necessary
-    real& operator()( index_type x, index_type y );
+    real& operator()( index_t x, index_t y );
     
     /// scale the matrix by a scalar factor
     void scale( real a );
     
     /// add the diagonal block ( x, x, x+sx, x+sx ) from this matrix to M
-    void addDiagonalBlock(real* M, index_type x, unsigned int sx) const;
+    void addDiagonalBlock(real* mat, unsigned ldd, index_t si, unsigned nb) const;
     
-    /// add the upper triagular block ( x, x, x+sx, x+sx ) from this matrix to M
-    void addTriangularBlock(real* M, index_type x, unsigned int sx) const;
+    /// add this' data block ( idx, idx, idx+siz, idx+siz ) to upper triangular half of `mat`
+    void addTriangularBlock(real* mat, index_t ldd, index_t si, unsigned nb, unsigned dim) const;
     
     /// multiplication of a vector: Y = Y + M * X, dim(X) = dim(M)
     void vecMulAdd( const real* X, real* Y ) const;
@@ -76,13 +82,16 @@ public:
     bool nonZero() const;
     
     /// number of element which are non-zero
-    unsigned int  nbNonZeroElements() const;
+    size_t nbElements(index_t start, index_t stop) const;
     
+    /// number of blocks which are not null
+    size_t nbElements() const { return nbElements(0, size_); }
+
     /// returns a string which a description of the type of matrix
     std::string what() const;
     
     /// printf debug function in sparse mode: i, j : value
-    void printSparse(std::ostream &) const;
+    void printSparse(std::ostream&) const;
     
     /// debug function
     int bad() const;

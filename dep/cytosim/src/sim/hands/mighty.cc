@@ -5,9 +5,7 @@
 #include "glossary.h"
 #include "exceptions.h"
 #include "iowrapper.h"
-extern Random RNG;
 
-//------------------------------------------------------------------------------
 
 Mighty::Mighty(MightyProp const* p, HandMonitor* h)
 : Hand(p, h), prop(p)
@@ -15,59 +13,98 @@ Mighty::Mighty(MightyProp const* p, HandMonitor* h)
 }
 
 
-//------------------------------------------------------------------------------
+bool Mighty::attachmentAllowed(FiberSite& sit) const
+{
+    if ( !Hand::attachmentAllowed(sit) )
+        return false;
+    
+    return true;
+}
+
 
 void Mighty::stepUnloaded()
 {
     assert_true( attached() );
     
-    // detach or move
-    if ( testDetachment() )
-        return;
+    real a = fbAbs + prop->set_speed_dt;
     
-    moveBy(prop->max_speed_dt);
+    if ( a <= fbFiber->abscissaM() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaM();
+    }
+    
+    if ( a >= fbFiber->abscissaP() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaP();
+    }
+    
+    // detachment is also induced by displacement:
+    assert_true( nextDetach >= 0 );
+    nextDetach -= prop->unbinding_density * fabs(a-fbAbs);
+    
+    // detach or move
+    if ( !testDetachment() )
+        moveTo(a);
 }
 
 
-
-void Mighty::stepLoaded(Vector const& force)
+void Mighty::stepLoaded(Vector const& force, real force_norm)
 {
     assert_true( attached() );
     
-    
     // the load is the projection of the force on the local direction of Fiber
-    real load = force * dirFiber();
+    real load = dot(force, dirFiber());
     
     // calculate load-dependent displacement:
-    real dabs = prop->max_speed_dt + load * prop->var_speed_dt;
+    real dab = prop->set_speed_dt + load * prop->var_speed_dt;
     
     // possibly limit the range of the speed:
     if ( prop->limit_speed )
     {
-        if ( dabs < prop->min_dabs )
-            dabs = prop->min_dabs;
-        
-        else if ( dabs > prop->max_dabs )
-            dabs = prop->max_dabs;
+        dab = std::max(dab, prop->min_dab);
+        dab = std::min(dab, prop->max_dab);
     }
-
-    /*
-     The probability to detach has two contributions:
-     - Kramers' theory  rate0 * exp( force / f0 )
-     - movement-induced detachment
-     */
-    real det = prop->unbinding_rate_dt * exp(force.norm()*prop->unbinding_force_inv)
-             + prop->unbinding_density * fabs(dabs);
     
-    nextDetach -= det;
-    if ( nextDetach < 0 )
+    real a = fbAbs + dab;
+    
+    if ( a <= fbFiber->abscissaM() )
     {
-        nextDetach = RNG.exponential();
-        detach();
-        return;
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaM();
     }
     
-    moveBy(dabs);
+    if ( a >= fbFiber->abscissaP() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaP();
+    }
+    
+    // detachment is also induced by displacement:
+    assert_true( nextDetach >= 0 );
+    nextDetach -= prop->unbinding_density * fabs(a-fbAbs);
+    
+    if ( testKramersDetachment(force_norm) )
+        return;
+    
+    // movement can lead to detachment, so we do it last:
+    moveTo(a);
 }
-
 

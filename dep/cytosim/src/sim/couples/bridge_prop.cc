@@ -9,59 +9,40 @@
 #include "bridge_prop.h"
 #include "bridge.h"
 
-//------------------------------------------------------------------------------
-Couple * BridgeProp::newCouple(Glossary * opt) const
+
+Couple * BridgeProp::newCouple(Glossary*) const
 {
-    //std::cout << "ForkProp::newCouple" << std::endl;
+    //std::clog << "BridgeProp::newCouple" << std::endl;
     return new Bridge(this);
 }
 
-//------------------------------------------------------------------------------
+
 void BridgeProp::clear()
 {
     CoupleProp::clear();
-    
-    specificity     = BIND_ALWAYS;
-    trans_activated = 0;
 }
 
-//------------------------------------------------------------------------------
+
 void BridgeProp::read(Glossary& glos)
 {
     CoupleProp::read(glos);
-    
-    glos.set(specificity,     "specificity",
-             KeyList<Specificity>("none",         BIND_ALWAYS,
-                                  "parallel",     BIND_PARALLEL,
-                                  "antiparallel", BIND_ANTIPARALLEL));
-    
-    glos.set(trans_activated, "trans_activated");
-
 }
 
-//------------------------------------------------------------------------------
-void BridgeProp::complete(SimulProp const* sp, PropertyList* plist)
+
+void BridgeProp::complete(Simul const& sim)
 {
-    CoupleProp::complete(sp, plist);
+    CoupleProp::complete(sim);
     
 #if ( DIM > 2 )
+    //@todo: the obligation for length > 0 can be removed, once interSideLink3D() is implemented
     if ( length <= 0 )
         throw InvalidParameter("bridge:length should be defined and > 0");
 #endif
-    
-    //Attachment is impossible if Couple:length is bigger than binding_range
-    if ( length > hand_prop1->binding_range )
-        Cytosim::warning("bridge:length > Hand1:binding_range\n");
-    if ( length > hand_prop2->binding_range )
-        Cytosim::warning("bridge:length > Hand2:binding_range\n");    
 }
 
-//------------------------------------------------------------------------------
 
-void BridgeProp::write_data(std::ostream & os) const
+void BridgeProp::write_values(std::ostream& os) const
 {
-    CoupleProp::write_data(os);
-    write_param(os, "specificity", specificity);
-    write_param(os, "trans_activated", trans_activated);
+    CoupleProp::write_values(os);
 }
 

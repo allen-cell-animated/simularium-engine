@@ -1,352 +1,396 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "matsparsesym.h"
+#include "assert_macro.h"
 #include "cblas.h"
-#include "smath.h"
+
 #include <iomanip>
 #include <sstream>
 
-//------------------------------------------------------------------------------
+
 MatrixSparseSymmetric::MatrixSparseSymmetric()
 {
-    mxSize      = 0;
-    mxAllocated = 0;
-    col       = 0;
-    colSize   = 0;
-    colMax    = 0;
+    allocated_ = 0;
+    col_       = nullptr;
+    col_size_  = nullptr;
+    col_max_   = nullptr;
 }
 
 
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::allocate( const unsigned int sz )
+void MatrixSparseSymmetric::allocate(size_t alc)
 {
-    mxSize = sz;
-    if ( mxSize > mxAllocated )
+    if ( alc > allocated_ )
     {
-        Element ** col_new     = new Element*[mxSize];
-        unsigned int * colSize_new = new unsigned int[mxSize];
-        unsigned int * colMax_new  = new unsigned int[mxSize];
+        constexpr size_t chunk = 64;
+        alc = ( alc + chunk - 1 ) & ~( chunk -1 );
+
+        //fprintf(stderr, "MSS allocate matrix %u\n", alc);
+        Element ** col_new      = new Element*[alc];
+        unsigned * col_size_new = new unsigned[alc];
+        size_t   * col_max_new  = new size_t[alc];
         
-        index_type ii = 0;
-        if ( col )
+        index_t ii = 0;
+        if ( col_ )
         {
-            for ( ; ii < mxAllocated; ++ii )
+            for ( ; ii < allocated_; ++ii )
             {
-                col_new[ii]     = col[ii];
-                colSize_new[ii] = colSize[ii];
-                colMax_new[ii]  = colMax[ii];
+                col_new[ii]      = col_[ii];
+                col_size_new[ii] = col_size_[ii];
+                col_max_new[ii]  = col_max_[ii];
             }
-            delete[] col;
-            delete[] colSize;
-            delete[] colMax;
+            delete[] col_;
+            delete[] col_size_;
+            delete[] col_max_;
         }
         
-        for ( ; ii < mxSize; ++ii )
+        col_       = col_new;
+        col_size_  = col_size_new;
+        col_max_   = col_max_new;
+        allocated_ = alc;
+
+        for ( ; ii < alc; ++ii )
         {
-            col_new[ii]     = 0;
-            colSize_new[ii] = 0;
-            colMax_new[ii]  = 0;
+            col_[ii]      = nullptr;
+            col_size_[ii] = 0;
+            col_max_[ii]  = 0;
         }
-        
-        col       = col_new;
-        colSize   = colSize_new;
-        colMax    = colMax_new;
-        mxAllocated = mxSize;
     }
 }
 
-//------------------------------------------------------------------------------
+
 void MatrixSparseSymmetric::deallocate()
 {
-    if ( col )
+    if ( col_ )
     {
-        for ( index_type ii = 0; ii < mxAllocated; ++ii )
-        {
-            if ( col[ii] )
-                delete[] col[ii];
-        }
-        delete[] col;       col     = 0;
-        delete[] colSize;   colSize = 0;
-        delete[] colMax;    colMax  = 0;
+        for ( size_t ii = 0; ii < allocated_; ++ii )
+            delete[] col_[ii];
+        delete[] col_;       col_      = nullptr;
+        delete[] col_size_;  col_size_ = nullptr;
+        delete[] col_max_;   col_max_  = nullptr;
     }
-    mxAllocated = 0;
+    allocated_ = 0;
 }
 
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::allocateColumn( const index_type jj, unsigned int sz )
+
+/// copy `cnt` elements from `src` to `dst`
+void copy(unsigned cnt, MatrixSparseSymmetric::Element * src, MatrixSparseSymmetric::Element * dst)
 {
-    assert_true( jj < mxSize );
-    assert_true( sz > 0 );
-    //printf("new S-COL %i %i\n", jj, sz );
-    
-    if ( sz > colMax[jj] )
+    for ( unsigned ii = 0; ii < cnt; ++ii )
+        dst[ii] = src[ii];
+}
+
+
+void MatrixSparseSymmetric::allocateColumn(const index_t jj, size_t alc)
+{
+    if ( jj >= size_ )
     {
-        const unsigned chunk = 4;
-        sz = ( sz + chunk - 1 ) & -chunk;
-        Element * col_new = new Element[sz];
+        fprintf(stderr, "out of range index %i for matrix of size %u\n", jj, size_);
+        exit(1);
+    }
+
+    if ( alc > col_max_[jj] )
+    {
+        //fprintf(stderr, "MSS allocate column %i size %u\n", jj, alc);
+        constexpr size_t chunk = 16;
+        alc = ( alc + chunk - 1 ) & ~( chunk -1 );
+        Element * col_new = new Element[alc];
         
-        if ( col[jj] )
+        if ( col_[jj] )
         {
-            //copy what is there
-            for ( unsigned int ii = 0; ii < colMax[jj]; ++ii )
-                col_new[ii] = col[jj][ii];
-            delete[] col[jj];
+            //copy over previous column elements
+            copy(col_size_[jj], col_[jj], col_new);
+            
+            //release old memory
+            delete[] col_[jj];
         }
-        col[jj]    = col_new;
-        colMax[jj] = sz;
+        col_[jj]     = col_new;
+        col_max_[jj] = alc;
     }
 }
 
-//------------------------------------------------------------------------------
-real& MatrixSparseSymmetric::operator()( index_type ii, index_type jj )
+
+/**
+ This allocate to be able to hold the matrix element if necessary
+ */
+real& MatrixSparseSymmetric::operator()(index_t i, index_t j)
 {
-    //this allocate the position if necessary
-    assert_true( ii < mxSize );
-    assert_true( jj < mxSize );
+    assert_true( i < size_ );
+    assert_true( j < size_ );
+    //fprintf(stderr, "MSS( %6i %6i )\n", i, j);
     
-    Element * e, * last;
-    
-    //we swap to get the order right
-    if ( jj < ii )
-    {
-        int tmp = ii;
-        ii = jj;
-        jj = tmp;
-    }
-    
-    //check if the column is empty:
-    if ( colSize[jj] == 0 )
-    {
-        allocateColumn(jj, 1);
-        e = col[jj];
-        //add requested term:
-        e->line = ii;
-        e->val  = 0.;
-        colSize[jj] = 1;
-        return e->val;
-    }
-    
-    e = col[jj];
-    last = e + colSize[jj];
-    
-    while ( e < last )
-    {
-        if ( e->line == ii )
-            return e->val;
-        ++e;
-    }
-    
-    //we will have to create/allocate a new Element
-    if ( colMax[jj] <= colSize[jj] )
-    {
-        allocateColumn( jj, colSize[jj]+1 );
-        e = col[jj] + colSize[jj];
-    }
-    
-    assert_true( colMax[jj] > colSize[jj] );
-    
-    //add the requested term:
-    e->line = ii;
-    e->val  = 0.;
-    ++colSize[jj];
-    return e->val;
-}
+    // swap to get ii > jj (address lower triangle)
+    index_t ii = std::max(i, j);
+    index_t jj = std::min(i, j);
 
-//------------------------------------------------------------------------------
-real* MatrixSparseSymmetric::addr( index_type ii, index_type jj ) const
-{
-    //we swap to get the order right
-    if ( jj < ii )
+    assert_true(jj < size_);
+    Element * col = col_[jj];
+    if ( col_size_[jj] > 0 )
     {
-        int tmp = ii;
-        ii  = jj;
-        jj  = tmp;
-    }
-    
-    for ( unsigned int kk = 0; kk < colSize[jj]; ++kk )
-        if ( col[jj][kk].line == ii )
-            return &( col[jj][kk].val );
-    return 0;
-}
-
-
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::makeZero()
-{
-    for ( index_type ii = 0; ii < mxSize; ++ii )
-        colSize[ii] = 0;
-}
-
-
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::scale(const real a)
-{
-    for ( index_type ii = 0; ii < mxSize; ++ii )
-        for ( unsigned int jj = 0; jj < colSize[ii]; ++jj )
-            col[ii][jj].val *= a;
-}
-
-//------------------------------------------------------------------------------
-// M <- M + the upper block contained in [x, x+sx, x, x+sx]
-void MatrixSparseSymmetric::addTriangularBlock(real* M, const index_type x, const unsigned int sx) const
-{
-    assert_true( x + sx <= mxSize );
-    
-    for ( index_type jj = 0; jj < sx; ++jj )
-    {
-        for ( unsigned int kk = 0; kk < colSize[jj+x]; ++kk )
+        Element * e = col;
+        Element * lst = col + col_size_[jj] - 1;
+        
+        //check all elements in the column:
+        while ( e <= lst )
         {
-            index_type ii = col[jj+x][kk].line;
-            if ( x <= ii  &&  ii < x+sx )
-            {
-                M[ ii-sx + sx * jj ] += col[jj+x][kk].val;
-                //printf("Sp %4i %4i % .4f\n", ii, jj, a );
-            }
+            if ( e->inx == ii )
+                return e->val;
+            ++e;
         }
     }
-}
-
-//------------------------------------------------------------------------------
-// M <- M + the upper block contained in [x, x+sx, x, x+sx]
-void MatrixSparseSymmetric::addDiagonalBlock(real* M, const index_type x, const unsigned int sx) const
-{
-    assert_true( x + sx <= mxSize );
     
-    for ( index_type jj = 0; jj < sx; ++jj )
+    // add the requested term at the end:
+    unsigned n = col_size_[jj];
+
+    // allocate space for new Element if necessary:
+    if ( n >= col_max_[jj] )
     {
-        for ( unsigned int kk = 0 ; kk < colSize[jj+x] ; ++kk )
-        {
-            index_type ii = col[jj+x][kk].line;
-            if ( x <= ii )
-            {
-                ii  -= x;
-                assert_true( ii <= jj );
-                M[ii + sx * jj] += col[jj+x][kk].val;
-                if ( ii != jj )
-                    M[jj + sx * ii] += col[jj+x][kk].val;
-                //printf("Sp %4i %4i % .4f\n", ii, jj, a );
-            }
-        }
+        allocateColumn(jj, n+1);
+        col = col_[jj];
     }
+    
+    col[n].reset(ii);
+    ++col_size_[jj];
+    
+    //printColumn(jj);
+    return col[n].val;
 }
 
 
-//------------------------------------------------------------------------------
-int MatrixSparseSymmetric::bad() const
+real* MatrixSparseSymmetric::addr(index_t i, index_t j) const
 {
-    if ( mxSize <= 0 ) return 1;
-    for ( unsigned int jj = 0; jj < mxSize; ++jj )
-    {
-        for ( unsigned int kk = 0 ; kk < colSize[jj] ; ++kk )
-        {
-            if ( col[jj][kk].line >= mxSize ) return 2;
-            if ( col[jj][kk].line <= jj )   return 3;
-        }
-    }
-    return 0;
+    // swap to get ii > jj (address lower triangle)
+    index_t ii = std::max(i, j);
+    index_t jj = std::min(i, j);
+
+    for ( unsigned kk = 0; kk < col_size_[jj]; ++kk )
+        if ( col_[jj][kk].inx == ii )
+            return &( col_[jj][kk].val );
+    
+    return nullptr;
 }
 
 
 //------------------------------------------------------------------------------
-void MatrixSparseSymmetric::printSparse(std::ostream & os) const
+#pragma mark -
+
+void MatrixSparseSymmetric::reset()
 {
-    for ( unsigned int jj = 0; jj < mxSize; ++jj )
-        for ( unsigned int kk = 0 ; kk < colSize[jj] ; ++kk )
-        {
-            os << col[jj][kk].line << " " << jj << " ";
-            os << std::setprecision(8) << col[jj][kk].val << std::endl;
-        }
+    for ( index_t jj = 0; jj < size_; ++jj )
+        col_size_[jj] = 0;
 }
 
 
-//------------------------------------------------------------------------------
 bool MatrixSparseSymmetric::nonZero() const
 {
     //check for any non-zero sparse term:
-    for ( unsigned int jj = 0; jj < mxSize; ++jj )
-        for ( unsigned int kk = 0 ; kk < colSize[jj] ; ++kk )
-            if ( col[jj][kk].val )
+    for ( index_t jj = 0; jj < size_; ++jj )
+        for ( unsigned kk = 0 ; kk < col_size_[jj] ; ++kk )
+            if ( col_[jj][kk].val != 0 )
                 return true;
     
     //if here, the matrix is empty
     return false;
 }
 
-//------------------------------------------------------------------------------
-unsigned int MatrixSparseSymmetric::nbNonZeroElements() const
+
+void MatrixSparseSymmetric::scale(const real alpha)
 {
+    for ( index_t jj = 0; jj < size_; ++jj )
+        for ( unsigned n = 0; n < col_size_[jj]; ++n )
+            col_[jj][n].val *= alpha;
+}
+
+
+void MatrixSparseSymmetric::addTriangularBlock(real* mat, const unsigned ldd,
+                                               const index_t si,
+                                               const unsigned nb,
+                                               const unsigned dim) const
+{
+    index_t up = si + nb;
+    assert_true( up <= size_ );
+    
+    for ( index_t jj = si; jj < up; ++jj )
+    {
+        for ( unsigned n = 0; n < col_size_[jj]; ++n )
+        {
+            index_t ii = col_[jj][n].inx;
+            if ( si <= ii && ii < up )
+            {
+                if ( ii < jj )
+                    mat[dim*(ii-si+ldd*(jj-si))] += col_[jj][n].val;
+                else
+                    mat[dim*(jj-si+ldd*(ii-si))] += col_[jj][n].val;
+            }
+        }
+    }
+}
+
+
+void MatrixSparseSymmetric::addDiagonalBlock(real* mat, unsigned ldd,
+                                             const index_t si,
+                                             const unsigned nb) const
+{
+    index_t up = si + nb;
+    assert_true( up <= size_ );
+    
+    for ( index_t jj = si; jj < up; ++jj )
+    {
+        for ( unsigned n = 0; n < col_size_[jj]; ++n )
+        {
+            index_t ii = col_[jj][n].inx;
+            if ( si <= ii && ii < up )
+            {
+                //printf("MSS1 %4i %4i % .4f\n", ii, jj, a);
+                mat[ii-si+ldd*(jj-si)] += col_[jj][n].val;
+                if ( jj != ii )
+                    mat[jj-si+ldd*(ii-si)] += col_[jj][n].val;
+            }
+        }
+    }
+}
+
+
+int MatrixSparseSymmetric::bad() const
+{
+    if ( size_ <= 0 ) return 1;
+    for ( index_t jj = 0; jj < size_; ++jj )
+    {
+        for ( unsigned kk = 0 ; kk < col_size_[jj] ; ++kk )
+        {
+            if ( col_[jj][kk].inx >= size_ ) return 2;
+            if ( col_[jj][kk].inx <= jj )   return 3;
+        }
+    }
+    return 0;
+}
+
+
+size_t MatrixSparseSymmetric::nbElements(index_t start, index_t stop) const
+{
+    assert_true( start <= stop );
+    assert_true( stop <= size_ );
     //all allocated elements are counted, even if zero
-    //the diagonal is not counted
-    unsigned int cnt = 0;
-    for ( unsigned int jj = 0; jj < mxSize; ++jj )
-        cnt += colSize[jj];
+    size_t cnt = 0;
+    for ( index_t jj = start; jj < stop; ++jj )
+        cnt += col_size_[jj];
     return cnt;
 }
 
 //------------------------------------------------------------------------------
+#pragma mark -
+
 std::string MatrixSparseSymmetric::what() const
 {
     std::ostringstream msg;
-    msg << "SPS (nnz: " << nbNonZeroElements() << ")";
+    msg << "MSS " << nbElements();
     return msg.str();
 }
 
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::prepareForMultiply()
+
+void MatrixSparseSymmetric::printSparse(std::ostream& os) const
 {
+    std::streamsize p = os.precision();
+    os.precision(8);
+    for ( index_t jj = 0; jj < size_; ++jj )
+    {
+        for ( unsigned n = 0 ; n < col_size_[jj] ; ++n )
+        {
+            os << col_[jj][n].inx << " " << jj << " ";
+            os << col_[jj][n].val << "\n";
+        }
+    }
+    os.precision(p);
+}
+
+
+void MatrixSparseSymmetric::printColumns(std::ostream& os)
+{
+    os << "MSS size " << size_ << ":";
+    for ( index_t jj = 0; jj < size_; ++jj )
+    {
+        os << "\n   " << jj << "   " << col_size_[jj];
+    }
+    std::endl(os);
+}
+
+
+void MatrixSparseSymmetric::printColumn(std::ostream& os, const index_t jj)
+{
+    Element const* col = col_[jj];
+    os << "MSS col " << jj << ":";
+    for ( unsigned n = 0; n < col_size_[jj]; ++n )
+    {
+        os << "\n" << col[n].inx << " :";
+        os << " " << col[n].val;
+    }
+    std::endl(os);
 }
 
 
 //------------------------------------------------------------------------------
-void MatrixSparseSymmetric::vecMulAdd( const real* X, real* Y ) const
+#pragma mark -
+
+void MatrixSparseSymmetric::prepareForMultiply(int)
 {
-    for ( index_type jj = 0; jj < mxSize; ++jj )
-        for ( index_type kk = 0 ; kk < colSize[jj] ; ++kk )
+}
+
+
+void MatrixSparseSymmetric::vecMulAdd(const real* X, real* Y) const
+{
+    for ( index_t jj = 0; jj < size_; ++jj )
+    {
+        for ( unsigned kk = 0 ; kk < col_size_[jj] ; ++kk )
         {
-            const index_type ii = col[jj][kk].line;
-            const real a = col[jj][kk].val;
+            const index_t ii = col_[jj][kk].inx;
+            const real a = col_[jj][kk].val;
             Y[ii] += a * X[jj];
             if ( ii != jj )
                 Y[jj] += a * X[ii];
         }
+    }
 }
 
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::vecMulAddIso2D( const real* X, real* Y ) const
+
+void MatrixSparseSymmetric::vecMulAddIso2D(const real* X, real* Y) const
 {
-    const unsigned int D = 2;
-    for ( index_type jj = 0; jj < mxSize; ++jj )
-        for ( index_type kk = 0 ; kk < colSize[jj] ; ++kk )
+    for ( index_t jj = 0; jj < size_; ++jj )
+    {
+        const index_t Djj = 2 * jj;
+        for ( unsigned kk = 0 ; kk < col_size_[jj] ; ++kk )
         {
-            const index_type ii = col[jj][kk].line;
-            const real a = col[jj][kk].val;
-            Y[D*ii  ] += a * X[D*jj  ];
-            Y[D*ii+1] += a * X[D*jj+1];
-            if ( ii != jj )
+            const index_t Dii = 2 * col_[jj][kk].inx;
+            const real  a = col_[jj][kk].val;
+            Y[Dii  ] += a * X[Djj  ];
+            Y[Dii+1] += a * X[Djj+1];
+            if ( Dii != Djj )
             {
-                Y[D*jj  ] += a * X[D*ii  ];
-                Y[D*jj+1] += a * X[D*ii+1];
+                Y[Djj  ] += a * X[Dii  ];
+                Y[Djj+1] += a * X[Dii+1];
             }
         }
+    }
 }
 
-//------------------------------------------------------------------------------
-void MatrixSparseSymmetric::vecMulAddIso3D( const real* X, real* Y ) const
+
+void MatrixSparseSymmetric::vecMulAddIso3D(const real* X, real* Y) const
 {
-    const int D = 3;
-    for ( index_type jj = 0; jj < mxSize; ++jj )
-        for ( index_type kk = 0 ; kk < colSize[jj] ; ++kk )
+    for ( index_t jj = 0; jj < size_; ++jj )
+    {
+        const index_t Djj = 3 * jj;
+        for ( unsigned kk = 0 ; kk < col_size_[jj] ; ++kk )
         {
-            const index_type ii = col[jj][kk].line;
-            const real a = col[jj][kk].val;
-            Y[D*ii  ] += a * X[D*jj  ];
-            Y[D*ii+1] += a * X[D*jj+1];
-            Y[D*ii+2] += a * X[D*jj+2];
-            if ( ii != jj )
+            const index_t Dii = 3 * col_[jj][kk].inx;
+            const real  a = col_[jj][kk].val;
+            Y[Dii  ] += a * X[Djj  ];
+            Y[Dii+1] += a * X[Djj+1];
+            Y[Dii+2] += a * X[Djj+2];
+            if ( Dii != Djj )
             {
-                Y[D*jj  ] += a * X[D*ii  ];
-                Y[D*jj+1] += a * X[D*ii+1];
-                Y[D*jj+2] += a * X[D*ii+2];
+                Y[Djj  ] += a * X[Dii  ];
+                Y[Djj+1] += a * X[Dii+1];
+                Y[Djj+2] += a * X[Dii+2];
             }
         }
+    }
 }
+

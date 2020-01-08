@@ -1,58 +1,69 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-// Test class PointsOnSphere
+// Test for PointsOnSphere
 
 #include <pthread.h>
 
 #include "pointsonsphere.h"
 #include "glapp.h"
+#include "glut.h"
 #include "gle.h"
-extern Random RNG;
 
-int nPoints = 12;
 PointsOnSphere S, T;
-
 PointsOnSphere * front = &S;
-PointsOnSphere * back  = &T;
 
 pthread_t       thread;
 pthread_mutex_t lock;
 
+int n_points = 12;
+
 //------------------------------------------------------------------------------
 
-void batch(int mn, int mx)
+void batch(unsigned long nbp, int repeat)
 {
-    int total = 0;
+    size_t iterations = 0;
+    real energy = INFINITY;
+    real distance = 0;
     
-    for ( int nbp = mn; nbp < mx; nbp += 7 )
+    printf("%4lu pts :", nbp);
+    printf(" %6.4f :", S.expectedDistance(nbp));
+    
+    for ( int m=0; m < repeat; ++m )
     {
-        printf("%4i pts :", nbp);
-        printf(" %6.4f :", S.expectedDistance(nbp));
-        for ( int m=0; m < mx; ++m )
-        {
-            int step = S.distributePoints(nbp);
-            printf(" %6.4f", S.minimumDistance());
-            total += step;
-        }
-        printf(" energy %7.2f", S.finalEnergy());
-        printf(" total iter. %7i\n", total);
+        iterations += S.distributePoints(nbp, 1e-4, 1<<14);
+        
+        if ( S.finalEnergy() < energy )
+            energy = S.finalEnergy();
+        
+        if ( S.minimumDistance() > distance )
+            distance = S.minimumDistance();
     }
+    
+    printf("   distance %9.6f",    distance);
+    printf("   energy %14.5f",     energy);
+    printf("   iterations %12lu\n", iterations);
 }
+
 //------------------------------------------------------------------------------
 
 void* calculateSphere(void * arg)
-{    
-    glApp::GP.message_left="Calculating...";
+{
+    glApp::setMessage("Calculating...");
     glApp::postRedisplay();
 
-    back->distributePoints(nPoints);
-
-    glApp::GP.message_left.clear();
+    if ( front == &S )
+    {
+        T.distributePoints(n_points, 1e-4, 1<<14);
+        front = &T;
+    }
+    else
+    {
+        S.distributePoints(n_points, 1e-4, 1<<14);
+        front = &S;
+    }
+    
+    glApp::setMessage("");
     glApp::postRedisplay();
-    
-    PointsOnSphere * tmp = back;
-    back  = front;
-    front = tmp;
-    
+        
     pthread_mutex_unlock(&lock);
     pthread_exit(0);
 }
@@ -62,19 +73,21 @@ void processNormalKey(unsigned char c, int x, int y)
 {
     switch (c)
     {
-        case 't': nPoints-=10;    break;
-        case 'y': nPoints+=1;     break;
-        case 'u': nPoints+=10;    break;
-        case 'i': nPoints+=100;   break;
-        case 'o': nPoints+=1000;  break;
+        case 'r': n_points-=256;   break;
+        case 't': n_points-=32;    break;
+        case 'y': n_points+=1;     break;
+        case 'u': n_points+=16;    break;
+        case 'i': n_points+=128;   break;
+        case 'o': n_points+=1024;  break;
+        case 'p': n_points+=8192;  break;
         case 'q' : exit(1);
             
         default:
             glApp::processNormalKey(c,x,y);
             return;
     }
-    if ( nPoints < 1 )
-        nPoints = 1;
+    if ( n_points < 1 )
+        n_points = 1;
     
     if ( 0 == pthread_mutex_trylock(&lock) )
     {
@@ -87,28 +100,62 @@ void processNormalKey(unsigned char c, int x, int y)
 }
 
 //------------------------------------------------------------------------------
-void display()
+void display(View&, int)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     
-    glPointSize(8);
-    glBegin(GL_POINTS);
+    glPointSize(7);
     
     if ( front == &T )
-        glColor3f(0.0, 0.0, 1.0);
+        glColor3f(0.0, 0.0, 0.7);
     else
-        glColor3f(0.0, 1.0, 0.0);
-    
-    for ( unsigned int ii=0; ii < front->nbPoints(); ++ii )
+        glColor3f(0.0, 0.7, 0.0);
+
+    glBegin(GL_POINTS);
+    for ( unsigned ii=0; ii < front->nbPoints(); ++ii )
     {
-#ifdef REAL_IS_FLOAT
-        glVertex3fv( front->addr(ii) );
-#else
+#if REAL_IS_DOUBLE
         glVertex3dv( front->addr(ii) );
+#else
+        glVertex3fv( front->addr(ii) );
 #endif
     }
-
     glEnd();
+    
+#if ( 0 )
+    glLineWidth(5);
+    glBegin(GL_LINES);
+    for ( unsigned ii=0; ii < front->nbPoints(); ++ii )
+    {
+        Vector3 p(front->addr(ii));
+        Vector3 n = p.orthogonal();
+        glColor3f(1.0, 1.0, 1.0);
+        gle::gleVertex(p);
+        glColor3f(0.0, 0.0, 0.0);
+        gle::gleVertex(p+0.1*n);
+    }
+    glEnd();
+#else
+    const real e = 0.05;
+    glLineWidth(4);
+    glBegin(GL_LINES);
+    for ( unsigned ii=0; ii < front->nbPoints(); ++ii )
+    {
+        Vector3 a(front->addr(ii));
+        Vector3 b, c;
+        a.orthonormal(b,c);
+        
+        glColor3f(0.0, 1.0, 0.0);
+        gle::gleVertex(a);
+        glColor3f(0.0, 0.0, 0.0);
+        gle::gleVertex(a+e*b);
+        glColor3f(0.0, 0.0, 1.0);
+        gle::gleVertex(a);
+        glColor3f(0.0, 0.0, 0.0);
+        gle::gleVertex(a+e*c);
+    }
+    glEnd();
+#endif
     
     if ( 0 )
     {
@@ -121,28 +168,32 @@ void display()
 
 //------------------------------------------------------------------------------
 int main(int argc, char* argv[])
-{    
-    RNG.seedTimer();
+{
+    RNG.seed();
+    
     if ( argc == 3 ) 
     {
-        batch(atoi(argv[1]), atoi(argv[2]));
+        unsigned min = (unsigned)strtoul(argv[1], 0, 10);
+        unsigned max = (unsigned)strtoul(argv[2], 0, 10);
+        
+        for (unsigned nbp = min; nbp < max; nbp += 7)
+            batch(nbp, 16);
         return EXIT_SUCCESS;
     }
+    
     if ( argc == 2 ) 
-    {
-        nPoints = atoi(argv[1]);
-        argv[1][0] = '\0';
-    }
+        n_points = strtoul(argv[1], 0, 10);
     
     pthread_mutex_init(&lock, 0);
-    front->distributePoints(nPoints);
+    front->distributePoints(n_points, 1e-4, 1<<14);
     
     glutInit(&argc, argv);
-    glApp::init(display, 3);
-    glApp::setScale(2);
+    glApp::setDimensionality(3);
     glApp::attachMenu(GLUT_RIGHT_BUTTON);
-    glutKeyboardFunc(processNormalKey);
-    
+    glApp::normalKeyFunc(processNormalKey);
+    glApp::createWindow(display);
+    glApp::setScale(3);
+
     glutMainLoop();
     return EXIT_SUCCESS;
 }

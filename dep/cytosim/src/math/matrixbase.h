@@ -1,8 +1,10 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
+#ifndef MATRIX_BASE
+#define MATRIX_BASE
+
 
 #include "real.h"
-#include "smath.h"
 #include "assert_macro.h"
 #include <iostream>
 #include <iomanip>
@@ -11,12 +13,10 @@ class Random;
 /// Fortran-style matrices of small dimensions: 1, 2 and 3
 /** 
 
- Square matrices of small dimensions.
- 
- The matrice's elements are stored in a one dimensional array to be
- compatible with FORTRAN routines
- Matrices for small dimensions: 1 2 or 3 can be used to represent
- transformations of the Vector class
+ Square matrices of small dimensions that can be used to represent
+ transformations over the Vector space.
+
+ The matrice's elements are stored in a one dimensional array in column major order.
  
  */
 
@@ -33,9 +33,6 @@ public:
     
     /// The default creator does not initialize
     MatrixBase() {}
-    
-    /// The default destructor does nothing
-    virtual ~MatrixBase() {}
     
     
     /// Copy-creator from a C-style array
@@ -54,27 +51,33 @@ public:
     }
     
     /// set all components to zero
-    void makeZero() 
+    void reset()
     {
         for ( unsigned ii = 0; ii < SZ*SZ; ++ii )
-            val[ii] = 0;
+            val[ii] = 0.0;
+    }
+    
+    /// set to Diagonal matrix with 'x' on diagonal
+    void makeDiagonal(real x)
+    {
+        for ( unsigned ii = 0; ii < SZ*SZ; ++ii )
+            val[ii] = 0.0;
+        for ( unsigned ii = 0; ii < SZ*SZ; ii += SZ+1 )
+            val[ii] = x;
     }
     
     /// set to Identity (ones on the diagonal, zero elsewhere)
-    void makeIdentity() 
+    void makeOne()
     {
-        makeZero();
-        for ( unsigned ii = 0; ii < SZ*SZ; ii += SZ+1 )
-            val[ii] = 1.;
+        makeDiagonal(1.0);
     }
 
-    
     /// conversion to a modifiable real array
-    operator real*() 
+    real* data() 
     {
         return val;
     }
-    
+
     /// access to modifiable elements of the matrix by (line, column)
     real& operator()(const unsigned ii, const unsigned jj)
     {
@@ -82,7 +85,7 @@ public:
     }
     
     /// access to constant elements of the matrix by (line, column)
-    real const& operator()(const unsigned ii, const unsigned jj) const
+    real operator()(const unsigned ii, const unsigned jj) const
     {
         return val[ii + SZ * jj];
     }
@@ -98,8 +101,42 @@ public:
     {
         return val[ii];
     }
-
-    /// return the transposed matrix
+    
+#if ( 0 )
+    /// extract column vector at index `jj`
+    void getColumn(const unsigned jj, real vec[SZ]) const
+    {
+        const real * v = val + jj * SZ;
+        for ( unsigned ii = 0; ii < SZ; ++ii )
+            vec[ii] = v[ii];
+    }
+    
+    /// set column vector at index `jj`
+    void setColumn(const unsigned jj, const real vec[SZ])
+    {
+        real * v = val + jj * SZ;
+        for ( unsigned ii = 0; ii < SZ; ++ii )
+            v[ii] = vec[ii];
+    }
+    
+    /// extract line vector at index `ii`
+    void getLine(const unsigned ii, real vec[SZ]) const
+    {
+        const real * v = val + ii;
+        for ( unsigned jj = 0; jj < SZ; ++jj )
+            vec[jj] = v[SZ*jj];
+    }
+    
+    /// set line vector at index `ii`
+    void setLine(const unsigned ii, const real vec[SZ])
+    {
+        real * v = val + ii;
+        for ( unsigned jj = 0; jj < SZ; ++jj )
+            v[SZ*jj] = vec[jj];
+    }
+#endif
+    
+    /// return transposed matrix
     MatrixBase transposed() const 
     {
         MatrixBase res;
@@ -120,7 +157,7 @@ public:
                 val[ii + SZ*jj] = val[jj + SZ*ii];
                 val[jj + SZ*ii] = x;
             }
-    }
+    }    
     
     /// maximum of all fabs(element)
     real maxNorm() const 
@@ -135,13 +172,14 @@ public:
     }
     
     /// formatted output
-    void write(std::ostream & os) const 
+    void print(std::ostream & os) const
     {
+        os.precision(4);
         for ( unsigned ii = 0; ii < SZ; ++ii )
         {
             for ( unsigned jj = 0; jj < SZ; ++jj )
-                os << std::setw(9) << std::setprecision(4) << val[ii+SZ*jj];
-            os << std::endl;
+                os << " " << std::setw(10) << val[ii+SZ*jj];
+            std::endl(os);
         }
     }
     
@@ -163,6 +201,15 @@ public:
         return res;
     }
     
+    /// opposition: change sign in all coordinates
+    MatrixBase operator - () const
+    {
+        MatrixBase res;
+        for ( unsigned ii = 0; ii < SZ*SZ; ++ii )
+            res.val[ii] = -val[ii];
+        return res;
+    }
+
     /// returns the matrix multiplied by the real scalar a
     friend MatrixBase operator * (const real a, const MatrixBase & b)
     {
@@ -173,14 +220,14 @@ public:
     }
     
     /// multiply the matrix by the real scalar a
-    void operator *=(const real a)
+    void operator *= (const real a)
     {
         for ( unsigned ii = 0; ii < SZ*SZ; ++ii )
             val[ii] *= a;
     }
     
     /// divide the matrix by the real scalar a
-    void operator /=(const real a)
+    void operator /= (const real a)
     {
         for ( unsigned ii = 0; ii < SZ*SZ; ++ii )
             val[ii] /= a;
@@ -200,7 +247,7 @@ public:
             val[ii] -= m.val[ii];
     }
     
-    /// add two matrices and return the result
+    /// return sum of two matrices
     friend MatrixBase operator + (const MatrixBase & a, const MatrixBase & b)
     {
         MatrixBase res;
@@ -232,7 +279,7 @@ public:
             }
         return res;
     }
-    
+
     /// Vector multiplication: out <- M * in
     void vecMul(const real* in, real* out) const
     {
@@ -262,7 +309,7 @@ public:
     static MatrixBase one()
     {
         MatrixBase res;
-        res.makeIdentity();
+        res.makeDiagonal(1.0);
         return res;
     }
     
@@ -270,28 +317,46 @@ public:
     static MatrixBase zero()
     {
         MatrixBase res;
-        res.makeZero();
+        res.reset();
         return res;
     }
-    
-    /// build the projection matrix V * V'
-    static MatrixBase projectionMatrix(const real V[])
+
+    /// build the rotation matrix `M = 2 V * V' - 1`
+    /**
+     This sets a rotation of determinant +1, under which 'V' is invariant
+     The plane orthogonal to axis 'V' is rotated by PI.
+     */
+    static MatrixBase set_householder(const real V[])
     {
         MatrixBase res;
         for ( unsigned ii = 0; ii < SZ; ++ii )
-        {
             for ( unsigned jj = 0; jj < SZ; ++jj )
-                res.val[ii+SZ*jj] = V[ii] * V[jj];
-        }
+                res.val[ii+SZ*jj] = 2.0 * V[ii] * V[jj] - ( ii == jj );
         return res;
     }
+    
+    /// build the projection matrix `M = 1 - V (x) V`
+    /**
+     This sets a projection on the plane perpendicular to 'V'.
+     */
+    static MatrixBase set_projection(const real V[])
+    {
+        MatrixBase res;
+        for ( unsigned ii = 0; ii < SZ; ++ii )
+            for ( unsigned jj = 0; jj < SZ; ++jj )
+                res.val[ii+SZ*jj] = 1.0 - V[ii] * V[jj];
+        return res;
+    }
+
 };
 
 /// output
 template < unsigned SZ >
-inline std::ostream & operator << (std::ostream & os, const MatrixBase<SZ>& mat)
+inline std::ostream& operator << (std::ostream& os, const MatrixBase<SZ>& mat)
 {
-    mat.write(os);
+    mat.print(os);
     return os;
 }
 
+
+#endif

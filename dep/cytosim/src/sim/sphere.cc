@@ -1,24 +1,22 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
+#include "sim.h"
+#include "smath.h"
 #include "assert_macro.h"
-#include "sphere.h"
-#include "wrist.h"
 #include "exceptions.h"
-#include "rotation.h"
-#include "meca.h"
 #include "messages.h"
 #include "glossary.h"
-#include "point_exact.h"
+#include "mecapoint.h"
 #include "sphere_prop.h"
 #include "object_set.h"
 #include "space_prop.h"
-#include "iowrapper.h"
 #include "space.h"
+#include "sphere.h"
+#include "wrist.h"
+#include "meca.h"
 #include "modulo.h"
 #include "simul.h"
-#include "sim.h"
 
-extern Random RNG;
 
 //------------------- construction and destruction ---------------------------
 
@@ -26,22 +24,25 @@ extern Random RNG;
  The Sphere is returned with no points
  */
 Sphere::Sphere(SphereProp const* p)
-: prop(p), spRadius(0), spMobility(0), spMobilityRot(0), spAllocated(0), spProj(0)
+: spRadius(0), spDrag(0), spDragRot(0), sRad(nullptr), prop(p)
 {
 }
 
 
+/*
+ This will create the center point
+ */
 Sphere::Sphere(SphereProp const* p, real rad)
-: prop(p), spRadius(rad), spMobility(0), spMobilityRot(0), spAllocated(0), spProj(0)
+: spRadius(rad), spDrag(0), spDragRot(0), sRad(nullptr), prop(p)
 {
-    if ( prop == 0 )
+    if ( !prop )
         throw InvalidParameter("Sphere:prop should be specified");
     
     if ( rad <= 0 )
         throw InvalidParameter("sphere:radius should be > 0");
     
     // center point
-    assert_true( nbPoints() == 0 );
+    assert_true( nPoints == 0 );
     addPoint( Vector(0,0,0) );
     
     // reference points to track the orientation of the sphere
@@ -57,30 +58,32 @@ Sphere::Sphere(SphereProp const* p, real rad)
 }
 
 
+Sphere::Sphere(const Sphere & o)
+: Mecable(o), sRad(nullptr)
+{
+    prop     = o.prop;
+    spRadius = o.spRadius;
+    setDragCoefficient();
+}
+
+
+Sphere & Sphere::operator =(const Sphere & o)
+{
+    prop     = o.prop;
+    spRadius = o.spRadius;
+    setDragCoefficient();
+    return *this;
+}
+
+
 Sphere::~Sphere()
 {
-    //free memory
-    if ( spProj ) delete[] spProj;
-    prop = 0;
+    release();
+    prop = nullptr;
 }
 
+//------------------------------------------------------------------------------
 #pragma mark -
-
-/*
- if PointSet::allocatePoints() allocated memory, it will return the
- size of the new array, and we allocate the same size for other arrays.
- */
-unsigned int Sphere::allocatePoints(unsigned int nbp)
-{
-    unsigned int ms = PointSet::allocatePoints(nbp);
-    if ( ms )
-    {
-        //std::cerr << "Sphere::allocatePoints " << ms << std::endl;
-        allocateProjection(ms);
-    }
-    return ms;
-}
-
 
 /*
  here 'cp' is the vector from the center to the point to be added,
@@ -88,9 +91,7 @@ unsigned int Sphere::allocatePoints(unsigned int nbp)
  */
 unsigned Sphere::addSurfacePoint(Vector const& cp)
 {
-    if ( 8 * cp.norm() < spRadius )
-        throw InvalidParameter("sphere:point is too far from the surface of radius ", spRadius);
-    return addPoint(posPoint(0)+cp.normalized(spRadius));
+    return addPoint(posP(0)+cp.normalized(spRadius));
 }
 
 
@@ -98,13 +99,12 @@ unsigned Sphere::addSurfacePoint(Vector const& cp)
  @ingroup NewObject
  
  Specify radius and number of surface points of a Sphere:
- @code
- new sphere NAME
- {
- radius = REAL
- point0 = INTEGER, POSITION [, SINGLE_SPEC]
- }
- @endcode
+
+     new sphere NAME
+     {
+        radius = REAL
+        point1 = INTEGER, POSITION [, SINGLE_SPEC]
+     }
  
  The `INTEGER` specifies the number of points created, and `POSITION` can be a
  `VECTOR`, or the string 'surface'.  Multiple `SINGLE_SPEC` can be specified.
@@ -113,17 +113,15 @@ unsigned Sphere::addSurfacePoint(Vector const& cp)
  
  The parameter 'attach' can be used to add Single to the points of a Solid:
  
- @code
- new sphere NAME
- {
- radius   = ...
- point0   = ...
- etc.
- attach   = SINGLE_SPEC [, SINGLE_SPEC] ...
- attach0  = SINGLE_SPEC [, SINGLE_SPEC] ...
- etc.
- }
- @endcode
+     new sphere NAME
+     {
+        radius   = ...
+        point0   = ...
+        etc.
+        attach   = SINGLE_SPEC [, SINGLE_SPEC] ...
+        attach0  = SINGLE_SPEC [, SINGLE_SPEC] ...
+        etc.
+     }
  
  Where `SINGLE_SPEC` is string containing at most 3 words: `[INTEGER] NAME [each]`,
  where the `INTEGER` specifies the number of Singles, `NAME` specifies their name,
@@ -136,43 +134,44 @@ unsigned Sphere::addSurfacePoint(Vector const& cp)
  
  For example if `grafted` is the name of a Single, one can use:
  
- @code
- new solid NAME
- {
- attach0 = 1 grafted each
- attach1 = 10 grafted
- }
- @endcode
+     new solid NAME
+     {
+        attach1 = 1 grafted each
+        attach2 = 10 grafted
+     }
  */
-ObjectList Sphere::build(Glossary & opt, Simul& simul)
+ObjectList Sphere::build(Glossary & opt, Simul& sim)
 {
     ObjectList res;
     std::string str;
-    unsigned inp = 0, inx = 0, nbp = 1;
-    
+    unsigned inp = 1, inx = 0, nbp = 1;
+
+    if ( opt.has_key("point0") )
+        throw InvalidParameter("point indices start at 1 (use `point1`, `point2`, etc.)");
+
     // interpret each instruction as a command to add points:
-    std::string var = "point0";
+    std::string var = "point1";
     while ( opt.has_key(var) )
     {
         inx = 0;
         nbp = 1;
-        if ( opt.is_number(var) == 2 && opt.set(nbp, var) )
+        if ( opt.is_positive_integer(var, 0) && opt.set(nbp, var) )
             ++inx;
         
         if ( nbp > 0 )
         {
-            unsigned fip = nbPoints();
+            unsigned fip = nPoints;
+            str = opt.value(var, inx);
             // add 'nbp' points:
             for ( unsigned n = 0; n < nbp; ++n )
             {
                 Vector vec(0,0,0);
-                str = opt.value(var, inx);
                 if ( str == "surface" )
-                    vec = Vector::randUnit(radius());
+                    vec = Vector::randU(radius());
                 else
                 {
                     std::istringstream iss(str);
-                    vec = Movable::readPosition(iss, 0);
+                    vec = Movable::readPosition(iss, nullptr);
                     if ( 8 * vec.norm() < spRadius )
                         throw InvalidParameter(var+" cannot be brought to the Sphere surface");
                 }
@@ -180,31 +179,30 @@ ObjectList Sphere::build(Glossary & opt, Simul& simul)
             }
             
             // attach Single to this set of points:
-            ++inx;
-            while ( opt.set(str, var, inx++) )
-                res.append(simul.singles.makeWrists(this, fip, nbp, str));
+            while ( opt.set(str, var, ++inx) )
+                res.append(sim.singles.makeWrists(this, fip, nbp, str));
             
             // attach Single to this set of points:
             inx = 0;
-            var = "attach" + sMath::repr(inp);
+            var = "attach" + std::to_string(inp);
             while ( opt.set(str, var, inx++) )
-                res.append(simul.singles.makeWrists(this, fip, nbp, str));
+                res.append(sim.singles.makeWrists(this, fip, nbp, str));
         }
         
         // set next keyword:
-        var = "point" + sMath::repr(++inp);
+        var = "point" + std::to_string(++inp);
     }
     
     
     // attach Singles distributed over the surface points:
     inx = 0;
     while ( opt.set(str, "attach", inx++) )
-        res.append(simul.singles.makeWrists(this, nbRefPts, nbSurfacePoints(), str));
-    
+        res.append(sim.singles.makeWrists(this, nbRefPoints, nbSurfacePoints(), str));
+
     
     // final verification of the number of points:
     nbp = 0;
-    if ( opt.set(nbp, "nb_points")  &&  nbp != nbPoints() )
+    if ( opt.set(nbp, "nb_points")  &&  nbp != nPoints )
     {
         throw InvalidParameter("could not find the number of points specified in solid:nb_points");
     }
@@ -217,65 +215,57 @@ ObjectList Sphere::build(Glossary & opt, Simul& simul)
 //------------------------------------------------------------------------------
 void Sphere::setInteractions(Meca & meca) const
 {
-    switch ( prop->confine )
+    if ( prop->confine != CONFINE_OFF )
     {
-        case CONFINE_NOT:
-            break;
-
-        case CONFINE_INSIDE:
-        {
-            Space const* spc = prop->confine_space_ptr;
-            
-            Vector pos = posPoint(0);
-            if ( !spc->inside(pos) )
-                spc->setInteraction(pos, PointExact(this, 0), meca, prop->confine_stiff);
-        } break;
+        Space const* spc = prop->confine_space_ptr;
         
-        case CONFINE_ALL_INSIDE:
+        switch ( prop->confine )
         {
-            const Space* spc = prop->confine_space_ptr;
-            
-            //for the sphere, we only need to confine the center (point with index 0)
-            Vector pos = posPoint(0);
-            if ( ! spc->allInside(pos, spRadius) )
-                spc->setInteraction(pos, PointExact(this, 0), spRadius, meca, prop->confine_stiff);
-        } break;
-        
-        case CONFINE_SURFACE:
-        {
-            const Space* spc = prop->confine_space_ptr;
-            spc->setInteraction(posPoint(0), PointExact(this, 0), meca, prop->confine_stiff);
+            case CONFINE_INSIDE:
+            {
+                Vector cen(pPos);
+                if ( ! spc->inside(cen) )
+                    spc->setInteraction(cen, Mecapoint(this, 0), meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_ALL_INSIDE:
+            {
+                Vector cen(pPos);
+                if ( ! spc->allInside(cen, spRadius) )
+                    spc->setInteraction(cen, Mecapoint(this, 0), spRadius, meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_ON:
+                spc->setInteraction(posP(0), Mecapoint(this, 0), meca, prop->confine_stiffness);
+                
+            default:
+                throw InvalidParameter("Invalid sphere::confine");
         }
-            
-        default:
-            throw InvalidParameter("Invalid sphere::confine");            
     }
-}
-
-
-void Sphere::foldPosition(const Modulo * s)
-{
-    //modulo around the first point, which is the center
-    s->fold( psPos );
-    for ( unsigned int p = 1; p < nbPoints(); p++ )
-        s->fold( psPos+DIM*p, psPos );
 }
 
 
 void Sphere::resize(const real R)
 {
-    //std::cerr << "Sphere::resize " << R << std::endl;
+    //std::clog << "Sphere::resize " << R << std::endl;
     if ( R > 0 )
     {
         spRadius = R;
-        //this only needs to be called once:
-        setDragCoefficient();
         reshape();
+        //recalculate drag:
+        setDragCoefficient();
     }
 }
 
 /**
- the mobility is that of a sphere in an infinite fluid (Stokes law)
+ the mobility is that of a sphere in an infinite fluid:
+ Stokes law:
+ 
+ mu_translation = 6 * PI * viscosity * radius
+ dposition/dt   = mu_trans * force
+ 
+ mu_rotation = 8 * PI * viscosity * radius^3
+ dangle/dt   = mu_rotation * torque
  */
 void Sphere::setDragCoefficientStokes()
 {
@@ -284,10 +274,10 @@ void Sphere::setDragCoefficientStokes()
     const real rad = spRadius;
     
     //hydrodynamic not corrected: infinite fluid is assumed
-    spMobility    = 1.0 / ( 6 * M_PI * prop->viscosity * rad );
-    spMobilityRot = 1.0 / ( 8 * M_PI * prop->viscosity * rad * rad * rad );
+    spDrag    = 6 * M_PI * prop->viscosity * rad;
+    spDragRot = 8 * M_PI * prop->viscosity * rad * rad * rad;
 
-    //Cytosim::MSG("Mobility of Sphere is %.2e\n", spMobility);
+    Cytosim::log("Sphere of radius %.3f has mobility %.2e\n", spRadius, spDrag);
 }
 
 
@@ -300,27 +290,31 @@ void Sphere::setDragCoefficientStokes()
  <em>The Motion of a Closely-Fitting Sphere in a Fluid-Filled Tube</em>\n
  <b>P. Bungay and H. Brenner, Int. J. Multiphase Flow</b>\n
  Vol 1, pp. 25-56, 1973 (see 3.6, 4.68a and 5.11)
+ @latex
+     \gamma = \frac{9 \pi^2 \sqrt{2} }{ 4\epsilon^{5/2}} \,\eta \, r
+     \gamma^{rot} = 2 \pi^2 \sqrt{\frac{2}{\epsilon}} \,\eta\, r^3
+ @end
  */
 void Sphere::setDragCoefficientPiston()
 {
-    assert_true( spRadius > 0 );
+    assert_true( radius() > 0 );
     assert_true( prop->confine_space_ptr );
     
-    const real rad = spRadius;
-    real cell_radius = prop->confine_space_ptr->length(1);
-    real eps  = ( cell_radius - rad ) / rad;
+    const real rad = radius();
+    real thickness = prop->confine_space_ptr->thickness();
+    real eps = ( thickness - rad ) / rad;
     
     if ( eps <= 0 )
-        throw InvalidParameter("Error: piston formula invalid if sphere is larger than the cell");
+        throw InvalidParameter("Error: piston formula yields invalid value");
 
     if ( eps > 1 )
-        throw InvalidParameter("Error: piston formula invalid if sphere and cylinder do not fit");
+        throw InvalidParameter("Error: piston formula yields invalid value");
 
-    spMobility    = 4*sqrt(sMath::power(eps,5)/2) / ( 9*M_PI*M_PI * prop->viscosity * rad );
-    spMobilityRot = sqrt(eps/2) / ( 2*M_PI*M_PI * prop->viscosity * rad * rad * rad );
+    spDrag    = 9*M_PI*M_PI * prop->viscosity * rad * M_SQRT2 / ( 4 * pow(eps,2.5) );
+    spDragRot = 2*M_PI*M_PI * prop->viscosity * rad * rad * rad * sqrt(2.0/eps);
         
     //report the reduced mobility of the sphere:
-    //Cytosim::MSG("Mobility of Sphere is %.2e, due to piston effect\n", spMobility);
+    Cytosim::out << "Sphere of radius "<< radius() <<" has drag coefficient "<<spDrag<<", due to piston effect" << std::endl;
 }
 
 
@@ -333,55 +327,84 @@ void Sphere::setDragCoefficient()
         if ( prop->confine_space_ptr )
             setDragCoefficientPiston();
         else
-            Cytosim::MSG("Piston effect ignored because space is undefined\n");
+            Cytosim::warn << "Piston effect ignored because space is undefined" << std::endl;
     }
 }
 
 
 #pragma mark -
 
+size_t Sphere::allocateMecable(size_t nbp)
+{
+    size_t ms = Mecable::allocateMecable(nbp);
+    if ( ms )
+    {
+        free_real(sRad);
+        sRad = new_real(DIM*ms);
+    }
+    return ms;
+}
+
+
+void Sphere::release()
+{
+    free_real(sRad);
+    sRad = nullptr;
+}
+
+
 void Sphere::prepareMecable()
 {
-    // setDragCoefficient() was already called by the constructor
+    //setDragCoefficient() was already called by the constructor
     //setDragCoefficient();
     
-    assert_true( spMobility > 0 );
-    assert_true( spMobilityRot > 0 );
+    assert_true( spDrag > 0 );
+    assert_true( spDragRot > 0 );
     
     makeProjection();
 }
 
 //------------------------------------------------------------------------------
 
-real Sphere::addBrownianForces(real* rhs, real sc) const
+real Sphere::addBrownianForces(real const* rnd, real sc, real* res) const
 {
-    real bT = sqrt( 2 * sc / spMobility );
-    real bS = sqrt( 2 * sc / prop->point_mobility );
-    
+    real bS, bT = sqrt( 2 * sc * spDrag );
+    if ( prop->point_mobility > 0 )
+        bS = sqrt( 2 * sc / prop->point_mobility );
+    else
+        bS = 0;
+
     Vector F(0, 0, 0);
-    Torque T = nullTorque;
-    
-    real cx = psPos[0];
-    real cy = psPos[1];
-    real cz = psPos[2];
-    
-    for ( unsigned dp = DIM*nbRefPts; dp < DIM*nbPoints(); dp+=DIM )
+    Torque T(nullTorque);
+
+    real cx = pPos[0];
+    real cy = pPos[1];
+    real cz = pPos[2];
+
+    /*
+     Add random forces to the surface points, and calculate the resulting force
+     and momentum in F and T. They will be subtracted from the reference points.
+     */
+    for ( unsigned p = nbRefPoints; p < nPoints; ++p )
     {
-        Vector fp = Vector::randGauss(bS);
+        real * rhs = res + DIM * p;
+        real * pos = pPos + DIM * p;
+        Vector fp = bS * Vector(rnd+DIM*p);
+        
         F += fp;
         
-        rhs[dp  ] += fp.XX;
+        rhs[0] += fp.XX;
         
 #if   ( DIM == 2 )
-        rhs[dp+1] += fp.YY;
-        T += vecProd(Vector(psPos[dp]-cx, psPos[dp+1]-cy), fp);
+        rhs[1] += fp.YY;
+        T += cross(Vector(pos[0]-cx, pos[1]-cy), fp);
 #elif ( DIM == 3 )
-        rhs[dp+1] += fp.YY;
-        rhs[dp+2] += fp.ZZ;
-        T += vecProd(Vector(psPos[dp]-cx, psPos[dp+1]-cy, psPos[dp+2]-cz), fp);
+        rhs[1] += fp.YY;
+        rhs[2] += fp.ZZ;
+        T += cross(Vector(pos[0]-cx, pos[1]-cy, pos[2]-cz), fp);
 #endif
     }
-    
+
     /*
      The Torque is distributed to the surface points.
      In 2D, there is one point, and the coefficient is therefore 1.
@@ -389,70 +412,68 @@ real Sphere::addBrownianForces(real* rhs, real sc) const
      and the decomposition over these 3 points gives a factor 2.
      */
     T /= - ( DIM - 1 ) * spRadius * spRadius;
-    Vector R = vecProd(Vector(cx,cy,cz), T);
-    
-    for ( unsigned dp = DIM; dp < DIM*nbRefPts; dp+=DIM )
+    Vector R = cross(Vector(cx,cy,cz), T);
+
+    for ( unsigned p = 1; p < nbRefPoints; ++p )
     {
+        real * rhs = res + DIM * p;
+        real const* pos = pPos + DIM * p;
+        Vector fp = bT * Vector(rnd+p);
 #if   ( DIM == 2 )
-        rhs[dp]   += R.XX - T * psPos[dp+1] + bT * RNG.gauss();
-        rhs[dp+1] += R.YY + T * psPos[dp  ] + bT * RNG.gauss();
-        F += vecProd(T, Vector(psPos[dp]-cx, psPos[dp+1]-cy));
+        rhs[0] += R.XX - T * pos[1] + fp.XX;
+        rhs[1] += R.YY + T * pos[0] + fp.YY;
+        F += fp + cross(T, Vector(pos[0]-cx, pos[1]-cy));
 #elif ( DIM == 3 )
-        rhs[dp  ] += R.XX + T.YY * psPos[dp+2] - T.ZZ * psPos[dp+1] + bT * RNG.gauss();
-        rhs[dp+1] += R.YY + T.ZZ * psPos[dp  ] - T.XX * psPos[dp+2] + bT * RNG.gauss();
-        rhs[dp+2] += R.ZZ + T.XX * psPos[dp+1] - T.YY * psPos[dp  ] + bT * RNG.gauss();
-        F += vecProd(T, Vector(psPos[dp]-cx, psPos[dp+1]-cy, psPos[dp+2]-cz));
+        rhs[0] += R.XX + T.YY * pos[2] - T.ZZ * pos[1] + fp.XX;
+        rhs[1] += R.YY + T.ZZ * pos[0] - T.XX * pos[2] + fp.YY;
+        rhs[2] += R.ZZ + T.XX * pos[1] - T.YY * pos[0] + fp.ZZ;
+        F += fp + cross(T, Vector(pos[0]-cx, pos[1]-cy, pos[2]-cz));
 #endif
     }
     
+    // center of the sphere:
 #if   ( DIM == 2 )
-    rhs[0] -= F.XX + bT * RNG.gauss();
-    rhs[1] -= F.YY + bT * RNG.gauss();
+    res[0] -= F.XX + bT * rnd[0];
+    res[1] -= F.YY + bT * rnd[1];
 #elif ( DIM == 3 )
-    rhs[0] -= F.XX + bT * RNG.gauss();
-    rhs[1] -= F.YY + bT * RNG.gauss();
-    rhs[2] -= F.ZZ + bT * RNG.gauss();
+    res[0] -= F.XX + bT * rnd[0];
+    res[1] -= F.YY + bT * rnd[1];
+    res[2] -= F.ZZ + bT * rnd[2];
 #endif
-    
-    return std::min(bT*spMobility, bS*prop->point_mobility);
+
+    return std::max(bT/spDrag, bS*prop->point_mobility);
 }
 
-//------------------------------------------------------------------------------
 
-void Sphere::orthogonalizeRef()
+/**
+ Here we start from the i-th Vector and make the other ones orthogonal.
+ There must be a better way to do this...
+ */
+void Sphere::orthogonalize(unsigned i)
 {
 #if ( DIM == 3 )
+    const unsigned ix = 1 + i;
+    const unsigned iy = 1 + (i+1)%3;
+    const unsigned iz = 1 + (i+2)%3;
     
-    const int i = RNG.pint_exc(3);
-    const int ix = 1+i, iy = 1+(i+1)%3, iz = 1+(i+2)%3;
-    
-    psCenter.set(psPos[0], psPos[1], psPos[2]);
-    assert_true( nbPoints() >= nbRefPts );
+    Vector cen(pPos);
+    assert_true( nPoints >= nbRefPoints );
     
     // reduce to the center of mass an normalize
-    Vector tmpX =   posPoint(ix) - psCenter;
-    Vector tmpY =   posPoint(iy) - psCenter;
-    Vector tmpZ = ( posPoint(iz) - psCenter ).normalized();
+    Vector tmpX = posP(ix) - cen;
+    Vector tmpY = posP(iy) - cen;
+    Vector tmpZ = normalize( posP(iz) - cen );
     
     // make tmpY orthogonal to tmpZ, and normalized
-    tmpY -= (tmpZ*tmpY) * tmpZ;
-    tmpY.normalize();
+    tmpY = normalize(tmpY - dot(tmpZ, tmpY) * tmpZ);
     
     // make tmpX orthogonal to tmpZ and tmpY
-    tmpX -= (tmpZ*tmpX) * tmpZ + (tmpY*tmpX) * tmpY;
+    tmpX = normalize(tmpX - dot(tmpZ, tmpX) * tmpZ - dot(tmpY, tmpX) * tmpY);
     
-    // normalize all to radius
-    tmpX.normalize(spRadius);
-    tmpY *= spRadius;
-    tmpZ *= spRadius;
-    
-    // put the corrected vectors back into the array
-    for ( unsigned int ii=0; ii < 3; ii++)
-    {
-        psPos[DIM*ix+ii] = tmpX[ii] + psCenter[ii];
-        psPos[DIM*iy+ii] = tmpY[ii] + psCenter[ii];
-        psPos[DIM*iz+ii] = tmpZ[ii] + psCenter[ii];
-    }
+    // store corrected vectors back into the array
+    ( cen + spRadius * tmpX ).store(pPos+DIM*ix);
+    ( cen + spRadius * tmpY ).store(pPos+DIM*iy);
+    ( cen + spRadius * tmpZ ).store(pPos+DIM*iz);
 #endif
 }
 
@@ -464,19 +485,20 @@ void Sphere::orthogonalizeRef()
 */
 void Sphere::reshape()
 {
-    assert_true( nbPoints() > 0 );
+    assert_true( nPoints > 0 );
     assert_true( spRadius > 0 );
     Vector axis;
-    psCenter.set(psPos[0], psPos[1], psPos[2]);
+    Vector cen(pPos);
     
-    for ( unsigned int j = 1; j < nbPoints(); ++j ) 
+    for ( unsigned j = 1; j < nPoints; ++j )
     {
-        axis = ( posPoint(j) - psCenter ).normalized( spRadius );
-        setPoint( j, psCenter + axis );
+        axis = ( posP(j) - cen ).normalized(spRadius);
+        setPoint(j, cen + axis);
     }
     
-    if ( DIM == 3 )
-        orthogonalizeRef();
+#if ( DIM == 3 )
+    orthogonalize(RNG.pint(3));
+#endif
 }
 
 
@@ -484,144 +506,124 @@ void Sphere::reshape()
 //------------------- methods for the projection -------------------------------
 #pragma mark -
 
-
-void Sphere::allocateProjection(const unsigned int nbp)
-{
-    //std::cerr << "Sphere::allocateProjection(" << nbp << ")" << std::endl;
-    if ( spAllocated < nbp )
-    {        
-        if ( spProj ) delete[] spProj;
-        
-        spAllocated = nbp;
-        spProj = new real[DIM*spAllocated];
-    }
-}
-
-
-#if (DIM == 1)
+#if ( DIM == 1 )
 
 //this is unsafe, don't use the sphere in 1D!
 void Sphere::makeProjection() { ABORT_NOW("Sphere is not implemented in 1D"); }
-void Sphere::addSurfaceSpeedsFromForces(real const*, real*, real) const {}
-void Sphere::setSpeedsFromForces(const real* X, real* Y, const real, bool) const {}
+void Sphere::projectForces(const real* X, real* Y) const {}
 
-#elif ( DIM == 2 || DIM == 3 )
+#else
 
 /**
  prepare variables for the projection 
  */
 void Sphere::makeProjection()
 {
-    //allocate more memory if needed
-    allocateProjection(nbPoints());
-    assert_true( spAllocated >= nbPoints() );
-    assert_true( nbPoints() >= nbRefPts );
-
-    //copy center of sphere:
-    psCenter.set(psPos[0], psPos[1], psPos[2]);
-
-    //preparations for the motion of the Surfaces:
-    //the reference points will be omitted!
-        
-    //calculate the nonzero components of j, omitting factors of 2
+    assert_true( nPoints >= nbRefPoints );
+    
+    // calculate radial vectors from center:
     real curv = 1.0 / spRadius;
-    for ( unsigned int p = nbRefPts; p < nbPoints(); ++p)
+    for ( unsigned p = nbRefPoints; p < nPoints; ++p )
     {
-        for ( int d = 0; d < DIM; ++d)
-            spProj[DIM*p+d] = curv * ( psPos[DIM*p+d] - psPos[d] );
+        real * ppp = sRad + DIM * p;
+        real * pos = pPos + DIM * p;
+        for ( int d = 0; d < DIM; ++d )
+            ppp[d] = curv * ( pos[d] - pPos[d] );
     }
 }
 
 
-void Sphere::setSphereSpeedsFromForces(const real* X, real* Y, const real sc) const
+// The function should set Y <- sc * mobility * X.
+void Sphere::projectForces(const real* X, real* Y) const
 {
+    // total force:
     Vector F(0,0,0);
+    
+    // total torque:
 #if   ( DIM == 2 )
     real T = 0;
-#elif ( DIM == 3 )
+#elif ( DIM >= 3 )
     Vector T(0,0,0);
 #endif
     
-    for ( unsigned int p = 0; p < nbPoints(); p++ )
+    for ( unsigned p = 0; p < nPoints; ++p )
     {
-        F.XX +=  X[DIM*p  ];
-        F.YY +=  X[DIM*p+1];
+        real * pos = pPos + DIM * p;
+        real const* xxx = X + DIM * p;
+        
+        F.XX += xxx[0];
+        F.YY += xxx[1];
 #if   ( DIM == 2 )
-        T    += psPos[DIM*p] * X[DIM*p+1] - psPos[DIM*p+1] * X[DIM*p];
-#elif ( DIM == 3 )
-        F.ZZ +=  X[DIM*p+2];
-        T.XX += psPos[DIM*p+1] * X[DIM*p+2] - psPos[DIM*p+2] * X[DIM*p+1];
-        T.YY += psPos[DIM*p+2] * X[DIM*p  ] - psPos[DIM*p  ] * X[DIM*p+2];
-        T.ZZ += psPos[DIM*p  ] * X[DIM*p+1] - psPos[DIM*p+1] * X[DIM*p  ];
+        T    += pos[0] * xxx[1] - pos[1] * xxx[0];
+#elif ( DIM >= 3 )
+        F.ZZ += xxx[2];
+        T.XX += pos[1] * xxx[2] - pos[2] * xxx[1];
+        T.YY += pos[2] * xxx[0] - pos[0] * xxx[2];
+        T.ZZ += pos[0] * xxx[1] - pos[1] * xxx[0];
 #endif
     }
     
-    T -= vecProd( psCenter, F );       // reduce the torque to the center of mass
-    T *= sc*spMobilityRot;             // multiply by the mobility and maybe dt
-    F  = sc*spMobility*F + vecProd( psCenter, T );
+    Vector cen(pPos);
+
+    T -= cross(cen, F);       // reduce the torque to the center of mass
+    T *= 1.0/spDragRot;       // multiply by the mobility
+    F  = F*(1.0/spDrag) + cross(cen, T);
     
-    for ( unsigned int p = 0; p < nbPoints(); p++ )
-    {
-#if   ( DIM == 2 )
-        Y[DIM*p]   = F.XX - T * psPos[DIM*p+1];
-        Y[DIM*p+1] = F.YY + T * psPos[DIM*p];
-#elif ( DIM == 3 )
-        Y[DIM*p  ] = F.XX + T.YY * psPos[DIM*p+2] - T.ZZ * psPos[DIM*p+1];
-        Y[DIM*p+1] = F.YY + T.ZZ * psPos[DIM*p  ] - T.XX * psPos[DIM*p+2];
-        Y[DIM*p+2] = F.ZZ + T.XX * psPos[DIM*p+1] - T.YY * psPos[DIM*p  ];
-#endif
-    }
-}
-
-
-void Sphere::addSurfaceSpeedsFromForces(const real* X, real* Y, real sc) const
-{
     //scale by point mobility:
-    sc *= prop->point_mobility;
-    
-    // no surface-motion on the center and reference points
-    assert_true( nbPoints() >= nbRefPts );
-    
-    // this should not apply to the reference-points:
-    for ( unsigned int p = nbRefPts; p < nbPoints(); ++p )
+    real mob = prop->point_mobility;
+
+    for ( unsigned p = 0; p < nbRefPoints; ++p )
     {
-        real a = spProj[DIM*p] * X[DIM*p];
-        
-        for ( int d = 1; d < DIM; ++d )
-            a += spProj[DIM*p+d] * X[DIM*p+d];
-        
+        real * yyy = Y + DIM * p;
+        real * pos = pPos + DIM * p;
+
         for ( int d = 0; d < DIM; ++d )
-            Y[DIM*p+d] += sc * ( X[DIM*p+d] - a * spProj[DIM*p+d] );
+#if   ( DIM == 2 )
+        yyy[0] = F.XX - T * pos[1];
+        yyy[1] = F.YY + T * pos[0];
+#elif ( DIM >= 3 )
+        yyy[0] = F.XX + T.YY * pos[2] - T.ZZ * pos[1];
+        yyy[1] = F.YY + T.ZZ * pos[0] - T.XX * pos[2];
+        yyy[2] = F.ZZ + T.XX * pos[1] - T.YY * pos[0];
+#endif
+    }
+    
+    for ( unsigned p = nbRefPoints; p < nPoints; ++p )
+    {
+        real * yyy = Y + DIM * p;
+        real * pos = pPos + DIM * p;
+        real * rad = sRad + DIM * p;
+        real const* xxx = X + DIM * p;
+#if   ( DIM == 2 )
+        real a = rad[0] * xxx[0] + rad[1] * xxx[1];
+        yyy[0] = F.XX - T * pos[1] + mob * ( xxx[0] - a * rad[0] );
+        yyy[1] = F.YY + T * pos[0] + mob * ( xxx[1] - a * rad[1] );
+#elif ( DIM >= 3 )
+        real a = rad[0] * xxx[0] + rad[1] * xxx[1] + rad[2] * xxx[2];
+        yyy[0] = F.XX + T.YY * pos[2] - T.ZZ * pos[1] + mob * ( xxx[0] - a * rad[0] );
+        yyy[1] = F.YY + T.ZZ * pos[0] - T.XX * pos[2] + mob * ( xxx[1] - a * rad[1] );
+        yyy[2] = F.ZZ + T.XX * pos[1] - T.YY * pos[0] + mob * ( xxx[2] - a * rad[2] );
+#endif
     }
 }
 
-
-void Sphere::setSpeedsFromForces(const real* X, real* Y, const real sc, bool) const
-{
-    // set motions from the rigid body
-    setSphereSpeedsFromForces( X, Y, sc );
-    //blas_xzero(DIM*nbPoints(), Y);
-    
-    // add contribution from the Surface motion
-    addSurfaceSpeedsFromForces( X, Y, sc );
-}
 #endif
-
 
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Sphere::write(OutputWrapper& out) const
+void Sphere::write(Outputter& out) const
 {
     out.writeFloat(radius());
-    PointSet::write(out);
+    Mecable::write(out);
 }
 
 
-void Sphere::read(InputWrapper & in, Simul& sim)
+void Sphere::read(Inputter& in, Simul& sim, ObjectTag tag)
 {
-    try {
+    try
+    {
         real rad;
 #ifdef BACKWARD_COMPATIBILITY
         if ( in.formatID() < 36 )
@@ -629,12 +631,32 @@ void Sphere::read(InputWrapper & in, Simul& sim)
         else
 #endif
         rad = in.readFloat();
-        PointSet::read(in, sim);
+        Mecable::read(in, sim, tag);
         resize(rad);
     }
-    catch( Exception & e ) {
-        e << ", in Sphere::read()";
+    catch( Exception & e )
+    {
         clearPoints();
         throw;
     }
 }
+
+
+void Sphere::print(std::ostream& os) const
+
+{
+    os << "new sphere " << reference() << '\n';
+    os << "{\n";
+    os << " nb_points = " << nbPoints() << '\n';
+    for ( unsigned i = 0; i < nbPoints() ; ++i )
+        os << " point" << i+1 << " = " << posP(i) << '\n';
+    os << "}" << '\n';
+}
+
+
+std::ostream& operator << (std::ostream& os, Sphere const& obj)
+{
+    obj.print(os);
+    return os;
+}
+

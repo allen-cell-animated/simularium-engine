@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SHACKLE_PROP_H
 #define SHACKLE_PROP_H
 
@@ -25,7 +24,6 @@ public:
     
     
     /// @}
-    //------------------ derived variables below ----------------
 
 public:
     
@@ -36,7 +34,7 @@ public:
     ~ShackleProp() { }
     
     /// return a Hand with this property
-    Couple * newCouple(Glossary * opt) const;
+    Couple * newCouple(Glossary*) const;
     
     /// set default values
     void clear();
@@ -45,13 +43,13 @@ public:
     void read(Glossary&);
     
     /// compute values derived from the parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new ShackleProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

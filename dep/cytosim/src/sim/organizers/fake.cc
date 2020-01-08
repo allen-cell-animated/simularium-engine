@@ -5,12 +5,11 @@
 #include "exceptions.h"
 #include "glossary.h"
 #include "messages.h"
-#include "organizer_set.h"
-#include "point_exact.h"
+#include "mecapoint.h"
+#include "simul.h"
 #include "fake.h"
 #include "aster.h"
 #include "meca.h"
-
 
 
 void Fake::step()
@@ -21,84 +20,121 @@ void Fake::step()
 void Fake::setInteractions(Meca & meca) const
 {
     assert_true( linked() );
+    assert_true( asterPoints.size() == solidPoints.size() );
     
-    for (unsigned int ii = 0; ii < asterPoints.size(); ++ii )
-        meca.interLink(asterPoints[ii], solidPoints[ii], prop->stiffness);
+    for (unsigned n = 0; n < asterPoints.size(); ++n )
+        meca.addLink(asterPoints[n], solidPoints[n], prop->stiffness);
 }
 
 
-//------------------------------------------------------------------------------
-ObjectList Fake::build(Glossary& opt, Simul& simul)
+ObjectList Fake::build(Glossary& opt, Simul& sim)
 {
-    assert_true(prop);
-    Aster * a  = new Aster(prop->aster_prop);
-    Aster * p  = new Aster(prop->aster_prop);
-    Solid * so = new Solid(0);
-    mSolid = so;
-    
     ObjectList res;
+    real rad = 0;
+    if ( ! opt.set(rad, "radius") ||  rad <= 0 )
+        throw InvalidParameter("fake:radius must be specified and > 0");
 
-    res.push_back(a);
-    res.push_back(p);
-    res.push_back(so);
-    res.append(a->build(opt, simul));
-    res.append(p->build(opt, simul));
-
-    real span = 0;
-    if ( ! opt.set(span, "span") || span < 0 )
-        throw InvalidParameter("fake:span must be specified and >= 0");
-
-    a->translate(Vector(-0.5*span, 0, 0));
-    p->translate(Vector(+0.5*span, 0, 0));    
+    assert_true(prop);
     
-    Solid * sa = a->solid();
-    Solid * sp = p->solid();
-    so->prop = sa->prop;
+    Solid * as = nullptr, * bs = nullptr;
+    std::string str;
     
-    Vector wa = a->position();
-    Vector wp = p->position();
-    Vector dir1 = ( wa - wp ).orthogonal(1);
+    // find the Aster specified:
+    if ( opt.set(str, "aster1") )
+    {
+        Aster * a = Aster::toAster(sim.organizers.findObject(str, "aster"));
+        if ( !a)
+            throw InvalidParameter("could not find Aster `"+str+"'");
+        as = a->solid();
+    }
+    else if ( opt.set(str, "solid1") )
+    {
+        as = Solid::toSolid(sim.solids.findObject(str, "solid"));
+        if ( !as )
+            throw InvalidParameter("could not find Solid `"+str+"'");
+    }
+    else
+        throw InvalidParameter("fake:solid1 must be specified");
+
+    // find the Aster specified:
+    if ( opt.set(str, "aster2") )
+    {
+        Aster * a = Aster::toAster(sim.organizers.findObject(str, "aster"));
+        if ( !a )
+            throw InvalidParameter("could not find Aster `"+str+"'");
+        bs = a->solid();
+    }
+    else if ( opt.set(str, "solid2") )
+    {
+        bs = Solid::toSolid(sim.solids.findObject(str, "solid"));
+        if ( !bs )
+            throw InvalidParameter("could not find Solid `"+str+"'");
+    }
+    else
+        throw InvalidParameter("fake:solid1 must be specified");
+    
+    Solid * so = new Solid(as->prop);
+    
+    Vector apos = as->posP(0);
+    Vector bpos = bs->posP(0);
+    
+    // define two orthogonal directions:
+    Vector dir1, dir2;
 #if ( DIM == 3 )
-    Vector dir2 = vecProd(wa-wp, dir1).normalized();
+    Vector dir0 = normalize( apos - bpos );
+    dir0.orthonormal(dir1, dir2);
 #else
-    Vector dir2 = dir1;
+    dir1 = ( apos - bpos ).orthogonal(1);
+    dir2 = dir1;
 #endif
+    
     asterPoints.clear();
     solidPoints.clear();
-    
-    real rad = 0;
-    if ( ! opt.set(rad, "radius", 2) ||  rad <= 0 )
-        throw InvalidParameter("fake:radius[2] must be specified and > 0");
 
-    Vector s(0,0,0);
-    for ( int pt = 0; pt < DIM+(DIM==3); ++pt )
+    for ( int d = 1; d < DIM; ++d )
     {
-        switch( pt )
+        for ( int s = -1; s < 2; s += 2 )
         {
-            case 0: s=+dir1; break;
-            case 1: s=-dir1; break;
-            case 2: s=+dir2; break;
-            case 3: s=-dir2; break;
-            default:
-                ABORT_NOW("wrong number of points");
+            Vector x = s * ( d == 2 ? dir2 : dir1 );
+            solidPoints.push_back(Mecapoint(so, so->addSphere(apos+x, rad)));
+            asterPoints.push_back(Mecapoint(as, as->addPoint(apos+x)));
+        
+            solidPoints.push_back(Mecapoint(so, so->addSphere(bpos+x, rad)));
+            asterPoints.push_back(Mecapoint(bs, bs->addPoint(bpos+x)));
         }
-        solidPoints.push_back(PointExact(so, so->addSphere( wa+s, rad )));
-        asterPoints.push_back(PointExact(sa, sa->addPoint( wa+s )));
-        solidPoints.push_back(PointExact(so, so->addSphere( wp+s, rad )));
-        asterPoints.push_back(PointExact(sp, sp->addPoint( wp+s )));
     }
     
-    sa->fixShape();
-    sp->fixShape();
     so->fixShape();
+    as->fixShape();
+    bs->fixShape();
+
+    /*
+     // print for debugging:
+     so->write(std::clog, true);
+     as->write(std::clog, true);
+     bs->write(std::clog, true);
+    */
+    
+    grasp(so);
+    res.push_back(so);
+    
+    disp_ptr = so->prop->disp;
     
     return res;
 }
 
-
-Fake::~Fake()
+/**
+ This sets the ends of the link number `inx`
+ or returns zero if the link does not exist
+ */
+bool Fake::getLink(size_t inx, Vector& pos1, Vector& pos2) const
 {
-    //Cytosim::MSG(31, "destroying %s\n", reference().c_str() );
-    prop = 0;
+    if ( inx < asterPoints.size() )
+    {
+        pos1 = asterPoints[inx].pos();
+        pos2 = solidPoints[inx].pos();
+        return true;
+    }
+    return false;
 }
 

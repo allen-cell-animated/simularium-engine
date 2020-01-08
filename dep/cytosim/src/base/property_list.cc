@@ -1,106 +1,102 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "property_list.h"
 #include "exceptions.h"
 #include <iomanip>
 
 void PropertyList::erase()
 {
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
-        delete( *n );
-    vec.clear();
+    for ( Property* i : vec_ )
+        delete(i);
+    vec_.clear();
 }
 
 /**
- If ( p == 0 ) nothing is done.
+ Add a property to the list. If ( p == 0 ) nothing is done.
 
- The index of the property is set from the number of 
- Property of the same kind() already present in the list.
+ This function sets the index of `p` to follow the Properties of the same category,
+ that are already present in the list.
  */
-void PropertyList::deposit(Property * p, bool refuse_duplicate)
+void PropertyList::deposit(Property * p)
 {
-    if ( p == 0 )
-        return;
-    
-    int cnt = 0;
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    if ( p )
     {
-        if ( (*n)->kind() == p->kind() )
+        unsigned cnt = 0;
+        for ( Property* i : vec_ )
         {
-            ++cnt;
-            if ( refuse_duplicate  &&  (*n)->is_named(p->name()) )
-                throw InvalidParameter(p->kind()+" '"+p->name()+"' already exists");
+            if ( i->category() == p->category() )
+                ++cnt;
+            if ( i->name() == p->name() )
+                throw InvalidParameter("Property '"+p->name()+"' is already defined");
         }
+        
+        //std::clog << "Property `" << p->name() << "' is " << p->category() << " # " << cnt+1 << std::endl;
+        
+        vec_.push_back(p);
+        p->renumber(cnt+1);
     }
-    
-    //std::cerr << this << "->deposit(" << p->kind() << ", " << p->name() << ") " << idx << std::endl;
-
-    vec.push_back(p);
-    p->index(cnt);
 }
 
 
 /**
  The size of the array will be reduced by one
  */
-int PropertyList::remove(Property * p)
+void PropertyList::remove(Property const* val)
 {
-    int idx = 0;
-    for ( iterator n = vec.begin(); n != vec.end(); ++n, ++idx )
+    const_iterator last = vec_.end();
+    for (iterator i = vec_.begin(); i != last; ++i)
     {
-        if ( *n == p )
+        if ( *i == val )
         {
-            vec.erase(n);
-            return idx;
+            vec_.erase(i);
+            return;
         }
     }
-    return -1;
 }
 
 
-unsigned int PropertyList::number_of(const std::string& kd) const
+unsigned int PropertyList::size(std::string const& cat) const
 {
-    unsigned int res = 0;
+    unsigned res = 0;
     
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
-        res += ( (*n)->kind() == kd );
+    for ( Property* i : vec_ )
+        if ( i->category() == cat )
+            ++res;
     
     return res;
 }
 
 
-Property * PropertyList::operator[] (const unsigned int n) const
+Property * PropertyList::operator[] (const size_t n) const
 {
-    if ( n >= vec.size() )
+    if ( n >= vec_.size() )
     {
-        std::ostringstream oss;
-        oss << "out-of-range index " << n << " ( list-size = " << vec.size() << " )";
-        throw InvalidSyntax(oss.str());
+        InvalidSyntax e("out-of-range");
+        e << " index " << n << " ( list-size = " << vec_.size() << " )";
+        throw e;
     }
-    return vec[n];
+    return vec_[n];
 }
 
 //-------------------------------------------------------------------------------
 
 void PropertyList::for_each(void func(Property *)) const
 {
-    //std::cerr << "Running function for "<<vec.size()<<" properties"<<std::endl;
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
-        func(*n);
+    //std::clog << "Running function for "<<vec_.size()<<" properties"<<std::endl;
+    for ( Property* i : vec_ )
+        func(i);
 }
 
-void PropertyList::complete(SimulProp const* sp)
+void PropertyList::complete(Simul const& sim) const
 {
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
-        (*n)->complete(sp, this);
+    for ( Property* i : vec_ )
+        i->complete(sim);
 }
 
-int PropertyList::find_index(const Property * p) const
+Property const* PropertyList::contains(Property const* p) const
 {
-    int idx = 0;
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n, ++idx )
-        if ( *n == p ) return idx;
-    return -1;
+    for ( Property* i : vec_ )
+        if ( i == p ) return p;
+    return nullptr;
 }
 
 
@@ -108,204 +104,216 @@ int PropertyList::find_index(const Property * p) const
 #pragma mark -
 
 /** 
- returns the first match
+ returns the first Property named as 'nom' or zero
  */
-Property * PropertyList::find(const std::string& nm) const
+Property * PropertyList::find(std::string const& nom) const
 {
-    //std::clog << this << "->find(" << nm << ")" << std::endl;
+    //std::clog << this << "->find(" << nom << ")" << std::endl;
+    for ( Property* i : vec_ )
+    {
+        if ( i->name() == nom )
+            return i;
+    }
     
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
-        if ( (*n)->is_named(nm) )
-            return *n;
-
-    return 0;
+    return nullptr;
 }
+
+
+/**
+ returns the first Property named as 'nom'
+ */
+Property * PropertyList::find_or_die(std::string const& nom) const
+{
+    //std::clog << this << "->find_or_die(" << nom << ")" << std::endl;
+    Property * p = find(nom);
+
+    if ( !p )
+    {
+        InvalidSyntax e("unknown class `"+nom+"'\n");
+        e << all_names(PREF);
+        throw e;
+    }
+    return p;
+}
+
 
 /**
  returns the first match
  */
-Property * PropertyList::find(const std::string& kd, const std::string& nm) const
+Property * PropertyList::find(std::string const& cat, std::string const& nom) const
 {
-    //std::clog << this << "->find(" << kd << ", " << nm << ")" << std::endl;
+    //std::clog << this << "->find(" << cat << ", " << nom << ")" << std::endl;
 
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind()==kd  &&  (*n)->is_named(nm) )
-            return *n;
+        if ( i->category()==cat  &&  i->name()==nom )
+            return i;
     }
     
-    return 0;
+    return nullptr;
 }
 
 
-Property * PropertyList::find(const std::string& kd, const int idx) const
+Property * PropertyList::find(std::string const& cat, const unsigned num) const
 {
-    //std::clog << this << "->find(" << kd << ", " << idx << ")" << std::endl;
-
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
-        if ( (*n)->kind()==kd  &&  (*n)->index()==idx )
-            return *n;
+    //std::clog << this << "->find(" << cat << ", " << idx << ")" << std::endl;
+    if ( num <= 0 )
+        return nullptr;
     
-    return 0;
+    for ( Property* i : vec_ )
+        if ( i->category()==cat  &&  i->number()==num )
+            return i;
+    
+    return nullptr;
 }
 
 
-
-Property * PropertyList::find_or_die(std::string const& knd, std::string const& nm) const
+Property * PropertyList::find_or_die(std::string const& cat, std::string const& nom) const
 {
-    Property * res = find(knd, nm);
+    Property * res = find(cat, nom);
     
     if ( !res )
     {
-        std::ostringstream oss;
-        oss << "Unknown " << knd << " `" << nm << "'\n";
-        write_names(oss, PREF);
-        throw InvalidSyntax(oss.str());
+        InvalidSyntax e("unknown "+cat+" class `"+nom+"'\n");
+        e << all_names(PREF);
+        throw e;
     }
     
     return res;
 }
 
 
-Property * PropertyList::find_or_die(std::string const& knd, const unsigned idx) const
+Property * PropertyList::find_or_die(std::string const& cat, const unsigned num) const
 {
-    Property * res = find(knd, idx);
+    Property * res = find(cat, num);
     
     if ( !res )
     {
-        std::ostringstream oss;
-        oss << "Unknown " << knd << "(" << idx << ")\n";
-        write_names(oss, PREF);
-        throw InvalidSyntax(oss.str());
+        InvalidSyntax e("unknown class `"+cat+std::to_string(num)+"'\n");
+        e << all_names(PREF);
+        throw e;
     }
     
     return res;
 }
 
 
-PropertyList PropertyList::find_all(const std::string& kd) const
+PropertyList PropertyList::find_all(std::string const& cat) const
 {
-    PropertyList list;
-    //std::cerr << this << "->find_all(" << kd << ") " << std::endl;
+    //std::clog << this << "->find_all(" << cat << ") " << std::endl;
 
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    PropertyList res;
+    res.reserve(4);
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind() == kd )
-            list.vec.push_back(*n);
+        if ( i->category() == cat )
+            res.push_back(i);
     }
-    
-    return list;
+    return res;
 }
 
 
-PropertyList PropertyList::find_all(const std::string& kd1, const std::string& kd2) const
+PropertyList PropertyList::find_all(std::string const& c1, std::string const& c2) const
 {
-    PropertyList list;
-    //std::cerr << this << "->find_all(" << kd << ") " << std::endl;
+    //std::clog << this << "->find_all(" << kd1 << "," << kd2 << ") " << std::endl;
     
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    PropertyList res;
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind() == kd1 || (*n)->kind() == kd2 )
-            list.vec.push_back(*n);
+        if ( i->category() == c1 || i->category() == c2 )
+            res.push_back(i);
     }
-    
-    return list;
+    return res;
 }
 
 
-PropertyList PropertyList::find_all(const std::string& kd1, const std::string& kd2, const std::string& kd3) const
+PropertyList PropertyList::find_all(std::string const& c1, std::string const& c2, std::string const& c3) const
 {
-    PropertyList list;
-    //std::cerr << this << "->find_all(" << kd << ") " << std::endl;
-    
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    //std::clog << this << "->find_all(" << kd1 << "," << kd2 << ") " << std::endl;
+
+    PropertyList res;
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind() == kd1 || (*n)->kind() == kd2 || (*n)->kind() == kd3 )
-            list.vec.push_back(*n);
+        if ( i->category() == c1 || i->category() == c2 || i->category() == c3 )
+            res.push_back(i);
     }
-    
-    return list;
+    return res;
 }
 
 
-Property* PropertyList::find_next(const std::string& kd, Property * p) const
+Property* PropertyList::find_next(std::string const& cat, Property * p) const
 {
-    //std::cerr << this << "->find_next(" << kd << ") " << std::endl;
-    bool found = ( p == 0 );
+    //std::clog << this << "->find_next(" << cat << ") " << std::endl;
+    bool found = ( p );
     
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind() == kd )
+        if ( i->category() == cat )
         {
             if ( found )
-                return *n;
-            found = ( *n == p );
+                return i;
+            found = ( i == p );
         }
     }
     
     if ( ! found ) 
-        return 0;
+        return nullptr;
     
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind() == kd )
-            return *n;
+        if ( i->category() == cat )
+            return i;
     }
     
-    return 0;
+    return nullptr;
 }
 
 
-PropertyList PropertyList::find_all_except(const std::string& kd) const
+PropertyList PropertyList::find_all_except(std::string const& cat) const
 {
-    PropertyList list;
-    //std::cerr << this << "->all_expect(" << kd << ") " << std::endl;
+    //std::clog << this << "->find_all_expect(" << cat << ") " << std::endl;
     
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n )
+    PropertyList res;
+    for ( Property* i : vec_ )
     {
-        if ( (*n)->kind() != kd )
-            list.vec.push_back(*n);
+        if ( i->category() != cat )
+            res.push_back(i);
     }
-    
-    return list;
+    return res;
 }
 
 
 //-------------------------------------------------------------------------------
 #pragma mark -
 
-void PropertyList::write_names(std::ostream & os, std::string const& pf) const
+void PropertyList::write_names(std::ostream& os, std::string const& pf) const
 {
-    os << pf << "Known properties:" << std::endl;
-
-    int idx = 0;
-    for ( const_iterator n = vec.begin(); n != vec.end(); ++n, ++idx )
+    os << pf << "Known classes:\n";
+    for ( Property* i : vec_ )
     {
-        os << pf << idx << " : ";
-        if ( *n )
-            os << std::setw(16) << (*n)->kind() << "  `"<< (*n)->name() << "'";
+        os << pf << std::setw(10);
+        if ( i )
+            os << i->category() << i->number() << " `"<< i->name() << "'";
         else
             os << "void";
-        os << std::endl;
+        std::endl(os);
     }
 }
 
+
+std::string PropertyList::all_names(std::string const& pf) const
+{
+    std::ostringstream oss;
+    write_names(oss, pf);
+    return oss.str();
+}
+        
 /**
  The values identical to the default settings are skipped if prune==1
  */
-void PropertyList::write(std::ostream & os, const bool prune) const
+void PropertyList::write(std::ostream& os, const bool prune) const
 {
-    const_iterator n = vec.begin();
-    
-    if ( n != vec.end() )
-    {
-        (*n)->write(os, prune);
-    
-        while ( ++n != vec.end() )
-        {
-            os << std::endl;
-            (*n)->write(os, prune);
-        }
-    }
+    for ( Property * i : vec_ )
+        i->write(os, prune);
 }
 

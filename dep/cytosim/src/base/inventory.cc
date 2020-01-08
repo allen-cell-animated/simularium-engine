@@ -7,13 +7,13 @@
 
 Inventory::Inventory()
 {
-    lowest    = 1;
-    highest   = 0;
-    allocated = 8;
-    byNames   = new Inventoried*[allocated];
+    lowest_    = 1;
+    highest_   = 0;
+    allocated_ = 8;
+    byNames    = new Inventoried*[allocated_];
     
-    for ( Number n = 0; n < allocated; ++n )
-        byNames[n] = 0;
+    for ( ObjectID n = 0; n < allocated_; ++n )
+        byNames[n] = nullptr;
 }
 
 
@@ -23,31 +23,31 @@ Inventory::~Inventory()
 }
 
 
-void Inventory::allocate(Number sz)
+void Inventory::allocate(size_t sz)
 {
-    const unsigned chunk = 32;
-    sz = ( sz + chunk - 1 ) & -chunk;
+    constexpr size_t chunk = 32;
+    sz = ( sz + chunk - 1 ) & ~( chunk -1 );
     
     Inventoried ** byNames_new = new Inventoried*[sz];
     
-    Number n = 0;
-    for ( ; n < allocated; ++n )
+    ObjectID n = 0;
+    for ( ; n < allocated_; ++n )
         byNames_new[n] = byNames[n];
     while ( n < sz )
-        byNames_new[n++] = 0;
+        byNames_new[n++] = nullptr;
     
     delete[] byNames;
-    byNames   = byNames_new;
-    allocated = sz;
+    byNames    = byNames_new;
+    allocated_ = sz;
 }
 
 
 //------------------------------------------------------------------------------
 
-Number Inventory::first_assigned() const
+ObjectID Inventory::first_assigned() const
 {
-    Number n = 1;
-    while ( n < allocated )
+    ObjectID n = 1;
+    while ( n < allocated_ )
     {
         if ( byNames[n] )
             return n;
@@ -57,9 +57,9 @@ Number Inventory::first_assigned() const
 }
 
 
-Number Inventory::last_assigned() const
+ObjectID Inventory::last_assigned() const
 {
-    Number n = allocated-1;
+    ObjectID n = allocated_-1;
     while ( n > 0 )
     {
         if ( byNames[n] )
@@ -70,10 +70,10 @@ Number Inventory::last_assigned() const
 }
 
 
-Number Inventory::next_assigned(Number n) const
+ObjectID Inventory::next_assigned(ObjectID n) const
 {
     ++n;
-    while ( n < allocated )
+    while ( n < allocated_ )
     {
         if ( byNames[n] )
             return n;
@@ -83,19 +83,19 @@ Number Inventory::next_assigned(Number n) const
 }
 
 
-Number Inventory::first_unassigned()
+ObjectID Inventory::first_unassigned()
 {
-    Number n = lowest;
+    ObjectID n = lowest_;
     
-    if ( n < allocated )
+    if ( n < allocated_ )
     {
-        if ( byNames[n] == 0 )
+        if ( !byNames[n] )
             return n;
-        
-        while ( n < allocated  &&  byNames[n] )
+    
+        while ( n < allocated_  &&  byNames[n] )
             ++n;
-        
-        lowest = n;
+    
+        lowest_ = n;
     }
     
     return n;
@@ -108,104 +108,104 @@ Number Inventory::first_unassigned()
  */
 void Inventory::assign(Inventoried * obj)
 {
-    Number & n = obj->nNumber;
+    ObjectID& n = obj->identity();
     
     if ( n == 0 )
-        n = ++highest;
-    else if ( highest < n )
-        highest = n;
+        n = ++highest_;
+    else if ( highest_ < n )
+        highest_ = n;
     
-    if ( n >= allocated )
+    if ( n >= allocated_ )
         allocate(n+1);
     
-    assert_true( byNames[n] == 0 );
+    assert_true( !byNames[n] );
     
     byNames[n] = obj;
-    //std::err << "Inventory::store() assigned " << n << " to " << obj << "\n";
+    //std::clog << "Inventory::store() assigned " << n << " to " << obj << "\n";
 }
 
 
 void Inventory::unassign(const Inventoried * obj)
 {
-    Number n = obj->nNumber;
-    assert_true( n < allocated );
-    byNames[n] = 0;
+    ObjectID n = obj->identity();
+    assert_true( n < allocated_ );
+    byNames[n] = nullptr;
     
-    if ( lowest >= n )
-        lowest = n;
+    if ( lowest_ >= n )
+        lowest_ = n;
     
-    while ( byNames[highest] == 0  &&  highest > 0 )
-        --highest;
+    while ( !byNames[highest_]  &&  highest_ > 0 )
+        --highest_;
 }
 
 
-Inventoried * Inventory::get(const Number n) const
+Inventoried * Inventory::get(const ObjectID n) const
 {
-    if ( n < allocated )
+    if ( n < allocated_ )
     {
-        assert_true( byNames[n]==0  ||  byNames[n]->number()==n );
+        assert_true( !byNames[n]  ||  byNames[n]->identity()==n );
         return byNames[n];
     }
-    return 0;
+    return nullptr;
 }
 
 
 Inventoried* Inventory::first() const
 {
-    Number n = 1;
-    while ( n < allocated )
+    ObjectID n = 1;
+    while ( n < allocated_ )
     {
         if ( byNames[n] )
             return byNames[n];
         ++n;
     }
-    return 0;
+    return nullptr;
 }
 
 
 Inventoried* Inventory::last() const
 {
-    Number n = highest;
+    ObjectID n = highest_;
     while ( n > 0 )
     {
         if ( byNames[n] )
             return byNames[n];
         --n;
     }
-    return 0;
+    return nullptr;
 }
 
 
 Inventoried* Inventory::previous(Inventoried const* i) const
 {
-    Number n = i->nNumber - 1;
+    ObjectID n = i->identity() - 1;
     while ( n > 0 )
     {
         if ( byNames[n] )
             return byNames[n];
         --n;
     }
-    return 0;
+    return nullptr;
 }
 
 #include <iostream>
 Inventoried* Inventory::next(Inventoried const* i) const
 {
-    Number n = i->nNumber + 1;
-    while ( n < allocated )
+    ObjectID n = i->identity() + 1;
+    while ( n < allocated_ )
     {
         if ( byNames[n] )
             return byNames[n];
         ++n;
     }
-    return 0;
+    return nullptr;
 }
 
 //------------------------------------------------------------------------------
 unsigned Inventory::count() const
 {
     unsigned cnt = 0;
-    for ( Number n = 0; n < allocated; ++n )
+    for ( ObjectID n = 0; n < allocated_; ++n )
         if ( byNames[n] ) ++cnt;
     return cnt;
 }
@@ -213,47 +213,53 @@ unsigned Inventory::count() const
 
 void Inventory::reassign()
 {
-    Number max = last_assigned();
-    Number next = 1;
-    Number nn   = 1;
+    ObjectID max = last_assigned();
+    ObjectID next = 1;
+    ObjectID nn   = 1;
     
     while ( nn <= max )
     {
-        while ( nn <= max  &&  byNames[nn] == 0 )
+        while ( nn <= max  &&  !byNames[nn] )
             ++nn;
         if ( nn > max )
             break;
         if ( next < nn )
         {
             byNames[next] = byNames[nn];
-            byNames[nn]   = 0;
-            byNames[next]->number(next);
+            byNames[nn]   = nullptr;
+            byNames[next]->identity(next);
         }
         ++next;
         ++nn;
     }
     
-    lowest = next;
-    highest = next-1;
+    lowest_ = next;
+    highest_ = next-1;
 }
 
 
 void Inventory::clear()
 {
-    for ( Number n = 0; n < allocated; ++n )
-        byNames[n] = 0;
+    for ( ObjectID n = 0; n < allocated_; ++n )
+        byNames[n] = nullptr;
     //std::clog << "Inventory::forgetAll() removed " << cnt << "numbers\n";
-    lowest = 1;
-    highest = 0;
+    lowest_ = 1;
+    highest_ = 0;
 }
 
 
 //------------------------------------------------------------------------------
-std::ostream & operator << (std::ostream & os, const Inventory& inv)
+void Inventory::print(std::ostream& os) const
 {
-    os << "Inventory " << &inv << std::endl;
-    for ( Number n = 0; n < inv.capacity(); ++n )
-        os << n << " -> " << inv[n] << std::endl;
+    os << "Inventory " << this << "\n";
+    for ( ObjectID n = 0; n < allocated_; ++n )
+        os << n << " -> " << byNames[n] << "\n";
+}
+
+
+std::ostream& operator << (std::ostream& os, Inventory const& obj)
+{
+    obj.print(os);
     return os;
 }
 

@@ -19,23 +19,24 @@
  - The stiffness of the interaction is 'prop->stiffness'.
  - The amount of overlap is 'prop->overlap'.
  .
+ 
+ @ingroup OrganizerGroup
  */
-
 class Bundle : public Organizer
 {
     
 private:
+    
+    /// add interactions to a Meca
+    void       linkAntiparallel(Meca &, Fiber *, Fiber *) const;
+    
+    /// add interactions to a Meca
+    void       linkParallel(Meca &, Fiber *, Fiber *) const;
+
+public:
 
     /// Property
     BundleProp const* prop;
-        
-    /// add interactions to the Meca
-    void       setAntiparallel(Meca &, Fiber *, Fiber *) const;
-    
-    /// add interactions to the Meca
-    void       setParallel(Meca &, Fiber *, Fiber *) const;
-    
-public:
     
     /// constructor
     Bundle(BundleProp const* p) : prop(p) {}
@@ -49,22 +50,28 @@ public:
     /// perform one Monte-Carlo step
     void       step();
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void       setInteractions(Meca &) const;
     
     /// return the center of gravity from all MT central ends
-    Vector     position() const { return Organizer::positionP(0); }
+    Vector     position() const;
     
+    /// retrieve links end-points for display
+    bool       getLink(size_t, Vector&, Vector&) const { return false; }
+    
+    /// display parameters
+    PointDisp const* disp() const { return nullptr; }
+
     //------------------------------ read/write --------------------------------
 
-    /// a unique character identifying the class
-    static const Tag TAG = 'u';
+    /// a unique character identifying the class in 
+    static const ObjectTag TAG = 'u';
     
     /// return unique character identifying the class
-    Tag        tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
+    /// return associated Property
+    Property const* property() const { return prop; }
     
  };
 

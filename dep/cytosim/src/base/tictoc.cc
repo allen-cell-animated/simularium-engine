@@ -1,4 +1,6 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
+// Created by Francois Nedelec on 27/9/2008.
+
 
 #include "tictoc.h"
 #include <cstdio>
@@ -9,13 +11,13 @@
 #pragma mark Wall time
 
 /**
- This calls the C-library functions time() and ctime_r()
+ This get current time from the C-library functions time() and ctime_r()
  */
-void TicToc::date(char * buf, size_t buf_size)
+void TicToc::get_date(char * buf, size_t buf_size)
 {
     if ( buf_size > 25 )
     {
-        time_t now = time(0);
+        time_t now = time(nullptr);
         //asctime_r(localtime(&now), buf);
 #if ( 0 )
         ctime_r(&now, buf);
@@ -23,39 +25,66 @@ void TicToc::date(char * buf, size_t buf_size)
         strncpy(buf, ctime(&now), buf_size);
 #endif
         // remove new line:
-        buf[24]='\0';
+        buf[24] = 0;
     }
+    else if ( buf_size > 0 )
+        buf[0] = 0;
     // terminate string:
-    buf[buf_size-1] = '\0';
+    if ( buf_size > 0 )
+        buf[buf_size-1] = 0;
 }
 
 
-void TicToc::date(char * buf, size_t buf_size, bool no_year)
+void TicToc::get_date(char * buf, size_t buf_size, bool no_year)
 {
     if ( buf_size > 25 )
     {
-        TicToc::date(buf, buf_size);
+        TicToc::get_date(buf, buf_size);
         // remove year:
         if ( no_year )
-            buf[19]='\0';
+            buf[19] = 0;
     }
 }
 
 
-int TicToc::date_hack(const char * date)
+char const* TicToc::date()
 {
-    static const char month_names[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
-    char s_month[5];
-    int month, day, year;
-    sscanf(date, "%s %d %d", s_month, &day, &year);
-    month = (strstr(month_names, s_month)-month_names)/3;
-    return ( year - 2000 ) * 372 + month * 31 + day; 
+    static char buf[32];
+    get_date(buf, sizeof(buf));
+    return buf;
+}
+
+
+int  TicToc::days_since_2000()
+{
+    time_t now = time(nullptr);
+    tm * loc = localtime(&now);
+    return loc->tm_year - 2000 + loc->tm_yday;
+}
+
+
+time_t TicToc::seconds_since_1970()
+{
+    return time(nullptr);
+}
+
+time_t  TicToc::seconds_since_2000()
+{
+    return time(nullptr) - 946684800;
+}
+
+
+int  TicToc::year()
+{
+    time_t now = time(nullptr);
+    tm * loc = localtime(&now);
+    return loc->tm_year;
 }
 
 
 int  TicToc::day_of_the_year()
 {
-    time_t now = time(0);
+    time_t now = time(nullptr);
     tm * loc = localtime(&now);
     return loc->tm_yday;
 }
@@ -63,46 +92,87 @@ int  TicToc::day_of_the_year()
 
 int  TicToc::hours_today()
 {
-    time_t now = time(0);
+    time_t now = time(nullptr);
     tm * loc = localtime(&now);
     return loc->tm_hour;
 }
 
 
-long TicToc::seconds_today()
+double TicToc::seconds_today()
 {
-    time_t now = time(0);
-    tm * loc = localtime(&now);
-    return loc->tm_sec + 60 * ( loc->tm_min + 60 * loc->tm_hour );
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return (double)tv.tv_sec + 1e-6 * tv.tv_usec;
 }
 
 
-long TicToc::milli_seconds_today()
+double TicToc::centiseconds()
 {
-    long msec = seconds_today() * 1e3;
-    struct timeval now;
-    gettimeofday(&now, 0);
-    return msec + now.tv_usec * 1e-3;
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return 100 * tv.tv_sec + tv.tv_usec / 10000.0;
 }
 
+double TicToc::microseconds()
+{
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return tv.tv_usec;
+}
 
 #pragma mark CPU time
 
 
+/**
+ This calls the C-library function clock()
+ */
+double TicToc::processor_time(clock_t& clk)
+{
+    clock_t now = clock();
+    double sec = double( now - clk ) / CLOCKS_PER_SEC;
+    clk = now;
+    return sec;
+}
+
+
 #if ( 1 )
 
+// using real time
 struct timeval tic_t;
+
+const int nbins = 8;
+double bins[nbins] = { 0 };
 
 void TicToc::tic()
 {
-    gettimeofday(&tic_t, 0);
+    gettimeofday(&tic_t, nullptr);
 }
 
 double TicToc::toc()
 {
-    timeval toc_t;
-    gettimeofday(&toc_t, 0);
-    return (toc_t.tv_sec-tic_t.tv_sec)*1e3 + (toc_t.tv_usec-tic_t.tv_usec)*1e-3;
+    timeval tv;
+    gettimeofday(&tv, nullptr);
+    return (tv.tv_sec-tic_t.tv_sec) + 1e-6*(tv.tv_usec-tic_t.tv_usec);
+}
+
+void TicToc::toc(int n)
+{
+    if ( n < nbins )
+    {
+        timeval tv;
+        gettimeofday(&tv, nullptr);
+        bins[n] += tv.tv_sec-tic_t.tv_sec + 1e-6*(tv.tv_usec-tic_t.tv_usec);
+        tic_t = tv;
+    }
+}
+
+void TicToc::report(const char * msg)
+{
+    for ( int n = 0; n < nbins; ++n )
+    {
+        printf("%s %i : %6.3fs\n", msg, n, bins[n]);
+        bins[n] = 0;
+    }
 }
 
 #else
@@ -110,6 +180,7 @@ double TicToc::toc()
 #include <ctime>
 clock_t tic_t;
 
+// using the CPU time
 void TicToc::tic()
 {
     tic_t = clock();
@@ -117,20 +188,24 @@ void TicToc::tic()
 
 double TicToc::toc()
 {
-    return 1000 * ( clock() - tic_t )/CLOCKS_PER_SEC;
+    return (double)( clock() - tic_t ) / CLOCKS_PER_SEC;
 }
 
 #endif
 
 
-double TicToc::toc(const char * msg)
+void TicToc::toc(const char * msg)
 {
-    double elapsed = toc();
-    if ( msg ) 
-        printf("%s : %4.0f ms ", msg, elapsed);
+    printf("%s : %6.6fs\n", msg, toc());
+}
+
+
+void TicToc::toc(const char * msg, const char * end)
+{
+    if ( end )
+        printf("%s : %6.3fs %s", msg, toc(), end);
     else
-        printf(" %4.0f ms ", elapsed);
-    return elapsed;
+        printf("%s : %6.3fs ", msg, toc());
 }
 
 

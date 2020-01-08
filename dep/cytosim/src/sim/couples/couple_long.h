@@ -18,12 +18,12 @@ class CoupleLong : public Couple
     /// the side (top/bottom) of the interaction
     mutable Torque mArm;
     
-    /// used to calculate \a mArm
-    static Torque calcArm(const PointInterpolated & pt, Vector const& pos, real len);
+    /// used to calculate `mArm`
+    static Torque calcArm(const Interpolation & pt, Vector const& pos, real len);
     
 public:
     
-    /// create following the specifications in the CoupleProp
+    /// constructor
     CoupleLong(CoupleProp const*, Vector const & w = Vector(0,0,0));
 
     /// destructor
@@ -33,9 +33,9 @@ public:
     Vector  posSide() const;
  
     /// force between hands, essentially: stiffness * ( cHand2->posHand() - cHand1->posHand() )
-    Vector  force1() const;
+    Vector  force() const;
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

@@ -1,342 +1,335 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-
 #ifndef BICGSTAB_H
 #define BICGSTAB_H
 
-#include <iostream>
-#include <cmath>
-
 #include "real.h"
 #include "cblas.h"
+#include "allocator.h"
+#include "monitor.h"
 
-#ifdef REAL_IS_FLOAT
-#    define DOT blas_dfdot
-#else
-#    define DOT blas_xdot
-#endif
-
-/// Templated iterative solvers for systems of linear equations
+/// Bi-Conjugate Gradient Stabilized method to solve a system of linear equations
 /**
- The linear system (and the preconditionner) is defined by class LinearOperator:    
- @code
-    class LinearOperator
-    {
-    public:
-        /// size of the matrix
-        unsigned int size() const;
-        
-        /// apply operator to a vector
-        void multiply(const real*, real*) const;
-        
-        /// apply transposed operator to vector
-        void transMultiply(const real*, real*) const;
-        
-        /// apply preconditionning 
-        void precondition(const real*, real*) const;
-    };
- @endcode
- 
- The iterative solver is followed by class Monitor,
- where the desired convergence criteria can be specified.
- Monitor will also keep track of iteration counts.
- An suitable implementation of Monitor is given here.
- 
- F. Nedelec, 27.03.2012 - 21.02.2013
+ F. Nedelec, 27.03.2012 - 13.03.2017
 */
-namespace Solver
+namespace LinearSolvers
 {
-    
-    /// records the number of iterations, and the convergence
-    class Monitor
-    {
-    private:
-        
-        int      mFlag;
-        
-        unsigned mIter,  mIterMax, mIterOld;
-        
-        real     mResid, mResidMax, mResidOld;
-        
-    public:
-        
-        /// set the maximum number of iterations, and the residual threshold
-        Monitor(unsigned i, real r) { reset(); mIterMax = i; mResidMax = r; }
-        
-        /// destructor
-        virtual ~Monitor() {};
-        
-        /// reset interation count and achieved residual
-        void reset() { mFlag = 0; mIter = 0; mResid = INFINITY; mIterOld = 0; mResidOld = INFINITY; }
-        
-        /// increment iteration count
-        void operator ++() { ++mIter; }
-        
-        /// the termination code
-        int flag()       const { return mFlag; }
-        
-        /// iteration count
-        int iterations() const { return mIter; }
-        
-        /// last achieved residual
-        real residual()  const { return mResid; }
-        
-        /// true if achieve residual < residual threshold
-        bool converged() const { return mResid < mResidMax; }
-        
-        /// calculate residual from \a x and return true if threshold is achieved
-        virtual bool finished(unsigned size, real const* x);
-
-        /// calculate residual from \a x and return true if threshold is achieved
-        virtual bool finished(int f, unsigned size, real const* x) { mFlag = f; return finished(size, x); }
-    };
-    
-    
-    /// allocates vectors of real
-    class Allocator
-    {
-    private:
-        
-        /// type for size
-        typedef size_t size_type;
-        
-        /// size of the vector to be allocated
-        size_type siz;
-        
-        /// number of vectors allocated
-        size_type alc;
-        
-        /// memory
-        real    * mem;
-        
-    public:
-        
-        Allocator()  { siz = 0; alc = 0; mem = 0; }
-        
-        ~Allocator() { release(); }
-        
-        void allocate(size_type s, unsigned int n)
-        {
-            // Keep memory aligned to 32 bytes:
-            const unsigned chunk = 32 / sizeof(real);
-            siz = ( s + chunk - 1 ) & -chunk;
-            size_t a = siz * n;
-            if ( a > alc )
-            {
-                if ( mem )
-                    delete(mem);
-                mem = new real[a];
-                alc = a;
-                //std::cerr << "Allocator::allocate "<<a<<std::endl;
-            }
-        }
-        
-        void release()
-        {
-            if ( mem )
-            {
-                delete(mem);
-                //std::cerr << "Allocator::release "<<std::endl;
-            }
-            mem = 0;
-            alc = 0;
-            siz = 0;
-        }
-        
-        void relax()
-        {
-            //release();
-        }
-        
-        real * bind(unsigned int i)
-        {
-            if ( mem == 0 )
-                return 0;
-            if ( (i+1)*siz > alc )
-                return 0;
-            //std::cerr << "Allocator::bind " << i << " " << mem+i*siz << std::endl;
-            return mem + i * siz;
-        }
-    };
-    
     /// Bi-Conjugate Gradient Stabilized without Preconditionning
+    /*
+     This solves `mat * x = rhs` with a tolerance specified in 'monitor'
+     */
     template < typename LinearOperator, typename Monitor, typename Allocator >
-    void BCGS(const LinearOperator& mat, const real* rhs, real* x, Monitor& monitor, Allocator& allocator)
+    void BCGS(const LinearOperator& mat, const real* rhs, real* sol,
+              Monitor& monitor, Allocator& allocator)
     {
-        double rho_1 = 1, rho_2, alpha = 0, beta = 0, omega = 1;
+        double rho = 1.0, rho_old = 1.0, alpha = 0.0, beta = 0.0, omega = 1.0;
         
-        const unsigned int size = mat.size();
-        allocator.allocate(size, 5);
-        real * r      = allocator.bind(0);
-        real * rtilde = allocator.bind(1);
-        real * p      = allocator.bind(2);
-        real * t      = allocator.bind(3);
-        real * v      = allocator.bind(4);
+        const int dim = mat.dimension();
+        allocator.allocate(dim, 5);
+        real * r  = allocator.bind(0);
+        real * r0 = allocator.bind(1);
+        real * p  = allocator.bind(2);
+        real * t  = allocator.bind(3);
+        real * v  = allocator.bind(4);
         
-        blas_xcopy(size, rhs, 1, r, 1);
-        mat.multiply(x, rtilde);
-        blas_xaxpy(size, -1.0, rtilde, 1, r, 1);      // r = rhs - A * x
-        blas_xcopy(size, r, 1, rtilde, 1);
+        mat.multiply(sol, r0);
+        blas::xcopy(dim, rhs, 1, r, 1);
+        blas::xaxpy(dim, -1.0, r0, 1, r, 1);    // r = rhs - A * x
+        blas::xcopy(dim, r, 1, r0, 1);          // r0 = r
         
-        while ( ! monitor.finished(size, r) )
+        rho = blas::dot(dim, r, r);
+        blas::xcopy(dim, r, 1, p, 1);
+
+        if ( monitor.finished(dim, r) )
+            return;
+
+        goto start;
+        
+        while ( ! monitor.finished(dim, r) )
         {
-            rho_2 = rho_1;
-            rho_1 = DOT(size, rtilde, 1, r, 1);
+            rho_old = rho;
+            rho = blas::dot(dim, r0, r);
             
-            if ( rho_1 == 0.0 )
+            if ( rho == 0.0 )
             {
-                monitor.finished(2, size, r);
-                break;
-            }
-            
-            beta = ( rho_1 / rho_2 ) * ( alpha / omega );
-            if ( beta == 0.0 )
-            {
-                // p = r;
-                blas_xcopy(size, r, 1, p, 1);
-            }
-            else {
-                // p = r + beta * ( p - omega * v )
-                blas_xaxpy(size, -omega, v, 1, p, 1);
-#ifdef __INTEL_MKL__
-                blas_xaxpby(size, 1.0, r, 1, beta, p, 1);
+#if ( 1 )
+                /* The residual vector became nearly orthogonal to the
+                 arbitrarily chosen direction r0, and we restart with a new r0 */
+                blas::xcopy(dim, rhs, 1, r, 1);         // r = rhs
+                mat.multiply(sol, r0);                  // r0 = A*x
+                blas::xaxpy(dim, -1.0, r0, 1, r, 1);    // r = rhs - A * x
+                blas::xcopy(dim, r, 1, r0, 1);          // r0 = r
+                rho = blas::dot(dim, r0, r0);
 #else
-                blas_xscal(size, beta, p, 1);
-                blas_xaxpy(size, 1.0, r, 1, p, 1);
+                monitor.finish(2, dim, r);
+                break;
 #endif
             }
             
-            mat.multiply( p, v );                     // v = A * p;
-            alpha = rho_1 / DOT(size, rtilde, 1,  v, 1);
+            beta = ( rho / rho_old ) * ( alpha / omega );
+            // p = r + beta * ( p - omega * v )
+            blas::xaxpy(dim, -omega, v, 1, p, 1);
+#ifdef __INTEL_MKL__
+            blas::xaxpby(dim, 1.0, r, 1, beta, p, 1);
+#else
+            blas::xscal(dim, beta, p, 1);
+            blas::xaxpy(dim, 1.0, r, 1, p, 1);
+#endif
+        start:
             
-            blas_xaxpy(size, -alpha, v, 1, r, 1);     // r = r - alpha * v;
-            blas_xaxpy(size,  alpha, p, 1, x, 1);     // x = x + alpha * p;
+            mat.multiply(p, v);                     // v = A * p;
+            alpha = rho / blas::dot(dim, r0, v);
+
+            blas::xaxpy(dim, -alpha, v, 1, r, 1);   // r = r - alpha * v;
+            blas::xaxpy(dim,  alpha, p, 1, sol, 1); // x = x + alpha * p;
             
-            //if ( monitor.finished(size, r) )
+            //if ( monitor.finished(dim, r) )
             //    break;
             
-            mat.multiply( r, t );                     // t = A * r;
-            
-            real tdt = DOT(size, t, 1, t, 1);
-            
-            if ( tdt == 0.0 )
-            {
-                monitor.finished(0, size, r);
-                break;
-            }
+            mat.multiply(r, t);                     // t = A * r;
+            monitor+=2;
 
-            omega = DOT(size, t, 1, r, 1) / tdt;
+            double tdt = blas::dot(dim, t, t);
             
-            if ( omega == 0.0 )
+            if ( tdt > 0.0 )
             {
-                monitor.finished(3, size, r);
-                break;
+                omega = blas::dot(dim, t, r) / tdt;
+                
+                if ( omega == 0.0 )
+                {
+                    monitor.finish(3, dim, r);
+                    break;
+                }
+                
+                blas::xaxpy(dim,  omega, r, 1, sol, 1);  // x = x + omega * r
+                blas::xaxpy(dim, -omega, t, 1, r, 1);    // r = r - omega * t
             }
-            
-            blas_xaxpy(size,  omega, r, 1, x, 1);     // x = x + omega * r;
-            blas_xaxpy(size, -omega, t, 1, r, 1);     // r = r - omega * t;
-            
-            ++monitor;
-         }
+            else
+                omega = 0.0;
+        }
         
-        allocator.relax();
+#if ( 0 )
+        // calculate true residual = rhs - A * x
+        mat.multiply(sol, r0);
+        blas::xaxpy(dim, -1.0, rhs, 1, r0, 1);
+        real resid = blas::nrm2(dim, r0);
+        fprintf(stderr, "BCGS  %4i count %4i residual %10.6f\n", dim, monitor.count(), resid);
+#endif
+        allocator.release();
     }
     
     
     /// Bi-Conjugate Gradient Stabilized with Preconditionning
+    /*
+     This solves `mat * x = rhs` with a tolerance specified in 'monitor'
+     */
     template < typename LinearOperator, typename Monitor, typename Allocator >
-    void BCGSP(const LinearOperator& mat, const real* rhs, real* x, Monitor& monitor, Allocator& allocator)
+    void BCGSP(const LinearOperator& mat, const real* rhs, real* sol,
+               Monitor& monitor, Allocator& allocator)
     {
-        double rho_1 = 1, rho_2, alpha = 0, beta = 0, omega = 1.0, delta;
+        double rho = 1.0, rho_old = 1.0, alpha = 0.0, beta = 0.0, omega = 1.0, delta;
         
-        const unsigned int size = mat.size();
-        allocator.allocate(size, 7);
-        real * r      = allocator.bind(0);
-        real * rtilde = allocator.bind(1);
-        real * p      = allocator.bind(2);
-        real * t      = allocator.bind(3);
-        real * v      = allocator.bind(4);
-        real * phat   = allocator.bind(5);
-        real * shat   = allocator.bind(6);
+        const int dim = mat.dimension();
+        allocator.allocate(dim, 7);
+        real * r    = allocator.bind(0);
+        real * r0   = allocator.bind(1);
+        real * p    = allocator.bind(2);
+        real * t    = allocator.bind(3);
+        real * v    = allocator.bind(4);
+        real * phat = allocator.bind(5);
+        real * shat = allocator.bind(6);
         
-        blas_xcopy(size, rhs, 1, r, 1);
-        mat.multiply(x, rtilde);
-        blas_xaxpy(size, -1.0, rtilde, 1, r, 1);        // r = rhs - A * x
-        blas_xcopy(size, r, 1, rtilde, 1);              // r_tilde = r
+        mat.multiply(sol, r0);
+        blas::xcopy(dim, rhs, 1, r, 1);
+        blas::xaxpy(dim, -1.0, r0, 1, r, 1);    // r = rhs - A * x
+        blas::xcopy(dim, r, 1, r0, 1);          // r0 = r
         
-        while ( ! monitor.finished(size, r) )
+        rho = blas::dot(dim, r, r);
+        blas::xcopy(dim, r, 1, p, 1);
+
+        if ( monitor.finished(dim, r) )
+            return;
+
+        goto start;
+
+        while ( ! monitor.finished(dim, r) )
         {
-            rho_2 = rho_1;
-            rho_1 = DOT(size, rtilde, 1, r, 1);
+            rho_old = rho;
+            rho = blas::dot(dim, r0, r);
             
-            if ( rho_1 == 0.0 )
+            if ( rho == 0.0 )
             {
-                monitor.finished(2, size, r);
-                break;
-            }
-            
-            beta = ( rho_1 / rho_2 ) * ( alpha / omega );
-            if ( beta == 0.0 )
-            {
-                // p = r;
-                blas_xcopy(size, r, 1, p, 1);
-            }
-            else {
-                // p = r + beta * ( p - omega * v )
-                blas_xaxpy(size, -omega, v, 1, p, 1);
-#ifdef __INTEL_MKL__
-                blas_xaxpby(size, 1.0, r, 1, beta, p, 1);
+#if ( 1 )
+                /* The residual vector became nearly orthogonal to the
+                 arbitrarily chosen direction r0, and we restart with a new r0 */
+                blas::xcopy(dim, rhs, 1, r, 1);
+                mat.multiply(sol, r0);
+                blas::xaxpy(dim, -1.0, r0, 1, r, 1);  // r = rhs - A * x
+                blas::xcopy(dim, r, 1, r0, 1);        // r0 = r
+                rho = blas::dot(dim, r0, r0);
 #else
-                blas_xscal(size, beta, p, 1);
-                blas_xaxpy(size, 1.0, r, 1, p, 1);
+                monitor.finish(2, dim, r);
+                break;
 #endif
             }
             
-            mat.precondition( p, phat );                // phat = PC * p;
-            mat.multiply( phat, v );                    // v = M * phat;
+            beta = ( rho / rho_old ) * ( alpha / omega );
+            // p = r + beta * ( p - omega * v )
+            blas::xaxpy(dim, -omega, v, 1, p, 1);
+#ifdef __INTEL_MKL__
+            blas::xaxpby(dim, 1.0, r, 1, beta, p, 1);
+#else
+            blas::xscal(dim, beta, p, 1);
+            blas::xaxpy(dim, 1.0, r, 1, p, 1);
+#endif
+        start:
             
-            delta = DOT(size, rtilde, 1,  v, 1);
+            mat.precondition(p, phat);                // phat = PC * p;
+            mat.multiply(phat, v);                    // v = M * PC * p;
+
+            delta = blas::dot(dim, r0, v);
             if ( delta == 0.0 )
             {
-                monitor.finished(4, size, r);
+                ++monitor;
+                monitor.finish(4, dim, r);
                 break;
             }
             
-            alpha = rho_1 / delta;
-            blas_xaxpy(size, -alpha, v, 1, r, 1);       // r = r - alpha * v;
-            blas_xaxpy(size,  alpha, phat, 1, x, 1);    // x = x + alpha * phat;
+            alpha = rho / delta;
+            blas::xaxpy(dim, -alpha,    v, 1,   r, 1);// r = r - alpha * v;
+            blas::xaxpy(dim,  alpha, phat, 1, sol, 1);// x = x + alpha * phat;
 
-            //if ( monitor.finished(size, r) )
-            //    break;
+            mat.precondition(r, shat);                // shat = PC * r
+            mat.multiply(shat, t);                    // t = M * PC * r
+            monitor+=2;
 
-            mat.precondition( r, shat );                // shat = PC * r
-            mat.multiply( shat, t );                    // t = M * shat
+            double tdt = blas::dot(dim, t, t);
             
-            real tdt = DOT(size, t, 1, t, 1);
-            
-            if ( tdt == 0.0 )
+            if ( tdt > 0.0 )
             {
-                monitor.finished(0, size, r);
-                break;
+                omega = blas::dot(dim, t, r) / tdt;
+            
+                if ( omega == 0.0 )
+                {
+                    monitor.finish(3, dim, r);
+                    break;
+                }
+                
+                blas::xaxpy(dim,  omega, shat, 1, sol, 1); // x = x + omega * shat
+                blas::xaxpy(dim, -omega,    t, 1,   r, 1); // r = r - omega * t
             }
-            
-            omega = DOT(size, t, 1, r, 1) / tdt;
-            
-            if ( omega == 0.0 )
-            {
-                monitor.finished(3, size, r);
-                break;
-            }
-            
-            blas_xaxpy(size,  omega, shat, 1, x, 1);    // x = x + omega * shat
-            blas_xaxpy(size, -omega, t, 1, r, 1);       // r = r - omega * t
-            
-            ++monitor;
+            else
+                omega = 0.0;
         }
+#if ( 0 )
+        // calculate true residual = rhs - A * x
+        mat.multiply(sol, r);
+        blas::xaxpy(dim, -1.0, rhs, 1, r, 1);
+        real resid = blas::nrm2(dim, r);
+        fprintf(stderr, "BCGSP count %4i residual %10.6f\n", monitor.count(), resid);
+#endif
         
-        allocator.relax();
+        allocator.release();
     }
-};
+    
+    
+    /**
+     This is an alternative implementation adapted from the CUPS project
+     https://cusplibrary.github.io/index.html
+     */
+    template < typename LinearOperator, typename Monitor, typename Allocator >
+    void bicgstab(const LinearOperator& mat, const real* rhs, real* sol,
+                  Monitor& monitor, Allocator& allocator)
+    {
+        const int dim = mat.dimension();
+        
+        allocator.allocate(dim, 8);
+        real * p     = allocator.bind(0);
+        real * r     = allocator.bind(1);
+        real * rstar = allocator.bind(2);
+        real * s     = allocator.bind(3);
+        real * Mp    = allocator.bind(4);
+        real * AMp   = allocator.bind(5);
+        real * Ms    = allocator.bind(6);
+        real * AMs   = allocator.bind(7);
+        
+        // r <- A*x
+        mat.multiply(sol, p);
+        
+        // r <- b - A*x
+        blas::xcopy(dim, rhs, 1, r, 1);
+        blas::xaxpy(dim, -1.0, p, 1, r, 1);
+        
+        // p <- r
+        blas::xcopy(dim, r, 1, p, 1);
+        
+        // r_star <- r
+        blas::xcopy(dim, r, 1, rstar, 1);
+        
+        double r_rstar_old = blas::dot(dim, rstar, r);
+        
+        while ( !monitor.finished(dim, r) )
+        {
+            // Mp = M*p
+            mat.precondition(p, Mp);
+            
+            // AMp = A*Mp
+            mat.multiply(Mp, AMp);
+
+            // alpha = (r_j, r_star) / (A*M*p, r_star)
+            double alpha = r_rstar_old / blas::dot(dim, rstar, AMp);
+            
+            // s_j = r_j - alpha * AMp
+            blas::xcopy(dim, r, 1, s, 1);
+            blas::xaxpy(dim, -alpha, AMp, 1, s, 1);
+            
+            if (monitor.finished(dim, s))
+            {
+                // x += alpha*M*p_j
+                blas::xaxpy(dim, alpha, Mp, 1, sol, 1);
+                ++monitor;
+                break;
+            }
+            
+            // Ms = M*s_j
+            mat.precondition(s, Ms);
+            
+            // AMs = A*Ms
+            mat.multiply(Ms, AMs);
+            monitor+=2;
+
+            // omega = (AMs, s) / (AMs, AMs)
+            double omega = blas::dot(dim, AMs, s) / blas::dot(dim, AMs, AMs);
+            
+            // x_{j+1} = x_j + alpha*M*p_j + omega*M*s_j
+            blas::xaxpy(dim, alpha, Mp, 1, sol, 1);
+            blas::xaxpy(dim, omega, Ms, 1, sol, 1);
+            
+            // r_{j+1} = s_j - omega*A*M*s
+            blas::xcopy(dim, s, 1, r, 1);
+            blas::xaxpy(dim, -omega, AMs, 1, r, 1);
+
+            // beta_j = (r_{j+1}, r_star) / (r_j, r_star) * (alpha/omega)
+            double r_rstar_new = blas::dot(dim, rstar, r);
+            double beta = (r_rstar_new / r_rstar_old) * (alpha / omega);
+            r_rstar_old = r_rstar_new;
+            
+            // p_{j+1} = r_{j+1} + beta*(p_j - omega*A*M*p)
+            blas::xaxpy(dim, -omega, AMp, 1, p, 1);
+            blas::xscal(dim, beta, p, 1);
+            blas::xaxpy(dim, 1.0, r, 1, p, 1);
+        }
+#if ( 0 )
+        // calculate true residual = rhs - A * x
+        mat.multiply(sol, r);
+        blas::xaxpy(dim, -1.0, rhs, 1, r, 1);
+        real resid = blas::nrm2(dim, r);
+        fprintf(stderr, "bicgs %4i count %4i residual %10.6f\n", dim, monitor.count(), resid);
+#endif
+        allocator.release();
+    }
+
+}
 
 #endif
 

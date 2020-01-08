@@ -1,6 +1,6 @@
 % F. Nedelec, April 2010
 
-set simul motile_bead 
+set simul system
 {
     time_step = 0.02
     viscosity = 0.2
@@ -10,10 +10,13 @@ set simul motile_bead
 
 set space cell
 {
-    geometry = ( square 10 10 10 )
+    shape = rectangle
 }
 
-new space cell
+new cell
+{
+    length = 20, 20, 20
+}
 
 set fiber actin
 {
@@ -26,7 +29,7 @@ set fiber actin
     shrinking_speed = -0.05, -0.01
     growing_force   =     2,  2
     
-    display = { color=white; point_size=5; speckles=1; line_style=1; line_width=1 }
+    display = { color=white; point_size=5; speckles=7,1; line_style=1; line_width=1 }
 }
 
 set hand formin
@@ -35,11 +38,11 @@ set hand formin
     unbinding = 0, 3
     
     activity = nucleate
-    nucleate = 1, actin
+    nucleate = 1, actin, ( length=0.01; end_state=1, 4 )
     hold_growing_end = 1
     hold_shrinking_end = 0
     track_end = plus_end
-    nucleation_spec = ( length=0.01; end_state=1, 4 )
+    hold_end = plus_end
 }
 
 set single grafted
@@ -48,25 +51,24 @@ set single grafted
     stiffness = 100
 }
 
-set sphere bead
+set sphere particle
 {
     point_mobility = 1
     steric = 1
-    display = { color=0xFFFF0055; style=7; size=8 }
+    display = { color=0xFFFF0055; style=8; size=8 }
 }
 
-new sphere bead
+new particle
 {
     radius = 1
-	% add 2 points with 3 grafted per point:
-    point0 = 2, surface, 2 grafted
-	% add 10 points with 1 grafted per point:
-    point1 = 10, surface, 1 grafted
+    point1 = 10, surface, grafted each
     position = ( 0 0 0 )
 }
 
-run simul *
+set system display { track_fibers=1 }
+
+run system
 {
-    nb_steps = 25000
+    nb_steps = 2500
     nb_frames = 50
 }

@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SINGLE_H
 #define SINGLE_H
 
@@ -8,21 +7,19 @@
 #include "movable.h"
 #include "object.h"
 #include "hand_monitor.h"
-#include "point_exact.h"
+#include "mecapoint.h"
 #include "single_prop.h"
 #include "hand.h"
 
-class Meca;
-class Modulo;
-class Glossary;
-class FiberGrid;
+
 class Fiber;
+class PointDisp;
 
 
 /// A point-like object containing one Hand.
 /**
  A Single contains one pointer to Hand, and consequently
- inherit the 2 possible states: \a attached or \a free.
+ inherit the 2 possible states: `attached` or `free`.
  
  By default:
  - Free Single are diffusing, and try to bind to nearby Fibers,
@@ -31,16 +28,16 @@ class Fiber;
  
  However, two derived classes change this behavior:
  -# a Picket is fixed in position and do not diffuse,
- -# a Wrist is attached to one model point of a Mecable.
+ -# a Wrist is attached to one vertex of a Mecable.
  .
  
  Attached Wrist and Picket exert a force on the Fiber to which the Hand is attached.
- 
  For WristLong and PicketLong, this force can have a non-zero resting length.
- 
- Wrist and Picket can be distinguished with Single::foot():
- - Single::foot() and Picket::foot() return zero, 
- - Wrist::foot() returns the Mecable on which the Wrist is attached.
+ For these class in which the Hand can be under tension, `hasForce()` returns true.
+
+ Wrist and Picket can be distinguished with Single::base():
+ - for Single and Picket, this returns zero,
+ - for Wrist, this returns the Mecable on which the Wrist is attached.
  .
 
  @ingroup SingleGroup
@@ -48,68 +45,76 @@ class Fiber;
 
 class Single : public Object, public HandMonitor
 {
+private:
+    
+    /// specialization of HandMonitor
+    void      afterAttachment(Hand const*);
+    /// specialization of HandMonitor
+    void      beforeDetachment(Hand const*);
+    /// specialization of HandMonitor
+    Vector    otherPosition(Hand const*) const { return posFoot(); }
+    /// = identity() of the Object on which a Wrist is attached, or Single::identity()
+    ObjectID  nucleatorID()              const { return base()?base()->identity():Object::identity(); }
+    /// Simul pointer
+    Simul*    simul()                    const { return &Object::simul(); }
+    /// specialization of HandMonitor
+    real      interactionLength()        const { return prop->length; }
+    /// stiffness of the interaction
+    real      interactionStiffness()     const { return 0; }
+
+protected:
+    
+    /// the position of the foot
+    Vector        sPos;
+    
+    /// the motor domain
+    Hand *        sHand;
+
 public:
     
     /// property
     SingleProp const* prop;
-    
-protected:    
-    
-    /// the motor domain
-    Hand *        sHand;    
-    
-    /// the position of the foot
-    Vector        sPos;
-
-private:
-    
-    /// specialization of HandMonitor
-    void      afterAttachment();
-    /// specialization of HandMonitor
-    void      afterDetachment();
-    /// specialization of HandMonitor
-    void      beforeDetachment();
-    /// = number() of the foot() or Single::number()
-    Number    objNumber() const { if ( foot() ) return foot()->number(); else return Object::number(); }
-    /// specialization of HandMonitor
-    real      interactionLength() const;
-
-public:
 
     /// constructor at specified position
     Single(SingleProp const*, Vector const& = Vector(0,0,0));
 
-    ///destructor
+    /// destructor
     virtual ~Single();
     
     //--------------------------------------------------------------------------
     
-    ///a reference to the Hand
-    Hand *  hand()                                      { return sHand; }
-    
-    ///position of the Hand
-    Vector  posHand()                            const  { return sHand->pos(); }
+    /// associated Hand
+    Hand*  hand()                              { return sHand; }
     
     /// sHand->attached()
-    bool    attached()                           const  { return sHand->attached(); }
+    bool    attached()                  const  { return sHand->attached(); }
     
-    /// attach the hand at the given position
-    void    attach(FiberBinder& fb)                     { return sHand->attach(fb); }
+    /// sHand->attached()
+    int     state()                     const  { return sHand->attached(); }
 
-    /// attach the hand at the given position 
-    void    attachTo(Fiber * f, real ab, FiberEnd from) { return sHand->attachTo(f, ab, from); }
+    /// Fiber to which this is attached
+    Fiber*  fiber()                     const  { return sHand->fiber(); }
     
-    /// attach Hand at the given end
-    void    attachToEnd(Fiber * f, FiberEnd end)        { return sHand->attachToEnd(f, end); }
+    /// attachment position of Hand along fiber (call is invalid if Hand is not attached)
+    real    abscissa()                  const  { return sHand->abscissa(); }
+    
+    /// position of the Hand (call is invalid if Hand is not attached)
+    Vector  posHand()                   const  { return sHand->pos(); }
+    
+    /// direction of Fiber at attachment point (call is invalid if Hand is not attached)
+    Vector  dirFiber()                  const  { return sHand->dirFiber(); }
+    
+    /// attach Hand at the given site
+    void    attach(FiberSite s)                { if ( sHand->attachmentAllowed(s) ) sHand->attach(s); }
+    
+    /// attach Hand at given Fiber end
+    void    attachEnd(Fiber * f, FiberEnd end) { sHand->attachEnd(f, end); }
+
+    /// move Hand at given end
+    void    moveToEnd(FiberEnd end)            { sHand->moveToEnd(end); }
     
     /// detach
-    void    detach()                                    { return sHand->detach(); }
-    
-    /// Fiber to which this is attached
-    Fiber*  fiber()                                     { return sHand->fiber(); }
-    
-    /// direction of Fiber at attachment point
-    Vector  dirFiber()                           const  { return sHand->dirFiber(); }
+    void    detach()                           { sHand->detach(); }
 
     //--------------------------------------------------------------------------
     
@@ -117,41 +122,44 @@ public:
     virtual Vector  position() const;
     
     /// Single can be translated only if it is not attached
-    virtual bool    translatable()               const  { return !sHand->attached(); }
+    virtual int     mobile()              const  { return !sHand->attached(); }
     
-    ///translate object's position by the given vector
-    virtual void    translate(Vector const& w)          { assert_false(sHand->attached()); sPos += w; }
+    /// translate object's position by the given vector
+    virtual void    translate(Vector const& x)   { sPos += x; }
     
     /// move object to specified position
-    virtual void    setPosition(Vector const& w)        { sPos = w; }
+    virtual void    setPosition(Vector const& x) { sPos = x; }
 
     /// modulo the position of the grafted
-    virtual void    foldPosition(const Modulo * s);
+    virtual void    foldPosition(Modulo const* s);
     
+    /// set the position randomly inside prop->confine_space
+    void            randomizePosition();
+
     //--------------------------------------------------------------------------
     
-    /// the Mecable to which this is attached, or zero
-    virtual Mecable const* foot()                const  { return 0; }
-    
-    /// the position of the foot holding the Hand
-    virtual Vector  posFoot()                    const  { return sPos; }
+    /// the position of the anchoring point
+    virtual Vector  posFoot()             const  { return sPos; }
     
     /// position on the side of fiber used for sideInteractions
-    virtual Vector  posSide()                    const  { return sHand->pos(); }
+    virtual Vector  posSide()             const  { return sHand->pos(); }
     
-    /// force = zero for a diffusible Single
-    virtual Vector  force()                      const  { return Vector(0,0,0); }
-
-    /// Monte-Carlo step for a free Single
-    virtual void    stepFree(const FiberGrid&);
-    
-    /// Monte-Carlo step for a bound Single
-    virtual void    stepAttached();
+    /// the Mecable to which this is anchored, or zero
+    virtual Mecable const* base()         const  { return nullptr; }
     
     /// true if Single creates an interaction
-    virtual bool    hasInteraction() const;
+    virtual bool    hasForce() const             { return false; }
+
+    /// force = stiffness * ( position_anchor - position_hand ), or zero for a diffusible Single
+    virtual Vector  force()               const  { return Vector(0,0,0); }
+
+    /// Monte-Carlo step if the Hand is not attached
+    virtual void    stepF(const FiberGrid&);
     
-    /// add interactions to the Meca
+    /// Monte-Carlo step if the Hand is attached
+    virtual void    stepA();
+    
+    /// add interactions to a Meca
     virtual void    setInteractions(Meca &) const;
     
     //--------------------------------------------------------------------------
@@ -165,19 +173,22 @@ public:
     //--------------------------------------------------------------------------
 
     /// a unique character identifying the class
-    static const Tag TAG = 's';
+    static const ObjectTag TAG = 's';
     
     /// return unique character identifying the class
-    virtual Tag     tag() const { return TAG; }
+    ObjectTag        tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
+    /// return associated Property
+    Property const*  property() const { return prop; }
     
+    /// return PointDisp of associated Hand
+    PointDisp const* disp() const { return sHand->prop->disp; }
+
     /// read from file
-    virtual void    read(InputWrapper&, Simul&);
+    virtual void    read(Inputter&, Simul&, ObjectTag);
     
     /// write to file
-    virtual void    write(OutputWrapper&) const;
+    virtual void    write(Outputter&) const;
     
 };
 

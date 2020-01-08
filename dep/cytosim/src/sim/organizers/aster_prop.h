@@ -5,11 +5,9 @@
 
 #include "real.h"
 #include "property.h"
-#include "fiber_naked.h"
-#include "solid_prop.h"
+#include "common.h"
 
 class FiberSet;
-class Glossary;
 
 
 /// Property for Aster
@@ -29,14 +27,7 @@ public:
      @ingroup Parameters
      @{
      */
-    
-    
-    /// name of Solid located at the center of the Aster to which each Fiber is attached
-    std::string   solid;
-    
-    /// name of Fiber that make up the Aster
-    std::string   fibers;
-    
+
     /// stiffness of links between the Solid and the Fiber
     /**
      - stiffness[0] is the link between the central point of the Solid 
@@ -50,17 +41,22 @@ public:
     /// designates which end of the fiber is towards the center
     FiberEnd      focus;
     
-    /// rate at which a new fiber is created at an unoccupied site
-    real          nucleation_rate;
+    /// rate at which a new fiber is created at an unoccupied site (known as nucleate)
+    real          fiber_rate;
     
+    /// name of Fiber that make up the Aster (know as `nucleate[1]`)
+    std::string   fiber_type;
+    
+    /// specifications for initial fibers (also known as `nucleate[2]`)
+    std::string   fiber_spec;
+
     /// @}
-    //------------------ derived variables below ----------------
+    
     
 private:
     
-    SolidProp *  solid_prop;
-    FiberSet *   fiber_set;
-    real         nucleation_rate_prob;
+    /// probability of nucleation
+    real         fiber_prob;
 
 public:
     
@@ -71,7 +67,7 @@ public:
     ~AsterProp() { }
     
     /// identifies the property
-    std::string kind() const { return "aster"; }
+    std::string category() const { return "aster"; }
     
     /// set default values
     void clear();
@@ -80,13 +76,13 @@ public:
     void read(Glossary&);
     
     /// check and derive parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new AsterProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

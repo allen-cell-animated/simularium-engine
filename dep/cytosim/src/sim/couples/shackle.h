@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SHACKLE_H
 #define SHACKLE_H
 
@@ -16,20 +15,13 @@
  */
 class Shackle : public Couple
 {
-    /// the side (top/bottom) of the interaction
-    mutable Torque mArm;
     
-    /// used to calculate \a mArm
-    static Torque calcArm(const PointInterpolated & pt, Vector const& pos, real len);
-   
-protected:
+public:
     
     /// property
     ShackleProp const* prop;
-        
-public:
     
-    /// create following the specifications in the CoupleProp
+    /// constructor
     Shackle(ShackleProp const* p, Vector const & w = Vector(0,0,0));
 
     /// destructor
@@ -40,7 +32,7 @@ public:
     /// simulation step if doubly attached
     void    stepAA();
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

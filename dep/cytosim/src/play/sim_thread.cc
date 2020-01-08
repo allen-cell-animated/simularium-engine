@@ -1,11 +1,14 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include <cstdio>
 #include <time.h>
 #include "sim_thread.h"
 #include "exceptions.h"
 #include "picket.h"
-
+#include "glapp.h"
 
 //------------------------------------------------------------------------------
 
@@ -13,238 +16,334 @@
  This uses a Parser that cannot write to disc.
  The function callback is called when Parser::hold() is reached.
  */
-SimThread::SimThread(void (*hold_callback)(void))
-: Parser(simul, 1, 1, 1, 1, 0), holding(hold_callback)
+SimThread::SimThread(void (*callback)(void))
+: Parser(simul, 1, 1, 1, 1, 0), hold_callback(callback)
 {
-    mStatus = 0;
+    hasChild = false;
+    mFlag   = 0;
     mHold   = 0;
     mPeriod = 1;
-    pthread_mutex_init(&mMutex, 0);
-    pthread_cond_init(&mCondition, 0);
+    pthread_mutex_init(&mMutex, nullptr);
+    pthread_cond_init(&mCondition, nullptr);
 }
 
 /**
- Known issue:
+ Possible issue:
  When quitting the application, this destructor might be called after the
  destructor of Simul(), in which case it will access non-existent data,
  most likely causing a crash().
  */
 SimThread::~SimThread()
 {
+    //std::cerr << "~SimThread()\n";
     stop();
-    pthread_detach(mThread);
+    pthread_cond_destroy(&mCondition);
+    pthread_mutex_destroy(&mMutex);
 }
 
 //------------------------------------------------------------------------------
-#pragma mark -
+#pragma mark - Process control
+
+
+void SimThread::debug(const char* msg) const
+{
+    if ( isChild() )
+        fprintf(stdout, "\n- - -  %-16s", msg);
+    else
+        fprintf(stdout, "\n* * *  %-16s", msg);
+}
+
+
+void SimThread::gubed(const char* msg) const
+{
+    if ( isChild() )
+        fprintf(stdout, "  - - %12s ", msg);
+    else
+        fprintf(stdout, "  * * %12s ", msg);
+}
+
 
 void SimThread::hold()
 {
-    //assert_true( pthread_equal(pthread_self(), mThread) );
+    assert_true( isChild() );
 
+    if ( mFlag )
+        pthread_exit(nullptr);
+    
     if ( ++mHold >= mPeriod )
     {
-        holding();
         mHold = 0;
-        if ( mStatus > 0 )
-            pthread_cond_wait(&mCondition, &mMutex);
-        else
-        {
-            // if ( mStatus < 0 ), we exit
-            mStatus = 0;
-            unlock();
-            pthread_exit(0);
-        }
+        //debug("holding");
+        hold_callback();
+        if ( mFlag )
+            pthread_exit(nullptr);
+        wait();  // this also unlocks and locks the mutex
     }
 }
+
+
+//------------------------------------------------------------------------------
+#pragma mark - Lauching threads
 
 
 void SimThread::run()
 {
-    //assert_true( pthread_equal(pthread_self(), mThread) );
-    
+    assert_true( isChild() );
     try {
-        Parser::readConfig(simul.prop->config);
+        if ( Parser::readConfig() )
+            std::cerr << "You must specify a config file\n";
     }
     catch( Exception & e ) {
-        std::cerr << std::endl << "Error: " << e.what() << std::endl;
-        //flashText("Error: simulation died");
-    }
-    mStatus = 0;
-    unlock();
-}
-
-
-void* run_thread(void * arg)
-{
-    SimThread * lt = static_cast<SimThread*>(arg);
-    lt->run();
-    return 0;
-}
-
-
-void SimThread::run_more()
-{
-    //assert_true( pthread_equal(pthread_self(), mThread) );
-    
-    try {
-        simul.prepare();
-        while ( 1 )
-        {
-            simul.step();
-            simul.solve();
-            hold();
-        }
-    }
-    catch( Exception & e ) {
-        std::cerr << std::endl << "Error: " << e.what() << std::endl;
         simul.relax();
-        mStatus = 0;
-        unlock();
-        //flashText("Error: %s", e.what());
+        std::cerr << "\nError: " << e.what() << std::endl;
+        //flashText("Error: the simulation died");
+    }
+    hold_callback();
+}
+
+
+/** C-style function to cleanup after thread has terminated */
+void child_cleanup(void * arg)
+{
+    SimThread * st = static_cast<SimThread*>(arg);
+    //st->debug("cleanup");
+    st->hasChild = 0;
+    st->unlock();
+}
+
+
+/** C-style function to start a new thread */
+void* run_launcher(void * arg)
+{
+    //std::clog << "slave  " << pthread_self() << '\n';
+    SimThread * st = static_cast<SimThread*>(arg);
+    st->lock();
+    pthread_cleanup_push(child_cleanup, arg);
+    st->run();
+    pthread_cleanup_pop(1);
+    pthread_detach(st->child());
+    return nullptr;
+}
+
+
+/**
+ This attempts to start the live simulation by
+ calling run() in the slave thread
+ */
+void SimThread::start()
+{
+    assert_false( isChild() );
+    if ( !hasChild )
+    {
+        mFlag = 0;
+        //std::clog << "master " << pthread_self() << '\n';
+        if ( pthread_create(&child_, nullptr, run_launcher, this) )
+            throw Exception("failed to create thread");
+        hasChild = 1;
     }
 }
 
-
-void* run_more_thread(void * arg)
-{
-    SimThread * lt = static_cast<SimThread*>(arg);
-    lt->run_more();
-    return 0;
-}
 
 //------------------------------------------------------------------------------
-#pragma mark -
 
-/**
- This attempts to start the live simulation
- */
-int SimThread::start()
+
+void SimThread::extend_run()
 {
-    if ( mStatus == 0 )
+    assert_true( isChild() );
+    try {
+        Parser::execute_run(100000);
+    }
+    catch( Exception & e ) {
+        std::cerr << "\nError: " << e.what() << '\n';
+        simul.relax();
+        //flashText("Error: %s", e.what());
+    }
+    hold_callback();
+}
+
+
+/** C-style function to start a new thread */
+void* extend_launcher(void * arg)
+{
+    //std::clog << "slave  " << pthread_self() << '\n';
+    SimThread * st = static_cast<SimThread*>(arg);
+    st->lock();
+    pthread_cleanup_push(child_cleanup, arg);
+    st->extend_run();
+    pthread_cleanup_pop(1);
+    pthread_detach(st->child());
+    return nullptr;
+}
+
+
+/// call extend_code() in the slave thread
+int SimThread::extend()
+{
+    assert_false( isChild() );
+    if ( !hasChild )
     {
-        if ( 0 == trylock() )
-        {
-            mStatus = 1;
-            pthread_create(&mThread, 0, run_thread, this);
-            return 0;
-        }
+        mFlag = 0;
+        //std::clog << "master " << pthread_self() << '\n';
+        if ( pthread_create(&child_, nullptr, extend_launcher, this) )
+            throw Exception("failed to create thread");
+        hasChild = 1;
+        return 0;
     }
     return 1;
 }
 
 
-int SimThread::persist()
+//------------------------------------------------------------------------------
+#pragma mark - Thread control & termination
+
+
+void SimThread::step()
 {
-    if ( mStatus == 0 )
-    {
-        if ( 0 == trylock() )
-        {
-            mStatus = 2;
-            pthread_create(&mThread, 0, run_more_thread, this);
-            return 0;
-        }
-    }
-    return 1;
+    assert_false( isChild() );
+    if ( hasChild )
+        signal();
 }
 
 
 /**
- ask the live-thread to exit at the next spontaneous halt
+ ask the slave thread to exit at the next spontaneous halt
 */ 
 void SimThread::stop()
 {
-    if ( mStatus > 0 )
+    assert_false( isChild() );
+    if ( hasChild )
     {
-        // request termination:
-        mStatus = -1;
-        release();
+        // request clean termination:
+        mFlag = 1;
+        signal();
+        //debug("join...");
         // wait for termination:
-        pthread_join(mThread, 0);
+        pthread_join(child_, nullptr);
+        pthread_detach(child_);
+        hasChild = 0;
     }
 }
 
 /**
- kill the live-thread immediately
+ kill the slave thread immediately
  */
 void SimThread::cancel()
 {
-    if ( mStatus > 0 )
+    assert_false( isChild() );
+    if ( hasChild )
     {
-        // request termination:
-        if ( 0 == pthread_cancel(mThread) )
+        mFlag = 2;
+        //debug("cancel...");
+        // force termination:
+        if ( 0 == pthread_cancel(child_) )
         {
             // wait for termination:
-            pthread_join(mThread, 0);
+            pthread_join(child_, nullptr);
+            pthread_detach(child_);
+            hasChild = 0;
             unlock();
-            mStatus = 0;
         }
     }
 }
 
-//------------------------------------------------------------------------------
-#pragma mark -
 
-
-SingleProp * SimThread::getHandleProperty(real range)
+void SimThread::restart()
 {
-    Property * p = simul.properties.find("single", "mouse");
-    
-    if ( p == 0 )
-    {
-        HandProp * hp = new HandProp("mouse");
-        
-        // Attach fast and never detach:
-        hp->binding_range   = range;
-        hp->binding_rate    = 1000;
-        hp->unbinding_rate  = 0;
-        hp->unbinding_force = INFINITY;
-        hp->complete(simul.prop, &simul.properties);
-        simul.properties.deposit(hp);
-        
-        SingleProp * sp = new SingleProp("mouse");
-        sp->hand = "mouse";
-        sp->stiffness = 1000;
-        sp->complete(simul.prop, &simul.properties);
-        simul.properties.deposit(sp);
-        return sp;
-    }
-    
+    assert_false( isChild() );
+    stop();
+    clear();
+    start();
+}
+
+//------------------------------------------------------------------------------
+#pragma mark - Mouse-controlled Single
+
+
+SingleProp * SimThread::getHandleProperty() const
+{
+    Property * p = simul.properties.find("single", "user_single");
     return static_cast<SingleProp*>(p);
 }
 
 
-Single * SimThread::createHandle(const Vector & pos, real range)
+SingleProp * SimThread::makeHandleProperty(real range)
 {
-    SimThread::Lock lck(this);
-    SingleProp * sp = getHandleProperty(range);
-    Single * res = new Picket(sp, pos);
-    mHandles.push_back(res);
+    // Create a Hand that attaches fast and never detach:
+    HandProp * hap = new HandProp("user_hand");
+    hap->binding_range   = range;
+    hap->binding_rate    = 10000;
+    hap->unbinding_rate  = 0;
+    hap->unbinding_force = INFINITY;
+    hap->complete(simul);
+    simul.properties.deposit(hap);
+
+    SingleProp * sip = new SingleProp("user_single");
+    sip->hand = "user_hand";
+    sip->stiffness = 256;
+    sip->complete(simul);
+    simul.properties.deposit(sip);
+    
+    return sip;
+}
+
+
+Single * SimThread::createHandle(Vector const& pos, real range)
+{
+    SingleProp * sip = getHandleProperty();
+    if ( !sip )
+        sip = makeHandleProperty(range);
+    Single * res = new Picket(sip, pos);
     simul.singles.add(res);
     mHandle = res;
     return res;
 }
 
 
+ObjectList SimThread::allHandles(SingleProp const* sip) const
+{
+    return simul.singles.collect(match_property, sip);
+}
+
+
 bool SimThread::selectClosestHandle(Vector const& pos, real range)
 {
-    Single * res = 0;
-    real dsm = 0;
-    for ( Single ** oi = mHandles.begin(); oi < mHandles.end(); ++oi )
+    SingleProp * sip = getHandleProperty();
+    
+    if ( sip )
     {
-        real d = ( (*oi)->posFoot() - pos).norm();
-        if ( res == 0  ||  d < dsm )
+        real dsm = 0;
+        Single * res = nullptr;
+        for ( Object * i : allHandles(sip) )
         {
-            res = *oi;
-            dsm = d;
+            Single * s = static_cast<Single*>(i);
+            real d = ( s->posFoot() - pos ).normSqr();
+            if ( !res || d < dsm )
+            {
+                res = s;
+                dsm = d;
+            }
+        }
+        if ( res && dsm < range )
+        {
+            mHandle = res;
+            return 1;
         }
     }
-    if ( res && dsm < range )
-    {
-        mHandle = res;
-        return 1;
-    }
     return 0;
+}
+
+
+Single const* SimThread::handle() const
+{
+    SingleProp * sip = getHandleProperty();
+    if ( sip && mHandle )
+    {
+        for ( Object * i : allHandles(sip) )
+            if ( i == mHandle )
+                return mHandle;
+    }
+    mHandle = nullptr;
+    return nullptr;
 }
 
 
@@ -252,123 +351,181 @@ void SimThread::detachHandle()
 {
     if ( mHandle )
     {
-        SimThread::Lock lck(this);
         if ( mHandle->attached() )
             mHandle->detach();
     }
 }
 
-void SimThread::moveHandle(const Vector & pos)
+void SimThread::moveHandle(Vector const& pos)
 {
     if ( mHandle )
     {
-        SimThread::Lock lck(this);
         mHandle->setPosition(pos);
     }
 }
 
 
-void SimThread::moveHandles(const Vector & vec)
+void SimThread::moveHandles(Vector const& vec)
 {
-    SimThread::Lock lck(this);
-    for ( Single ** oi = mHandles.begin(); oi < mHandles.end(); ++oi )
-        (*oi)->translate(vec);
+    SingleProp * sip = getHandleProperty();
+    if ( sip )
+        ObjectSet::translateObjects(allHandles(sip), vec);
 }
 
 
 void SimThread::deleteHandles()
 {
-    SimThread::Lock lck(this);
-    for ( unsigned int ii = 0; ii < mHandles.size(); ++ii )
-    {
-        if ( mHandles[ii] )
-            simul.erase( mHandles[ii] );
-    }
-    mHandles.clear();
-    mHandle = 0;
+    lock();
+    SingleProp * sip = getHandleProperty();
+    if ( sip )
+        simul.erase(allHandles(sip));
+    mHandle = nullptr;
+    unlock();
 }
-
 
 void SimThread::clear()
 {
+    assert_false( isChild() );
     simul.erase();
-    mHandles.clear();
-    mHandle = 0;
+    mHandle = nullptr;
 }
 
 //------------------------------------------------------------------------------
-#pragma mark -
+#pragma mark - Parameter modifications
 
-/**
- Read config file from the start, allowing parameters to be changed, 
- while simulation objects remain as they are.
- 
- If the simulation is running live, this will pause it,
- read the config file, and allow it to proceed.
- */
-void SimThread::reloadConfig()
+#if ( 0 )
+
+#include <fcntl.h>
+
+/// set file to not block on read() even if data is not available:
+void set_nonblocking(int fd)
 {
-    Lock lck(this);
-    // the parser can only change properties:
-    Parser(simul, 0, 1, 0, 0, 0).readConfig(simul.prop->config);
-    simul.prop->display_fresh = false;
+    fcntl(fd, F_SETFL, O_NONBLOCK);
+}
+
+#endif
+
+
+/// check if file has data for input
+inline int has_input(int fd)
+{
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+    struct timeval tv = {0, 10};   // seconds, microseconds
+    return select(1, &fds, nullptr, nullptr, &tv);
 }
 
 
 /**
- This will execute the code specified in \a iss.
- 
- If the simulation is running live, the SimThread is paused,
- and the code is executed with another Parser.
- When that is completed, the SimThread is released.
- 
- The parser has full rights during the execution
+ Read standard input and executes incoming commands.
+ This should be executed by a process who already owns the lock on the data
  */
-int  SimThread::execute(std::istream& iss)
+size_t SimThread::readInput(size_t max_nb_lines)
 {
-    SimThread::Lock lck(this);
-    try {
-        Parser(simul, 1, 1, 1, 1, 1).parse(iss, "executing magic code");
-    }
-    catch( Exception & e ) {
-        std::cerr << "Error : " << e.what();
+    const size_t LINESIZE = 2048;
+    clearerr(stdin);
+    
+    if ( has_input(STDIN_FILENO) > 0 )
+    {
+        size_t cnt = 0;
+        // some input is available, process line-by-line:
+        char str[LINESIZE];
+        
+        // read one line from standard input (including terminating \n):
+        while ( fgets(str, LINESIZE, stdin) )
+        {
+            //write(STDOUT_FILENO, ">>>> ", 5); write(STDOUT_FILENO, str, strlen(str));
+            try {
+                evaluate(str);
+                glApp::flashText0(str);
+            }
+            catch ( Exception & e ) {
+                std::cerr << "Error in stdin: " << e.what() << '\n';
+            }
+            if ( ++cnt >= max_nb_lines )
+                break;
+            // check if more input is available:
+            if ( has_input(STDIN_FILENO) < 1 )
+            {
+                //printf("processed %i lines from standard input\n", cnt);
+                break;
+            }
+        }
+        return cnt;
     }
     return 0;
 }
 
 /**
- Save current state in two files
+ Read config file from the start, allowing parameters to be changed, while 
+ simulation objects remain as they are. This will pause a running simulation 
+ is running live, read the config file, and allow it to proceed.
  */
-void SimThread::writeState()
+void SimThread::reloadParameters(std::string const& file)
 {
-    Lock lck(this);
-    try {
+    lock();
+    // set a parser that can only change properties:
+    if ( Parser(simul, 0, 1, 0, 0, 0).readConfig(file) )
+        std::cerr << "Error: File not found";
+    //std::cerr << "reloaded " << simul.prop->config_file << std::endl;
+    unlock();
+}
+
+
+/**
+ This will execute the given code, with full rights to modify Simul.
  
-        std::ostringstream oss;
-        oss << std::setw(4) << std::setfill('0') << reader.frame() << ".cmo";
-        
-        std::string pfile = "properties"+oss.str();
-        simul.writeProperties(pfile, true);
-        
-        std::string ofile = "objects"+oss.str();
-        OutputWrapper out(ofile.c_str(), false, false);
-        simul.writeObjects(out);
+ A simulation running live will be paused; the code executed in another Parser,
+ and the simulation then allowed to proceed.
+ 
+ This can be executed by the parent thread who does not own the data
+ */
+void SimThread::execute(std::string const& code)
+{
+    lock();
+    try {
+        evaluate(code);
     }
     catch( Exception & e ) {
-        std::cerr << "Error in Simul::writeState(): " << e.what();
+        std::cerr << "Error: " << e.what();
     }
+    unlock();
+}
+
+
+/**
+ Save current state in two files
+ */
+void SimThread::exportObjects(bool binary)
+{
+    lock();
+    try {
+        char str[64] = { '\0' };
+        
+        snprintf(str, sizeof(str), "properties%04li.cmo", reader.currentFrame());
+        simul.writeProperties(str, true);
+        
+        snprintf(str, sizeof(str), "objects%04li.cmo", reader.currentFrame());
+        simul.writeObjects(str, false, binary);
+    }
+    catch( Exception & e ) {
+        std::cerr << "Error in Simul::exportObjects(): " << e.what();
+    }
+    unlock();
 }
 
 
 void SimThread::writeProperties(std::ostream& os, bool prune)
 {
-    Lock lck(this);
+    lock();
     try {
         simul.writeProperties(os, prune);
     }
     catch( Exception & e ) {
-        std::cerr << "Error in Simul::writeState(): " << e.what();
+        std::cerr << "Error in Simul::writeProperties(): " << e.what();
     }
+    unlock();
 }
 
 

@@ -5,13 +5,12 @@
 #include <pthread.h>
 
 /*
- An example where the execution of a thread 'slave',
+ An example where the execution of a 'slave' thread,
  is controlled from the current thread (through keyboard input)
  */
 
 pthread_mutex_t mutex;
 pthread_cond_t condition;
-
 
 
 void* loop(void *arg)
@@ -20,7 +19,7 @@ void* loop(void *arg)
     pthread_t self = pthread_self();
     for ( int cnt = 1; cnt <= 10; ++cnt )
     {
-        printf("\n-thread %p: step %i\n", self, cnt);
+        printf("- thread %p: step %i", self, cnt);
         pthread_cond_wait(&condition, &mutex);
     }
     pthread_mutex_unlock(&mutex);
@@ -29,7 +28,10 @@ void* loop(void *arg)
 
 
 int main(int argc, char *argv[]) 
-{    
+{
+    printf("test_thread:\n");
+    printf("type `return` to signal to thread or enter `q` to quit\n");
+
     pthread_mutex_init(&mutex, 0);
     pthread_cond_init(&condition, 0);
     
@@ -38,7 +40,6 @@ int main(int argc, char *argv[])
     
     char key[32];
     do {
-        printf(">");
         fgets(key, sizeof(key), stdin);
         pthread_cond_signal(&condition);
     } while( key[0] != 'q' );
@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
     {
         pthread_cancel(slave);
         pthread_join(slave, 0);
+        pthread_detach(slave);
     }
     
     pthread_cond_destroy(&condition);

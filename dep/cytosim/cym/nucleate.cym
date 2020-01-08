@@ -1,7 +1,7 @@
-% Test for Hand::activity=nucleate and Couple::trans_activated
+% Create new Fibers from within the 'run' command
 % F. Nedelec, April 2011
 
-set simul nucleate 
+set simul system
 {
     time_step = 0.005
     viscosity = 0.1
@@ -9,10 +9,13 @@ set simul nucleate
 
 set space cell
 {
-    geometry = ( sphere 5 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 5
+}
 
 set fiber microtubule
 {
@@ -30,9 +33,8 @@ set fiber microtubule
     display = ( plus_end = 2 )
 }
 
-run simul *
+run 100000 system
 {
-    nb_steps = 10000
     nb_frames = 10
-    event = 2, ( new fiber microtubule { position=(rectangle 2 5); length=0.05 } )
+    event = 2, ( new microtubule { position=(rectangle 2 5); length=0.05; end_state=grow; } )
 }

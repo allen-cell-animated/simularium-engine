@@ -5,7 +5,7 @@
  F. Nedelec, September 2012
 */
 
-set simul rescue
+set simul system
 {
     time_step = 0.01
     viscosity = 1
@@ -13,10 +13,14 @@ set simul rescue
 
 set space cell
 {
-    geometry = ( capsule 2 2 )
+    shape = capsule
 }
 
-new space cell
+new cell
+{
+    length = 8
+    radius = 2
+}
 
 set fiber microtubule
 {
@@ -33,13 +37,13 @@ set fiber microtubule
     display = { line_width=2; plus_end=16, 2; }
 }
 
-new 5 fiber microtubule
+new 5 microtubule
 {
     length = 5
     end_state = red
 }
 
-set hand rescue
+set hand rescuer
 {
     binding_rate = 10
     binding_range = 0.1
@@ -51,15 +55,15 @@ set hand rescue
     display = { width=3; size=6; color=green }
 }
 
-set single protein
+set single simplex
 {
-    hand = rescue
+    hand = rescuer
     diffusion = 10
 }
 
-new 500 single protein
+new 500 simplex
 
-run simul *
+run system
 {
     nb_steps = 100000
     nb_frames = 10

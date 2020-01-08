@@ -1,14 +1,13 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "picket.h"
 #include "simul.h"
 #include "meca.h"
 #include "modulo.h"
 
 
-extern Modulo * modulo;
+extern Modulo const* modulo;
 
-//------------------------------------------------------------------------------
+
 Picket::Picket(SingleProp const* p, Vector const& w)
 : Single(p, w)
 {
@@ -18,53 +17,60 @@ Picket::Picket(SingleProp const* p, Vector const& w)
 #endif
 }
 
-//------------------------------------------------------------------------------
+
 Picket::~Picket()
 {
-    //std::cerr<<"~Picket("<<this<<")"<<std::endl;
+    //std::clog<<"~Picket("<<this<<")"<<std::endl;
 }
 
-//------------------------------------------------------------------------------
-void Picket::stepFree(const FiberGrid& grid)
+
+void Picket::beforeDetachment(Hand const*)
+{
+    assert_true( attached() );
+
+    SingleSet * set = static_cast<SingleSet*>(objset());
+    if ( set )
+        set->relinkD(this);
+}
+
+
+void Picket::stepF(const FiberGrid& grid)
 {
     assert_false( sHand->attached() );
 
-    sHand->stepFree(grid, sPos);
+    sHand->stepUnattached(grid, sPos);
 }
 
-//------------------------------------------------------------------------------
-void Picket::stepAttached()
+
+void Picket::stepA()
 {
     assert_true( sHand->attached() );
     
-    sHand->stepLoaded(force());
+    Vector f = force();
+    sHand->stepLoaded(f, f.norm());
 }
 
 
-//------------------------------------------------------------------------------
 /**
- This calculates the force corresponding to interClamp()
+ This calculates the force corresponding to addPointClamp()
  */
 Vector Picket::force() const
 {
-    if ( sHand->attached() )
-    {
-        Vector d = sPos - posHand();
-        
-        if ( modulo )
-            modulo->fold(d);
-        
-        return prop->stiffness * d;
-    }
-    return Vector(0,0,0);
+    assert_true( sHand->attached() );
+    Vector d = sPos - posHand();
+    
+    if ( modulo )
+        modulo->fold(d);
+    
+    return prop->stiffness * d;
 }
 
-//------------------------------------------------------------------------------
+
 void Picket::setInteractions(Meca & meca) const
 {
     assert_true( prop->length == 0 );
-    meca.interClamp(sHand->interpolation(), sPos, prop->stiffness);
-    //meca.interSlidingClamp( sHand->interpolation(), sPos, prop->stiffness);
+    meca.addPointClamp(sHand->interpolation(), sPos, prop->stiffness);
+    //meca.addLineClamp(sHand->interpolation(), sPos, sHand->dirFiber(), prop->stiffness);
 }
 
 

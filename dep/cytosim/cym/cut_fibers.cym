@@ -1,7 +1,7 @@
 % A test for cuting fiber
 % F. Nedelec, April 2011
 
-set simul fiber 
+set simul system
 {
     time_step = 0.01
     viscosity = 0.02
@@ -9,10 +9,14 @@ set simul fiber
 
 set space cell
 {
-    geometry = ( capsule 4 3 )
+    shape = capsule
 }
 
-new space cell
+new cell
+{
+    length = 10
+    radius = 3
+}
 
 set fiber microtubule
 {
@@ -20,10 +24,10 @@ set fiber microtubule
     segmentation = 0.5
     confine = inside, 100
 
-    display = ( plus_end=16,2; line_style=2; speckles=1, 0.25 )
+    display = ( plus_end=16,2; line=3,2; speckles=7,1,0.25 )
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 12
     position = ( 0 0 0 )
@@ -38,38 +42,38 @@ set hand binder
     display = ( width=3; size=10; color=green )
 }
 
-set single protein
+set single simplex
 {
     hand = binder
     diffusion = 0.1
     stiffness = 100
 }
 
-new 100 single protein
+new 100 simplex
 
 
-run simul * 
+run system 
 {
     nb_steps =  100
     nb_frames = 5
 }
 
-cut fiber *
+cut microtubule
 {
     plane = 1 0 0, 0
 }
 
-cut fiber *
+cut microtubule
 {
     plane = 1 0 0, 3
 }
 
-cut fiber *
+cut microtubule
 {
     plane = 1 0 0, -3
 }
 
-run simul *
+run system
 {
     nb_steps = 1000
     nb_frames = 1

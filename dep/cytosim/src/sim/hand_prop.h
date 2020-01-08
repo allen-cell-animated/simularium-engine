@@ -4,25 +4,16 @@
 #define HAND_PROP
 
 #include "real.h"
+#include "common.h"
 #include "property.h"
 
 
-class Glossary;
-class PointDisp;
+/// enables "bind_only_free_end" to limit binding of Hands to Fibers
+#define NEW_BIND_ONLY_FREE_END 0
+
 class Hand;
 class HandMonitor;
-
-
-/**
- Enables detachment rate that are different if Hands are near the Fiber end.
- 
- Implementation done by Jamie-Li Rickman for:
- "Determinants of polar versus nematic organization in networks
- of dynamic microtubules and mitotic motors" published in 2018
- By J. Roostalu, J. Rickman, C. Thomas, F. Nedelec and T. Surrey
- */
-#define NEW_END_DEPENDENT_DETACHMENT 0
-
+class PointDisp;
 
 /// Property for Hand
 /**
@@ -36,9 +27,6 @@ public:
       
     /// return one of the Property derived from HandProp
     static HandProp * newProperty(const std::string& n, Glossary&);
-  
-    /// the maximum range (useful to set the binding grid)
-    static real binding_range_max;
     
 public:
     
@@ -48,8 +36,9 @@ public:
      @{
      */
     
-    /// binding rate when the Hand is within \a binding_range (also known as \c binding[0])
+    /// rate of attachment when the Hand is within `binding_range` (also known as `binding[0]`)
     /**
+     This has units of 1/seconds.
      According to Leduc et al. PNAS 2004 vol. 101 no. 49 17096-17101
      the molecular binding_rate of kinesin is 4.7 +/- 2.4 /s.
      <em>
@@ -60,7 +49,7 @@ public:
     real         binding_rate;
     
     
-    /// maximum distance at which the Hand can bind (also known as \c binding[1])
+    /// maximum distance at which the Hand can bind (also known as `binding[1]`)
     real         binding_range;
     
     
@@ -68,36 +57,48 @@ public:
     /**
      The binding to a fiber is allowed only if the keys of the Hand and Fiber match.
      The test is a BITWISE-AND of the two keys:
-     @code
-     if ( fiber:binding_key & hand:binding_key )
-        allowed = true;
-     else
-        allowed = false;
-     @endcode
+
+         if ( fiber:binding_key & hand:binding_key )
+            allowed = true;
+         else
+            allowed = false;
+
      */
     unsigned int binding_key;
     
     
-    /// detachment rate at force=0 (also known as \c unbinding[0])
+    /// detachment rate in the absence of load (also known as `unbinding[0]`)
     /**
      Kramers theory specifies that the detachment rate depends on the force
      in the link:
-     @code
-     off_rate = RATE * exp( force / FORCE )
-     @endcode
-     RATE is specified as \a unbinding_rate, and FORCE as \a unbinding_force,
-     but one can also directly specify `unbinding = RATE, FORCE`.
+     
+         RATE = unbinding_rate * exp( FORCE / unbinding_force )
+     
+     where FORCE is the norm of the tension in the link holding the Hand,
+     and `unbinding_rate' and `unbinding_force' are two parameters.
+     By setting `unbinding_force=inf', unbinding is made independent of load.
+     
+     Various measurements:
+     <em>
+     <b>Mechanics of the kinesin step</b>
+     Carter, N. & Cross, R. Nature 435, 308–312 (2005).
+     http://dx.doi.org/doi:10.1038/nature03528
+
+     <b>Examining kinesin processivity within a general gating framework</b>
+     Andreasson et al. eLife 2015;4:e07403
+     http://dx.doi.org/10.7554/eLife.07403
+     </em>
+     provide similar values for conventional kinesin:
+
+         unbinding_rate = 1 / s
+         unbinding_force ~ 2 pN
+     
      (see @ref Stochastic)
      */
     real         unbinding_rate;
-
-#if NEW_END_DEPENDENT_DETACHMENT
-    /// rate of detachment, once the motor has reached the end of a fiber
-    real         unbinding_rate_end;
-#endif
     
     
-    /// characteristic force of unbinding (also known as \c unbinding[1])
+    /// characteristic force of unbinding (also known as `unbinding[1]`)
     /**
      @copydetails unbinding_rate
      */
@@ -106,39 +107,66 @@ public:
     
     /// if true, the Hand can also bind directly to the tip of fibers
     /**
-     This determines the binding ability of a Hand that is located within the binding_range
-     of a fiber, but at a position where the orthogonal projection is outside the Fiber,
-     ie. below the MINUS_END, or above the PLUS_END.
-     This corresponds to two hemi-spheres at the two ends of a Fiber.
+     The value of `bind_also_end` affects Hands that are located at a position
+     for which the orthogonal projection on the fiber backbone is beyond one
+     of the end. In this case, the attachement will occur only if `bind_also_end`
+     is set and matches this end. Attachment will occur at the end of the fiber,
+     if the distance is shorter than `binding_range`.
      
-     <em>default value = false</em>
+     Values for  are `off`, `minus_end`, `plus_end` and `both_ends`.
+     
+     In other words, setting 'bind_also_end==true', will extend the capture
+     regions of the fibers to include one or two hemi-spheres at the ends of
+     the fibers, with a radius `binding_range`.
+     
+     <em>default value = off</em>
      */
-    bool         bind_also_ends;
+    int          bind_also_end;
     
+    
+    /// if true, the Hand can bind only near the ends of the fibers
+    /**
+     This determines that a Hand can only bind near the ends of the fiber.
+     This parameter can be 'none', 'plus_end', 'minus_end' or 'both_ends'.
+     Binding is allowed on positions located within a distance 'bind_end_range'
+     from the specified end ('bind_end_range' is specified as `bind_only_end[1]`).
+     
+     <em>default value = off</em>
+     */
+    FiberEnd     bind_only_end;
+    
+    
+    /// cutoff associated with `bind_only_end` where hand may bind (set as `bind_only_end[1]`)
+    real         bind_end_range;
+
+#if NEW_BIND_ONLY_FREE_END
+    /// if true, only bind fiber tip if no other hand is bound already
+    bool         bind_only_free_end;
+#endif
     
     /// if false, the Hand will detach immediately upon reaching a growing or a static fiber end
     /**
-     A Hand may reach the tip of the fiber on which it is bound,
-     either if it is moving, or if is dragged by some other force.
-     When this happens, \a hold_growing_end will determine if the Hand
-     will detach or not.
+     A Hand may reach the tip of the fiber on which it is bound, because it has
+     moved, and `hold_growing_end` will determine the probability of detachment
+     in this case. A value of 0 leads to immediate detachment.
+     With a value of 1, the hand will remain attached.
      
-     <em>default = false</em>
+     <em>default = 0</em>
      */
-    bool         hold_growing_end;
+    real         hold_growing_end;
     
     
     /// if false, the Hand will detach immediately upon reaching a shrinking fiber end
     /**
      A Hand may reach the tip of the fiber on which it is bound,
      of the tip of the fiber may reach a immobile hand because it is disassembling.
-     When this happens, \a hold_shrinking_end will determine if the Hand
+     When this happens, `hold_shrinking_end` will determine if the Hand
      will detach or not.
-     If \a hold_shrinking_end is true, the hand will be relocated to track the end.
+     If `hold_shrinking_end` is true, the hand will be relocated to track the end.
 
      <em>default = false</em>
      */
-    bool         hold_shrinking_end;
+    real         hold_shrinking_end;
     
     
     /// specialization
@@ -151,44 +179,44 @@ public:
     /// display parameters (see @ref PointDispPar)
     std::string  display;
     
-    /// @}
-    //------------------ derived variables below ----------------
+    /** @} */
     
-    /// inverse of unbinding_force:
+    /// derived variable: inverse of unbinding_force. This is a flag to Kramer
     real unbinding_force_inv;
     
+    /// oversampled binding_rate for Gillespie's method
+    real   binding_rate_dt_8;
+
 public:
     
-    /// binding_rate_dt = binding_rate * time_step;
-    real   binding_rate_dt;
+    /// binding_rate_prob = probability to bind in one `time_step`;
+    real   binding_rate_prob;
     
-    /// binding_range_sqr = binding_range * binding_range;
+    /// binding_range_sqr = square(binding_range);
     real   binding_range_sqr;
     
     /// unbinding_rate_dt = unbinding_rate * time_step;
     real   unbinding_rate_dt;
     
-#if NEW_END_DEPENDENT_DETACHMENT
-    /// unbinding_rate_end_dt = unbinding_rate_end * time_step;
-    real   unbinding_rate_end_dt;
-#endif
-    
+    /// flag to indicate that `display` has a new value
+    bool   display_fresh;
+
     /// the display parameters for this category of Hand
-    PointDisp  * disp;
+    PointDisp * disp;
     
 public:
     
     /// constructor
-    HandProp(const std::string& n) : Property(n), disp(0) { clear(); }
+    HandProp(const std::string& n) : Property(n), disp(nullptr) { clear(); }
     
     /// destructor
     ~HandProp() { }
     
     /// return a Hand with this property
-    virtual Hand * newHand(HandMonitor* h) const;
+    virtual Hand * newHand(HandMonitor*) const;
 
     /// identifies the property
-    std::string kind() const { return "hand"; }
+    std::string category() const { return "hand"; }
     
     /// set default values
     void clear();
@@ -197,13 +225,19 @@ public:
     virtual void read(Glossary&);
     
     /// compute values derived from the parameters
-    virtual void complete(SimulProp const*, PropertyList*);
+    virtual void complete(Simul const&);
     
-    /// perform more checks, knowing the elasticity
+    /// perform additional tests for the validity of parameters, given the elasticity
     virtual void checkStiffness(real stiff, real len, real mul, real kT) const;
     
+    /// Attachment rate per unit length of fiber
+    real bindingSectionRate() const;
+    
+    /// Attachment probability per unit length of fiber in one time_step
+    real bindingSectionProb() const;
+
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
     /// return a carbon copy of object
     Property* clone() const { return new HandProp(*this); }

@@ -1,32 +1,33 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef WRIST_H
 #define WRIST_H
 
 #include "single.h"
-#include "point_exact.h"
-
+#include "interpolation4.h"
 
 /// a Single anchored to a Mecable.
 /**
- The anchorage is described by PointExact sBase:
- - the Mecable is sBase.object()
- - the index of the model-point on this Mecable is sBase.index()
- .
+ The Wrist is anchored to a Solid, on a position that is interpolated from the
+ Solid's vertices. See class Interpolation4
 
  @ingroup SingleGroup
  */
 class Wrist : public Single
 {
 protected:
-        
-    /// describes the anchorage: Mecable and index of model-point
-    PointExact    sBase;
+    
+    Interpolation4 anchor;
     
 public:
      
-    /// constructor
-    Wrist(SingleProp const*, Mecable const*, unsigned);
+    /// Construct object anchored at one Mecapoint
+    Wrist(SingleProp const*, Mecable const*, unsigned point);
+    
+    /// Construct object anchored between two Mecapoint
+    Wrist(SingleProp const*, Mecable const*, unsigned, unsigned, real);
+   
+    /// Constructor object interpolated over a triad of Mecapoint
+    Wrist(SingleProp const*, Mecable const*, unsigned ref, Vector pos);
 
     /// destructor
     ~Wrist();
@@ -34,55 +35,58 @@ public:
     //--------------------------------------------------------------------------
     
     /// return the position in space of the object
-    Vector  position()                   const  { return sBase.pos(); }
+    Vector  position() const { return posFoot(); }
     
-    /// true if object accepts translations
-    bool    translatable()               const  { return false; }
+    /// Wrist accepts translation
+    int     mobile() const { return 1; }
     
     /// translate object's position by the given vector
-    void    translate(Vector const& T)          { }
+    void    translate(Vector const&) { }
     
     /// modulo the position of the grafted
-    void    foldPosition(const Modulo * s)      { }
+    void    foldPosition(Modulo const*) { }
+    
+    /// stiffness of the interaction
+    real    interactionStiffness() const { return prop->stiffness; }
 
     //--------------------------------------------------------------------------
     
-    /// Object to which this is attached
-    Mecable const* foot()                 const { return sBase.mecable(); }
+    /// Object to which this is anchored
+    Mecable const* base() const { return anchor.base(); }
 
-    /// the position of what is holding the Hand
-    Vector  posFoot()                     const { return sBase.pos(); }
+    /// the position of the anchoring point
+    Vector  posFoot() const { return anchor.position(); }
     
+    
+    /// true if Single creates a link
+    bool    hasForce() const { return true; }
+
     /// force = stiffness * ( posFoot() - posHand() )
     Vector  force() const;
     
     
     /// Monte-Carlo step for a free Single
-    void    stepFree(const FiberGrid&);
+    void    stepF(const FiberGrid&);
     
     /// Monte-Carlo step for a bound Single
-    void    stepAttached();
-    
-    
-    /// true if Single creates an interaction
-    bool    hasInteraction() const { return true; }
+    void    stepA();
 
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
 
     //--------------------------------------------------------------------------
     
-    //The Wrist uses a specific TAG to distinguish itself from the Single
-    static const Tag TAG = 'w';
+    /// the Wrist uses a specific TAG to distinguish itself from the Single
+    static const ObjectTag TAG = 'w';
     
     /// return unique character identifying the class
-    Tag     tag() const { return TAG; }
+    ObjectTag    tag() const { return TAG; }
     
     /// read from file
-    void    read(InputWrapper&, Simul&);
+    void    read(Inputter&, Simul&, ObjectTag);
     
     /// write to file
-    void    write(OutputWrapper&) const;
+    void    write(Outputter&) const;
     
 };
 

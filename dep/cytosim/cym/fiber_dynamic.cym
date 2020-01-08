@@ -1,53 +1,51 @@
-/**
- @example fiber_dynamic.cym
- We create a dynamic fiber with activity=dynamic
+% A dynamic fiber
+% F. Nedelec, April 2010
 
- F. Nedelec, February 2011
-*/
-
-
-set simul demo
+set simul system
 {
     time_step = 0.01
-    viscosity = 1
+    viscosity = 0.2
+    display = ( delay=4; style=2; )
 }
 
 set space cell
 {
-    geometry = ( capsule 2 2 )
+    shape = rectangle
 }
 
-new space cell
+new cell
+{
+    length = 80, 40
+}
 
 set fiber microtubule
 {
-    rigidity     = 20
-    segmentation = 0.5
-    confine      = inside, 100
-    
+    rigidity = 20
+    segmentation = 1
+
     activity        = dynamic
     unit_length     = 0.008
-    growing_speed   = 0.06
-    shrinking_speed = -0.15
-    hydrolysis_rate = 0.06
+    growing_speed   = 0.18
+    shrinking_speed = -0.36
+    hydrolysis_rate = 0.43
     growing_force   = 1.7
-    display = { line_width=4; plus_end=16, 2; }
+       
+    min_length = 0.05
+
+    display = ( lines=6,2; points=10,0; plus_end=16, 2; )
 }
 
-new 5 fiber microtubule
+new 0 microtubule
 {
-    length = 1
-    plus_end_state = 1
+    length = 0.05
+    position = rectangle 0 20
+    orientation = horizontal
+    plus_end = grow
 }
 
-new 5 fiber microtubule
+run 500000 system
 {
-    length = 2
-    plus_end_state = 4
-}
-
-run simul *
-{
-    nb_steps = 100000
     nb_frames = 10
+    solve = 0
+    event = 1, ( new microtubule { position=(rectangle 0 20); length=0.05; orientation=horizontal; plus_end=grow; } )
 }

@@ -1,7 +1,7 @@
-% A confined fiber
+% A humorous model of Cytoplasmic streaming found in drosophila oocyte
 % F. Nedelec, April 2010
 
-set simul anchor 
+set simul system
 {
     time_step = 0.01
     viscosity = 0.02
@@ -10,14 +10,17 @@ set simul anchor
 
 set space cell
 {
-    geometry = ( sphere 10 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 10
+}
 
 set hand strong_hand
 {
-    unbinding = 0, 1e6
+    unbinding = 0, inf
 }
 
 set single pivot
@@ -27,20 +30,20 @@ set single pivot
     activity = fixed
 }
 
-set fiber tube
+set fiber filament
 {
     rigidity = 20
     segmentation = 1
     confine = inside, 100
 }
 
-new 20 fiber tube
+new 20 filament
 {
-    orientation = 0.8 0.5 0 
+    orientation = 0.8 0.5 0, random
     position = ( -5 0 0 )
     length = 9
-    single = pivot, minus_dir, 0.5
-    post_rotation = ( 0.8 0.25 )
+    attach1 = pivot,   0, minus_end
+    attach2 = pivot, 0.5, minus_end
 }
 
 set hand kinesin 
@@ -51,7 +54,7 @@ set hand kinesin
     unbinding_force = 3
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     stall_force = 6
     display = ( size=8; color=0x00FF00FF; )
 }
@@ -62,20 +65,19 @@ set single grafted
     stiffness = 100
 }
 
-set solid dirty
+set bead dirt
 {
-    confine = all_inside, 100
+    confine = inside, 100
     steric = 1
     display = ( coloring=1; )
 }
 
-new 301 bead dirty
+new 301 dirt
 {
-    single = grafted
-    radius = 0.4
+    point1 = center, 0.4, grafted
 }
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 100

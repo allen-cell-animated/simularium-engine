@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "solid_set.h"
 #include "solid_prop.h"
 #include "iowrapper.h"
@@ -8,69 +7,69 @@
 #include "wrist.h"
 
 
-
+#if ( 0 )
 void SolidSet::step()
 {
     for ( Solid * o = first(); o; o=o->next() )
         o->step();
 }
-
+#endif
 
 
 //------------------------------------------------------------------------------
 
-Property* SolidSet::newProperty(const std::string& kd, const std::string& nm, Glossary&) const
+Property* SolidSet::newProperty(const std::string& cat, const std::string& nom, Glossary&) const
 {
-    if ( kd == kind() )
-        return new SolidProp(nm);
-    return 0;
+    if ( cat == "solid" )
+        return new SolidProp(cat, nom);
+    return nullptr;
 }
 
 
-Object * SolidSet::newObjectT(const Tag tag, int idx)
+Object * SolidSet::newObject(const ObjectTag tag, unsigned num)
 {
     if ( tag == Solid::TAG )
     {
-        // as Solid use a BeadProp, we search for "bead":
-        Property * p = simul.properties.find_or_die("bead", idx);
-        Solid * s = new Solid(static_cast<SolidProp*>(p));
-        return s;        
-    }
-    return 0;
+        Property * p = simul.properties.find("solid", num);
+#ifdef BACKWARD_COMPATIBILITY
+        // prior to 04.2016, "bead" and "solid" were used interchangeably
+        if ( !p )
+             p = simul.properties.find("bead", num);
+#endif
+        if ( !p )
+            throw InvalidIO("could not find `solid' class with id "+std::to_string(num));
+        return new Solid(static_cast<SolidProp*>(p));
+   }
+    return nullptr;
 }
 
 
 /**
- @ref Solid::build
+@ref Solid::build
  */
-ObjectList SolidSet::newObjects(const std::string& kd, const std::string& nm, Glossary& opt)
+ObjectList SolidSet::newObjects(const std::string& name, Glossary& opt)
 {
-    Solid * obj = 0;
-    
-    if ( kd == "solid" )
-    {
-        // as Solid use a BeadProp, we search for "bead":
-        Property * p = simul.properties.find_or_die("bead", nm);
-        obj = new Solid(static_cast<SolidProp*>(p));
-    }
+    SolidProp * p = simul.findProperty<SolidProp>("solid", name);
+    Solid * obj = new Solid(p);
     
     ObjectList res;
-    if ( obj )
-    {
-        res.push_back(obj);
-        res.append(obj->build(opt, simul));
-        obj->fixShape();
-    }
+    res.push_back(obj);
+    res.append(obj->build(opt, simul));
+    obj->fixShape();
     return res;
 }
 
 
-//------------------------------------------------------------------------------
-
-void SolidSet::erase()
+void SolidSet::write(Outputter& out) const
 {
-    ObjectSet::erase();
+    if ( size() > 0 )
+    {
+        out.put_line("\n#section "+title(), out.binary());
+        writeNodes(out, nodes);
+    }
 }
+
+//------------------------------------------------------------------------------
 
 void SolidSet::add(Object * obj)
 {
@@ -82,12 +81,11 @@ void SolidSet::add(Object * obj)
 void SolidSet::remove(Object * obj)
 {
     ObjectSet::remove(obj);
-    assert_true(obj->tag() == Solid::TAG);
     simul.singles.removeWrists(obj);
 }
 
 
-void SolidSet::foldPosition(const Modulo * s) const
+void SolidSet::foldPosition(Modulo const* s) const
 {
     for ( Solid * o=first(); o; o=o->next() )
         o->foldPosition(s);

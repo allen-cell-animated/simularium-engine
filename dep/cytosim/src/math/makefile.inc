@@ -1,27 +1,55 @@
 # Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 
-OBJ_MATH:=smath.o vector1.o vector2.o vector3.o matrix1.o matrix2.o matrix3.o \
-	 rasterizer.o grid.o matrix.o matsparse.o matsparsesym.o \
-	 matsym.o matsparsesym1.o bicgstab.o polygon.o\
-	 pointsonsphere.o random.o random_vector.o project_ellipse.o \
-
+OBJ_MATH:=smath.o vector1.o vector2.o vector3.o matrix11.o matrix22.o matrix33.o\
+    	rasterizer.o project_ellipse.o platonic.o matrix.o matsparse.o matsparsesym.o\
+    	matsparsesym1.o polygon.o pointsonsphere.o random.o random_vector.o
 
 #----------------------------rules----------------------------------------------
 
-INC_MATH:=$(addprefix -Isrc/, SFMT math base)
+INC_BM:=$(addprefix -Isrc/, base math)
 
 
-$(OBJ_MATH): %.o: %.cc %.h
-	$(COMPILE) -c $(INC_MATH) $< -o build/$@
+$(OBJ_MATH): %.o: %.cc %.h | build
+	$(COMPILE) $(INC_BM) -c $< -o build/$@
 
 
-# this is for graphical debugging of the rasterizer:
-rasterizerGL.o: rasterizer.cc rasterizer.h
-	$(COMPILE) -c $(INC_MATH) -Isrc/gl -DDISPLAY $< -o $@
+matsparsesym2.o: %.o: %.cc %.h | build
+	$(COMPILE) $(INC_BM) -c $< -o build/$@
 
 
-libcytomath.a: $(OBJ_MATH)
+matsparsesymblk.o: matsparsesymblk.cc matsparsesymblk.h
+	$(COMPILE) $(INC_BM) -c $< -o build/$@
+
+matsparsesymblkD1.o: matsparsesymblk.cc matsparsesymblk.h
+	$(COMPILE) $(INC_BM) -DBLOCK_SIZE=1 -c $< -o build/$@
+
+matsparsesymblkD2.o: matsparsesymblk.cc matsparsesymblk.h
+	$(COMPILE) $(INC_BM) -DBLOCK_SIZE=2 -c $< -o build/$@
+
+matsparsesymblkD3.o: matsparsesymblk.cc matsparsesymblk.h
+	$(COMPILE) $(INC_BM) -DBLOCK_SIZE=3 -c $< -o build/$@
+
+
+cytomath.a: $(OBJ_MATH) matsparsesymblk.o | lib
 	$(MAKELIB)
 	$(DONE)
+
+cytomathD1.a: $(OBJ_MATH) matsparsesymblkD1.o
+	$(MAKELIB)
+	$(DONE)
+
+cytomathD2.a: $(OBJ_MATH) matsparsesymblkD2.o
+	$(MAKELIB)
+	$(DONE)
+
+cytomathD3.a: $(OBJ_MATH) matsparsesymblkD3.o
+	$(MAKELIB)
+	$(DONE)
+
+
+# build the rasterizer with graphical debugging enabled:
+rasterizerG.o: rasterizer.cc rasterizer.h
+	$(COMPILE) $(INC_BM) -Isrc/disp -DDISPLAY -c $< -o build/$@
+vpath rasterizerG.o build
 

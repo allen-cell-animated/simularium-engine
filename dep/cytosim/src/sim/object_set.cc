@@ -8,254 +8,129 @@
 #include "modulo.h"
 #include "space.h"
 #include "simul.h"
+#include <errno.h>
 
-extern Modulo * modulo;
+extern Modulo const* modulo;
 
 //------------------------------------------------------------------------------
 
 /**
- The object is added at the end of the list
+ The object is added at the front of the list
  */
 void ObjectSet::link(Object * obj)
 {
-    assert_true( !obj->linked() );
-    nodes.push_back(obj);
+    assert_true( !obj->objset() );
+    obj->objset(this);
+    nodes.push_front(obj);
 }
 
-/**
- relink() should only be called for object already linked()
- */
-void ObjectSet::relink(Object * obj)
+
+void ObjectSet::unlink(Object * obj)
 {
-    assert_true( obj->linked() );
-    obj->list()->pop(obj);
-    link(obj);
+    assert_true( obj->objset() == this );
+    nodes.pop(obj);
+    obj->objset(nullptr);
 }
-
-//------------------------------------------------------------------------------
-
-/**
- Translate all objects for which ( Object::translatable()==true ) by \a vec
- */
-
-void ObjectSet::translateObjects(ObjectList const& objs, Vector const& vec)
-{
-    for ( ObjectList::iterator oi = objs.begin(); oi < objs.end(); ++oi )
-    {
-        Movable * mv = *oi;
-        if ( mv  &&  mv->translatable() )
-            mv->translate(vec);
-    }
-}
-
-/**
- Rotate all objects in \a objs around the origin.
- 
- If ( Object::rotatable()==false ) but ( Object::translatable()==true ), 
- the Object is translated by \a [ rot * Object::position() - Object::position() ]
- */
-
-void ObjectSet::rotateObjects(ObjectList const& objs, Rotation const& rot)
-{
-    for ( ObjectList::iterator oi = objs.begin(); oi < objs.end(); ++oi )
-    {
-        Movable * mv = *oi;
-        if ( mv )
-        {
-            if ( mv->rotatable() )
-                mv->rotate(rot);
-            else if ( mv->translatable() )
-            {
-                Vector pos = mv->position();
-                mv->translate(rot*pos-pos);
-            }
-        }
-    }
-}
-
-
-/**
- @return the position where the objects were placed
- @todo implement keyword 'transformation'
- */
-
-Vector ObjectSet::placeObjects(ObjectList const& objs, Glossary& opt, const Space* spc)
-{
-    std::string str;
-    
-    // Position
-    Vector pos(0,0,0);
-    if ( opt.set(str, "position") )
-    {
-        std::istringstream iss(str);
-        pos = Movable::readPosition(iss, spc);
-    }
-    else if ( spc )
-        pos = spc->randomPlace();
-    
-    // Rotation
-    Rotation rot;
-    if ( opt.set(str, "orientation") )
-    {
-        std::istringstream iss(str);
-        rot = Movable::readRotation(iss, pos, spc);
-    }
-    else if ( opt.set(str, "direction") )
-    {
-        std::istringstream iss(str);
-        Vector vec = Movable::readDirection(iss, pos, spc);
-        rot = Rotation::rotationToVector(vec, RNG);
-    }
-    else
-        rot = Rotation::randomRotation(RNG);
-    
-    rotateObjects(objs, rot);
-
-    // objects are wrapped within periodic-boundaries:
-    if ( modulo )
-        modulo->fold(pos);
-    
-    translateObjects(objs, pos);
-    return pos;
-}
-
-
-/**
- - This returns a list of Objects, that are not necessarily all of the same class.
- For example, the list may contain a Solid, and any number of attached Singles.
- - These Objects are not yet linked in the Simul.
- - They are placed and oriented in Space according to the options provided in 'opt'.
- .
- This calls newObjects()
- 
- @code
- new INTEGER CLASS NAME
- {
-   position = POSITION
-   placement = PLACEMENT, SPACE_NAME
-   nb_trials = INTEGER
- }
- @endcode
-
- 
- PLACEMENT can be:
- - if placement = \a inside (default), it tries to find a place inside the Space
- - if placement = \a anywhere, the position is returned
- - if placement = \a outside, the object is created only if it is outside the Space
- - if placement = \a surface, the position is projected on the edge of current Space
- .
- 
- By default, the specifications are relative to the last Space that was defined,
- but a different space can be specified as second argument of PLACEMENT.
- 
- You can set the density of objects by setting nb_trials=1:
- @code
- new 100 single grafted
- {
-    position = ( rectangle 10 10 )
-    nb_trials = 1
- }
- @endcode
- This way an object will be created only if the position falls inside,
- and the density will be exactly 100/10*10 = 1.
- */
-ObjectList ObjectSet::newPlacedObjects(const std::string& kd, const std::string& nm, Glossary& opt)
-{
-    int n = 0, nb_trials = 1000;
-    opt.set(nb_trials, "nb_trials");
-    
-    Confinement placement = CONFINE_INSIDE;
-    
-    opt.set(placement, "placement",
-            KeyList<Confinement>("anywhere", CONFINE_NOT,
-                                 "inside",   CONFINE_INSIDE,
-                                 "outside",  CONFINE_OUTSIDE,
-                                 "surface",  CONFINE_SURFACE));
-    
-    // space is current Space or as specified in placement[1]
-    const Space* spc = simul.space();
-    std::string str;
-    if ( opt.set(str, "placement", 1) )
-        spc = simul.findSpace(str);
-
-    
-    //we may bail out after 'nb_trials' unsuccessful attempts
-    while ( ++n <= nb_trials )
-    {
-        ObjectList res = newObjects(kd, nm, opt);
-        
-        if ( res.empty() || res[0]==0 )
-            throw InvalidParameter("failed to create "+kd+" `"+nm+"'");
-        
-        Vector pos = placeObjects(res, opt, spc);
-        
-        if ( spc == 0 || placement == CONFINE_NOT )
-            return res;
-
-        if ( placement == CONFINE_SURFACE )
-        {
-            Vector prj;
-            spc->project(pos, prj);
-            translateObjects(res, prj-pos);
-            return res;
-        }
-        if ( spc->inside(pos) )
-        {
-            if ( placement == CONFINE_INSIDE )
-                return res;
-        }
-        else
-        {
-            if ( placement == CONFINE_OUTSIDE )
-                return res;
-        }
-        
-        //delete objects if the placement was not fulfilled:
-        for ( ObjectList::iterator oi = res.begin(); oi < res.end(); ++oi )
-        {
-            delete(*oi);
-            *oi = 0;
-        }
-    }
-    
-    //std::cerr << "ObjectSet::newPlacedObjects() exceeded " << nb_trials << " trials" << std::endl;
-    //return an empty list:
-    return ObjectList();
-}
-
-
-
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void ObjectSet::freeze()
+
+/**
+ Translate all listed movable objects ( Object::mobile()==true ) by `vec`
+ */
+void ObjectSet::translateObjects(ObjectList const& objs, Vector const& vec)
 {
-    ice.transfer(nodes);
+    for ( Object * obj : objs )
+        if ( obj->mobile() & 1 )
+            obj->translate(vec);
 }
 
-
-void ObjectSet::forget(NodeList & list)
+/**
+ Apply Rotation around the origin to all movable objects in list
+ */
+void ObjectSet::rotateObjects(ObjectList const& objs, Rotation const& rot)
 {
-    Node * n = list.first();
-    while ( n )
+    for ( Object * obj : objs )
+        if ( obj->mobile() & 2 )
+            obj->rotate(rot);
+}
+
+/**
+ Apply isometry to all objects
+ */
+void ObjectSet::moveObjects(ObjectList const& objs, Isometry const& iso)
+{
+    //std::clog << "moving " << objs.size() << " objects" << std::endl;
+    for ( Object * obj : objs )
     {
-        inventory.unassign(static_cast<Object*>(n));
-        n = n->next();
+        switch ( obj->mobile() )
+        {
+            case 1: obj->rotateT(iso); obj->translate(iso); break;
+            case 2: obj->rotate(iso); break;
+            case 3: obj->rotate(iso); obj->translate(iso); break;
+        }
     }
 }
 
 
-void ObjectSet::thaw(bool erase)
+void ObjectSet::flagObjects(ObjectList const& objs, ObjectFlag f)
 {
-    if ( erase )
+    for ( Object * obj : objs )
+        obj->flag(f);
+}
+
+
+/**
+ Translate movable objects in list if ( obj->flag() != f )
+ */
+void ObjectSet::translateObjects(ObjectList const& objs, Vector const& vec, ObjectFlag f)
+{
+    for ( Object * obj : objs )
     {
-        forget(ice);
-        ice.erase();
+        if ( obj->mobile() & 1 && obj->flag() != f )
+        {
+            obj->translate(vec);
+            obj->flag(f);
+        }
     }
-    else
+}
+
+/**
+ Apply Rotation around the origin to objects in list if ( obj->flag() != f )
+ */
+void ObjectSet::rotateObjects(ObjectList const& objs, Rotation const& rot, ObjectFlag f)
+{
+    for ( Object * obj : objs )
     {
-        nodes.transfer(ice);
+        if ( obj->mobile() & 2 && obj->flag() != f )
+        {
+            obj->rotate(rot);
+            obj->flag(f);
+        }
+    }
+}
+
+/**
+Apply isometry to objects in list if ( obj->flag() != f )
+ */
+void ObjectSet::moveObjects(ObjectList const& objs, Isometry const& iso, ObjectFlag f)
+{
+    //std::clog << "moving " << objs.size() << " objects" << std::endl;
+    for ( Object * obj : objs )
+    {
+        if ( obj->flag() != f )
+        {
+            //std::clog << "    moving " << obj->reference() << std::endl;
+            switch ( obj->mobile() )
+            {
+                case 1: obj->rotateT(iso); obj->translate(iso); break;
+                case 2: obj->rotate(iso); break;
+                case 3: obj->rotate(iso); obj->translate(iso); break;
+            }
+            obj->flag(f);
+        }
+        //else std::clog << "    already moved " << obj->reference() << std::endl;
     }
 }
 
@@ -265,43 +140,59 @@ void ObjectSet::thaw(bool erase)
 
 void ObjectSet::add(Object * obj)
 {
-    if ( obj->linked() )
+    if ( !obj->linked() )
     {
-        fprintf(stderr, "Warning: ObjectSet::add(linked Object)\n");
-        return;
+        inventory.assign(obj);
+        link(obj);
+        //std::clog << "ObjectSet::add(" << obj->reference() << ")\n";
     }
-    inventory.assign(obj);
-    link(obj);
-    //std::cerr << "ObjectSet::add(" <<  obj->reference() << ")\n";
+    else
+    {
+        std::cerr << "Warning: attempted to re-link "+obj->reference()+" \n";
+    }
 }
 
 
-void ObjectSet::add(ObjectList & objs)
+void ObjectSet::add(ObjectList const& list)
 {
-    for ( ObjectList::iterator oi = objs.begin(); oi < objs.end(); ++oi )
-        add(*oi);
+    for ( Object * obj : list )
+        add(obj);
 }
 
 
 void ObjectSet::remove(Object * obj)
 {
-    //std::cerr << "ObjectSet::remove(" <<  obj->reference() << ")\n";
-    assert_true( obj->linked() );
-    assert_true( obj->objset()==this );
+    //std::clog << "ObjectSet::remove " <<  obj->reference() << '\n';
     inventory.unassign(obj);
-    obj->list()->pop(obj);
+    if ( obj->linked() )
+        unlink(obj);
 }
 
 
-void ObjectSet::remove(ObjectList & objs)
+void ObjectSet::remove(ObjectList const& list)
 {
-    for ( ObjectList::iterator oi = objs.begin(); oi < objs.end(); ++oi )
-        remove(*oi);
+    for ( Object * obj : list )
+        remove(obj);
+}
+
+
+void ObjectSet::erase(NodeList & list)
+{
+    Node * n = list.front();
+    while ( n )
+    {
+        Node * p = n->next();
+        list.pop(n);
+        static_cast<Object*>(n)->objset(nullptr);
+        delete(n);
+        n = p;
+    }
 }
 
 
 void ObjectSet::erase(Object * obj)
 {
+    //std::clog << "ObjectSet::erase " << obj->reference() << '\n';
     remove(obj);
     delete(obj);
 }
@@ -309,30 +200,150 @@ void ObjectSet::erase(Object * obj)
 
 void ObjectSet::erase()
 {
-    nodes.erase();
+    erase(nodes);
     inventory.clear();
 }
 
 
-
-/**
- if ( num > 0 ) this will call Inventory::find()
- if ( num < 0 ) objects from the end of the list will be returned:
- num = 0 is the last object
- num = -1 is the previous one,
- etc.
- */
-Object * ObjectSet::findObject(long num) const
+Object* ObjectSet::findObject(std::string spec, long num, const std::string& title) const
 {
+    //std::clog << "findObject(" << spec << "|" << num << "|" << title << ")\n";
+    // check for a string starting with the class name (eg. 'fiber'):
+    if ( spec == title )
+    {
+        Inventoried * inv = nullptr;
+        if ( num > 0 )
+        {
+            inv = inventory.get(num);
+        }
+        else
+        {
+            // start from the end of the list:
+            inv = inventory.last();
+            while ( inv  &&  ++num <= 0 )
+                inv = inventory.previous(inv);
+        }
+        return static_cast<Object*>(inv);
+    }
+    
+    // check if string starts with 'first'
+    if ( spec == "first" )
+    {
+        Inventoried* inv = inventory.first();
+        while ( inv  &&  --num >= 0 )
+            inv = inventory.next(inv);
+        return static_cast<Object*>(inv);
+    }
+    
+    // check if string starts with 'last'
+    if ( spec == "last" )
+    {
+        Inventoried* inv = inventory.last();
+        while ( inv  &&  ++num <= 0 )
+            inv = inventory.previous(inv);
+        return static_cast<Object*>(inv);
+    }
+    
     if ( num > 0 )
-        return static_cast<Object*>(inventory.get(num));
+    {
+        // finally get object by identity:
+        Object * obj = findID(num);
+        if ( obj )
+        {
+            if ( spec == obj->property()->name() || spec == obj->property()->category() )
+                return obj;
+        }
+    }
     else
     {
-        Object * res = last();
-        while ( res  &&  ++num <= 0 )
-            res = res->prev();
-        return res;
+        // 'microtubule0' would return the last created microtubule
+        Property * p = simul.findProperty(title, spec);
+        if ( p )
+        {
+            //std::clog << "findObject -> highest pick `" << spec << num << "'\n";
+            Inventoried* inv = inventory.last();
+            while ( inv )
+            {
+                num += ( static_cast<Object*>(inv)->property() == p );
+                if ( num > 0 )
+                    break;
+                inv = inventory.previous(inv);
+            }
+            return static_cast<Object*>(inv);
+        }
     }
+    
+    return nullptr;
+}
+
+
+// split into a word and a number, without a space:
+bool splitObjectSpec(std::string& str, long& num)
+{
+    size_t pos = str.find_first_of("0123456789+-");
+    if ( pos != std::string::npos )
+    {
+        char const* ptr = str.c_str() + pos;
+        char * end;
+        errno = 0;
+        num = strtol(ptr, &end, 10);
+        if ( errno || ( *end && !isspace(*end) ))
+            throw InvalidParameter("expected a number in `"+str+"'");
+        str.resize(pos);
+        //std::clog << "splitObjectSpec |" << str << "|" << num << "|\n";
+        return true;
+    }
+    return false;
+}
+
+/*
+ There are several ways to designate an object.
+ For example, if the class name (title) is 'fiber', one may use:
+ - `fiber1`  indicates fiber number 1
+ - `fiber2`  indicates fiber number 2, etc.
+ - `first`   indicates the oldest fiber remaining
+ - `first+1` indicates the second oldest fiber remaining
+ - `last`    indicates the last fiber created
+ - `last-1`  indicates the penultimate fiber created
+ - `fiber0`  the last fiber created,
+ - `fiber-1` the penultimate fiber, etc.
+ .
+ */
+Object* ObjectSet::findObject(std::string spec, const std::string& title) const
+{
+    //std::clog << "ObjectSet::findObject " << spec << std::endl;
+    
+    if ( spec == "first" )
+        return static_cast<Object*>(inventory.first());
+    
+    if ( spec == "last" )
+        return static_cast<Object*>(inventory.last());
+ 
+    // try to split into a word and a number:
+    long num = 0;
+    if ( splitObjectSpec(spec, num) )
+        return findObject(spec, num, title);
+
+    // check category name, eg. 'fiber':
+    if ( spec == title )
+    {
+        ObjectList all = collect();
+        //std::clog << "findObject -> random pick among " << sel.size() << " " << title << "\n";
+        if ( all.size() > 0 )
+            return all.pick_one();
+    }
+    
+    // check property name:
+    Property * p = simul.findProperty(title, spec);
+    if ( p )
+    {
+        ObjectList sel = collect(match_property, p);
+        //std::clog << "findObject -> random pick among " << sel.size() << " " << spec << "\n";
+        if ( sel.size() > 0 )
+            return sel.pick_one();
+    }
+
+    return nullptr;
 }
 
 
@@ -341,20 +352,44 @@ Object * ObjectSet::findObject(long num) const
  but it can be any one of them, since the lists are regularly
  shuffled to randomize the order in the list.
  */
-Object * ObjectSet::first(const Property* prop) const
+Object * ObjectSet::findObject(Property const* p) const
 {
     for ( Object* obj=first(); obj; obj=obj->next() )
-        if ( obj->property() == prop )
+        if ( obj->property() == p )
             return obj;
-    return 0;
+    return nullptr;
+}
+
+
+unsigned ObjectSet::count(const NodeList & list,
+                          bool (*func)(Object const*, void const*), void const* arg)
+{
+    unsigned res = 0;
+    Node const* n = list.front();
+    while ( n )
+    {
+        Object const* obj = static_cast<Object const*>(n);
+        n = n->next();
+        res += func(obj, arg);
+    }
+    return res;
+}
+
+
+ObjectList ObjectSet::collect(const NodeList & list)
+{
+    ObjectList res;
+    for ( Node* n = list.front(); n; n=n->next() )
+        res.push_back(static_cast<Object*>(n));
+    return res;
 }
 
 
 ObjectList ObjectSet::collect(const NodeList & list,
-                              bool (*func)(Object const*, void*), void* arg)
+                              bool (*func)(Object const*, void const*), void const* arg)
 {
     ObjectList res;
-    Node * n = list.first();
+    Node * n = list.front();
     while ( n )
     {
         Object * obj = static_cast<Object*>(n);
@@ -366,70 +401,208 @@ ObjectList ObjectSet::collect(const NodeList & list,
 }
 
 
-ObjectList ObjectSet::collect(bool (*func)(Object const*, void*), void* arg) const
+ObjectList ObjectSet::collect() const
+{
+    return collect(nodes);
+}
+
+
+ObjectList ObjectSet::collect(bool (*func)(Object const*, void const*), void const* arg) const
 {
     return collect(nodes, func, arg);
 }
 
+
+ObjectList ObjectSet::collect(Property * p) const
+{
+    return collect(match_property, p);
+}
+
+
+unsigned ObjectSet::count(bool (*func)(Object const*, void const*), void const* arg) const
+{
+    return count(nodes, func, arg);
+}
+
 //------------------------------------------------------------------------------
-#pragma mark -
+#pragma mark - I/O
+
+
+void ObjectSet::flag(NodeList const& list, ObjectFlag f)
+{
+    for ( Node * n=list.front(); n; n=n->next() )
+        static_cast<Object*>(n)->flag(f);
+}
+
+
+void ObjectSet::prune(NodeList const& list, ObjectFlag f, ObjectFlag g)
+{
+    Node * n = list.front();
+    
+    while ( n )
+    {
+        Node * p = n->next();
+        Object * o = static_cast<Object*>(n);
+        if ( o->flag() == f )
+            delete(o);
+        else
+            o->flag(g);
+        n = p;
+    }
+}
+
 
 /**
- This writes a new line, the reference and the Object data, for each Object in \a list
+ Write Reference and Object's data, for all Objects in `list`
  */
-void ObjectSet::write(const NodeList& list, OutputWrapper & out)
+void ObjectSet::writeNodes(Outputter& out, NodeList const& list)
 {
-    for ( Node const* n=list.first(); n; n=n->next() )
+    for ( Node const* n=list.front(); n; n=n->next() )
     {
-        const Object * o = static_cast<const Object*>(n);
-        out.write('\n');
-        o->writeReference(out);
+        Object const* o = static_cast<const Object*>(n);
+        //std::clog << "writeObject " << o->reference() << '\n';
+        o->writeHeader(out, o->tag());
         o->write(out);
     }
 }
 
+
 /**
- We do not allow property()->index() of an Object to change during a file import.
- However, there is no structural reason for that in cytosim.
- If necessary, it should be possible to remove this constraint.
+ Load an object from file, overwritting the current object if it is found
+ in the ObjectSet, to make it identical to what was saved in the file.
  */
-void ObjectSet::readObject(InputWrapper& in, const Tag tag, const char pretag)
+Object * ObjectSet::readObject(Inputter& in, const ObjectTag tag, bool fat)
 {
-    int ix = 0, mk = 0;
-    Number nb = 0;
+    unsigned ix = 0;
+    ObjectID id = 0;
+    ObjectMark mk = 0;
+
+    assert_true(isprint(tag));
     
-    Object::readReference(in, ix, nb, mk, pretag);
-    
-    if ( nb == 0 )
-        throw InvalidSyntax("Invalid (null) object reference");
-    
-    Object * w = find(nb);
-    
-    if ( w )
+    // read header:
+    if ( in.binary() )
     {
-        //std::cerr << "read " << w->reference() << std::endl;
-        assert_true( w->number() == nb );
-        assert_true( w->linked() );
-        w->mark(mk);
-        w->read(in, simul);
-        assert_true(w->property());
-        if ( w->property()->index() != ix )
+        if ( fat )
         {
-            throw InvalidSyntax("The property of a `"+w->property()->kind()+"' should not change!");
+            ix = in.readUInt16();
+            id = in.readUInt32();
+#ifdef BACKWARD_COMPATIBILITY
+            if ( in.formatID() < 34 )
+                ;
+            else if ( in.formatID() < 39 )
+                mk = in.readUInt16();
+            else
+#endif
+
+            mk = in.readUInt32();
         }
-        relink(w);
+        else
+        {
+            ix = in.readUInt8();
+            id = in.readUInt16();
+        }
     }
     else
     {
-        //std::cerr << "creating " << tag << nb << std::endl;
-        w = newObjectT(tag, ix);
-        w->number(nb);
-        w->mark(mk);
-        //std::cerr << "read " << w->reference() << std::endl;
-        w->read(in, simul);
-        add(w);
+        FILE * file = in.file();
+        if ( 1 != fscanf(file, "%u", &ix) )
+            throw InvalidIO("invalid Object header");
+        if ( in.get_char() != ':' )
+            throw InvalidIO("invalid Object header");
+        if ( 1 != fscanf(file, "%u", &id) )
+            throw InvalidIO("invalid Object header");
+        int c = in.get_char();
+        if ( c == ':' )
+        {
+            if ( 1 != fscanf(file, "%lu", &mk) )
+            throw InvalidIO("invalid Object header");
+        }
+        else
+            in.unget(c);
     }
+#ifdef BACKWARD_COMPATIBILITY
+    if ( in.formatID() < 45 )
+        ++ix;
+#endif
+
+    if ( id == 0 )
+        throw InvalidIO("Invalid ObjectID referenced in file");
+
+    // find corresponding object:
+    Object * w = findID(id);
+    
+    if ( !w )
+    {
+        // create new object of required class
+        w = newObject(tag, ix);
+        if ( !w )
+        {
+            std::string str = std::to_string(tag);
+            if ( isprint(tag) )
+                str += " ("+std::string(1,tag)+")";
+            throw InvalidIO("invalid ObjectTag "+str+" referenced in file");
+        }
+        w->identity(id);
+    }
+    assert_true( w->identity() == id );
+    assert_true( w->property() );
+    
+    try {
+        //std::clog << "- loading " << Object::reference(tag, ix, id) << " at " << in.pos() << '\n';
+        // read object data:
+        w->read(in, simul, tag);
+    }
+    catch( Exception & e )
+    {
+        e << ", while loading " << Object::reference(tag, ix, id);
+        throw;
+    }
+
+    w->mark(mk);
+    return w;
 }
 
 
+/**
+ Load an object from file, overwritting the current object in the ObjectSet
+ */
+void ObjectSet::loadObject(Inputter& in, const ObjectTag tag, bool fat, bool skip)
+{
+    Object * w = readObject(in, tag, fat);
+    
+    // clear flag to indicate that object was refreshed:
+    w->flag(0);
+
+    if ( skip )
+        delete(w);
+    else if ( !w->linked() )
+        add(w);
+}
+
+
+//------------------------------------------------------------------------------
+
+
+void ObjectSet::writeAssets(std::ostream& os, const std::string& title) const
+{
+    if ( size() > 0 )
+    {
+        os << '\n' << title;
+        PropertyList plist = simul.properties.find_all(title);
+        if ( plist.size() > 0 )
+        {
+            for ( Property * p : plist )
+            {
+                size_t cnt = count(match_property, p);
+                os << '\n' << std::setw(10) << cnt << " " << p->name();
+            }
+            if ( plist.size() > 1 )
+                os << '\n' << std::setw(10) << size() << " total";
+        }
+        else
+        {
+            os << '\n' << std::setw(10) << size() << " " << title;
+        }
+    }
+}
 

@@ -1,10 +1,9 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef PICKET_LONG_H
 #define PICKET_LONG_H
 
 #include "picket.h"
-class FiberGrid;
+
 
 /// a Picket with a non-zero resting length.
 /**
@@ -19,8 +18,8 @@ class PicketLong : public Picket
     /// the side (top/bottom) of the interaction
     mutable Torque mArm;
     
-    /// used to recalculate \a arm
-    static Torque calcArm(const PointInterpolated & pt, Vector const& pos, real len);
+    /// used to recalculate `mArm`
+    static Torque calcArm(const Interpolation & pt, Vector const& pos, real len);
     
 public:
 
@@ -36,7 +35,7 @@ public:
     /// force = stiffness * ( posFoot() - posHand() )
     Vector  force() const;
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

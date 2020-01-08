@@ -1,109 +1,120 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 /** 
- This file implements a safe 'dummy' grid using STL code, which is safe.
+ This file implements a 'dummy' grid using STL code, which can be used as a reference.
  For each position, it calculates the geometrical distance to all fiber segments.
- This is the slowest method with many segments, but it is simple and most likely correct!
- It is useful to evaluate the validity of other methods.
+ This is algorithmically the slowest method, but it is simple and most likely correct!
+ It is useful to get a ground truth and evaluate more advanced methods.
  */
 
 
 #include <algorithm>
 
-typedef std::vector <FiberLocus const*> SegmentVector;
+typedef std::vector <FiberSegment> SegmentVector;
 
 /// a list containing all segments, as a global variable
 SegmentVector allSegments;
 
 
-int FiberGrid::setGrid(const Space *, const Modulo * mod, real, unsigned long) 
+unsigned FiberGrid::setGrid(Space const*, real)
 {
-    MSG_ONCE("Cytosim is not using a grid to find attachement to Fiber!\n");
-    gridRange = 0;
+    PRINT_ONCE("Cytosim is using a crude method to localize fibers!\n");
     return 0;
 }
 
-void FiberGrid::paintGrid(const Fiber * first, const Fiber * last, real) 
+void FiberGrid::paintGrid(const Fiber * first, const Fiber * last)
 {
     allSegments.clear();
-    //we go through all the segments
-    for ( const Fiber * fb = first ; fb != last ; fb=fb->next() )
+    // add all segments
+    for ( const Fiber * f = first ; f != last ; f=f->next() )
     {
-        for ( unsigned int sg = 0; sg < fb->nbSegments(); ++sg )
-            allSegments.push_back( &(fb->segment(sg)) );
+        for ( unsigned s = 0; s < f->nbSegments(); ++s )
+            allSegments.push_back(FiberSegment(f,s));
     }
 }
 
-bool FiberGrid::hasGrid() const
-{
-    return true;
-}
 
-void FiberGrid::clear()
+void FiberGrid::createCells()
 {
 }
 
-//------------------------------------------------------------------------------
-bool FiberGrid::tryToAttach(Vector const& place, Hand& ha) const
+size_t FiberGrid::hasGrid() const
+{
+    return 1;
+}
+
+
+void FiberGrid::tryToAttach(Vector const& place, Hand& ha) const
 {
     // randomize the list order
     std::random_shuffle( allSegments.begin(), allSegments.end() );
 
-    
     // test all segments:
-    
-    for ( SegmentVector::iterator seg = allSegments.begin(); seg < allSegments.end(); ++seg )
+    for ( FiberSegment const& seg : allSegments )
     {
-        FiberLocus const* loc = *seg;
-        
-        // Compute the distance from the hand to the segment:
-        
-        real abs, dis = INFINITY;
-        // Compute the distance from the hand to the rod:
-        loc->projectPoint(place, abs, dis);
-        
-        // compare to the maximum attach distance of the hand:
-        if ( dis < ha.prop->binding_range_sqr )
+        if ( RNG.test(ha.prop->binding_rate_prob) )
         {
-            Fiber * fib = const_cast<Fiber*>(loc->fiber());
-        
-            FiberBinder site(fib, fib->abscissaP(loc->point())+abs);
-        
-            if ( ha.attachmentAllowed(site) )
+            real dis = INFINITY;
+            // Compute the distance from the hand to the rod, and abscissa of projection:
+            real abs = seg.projectPoint(place, dis);
+            
+            /*
+             Compare to the maximum attachment range of the hand,
+             and compare a newly tossed random number with 'prob'
+             */
+            if ( dis < ha.prop->binding_range_sqr )
             {
-                ha.attach(site);
-                return true;
+                Fiber * fib = const_cast<Fiber*>(seg.fiber());
+                FiberSite pos(fib, seg.abscissa1()+abs);
+                
+                if ( ha.attachmentAllowed(pos) )
+                {
+                    ha.attach(pos);
+                    return;
+                }
             }
         }
     }
-    return false;
 }
 
 
-
-
-//======================================================================
-/** 
- This function is limited to the range given in paintGrid();
- */
-FiberGrid::SegmentList FiberGrid::nearbySegments( Vector const& place, const real D, Fiber * exclude )
+FiberGrid::SegmentList FiberGrid::nearbySegments(Vector const& place, const real DD, Fiber * exclude) const
 {
     SegmentList res;
     
-    const real DD = D * D;
-    for ( SegmentVector::iterator seg = allSegments.begin(); seg < allSegments.end(); ++seg )
+    for ( FiberSegment const& seg : allSegments )
     {
-        FiberLocus const* loc = *seg;
-             
-        if ( loc->fiber() == exclude )
-            continue;
-        
-        real abs, dis = INFINITY;
+        if ( seg.fiber() != exclude )
+        {
+            real dis = INFINITY;
+            // Compute the distance from the hand to the rod:
+            seg.projectPoint(place, dis);
+            
+            if ( dis < DD )
+                res.push_back(seg);
+        }
+    }
+    
+    return res;
+}
+
+
+FiberSegment FiberGrid::closestSegment(Vector const& place) const
+{
+    FiberSegment res(nullptr, 0);
+    real hit = INFINITY;
+    
+    for ( FiberSegment const& seg : allSegments )
+    {
+        real dis = INFINITY;
         // Compute the distance from the hand to the rod:
-        loc->projectPoint(place, abs, dist);      // always works
+        seg.projectPoint(place, dis);
         
-        if ( dis < DD )
-            res.push_back(loc);
+        if ( dis < hit )
+        {
+            hit = dis;
+            res = seg;
+        }
     }
     
     return res;

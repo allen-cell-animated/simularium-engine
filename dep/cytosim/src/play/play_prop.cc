@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "play_prop.h"
 #include "glossary.h"
 #include "saveimage.h"
@@ -7,88 +6,80 @@
 //------------------------------------------------------------------------------
 void PlayProp::clear()
 {
-    frame        = 0;
     play         = 0;
     loop         = 0;
+    exit_at_eof  = false;
     period       = 1;
     delay        = 32;
-    live         = 0;
-    style        = 1;
-    
-    report       = "";
-    report1      = "fiber:lengths";
-    report2      = "fiber:dynamics";
-    report3      = "single";
-    report4      = "couple";
-    report5      = "fiber:segments";
-    
+
+    report_index = 0;
+
     for ( int k = 0; k < NB_MAGIC_KEYS; ++k )
     {
         magic_key[k]  = 0;
         magic_code[k] = "";
     }
     
+    save_images = false;
     if ( SaveImage::supported("png") )
         image_format = "png";
     else
         image_format = "ppm";
 
     image_dir    = "";
+    downsample   = 1;
     image_index  = 0;
     poster_index = 0;
 }
 
+
 //------------------------------------------------------------------------------
 void PlayProp::read(Glossary& glos)
 {
-    glos.set(frame,        "frame");
     glos.set(play,         "play");
     glos.set(loop,         "loop");
-    glos.set(period,       "period");
-    glos.set(delay,        "delay");
-    glos.set(style,        "style");
+    if ( glos.set(period,  "period") )
+        period = std::max(1u, period);
+    if ( glos.set(delay,   "delay") )
+        delay = std::max(2u, delay);
+    glos.set(save_images,  "save_images");
     glos.set(image_format, "image_format");
     glos.set(image_dir,    "image_dir");
-    
+    glos.set(downsample,   "downsample");
+    glos.set(downsample,   "downsampling");
+    glos.set(report,       "report");
+
     if ( ! SaveImage::supported(image_format.c_str()) )
         throw InvalidParameter("unsupported image format");
     
+    std::string var = "magic_key";
     for ( int k = 0; k < NB_MAGIC_KEYS; ++k )
     {
-        char var[16];
-        snprintf(var, sizeof(var), "magic_key%u", k);
-        glos.set(magic_key[k],  var);
+        glos.set(magic_key[k], var);
         glos.set(magic_code[k], var, 1);
+        var = "magic_key" + std::to_string(k+1);
     }
-    
-    glos.set(report,      "report");
-    glos.set(report1,     "report1");
-    glos.set(report2,     "report2");
-    glos.set(report3,     "report3");
-    glos.set(report4,     "report4");
-    glos.set(report5,     "report5");
 }
 
 
 //------------------------------------------------------------------------------
 
-void PlayProp::write_data(std::ostream & os) const
+void PlayProp::write_values(std::ostream& os) const
 {
-    write_param(os, "frame",  frame);
-    write_param(os, "play",   play);
-    write_param(os, "loop",   loop);
-    write_param(os, "period", period);
-    write_param(os, "delay",  delay);
-    write_param(os, "style",  style);
-    write_param(os, "report", report);
-    write_param(os, "image_format", image_format);
-    write_param(os, "image_dir", image_dir);
+    write_value(os, "play",   play);
+    write_value(os, "loop",   loop);
+    write_value(os, "period", period);
+    write_value(os, "delay",  delay);
+    write_value(os, "report", report);
+    write_value(os, "save_images", save_images);
+    write_value(os, "image_format", image_format);
+    write_value(os, "image_dir", image_dir);
+    write_value(os, "downsample", downsample);
 
     for ( int k = 0; k < NB_MAGIC_KEYS; ++k )
     {
-        char var[16];
-        snprintf(var, sizeof(var), "magic_key%u", k);
-        write_param(os, var, magic_key[k], "("+magic_code[k]+")");
+        std::string var = "magic_key" + std::to_string(k);
+        write_value(os, var, magic_key[k], "("+magic_code[k]+")");
     }
 }
 
@@ -96,20 +87,33 @@ void PlayProp::write_data(std::ostream & os) const
 
 void PlayProp::toggleReport(bool alt)
 {
+    report_index = ( report_index + 1 ) % 7;
+    
     if ( alt )
     {
-        if ( report.empty() )
-            report = report5;
-        else
-            report.clear();
+        switch( report_index )
+        {
+            case 0: report = "";                   break;
+            case 1: report = "inventory";          break;
+            case 2: report = "platelet";           break;
+            case 3: report = "fiber:lattice_density;field"; break;
+            case 4: report = "fiber:segment";      break;
+            case 5: report = "fiber:cluster";      break;
+            case 6: report = "fiber:age";          break;
+        }
     }
     else
     {
-        if ( report.empty() )          report = report1;
-        else if ( report == report1 )  report = report2;
-        else if ( report == report2 )  report = report3;
-        else if ( report == report3 )  report = report4;
-        else report.clear();
+        switch( report_index )
+        {
+            case 0: report = "";                   break;
+            case 1: report = "fiber:lengths";      break;
+            case 2: report = "fiber:dynamics";     break;
+            case 3: report = "single";             break;
+            case 4: report = "couple";             break;
+            case 5: report = "couple:configuration"; break;
+            case 6: report = "fiber:distribution"; break;
+        }
     }
 }
 

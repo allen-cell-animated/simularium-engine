@@ -1,11 +1,10 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "assert_macro.h"
 #include "rasterizer.h"
 #include "fiber_grid.h"
 #include "exceptions.h"
-#include "fiber_locus.h"
-#include "fiber_binder.h"
+#include "fiber_segment.h"
+#include "fiber_site.h"
 #include "messages.h"
 #include "space.h"
 #include "modulo.h"
@@ -13,7 +12,9 @@
 #include "hand_prop.h"
 #include "simul.h"
 #include "sim.h"
-extern Random RNG;
+
+extern Modulo const* modulo;
+
 
 #if ( 0 )
 // this includes a naive implementation, which is slow but helpful for debugging
@@ -21,126 +22,111 @@ extern Random RNG;
 #else
 
 /**
- Creates a grid where the dimensions of the cells are \a max_step at most.
- If the numbers of cells that need to be created is greater than \a max_nb_cells,
+ Creates a grid where the dimensions of the cells are `max_step` at most.
+ If the numbers of cells that need to be created is greater than `max_nb_cells`,
  the function returns 1 without building the grid.
  The return value is zero in case of success.
  
- The algorithm works with any value of \a max_step (the results are always correct),
- but \a max_steps affects the efficiency (speed) of the algorithm:
- -if max_step is too slow, paintGrid() will be slow,
- -if max_step is too large, tryToAttach() will be slow.
- A good compromise is to set max_step equivalent to the attachment distance,
+ The algorithm works with any value of `max_step` (the results are always correct),
+ but `max_step` affects the efficiency (speed) of the algorithm:
+ -if `max_step` is too small, paintGrid() will be slow,
+ -if `max_step` is too large, tryToAttach() will be slow.
+ A good compromise is to set `max_step` equivalent to the attachment distance,
  or at least to the size of the segments of the Fibers.
  */
-int FiberGrid::setGrid(const Space * space, const Modulo * mod, real max_step, unsigned long max_nb_cells)
+unsigned FiberGrid::setGrid(Space const* space, real max_step)
 {
     if ( max_step <= 0 )
         throw InvalidParameter("simul:binding_grid_step should be > 0");
     
-    //set gridRange=0 to trigger an error if paintGrid() is not called:
-    gridRange = 0;
+    Vector inf, sup;
+    space->boundaries(inf, sup);
     
-    modulo = mod;
-    Vector range = space->extension();
+    int n_cell[3] = { 1, 1, 1 };
     
-    bool periodic = false;
-    int nCells[3] = { 1, 1, 1 };
-    
-    for ( int d = 0; d < DIM; ++d )
+    for ( unsigned d = 0; d < DIM; ++d )
     {
-        if ( range[d] < 0 )
-            throw InvalidParameter("space:dimension should be >= 0");
-
-        real n = 2 * range[d] / max_step;
-        nCells[d] = (int) ceil(n);
+        n_cell[d] = (int) ceil( ( sup[d] - inf[d] ) / max_step );
+        
+        if ( n_cell[d] < 0 )
+            throw InvalidParameter("invalid space:boundaries");
         
         if ( modulo  &&  modulo->isPeriodic(d) )
         {
             //adjust the grid to match the edges exactly
-            periodic = true;
-            if ( nCells[d] <= 0 )
-                nCells[d] = 1;
+            fGrid.setPeriodic(d, true);
         }
         else
         {
-            //extend the grid beyond the borders of the space
-            nCells[d] += 2;
-            n = nCells[d] * 0.5 * max_step;
-            assert_true( n >= range[d] );
-            range[d] = n;
+            //extend the grid by one cell on each side
+            inf[d]    -= max_step;
+            sup[d]    += max_step;
+            n_cell[d] += 2;
         }
+        
+        if ( n_cell[d] <= 0 )
+            n_cell[d] = 1;
     }
 
     //create the grid using the calculated dimensions:
-    if ( periodic )
-        mGrid.periodic(true);
-    else
-        modulo = 0;
-    
-    mGrid.setDimensions(-range, range, nCells);
-    
-    // we check the number of cells, to avoid crazy memory requirements
-    if ( mGrid.nbCells() > max_nb_cells )
-        return 1;
-    
-    mGrid.createCells();
-    
-    //report the grid size used
-    Cytosim::MSG(5, "FiberGrid set with %i cells", mGrid.nbCells());
-    for ( int ii = 0; ii < DIM; ++ii )
-        Cytosim::MSG(5, ",  %.1fum / %i bins", 2*range[ii], nCells[ii]);
-    Cytosim::MSG(5, " (binding_grid_step=%.3f)\n", max_step);
-        
-    return 0;
+    fGrid.setDimensions(inf, sup, n_cell);
+    return fGrid.nbCells();
 }
 
 
-//-----------------------------------------------------------------------
-
-bool FiberGrid::hasGrid() const
+void FiberGrid::createCells()
 {
-    return mGrid.hasCells();
+    fGrid.createCells();
+#if ( 0 )
+    if ( fGrid.nbCells() > 4096 )
+        fGrid.printSummary(std::cerr, "FiberGrid");
+#endif
 }
 
 
-void FiberGrid::clear()
+size_t FiberGrid::hasGrid() const
 {
-    // this is to be able to detect if paintGrid() is not called:
-    gridRange = 0;
-    
-    mGrid.clear();
+    return fGrid.hasCells();
 }
-
 
 //------------------------------------------------------------------------------
-/** 
+#pragma mark - Paint
+
+/// Structure used by FiberGrid::paintGrid to find Hand's attachement
+struct PaintJob
+{
+    FiberGrid::grid_type * grid;
+    FiberSegment segment;
+};
+
+
+/**
  paintCell(x,y,z) adds a Segment to the SegmentList associated with
- the grid point (x,y,z). 
+ the grid point (x,y,z).
  It is called by the rasterizer function paintFatLine().
  
  This version uses the fact that cells with consecutive
  X-coordinates should be consecutive also in the Grid
  */
-
-void paintCell(const int x_inf, const int x_sup, const int y, const int z, void * arg1, void * arg2)
+void paintCell(const int x_inf, const int x_sup, const int y, const int z, void * arg)
 {
-    FiberLocus const* seg = static_cast<FiberLocus const*>(arg1);
-    FiberGrid::grid_type * mGrid = static_cast<FiberGrid::grid_type *>(arg2);
+    auto* grid = static_cast<PaintJob*>(arg)->grid;
+    const auto& seg = static_cast<PaintJob*>(arg)->segment;
     //printf("paint %p in (%i to %i, %i, %i)\n", seg, x_inf, x_sup, y, z);
 
 #if   ( DIM == 1 )
-    FiberGrid::SegmentList & inf = mGrid->cell1D( x_inf );
-    FiberGrid::SegmentList & sup = mGrid->cell1D( x_sup );
+    FiberGrid::SegmentList * inf = & grid->icell1D( x_inf );
+    FiberGrid::SegmentList * sup = & grid->icell1D( x_sup );
 #elif ( DIM == 2 )
-    FiberGrid::SegmentList & inf = mGrid->cell2D( x_inf, y );
-    FiberGrid::SegmentList & sup = mGrid->cell2D( x_sup, y );
-#elif ( DIM == 3 )
-    FiberGrid::SegmentList & inf = mGrid->cell3D( x_inf, y, z );
-    FiberGrid::SegmentList & sup = mGrid->cell3D( x_sup, y, z );
+    FiberGrid::SegmentList * inf = & grid->icell2D( x_inf, y );
+    FiberGrid::SegmentList * sup = & grid->icell2D( x_sup, y );
+#else
+    FiberGrid::SegmentList * inf = & grid->icell3D( x_inf, y, z );
+    FiberGrid::SegmentList * sup = & grid->icell3D( x_sup, y, z );
 #endif
     
-    for ( FiberGrid::SegmentList * list = &inf; list <= &sup; ++list )
+    # pragma ivdep
+    for ( FiberGrid::SegmentList * list = inf; list <= sup; ++list )
         list->push_back(seg);
 }
 
@@ -151,44 +137,47 @@ void paintCell(const int x_inf, const int x_sup, const int y, const int z, void 
  It is called by the rasterizer function paintFatLine()
  */
 
-void paintCellPeriodic(const int x_inf, const int x_sup, const int y, const int z, void * arg1, void * arg2)
+void paintCellPeriodic(const int x_inf, const int x_sup, const int y, const int z, void * arg)
 {
-    FiberLocus const* seg = static_cast<FiberLocus const*>(arg1);
-    FiberGrid::grid_type * mGrid = static_cast<FiberGrid::grid_type *>(arg2);
+    auto* grid = static_cast<PaintJob*>(arg)->grid;
+    const auto& seg = static_cast<PaintJob*>(arg)->segment;
     //printf("paint %p in (%i to %i, %i, %i)\n", seg, x_inf, x_sup, y, z);
     
+    # pragma ivdep
     for ( int x = x_inf; x <= x_sup; ++x )
     {
+        //@todo write/call a specialized function for periodic: icellP1D
 #if   ( DIM == 1 )
-        mGrid->cell1D( x ).push_back(seg);
+        grid->icell1D( x ).push_back(seg);
 #elif ( DIM == 2 )
-        mGrid->cell2D( x, y ).push_back(seg);
+        grid->icell2D( x, y ).push_back(seg);
 #elif ( DIM == 3 )
-        mGrid->cell3D( x, y, z ).push_back(seg);
+        grid->icell3D( x, y, z ).push_back(seg);
 #endif
     }
 }
 
-//------------------------------------------------------------------------------
+
 /**
-paintGrid( first_fiber, last_fiber, max_range ) links all segments found in 'fiber' and its
+paintGrid(first_fiber, last_fiber) links all segments found in 'fiber' and its
  descendant, in the point-list GP that match distance(GP, segment) < H.
  
- 'H' is calculated such that tryToAttach() finds any segment closer than 'max_range':
+ 'H' is calculated such that tryToAttach() finds any segment closer than 'grid:range':
  
  To determine H, we start from a relation on the sides of a triangle:
  (A) distance( GP, segment ) < distance( GP, X ) + distance( X, segment )
  where GP (grid-point) is the closest point on the grid to X.
  
- Since GP in tryToAttach() is the closest point on mGrid to X, we have:
- (B) distance( GP, X ) < 0.5 * mGrid.diagonalLength()
+ Since GP in tryToAttach() is the closest point on fGrid to X, we have:
+ (B) distance( GP, X ) < 0.5 * fGrid.diagonalLength()
  
  Thus to find all rods for which:
- (B) distance( X, segment ) < max_range
+ (B) distance( X, segment ) < grid::range
  we simply use:
- H =  max_range + 0.5 * mGrid.diagonalLength();
  
- Note: H is calculated by paintGrid(), and the user only provides 'max_range'.
+     H = grid::range + 0.5 * fGrid.diagonalLength();
+ 
+ Note: H is calculated by paintGrid() and grid::range by setFiberGrid().
  
  Linking all segments is done in an inverse way:
  for each segment, we cover all points of the grid inside a volume obtained
@@ -196,283 +185,293 @@ paintGrid( first_fiber, last_fiber, max_range ) links all segments found in 'fib
  calls the function paint() above.
  */
 
-void FiberGrid::paintGrid(const Fiber * first, const Fiber * last, const real max_range)
+void FiberGrid::paintGrid(const Fiber * first, const Fiber * last, real range)
 {
-    clear();
-    gridRange = max_range;
-    
     assert_true(hasGrid());
+    assert_true(range >= 0);
     
-    const real* offset = mGrid.inf();
-    const real* deltas = mGrid.delta();
-    real width = gridRange + 0.5 * mGrid.diagonalLength();
+    fGrid.clear();
+    const Vector offset(fGrid.inf());
+    const Vector deltas(fGrid.delta());
+    const real width = range + 0.5 * fGrid.diagonalLength();
     
     //define the painting function used:
-    void (*paint)(int, int, int, int, void*, void*) = modulo ? paintCellPeriodic : paintCell;
+    void (*paint)(int, int, int, int, void*) = modulo ? paintCellPeriodic : paintCell;
     
     for ( const Fiber * fib = first; fib != last ; fib=fib->next() )
     {
-        Vector Q, P = fib->posPoint(0);
-        real S = fib->segmentation();
-        
-        for ( unsigned pp = 1; pp < fib->nbPoints(); ++pp )
+        PaintJob job;
+        job.grid = &fGrid;
+        Vector P, Q = fib->posP(0);
+        const real S = fib->segmentation();
+
+        for ( unsigned n = 1; n < fib->nbPoints(); ++n )
         {
-            FiberLocus * seg = &(fib->segment(pp-1));
-            
-            if ( pp & 1 )
-                Q = fib->posPoint(pp);
-            else
-                P = fib->posPoint(pp);
-            
-#if   (DIM == 1)
-            Rasterizer::paintFatLine1D(paint, seg, &mGrid, P, Q, width, offset, deltas);
-#elif (DIM == 2)
-            Rasterizer::paintFatLine2D(paint, seg, &mGrid, P, Q, width, offset, deltas, S);
-#elif (DIM == 3)
-            //Rasterizer::paintHexLine3D(paint, seg, &mGrid, P, Q, width, offset, deltas, S);
-            Rasterizer::paintFatLine3D(paint, seg, &mGrid, P, Q, width, offset, deltas, S);
-            //Rasterizer::paintBox3D(paint, seg, &mGrid, P, Q, width, offset, deltas);
+            P = Q;
+            Q = fib->posP(n);
+            job.segment.set(fib, n-1);
+
+#if ( 0 )
+            if ( (P-Q).normSqr() > 4*S*S )
+                throw InvalidParameter("Erroneous filament segmentation");
+#endif
+#if   ( DIM == 1 )
+            Rasterizer::paintFatLine1D(paint, &job, P, Q, width, offset, deltas);
+#elif ( DIM == 2 )
+            Rasterizer::paintFatLine2D(paint, &job, P, Q, S, width, offset, deltas);
+#else
+            //Rasterizer::paintHexLine3D(paint, &job, P, Q, S, width, offset, deltas);
+            Rasterizer::paintFatLine3D(paint, &job, P, Q, S, width, offset, deltas);
+            //Rasterizer::paintBox3D(paint, &job, P, Q, width, offset, deltas);
 #endif
         }
     }
 }
 
 
-
-//============================================================================
-#pragma mark -
+//------------------------------------------------------------------------------
+#pragma mark - Access
 
 /**
- The range at which Hand will the the Fibers is limited to the range given in paintGrid()
+ This will bind the given Hand to any Fiber found within `binding_range`, with a
+ probability that is encoded in `prob`.
+ The test is `RNG.pint() < prob`, and with 'prob = 1<<30', the chance is 1/4.
+ The result is thus stochastic, and will depend on the number of Fiber
+ within the range, but it will saturate if there are more than '4' possible targets.
+ 
+ NOTE:
+ The distance at which Fibers are detected is limited to the range given in paintGrid()
  */
-bool FiberGrid::tryToAttach(Vector const& place, Hand& ha) const
+void FiberGrid::tryToAttach(Vector const& place, Hand& ha) const
 {
     assert_true( hasGrid() );
     
-    if ( gridRange < ha.prop->binding_range )
-    {
-        printf("Warning: the FiberGrid range was exceeded:\n");
-        //printf("  gridRange = %.3e < Hand::binding_range = %.3f\n", gridRange, ha.prop->binding_range);
-        //throw InvalidParameter("the FiberGrid range was exceeded");
-    }
-    
-    //get the grid node list index closest to the position in space:
-    const unsigned int indx = mGrid.index(place, 0.5);
+    //get the cell index closest to the position in space:
+    const auto indx = fGrid.index(place, 0.5);
     
     //get the list of rods associated with this cell:
-    SegmentList & segments = mGrid.cell(indx);
-   
-    //randomize the list, to make attachments more fair:
-    //this might not be necessary, since the MT list is already mixed
-    segments.mix(RNG);
-    
+    SegmentList & segments = fGrid.icell(indx);
 
-    for ( SegmentList::iterator si = segments.begin(); si < segments.end(); ++si )
+    //randomize the list, to make attachments more fair:
+    if ( segments.size() > 1 )
     {
-        FiberLocus const* loc = *si;
-        
-        real abs, dis = INFINITY;
-        // Compute the distance from the hand to the rod:
-        loc->projectPoint(place, abs, dis);      // always works
-        //loc->projectPointF(place, abs, dis);    // faster, but not compatible with periodic boundaries
-        
-        // compare to the maximum attach distance of the hand:
-        if ( dis > ha.prop->binding_range_sqr )
-            continue;
-        
-        Fiber * fib = const_cast<Fiber*>(loc->fiber());
-        
-        FiberBinder site(fib, fib->abscissaP(loc->point())+abs);
-        
-        if ( ha.attachmentAllowed(site) )
+        // randomize the list order
+        //std::random_shuffle(segments.begin(), segments.end());
+        segments.shuffle();
+    }
+    else if ( segments.empty() )
+        return;
+    
+    //std::clog << "tryToAttach has " << segments.size() << " segments\n";
+    
+    for ( FiberSegment const& seg : segments )
+    {
+        if ( RNG.test(ha.prop->binding_rate_prob) )
         {
-            ha.attach(site);
-            return true;
+            real dis = INFINITY;
+            // Compute the distance from the hand to the rod, and abscissa of projection:
+            real abs = seg.projectPoint(place, dis);      // always works
+            //real abs = seg->projectPointF(place, dis);    // faster, but not compatible with periodic boundaries
+            
+            /*
+             Compare to the maximum attachment range of the hand,
+             and compare a newly tossed random number with 'prob'
+             */
+            if ( dis < ha.prop->binding_range_sqr )
+            {
+                Fiber * fib = const_cast<Fiber*>(seg.fiber());
+                FiberSite pos(fib, seg.abscissa1()+abs);
+                
+                if ( ha.attachmentAllowed(pos) )
+                {
+                    ha.attach(pos);
+                    return;
+                }
+            }
         }
     }
-    
-    return false;
 }
 
 
-//------------------------------------------------------------------------------
-/** 
+/**
  This function is limited to the range given in paintGrid();
  */
-FiberGrid::SegmentList FiberGrid::nearbySegments( Vector const& place, const real D, Fiber * exclude)
+FiberGrid::SegmentList FiberGrid::nearbySegments(Vector const& place, const real DD, Fiber * exclude) const
 {
-    if ( gridRange <= 0 )
-        throw InvalidParameter("the Grid was not initialized");
-    if ( gridRange < D )
-    {
-        printf("gridRange = %.4f < range = %.4f\n", gridRange, D);
-        throw InvalidParameter("the Grid maximum distance was exceeded");
-    }
-    
     SegmentList res;
     
     //get the grid node list index closest to the position in space:
-    const unsigned indx = mGrid.index( place, 0.5 );
+    const auto indx = fGrid.index(place, 0.5);
     
     //get the list of rods associated with this cell:
-    SegmentList & segments = mGrid.cell(indx);
-    
-    const real DD = D*D;
-    for ( SegmentList::iterator si = segments.begin(); si < segments.end(); ++si )
+    for ( FiberSegment const& seg : fGrid.icell(indx) )
     {
-        FiberLocus const* loc = *si;
-        
-        if ( loc->fiber() == exclude ) 
-            continue;
-        
-        real abs, dis = INFINITY;
-        loc->projectPoint(place, abs, dis);
-        
-        if ( dis < DD )
-            res.push_back(loc);
+        if ( seg.fiber() != exclude )
+        {
+            real dis = INFINITY;
+            seg.projectPoint(place, dis);
+            
+            if ( dis < DD )
+                res.push_back(seg);
+        }
     }
     
     return res;
 }
 
 
-//============================================================================
-//===                            ACCESSORY                                ====
-//============================================================================
-
-FiberLocus FiberGrid::closestSegment(Vector const& place)
+FiberSegment FiberGrid::closestSegment(Vector const& place) const
 {
     //get the cell index from the position in space:
-    const unsigned indx = mGrid.index( place, 0.5 );
+    const auto indx = fGrid.index(place, 0.5);
+    
+    FiberSegment res(nullptr, 0);
+    real hit = INFINITY;
     
     //get the list of rods associated with this cell:
-    SegmentList & segments =  mGrid.cell(indx);
-    
-    FiberLocus const* res = 0;
-    real closest = 4 * gridRange * gridRange;
-    
-    for ( SegmentList::iterator si = segments.begin(); si < segments.end(); ++si )
+    for ( FiberSegment const& seg : fGrid.icell(indx) )
     {
-        FiberLocus const* loc = *si;
-        
         //we compute the distance from the hand to the candidate rod,
         //and compare it to the best we have so far.
-        real abs, dis = INFINITY;
-        loc->projectPoint(place, abs, dis);
+        real dis = INFINITY;
+        seg.projectPoint(place, dis);
         
-        if ( dis < closest )
+        if ( dis < hit )
         {
-            closest = dis;
-            res = loc;
+            hit = dis;
+            res = seg;
         }
     }
-    return *res;
+    return res;
 }
 
 
 #endif
 
 
-//============================================================================
-//===                       DEBUG  ATTACHMENT                             ====
-//============================================================================
-#pragma mark -
+//==============================================================================
+//===                        TEST  ATTACHMENT                               ====
+//==============================================================================
+#pragma mark - Test
 
 #include <map>
 #include "simul.h"
+
+
+/// used for debugging
+unsigned mingle(FiberSegment const& seg)
+{
+    return ( seg.fiber()->identity() << 16 ) | seg.point();
+}
 
 /**
 Function testAttach() is given a position in space,
  it calls tryToAttach() from this position to check that:
  - attachement has equal probability to all targets,
  - no target is missed,
- - attachment are not made to targets that are beyond binding_range_max
+ - attachment are not made to targets that are beyond binding_range
  */
-void FiberGrid::testAttach(FILE * out, const Vector pos, Fiber * start, HandProp const* hp)
+void FiberGrid::testAttach(FILE* out, const Vector pos, FiberSet const& set, HandProp const* hp) const
 {
-    //create a test motor with a dummy HandMonitor:
+    typedef std::map < unsigned, int > map_type;
+    map_type hits;
+
+    // create a test Hand with a dummy HandMonitor:
     HandMonitor hm;
     Hand ha(hp, &hm);
-    real dsq = hp->binding_range_sqr;
+    real sup = square(hp->binding_range);
     
-    typedef std::map < FiberLocus const*, int > map_type;
-    map_type hits;
-    
-    //go through all the segments to find those close enough from pos:
-    for ( Fiber * fib=start; fib; fib=fib->next() )
+    //check all the segments to find those close enough from pos:
+    for ( Fiber const* fib=set.first(); fib; fib=fib->next() )
     {
-        for ( unsigned int p = 0; p < fib->nbSegments(); ++p )
+        for ( unsigned p = 0; p < fib->nbSegments(); ++p )
         {
-            FiberLocus const& loc = fib->segment(p);
-            real abs, dis = INFINITY;
-            loc.projectPoint(pos, abs, dis);
-            
-            if ( dis < dsq )
-                hits[&loc] = 0;
+            FiberSegment seg(fib, p);
+            real dis = INFINITY;
+            seg.projectPoint(pos, dis);
+            if ( dis < sup )
+                hits[mingle(seg)] = 0;
         }
     }
     
-    const size_t targets = hits.size();
-    
-    if ( targets == 0 )
+    const size_t n_targets = hits.size();
+    // call tryTyAttach 100 times per target:
+    for ( size_t n = 0; n < n_targets; ++n )
+    for ( size_t i = 0; i < 100; ++i )
     {
-        //fprintf(out, "no target here\n");
-        return;
-    }
-    
-    //call tryTyAttach NB times to check to which rods the Hand binds:
-    const size_t NB = (int)ceil( 100 * targets / hp->binding_rate_dt );
-    for ( size_t n = 0; n < NB; ++n )
-    {
-        if ( tryToAttach(pos, ha) )
+        tryToAttach(pos, ha);
+        if ( ha.attached() )
         {
-            PointInterpolated inter = ha.fiber()->interpolate(ha.abscissa());
-            FiberLocus const& loc = ha.fiber()->segment(inter.point1());
+            Interpolation inter = ha.fiber()->interpolate(ha.abscissa());
+            FiberSegment seg(ha.fiber(), inter.point1());
             
-            if ( hits.find(&loc) != hits.end() )
-                ++hits[&loc];
+            if ( hits.find(mingle(seg)) != hits.end() )
+                ++hits[mingle(seg)];
             else
-                hits[&loc] = -2;
-            
+                hits[mingle(seg)] = -2;
+            //fprintf(out, "   attached to f%04d abscissa %7.3f\n", ha.fiber()->identity(), ha.abscissa());
             ha.detach();
         }
     }
     
+    if ( hits.empty() )
+        return;
+
     //detect segments that have been missed or mistargeted:
     int verbose = 0;
-    for ( map_type::const_iterator it = hits.begin(); it != hits.end(); ++it )
+    for ( auto const& i : hits )
     {
-        if ( it->second <= 50 )
+        if ( i.second < 50 )
             verbose = 1;
-        if ( it->second < 0 )
-            verbose = 2;
     }
     
     if ( verbose )
     {
         // print a summary of all targets:
-        fprintf(out, "testAttach\n");
-        fprintf(out, "   %lu target(s) within %.3f um\n", targets, hp->binding_range);
-        fprintf(out, "   %lu trials\n", NB);
-        real avg = NB * hp->binding_rate_dt / targets;
-        fprintf(out, "   binding_prob = %.2f, expected_hits / target = %.3f\n", hp->binding_rate_dt, avg);
-
-        //go through all the rods that were targeted:
-        for (map_type::const_iterator it = hits.begin(); it != hits.end(); ++it )
+        fprintf(out, "FiberGrid::testAttach %lu target(s) within %.3f um of", n_targets, hp->binding_range);
+        pos.println(out);
+#if ( 0 )
+        //report content of grid's list
+        const auto indx = fGrid.index(pos, 0.5);
+        for ( FiberSegment const& seg : fGrid.icell(indx) )
+            fprintf(out, "    target f%04d:%02i\n", seg.fiber()->identity(), seg.point());
+#endif
+        //report for all the segments that were targeted:
+        for ( auto const& hit : hits )
         {
-            FiberLocus const* loc = it->first;
-            Fiber const* fib = loc->fiber();
-            real abs, dis = INFINITY;
-            loc->projectPoint(pos, abs, dis);
+            ObjectID id = hit.first >> 16;    // opposite of mingle()
+            unsigned pt = hit.first & 65535;  // opposite of mingle()
+            Fiber const* fib = set.findID(id);
+            FiberSegment seg(fib, pt);
+            real dis = INFINITY;
+            real abs = seg.projectPoint(pos, dis);
             
-            fprintf(out, "    fib%-3lx:%-3i dist %5.3f um, abs %+.2f : ", fib->number(), loc->point(), dis, abs);
-            if ( hits[loc] == 0 )
-                fprintf(out, "missed\n");
-            else if ( hits[loc] < 0 )
-                fprintf(out, "found, although out-of-range\n");
-            else if ( hits[loc] > 0 )
-                fprintf(out, "%-3i hits, hits/expected = %.3f\n", hits[loc], hits[loc]/avg);
+            fprintf(out, "    rod f%04d:%02i at %12.7f um, abs %+.2f : ", id, pt, dis, abs);
+            if ( hit.second == 0 )
+                fprintf(out, "missed");
+            else if ( hit.second < 0 )
+                fprintf(out, "found, although out of range");
+            else if ( hit.second > 0 )
+                fprintf(out, "%-3i hits", hit.second);
+            fprintf(out, "\n");
         }
     }
 }
 
+//==============================================================================
+#pragma mark - Display
+
+#ifdef DISPLAY
+
+#  include "grid_display.h"
+
+void FiberGrid::draw() const
+{
+    glPushAttrib(GL_LIGHTING_BIT);
+    glDisable(GL_LIGHTING);
+    glColor4f(0, 1, 1, 1);
+    glLineWidth(0.5);
+    drawEdges(fGrid);
+    glPopAttrib();
+}
+#endif

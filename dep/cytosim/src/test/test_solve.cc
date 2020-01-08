@@ -1,16 +1,15 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-// nedelec@embl-heidelberg.de  April 2003
+// This was created by F. Nedelec on April 2003
 
 #include <cstdlib>
 #include <cstdio>
 #include "glut.h"
+#include "glu_unproject.cc"
 
-#include "smath.h"
 #include "vector2.h"
-#include "matrix2.h"
+#include "matrix22.h"
 #include "random.h"
 
-extern Random RNG;
 
 //a point in space:
 GLdouble Gx=1, Gy=1, Gz;
@@ -18,21 +17,21 @@ GLdouble Gx=1, Gy=1, Gz;
 Vector2 pg(5,0,0), px(1,0,0), pf, pn, pc, pp;
 
 //rate of calculation:
-int delay = 50;
-int normalize = 1;
+int delay = 100;
+int normalization = 1;
 int correct = 1;
 int mobile = 1;
 
 real radius = 1;
 real dt = 1./16;
-real km = 1;
+real km = 10;
 real noise = 1;
 
 void timerFunction(int value)
 {
     real s, h = km * dt;
-    Matrix2 I, P, D, C;
-    I = Matrix2::one();
+    Matrix22 I, P, D, C;
+    I = Matrix22::identity();
     real xn = px.norm();
     Vector2 pxn = px.normalized();
     
@@ -42,16 +41,16 @@ void timerFunction(int value)
     P(1,1) = 1.0 - pxn[1] * pxn[1];
     
     Vector2 rhs, f, fx;
-    Vector2 random_force( RNG.gauss()*noise/km, RNG.gauss()*noise/km, 0);
+    Vector2 random(RNG.gauss()*noise/km, RNG.gauss()*noise/km, 0);
     
     
     printf("\nkm*dt %2f noise %f correct %i norm %i :\n",
-           km*dt, noise, correct, normalize);
+           km*dt, noise, correct, normalization);
     printf("px    : "); px.println();
     //P.println();
     
     //free point obtained without the constraints:
-    pf = ( px + h * ( pg + random_force ) ) / ( 1.0 + h );
+    pf = ( px + h * ( pg + random ) ) / ( 1.0 + h );
     printf("free  : "); pf.println();
     
     //projection of the free point on the constraints
@@ -59,12 +58,12 @@ void timerFunction(int value)
     printf("proj  : "); pp.println();
     
     //adding the projector in the dynamic matrix
-    rhs = px + h * ( P * ( pg + random_force ));
-    pc = Matrix2(I + h * P).inverted() * rhs;
+    rhs = px + h * ( P * ( pg + random ));
+    pc = (I + h * P).inverted() * rhs;
     printf("const : "); pc.println();
     
     f = ( pg - px );
-    s = ( pxn * f ) / xn;
+    s = dot(pxn, f) / xn;
     fx = 2.0 * s * pxn - f / xn;
     
     //projector with its corrections due to the derivative of the constraints:
@@ -74,7 +73,7 @@ void timerFunction(int value)
     C(1,1) = pxn[1] * fx[1] - s;
     
     //C.println();
-    rhs = px + h * ( P * ( pg + random_force - C * px ));
+    rhs = px + h * ( P * ( pg + random - C * px ));
     D = I + h * ( P * ( I - C ));
     //D.println();
     //D.inverse();
@@ -82,11 +81,11 @@ void timerFunction(int value)
     pn = D.inverted() * rhs;
     printf("new   : ");   pn.println();
     
-    if ( mobile )    px = correct ? pn : pc;
-    if ( normalize ) px = radius * px.normalized();
+    if ( mobile )        px = correct ? pn : pc;
+    if ( normalization ) px = px.normalized(radius);
     
     glutPostRedisplay();
-    glutTimerFunc( delay, timerFunction, 1);
+    glutTimerFunc(delay, timerFunction, 1);
 }
 
 
@@ -172,8 +171,8 @@ void processNormalKey(unsigned char c, int x, int y)
         case 'o':
             delay *= 2; break;
         case 'p':
-            if ( delay > 1 ) delay /= 2; break;
-            
+            if ( delay > 1 ) delay /= 2;
+            break;
         case 'K':
             km *= 2; break;
         case 'J':
@@ -189,7 +188,7 @@ void processNormalKey(unsigned char c, int x, int y)
             noise /= 2; break;
             
         case 'n':
-            normalize = !normalize;
+            normalization = !normalization;
             break;
             
         case 'c':
@@ -253,7 +252,7 @@ void processMouse(int button, int state, int x, int y)
         case MOUSE_SET:
             glGetDoublev(GL_MODELVIEW_MATRIX, mat_model);
             glGetDoublev(GL_PROJECTION_MATRIX, mat_proj);
-            gluUnProject(x, viewport[3]-y, 0, mat_model, mat_proj, viewport,
+            myUnproject(x, viewport[3]-y, 0, mat_model, mat_proj, viewport,
                          &Gx, &Gy, &Gz);
             pg.set(Gx, Gy, Gz);
             glutPostRedisplay();
@@ -277,7 +276,7 @@ void processMotion(int x, int y)
         case MOUSE_SET:
             glGetDoublev(GL_MODELVIEW_MATRIX, mat_model);
             glGetDoublev(GL_PROJECTION_MATRIX, mat_proj);
-            gluUnProject(x, viewport[3]-y, 0, mat_model, mat_proj, viewport,
+            myUnproject(x, viewport[3]-y, 0, mat_model, mat_proj, viewport,
                          &Gx, &Gy, &Gz);
             pg.set(Gx, Gy, Gz);
             glutPostRedisplay();
@@ -301,11 +300,12 @@ void initGLUT()
     glutAttachMenu(MENU_BUTTON);
     
     setModelView();
-    glutTimerFunc( delay, timerFunction, 1);
+    glutTimerFunc(100, timerFunction, 1);
 }
 
 int main(int argc, char* argv[])
 {
+    RNG.seed();
     glutInit(&argc, argv);
     
     glutInitDisplayMode( GLUT_SINGLE | GLUT_RGBA );

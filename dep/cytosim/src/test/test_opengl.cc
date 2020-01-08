@@ -1,24 +1,22 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-/*
 
+/*
  Francois Nedelec, Nov. 2003,  nedelec@embl.de
  To compile on mac-osx:
  g++ test_opengl.cc -framework GLUT -framework openGL
  On Linux:
- g++ test_opengl.cc -L/usr/X11R6/lib -lglut -lGL -lGLU -lXt -lX11 -lXi
-
+ g++ test_opengl.cc -L/usr/X11R6/lib -lglut -lGL -lGLU -lXt -lX11
+ 
  */
 
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <cstring>
 
 #ifdef __APPLE__
   #include <OpenGL/gl.h>
-  #include <OpenGL/glext.h>
   #include <GLUT/glut.h>
-  #include <AGL/agl.h>
 #else
   #include <GL/glew.h>
   #include <GL/glext.h>
@@ -26,12 +24,12 @@
 #endif
 
 
-#ifndef GL_DEPTH_CLAMP
-#define GL_DEPTH_CLAMP 0x864F
-#endif
-
 #ifndef GL_MULTISAMPLE
 #define GL_MULTISAMPLE 0x809D
+#endif
+
+#ifndef GL_DEPTH_CLAMP
+#define GL_DEPTH_CLAMP 0x864F
 #endif
 
 unsigned int delay          = 13;       //delay 13 == 75 Hz display
@@ -45,18 +43,19 @@ int          transparency   = 0;
 void printCaps()
 {
     GLint fog, depth, blend, clamp;
-    glGetIntegerv( GL_BLEND,          &blend );
-    glGetIntegerv( GL_FOG,            &fog );
-    glGetIntegerv( GL_DEPTH_TEST,     &depth );
-    glGetIntegerv( GL_DEPTH_CLAMP,    &clamp );
+    glGetIntegerv(GL_BLEND,       &blend);
+    glGetIntegerv(GL_FOG,         &fog);
+    glGetIntegerv(GL_DEPTH_TEST,  &depth);
+    glGetIntegerv(GL_DEPTH_CLAMP, &clamp);
+    
     printf("transparency %i - blend %i - fog %i - depth %i - clamp %i",
            transparency, int(blend), int(fog), int(depth), int(clamp));
-
-
+    
+    
     GLint point_smooth, line_smooth, multisample;
-    glGetIntegerv( GL_POINT_SMOOTH,   &point_smooth );
-    glGetIntegerv( GL_LINE_SMOOTH,    &line_smooth );
-    glGetIntegerv( GL_MULTISAMPLE,    &multisample );
+    glGetIntegerv(GL_POINT_SMOOTH,   &point_smooth);
+    glGetIntegerv(GL_LINE_SMOOTH,    &line_smooth);
+    glGetIntegerv(GL_MULTISAMPLE,    &multisample);
 
     printf(" - point_smooth %i - line_smooth %i - multisample %i\n",
            int(point_smooth), int(line_smooth), int(multisample));
@@ -78,18 +77,17 @@ void flip_cap( GLenum cap )
 }
 
 
-//------------------------------------------------------------------------------
 void processNormalKey(unsigned char c, int x, int y)
 {
     switch (c)
     {
-        case 'f':
+        case 'z':
             if ( delay > 1 ) delay /= 2;
             return;
         case 's':
             delay *= 2;
             return;
-
+            
         case ']':
             linewidth += 0.5;
             return;
@@ -97,50 +95,50 @@ void processNormalKey(unsigned char c, int x, int y)
             if ( linewidth > 1 )
                 linewidth -= 0.5;
             return;
-
+            
         case 'c':
-            flip_cap( GL_DEPTH_CLAMP );
+            flip_cap(GL_DEPTH_CLAMP);
             break;
         case 'd':
-            flip_cap( GL_DEPTH_TEST );
+            flip_cap(GL_DEPTH_TEST);
             break;
-        case 'g':
-            flip_cap( GL_FOG );
+        case 'f':
+            flip_cap(GL_FOG);
             break;
         case 'b':
-            flip_cap( GL_BLEND );
+            flip_cap(GL_BLEND);
             break;
         case 'p':
-            flip_cap( GL_POINT_SMOOTH );
+            flip_cap(GL_POINT_SMOOTH);
             break;
         case 'l':
-            flip_cap( GL_LINE_SMOOTH );
+            flip_cap(GL_LINE_SMOOTH);
             break;
         case 'm':
-            flip_cap( GL_MULTISAMPLE );
+            flip_cap(GL_MULTISAMPLE);
             break;
         case 't':
             transparency = !transparency;
             break;
-
+            
         case 27:
         case 'q':
             exit(EXIT_SUCCESS);
     }
-
+    
     printCaps();
 }
 
 
 //------------------------------------------------------------------------------
-void reshaped(int ww, int wh)
+void reshape(int ww, int wh)
 {
     glViewport(0, 0, ww, wh);
-
+    
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     double ratio = ww / double( wh );
-
+    
     if ( ratio > 1 )
         glOrtho(-range, range, -range/ratio, range/ratio, 1, 4);
     else
@@ -153,15 +151,15 @@ void initGL()
 {
     glClearColor(0.0, 0.0, 0.0, 0.0);
     glEnable(GL_DEPTH_TEST);
-
+    
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    
     //glEnable(GL_POINT_SMOOTH);
     //glEnable(GL_LINE_SMOOTH);
     glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-
+    
     glEnable(GL_FOG);
     glFogi(GL_FOG_MODE, GL_LINEAR);
     glFogf(GL_FOG_START, 0 );
@@ -183,12 +181,12 @@ void setView(GLfloat angle)
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-
+    
     setView(angle);
     glLineWidth(linewidth);
     glColor3f(1.0, 1.0, 1.0);
     glutWireCube(1.35);
-
+    
     glPointSize(32.0);
     glBegin(GL_POINTS);
     glColor3f(1.0, 1.0, 1.0);   glVertex3f(0.0, 0.0, 0.0);
@@ -196,7 +194,7 @@ void display()
     glColor3f(0.0, 1.0, 0.0);   glVertex3f(0.0, 1.0, 0.0);
     glColor3f(0.0, 0.0, 1.0);   glVertex3f(0.0, 0.0, 1.0);
     glEnd();
-
+    
     if ( transparency )
     {
         glColor4f(0.5, 0.5, 0.5, 0.35);
@@ -214,7 +212,7 @@ void display()
         glColor3f(0.5, 0.5, 0.5);
         glutSolidSphere(1, 32, 32);
     }
-
+    
     glutSwapBuffers();
     glutReportErrors();
 }
@@ -248,22 +246,24 @@ void printInfo()
     print_str("VENDOR  ", GL_VENDOR);
     print_str("RENDERER", GL_RENDERER);
     print_str("VERSION ", GL_VERSION);
-
-#ifdef __APPLE__
-
+    
+#if 0
+    
     GLint minor, major;
     aglGetVersion(&major, &minor);
     printf("AGL VERSION %i.%i\n", int(major), int(minor));
-
+    
 #endif
 
     print_cap("GL_MAX_CLIP_PLANES", GL_MAX_CLIP_PLANES);
-    print_cap("GL_STENCIL_BITS", GL_STENCIL_BITS);
+    //print_cap("GL_STENCIL_BITS", GL_STENCIL_BITS);
     print_cap("GL_AUX_BUFFERS", GL_AUX_BUFFERS);
-    print_cap("GL_STENCIL_TEST", GL_STENCIL_TEST);
-    print_cap("GL_TEXTURE_2D", GL_TEXTURE_2D);
-    print_cap("GL_ALPHA_TEST", GL_ALPHA_TEST);
-    print_cap("GL_DITHER", GL_DITHER);
+    print_cap("STEREO", GL_STEREO);
+    //print_cap("GL_STENCIL_TEST", GL_STENCIL_TEST);
+    //print_cap("GL_TEXTURE_2D", GL_TEXTURE_2D);
+    //print_cap("GL_ALPHA_TEST", GL_ALPHA_TEST);
+    //print_cap("GL_DITHER", GL_DITHER);
+    print_cap("GL_MAX_SAMPLES", GL_MAX_SAMPLES);
 
 #if ( 0 )
     printf("has keyboard %i\n",            glutDeviceGet(GLUT_HAS_KEYBOARD));
@@ -275,14 +275,14 @@ void printInfo()
     printf("Current mode possible %i\n",   glutGet(GLUT_DISPLAY_MODE_POSSIBLE));
     printf("Overlay possible %i\n",        glutLayerGet(GLUT_OVERLAY_POSSIBLE));
 #endif
-
+    
     //anti-aliasing of points and lines:
-    printf("GL_POINT_SMOOTH enabled: %i\n", glIsEnabled(GL_POINT_SMOOTH));
+    //printf("GL_POINT_SMOOTH enabled: %i\n", glIsEnabled(GL_POINT_SMOOTH));
     GLfloat s[2];
     glGetFloatv(GL_SMOOTH_POINT_SIZE_RANGE, s);
     printf("GL_SMOOTH_POINT_SIZE_RANGE: %.2f - %.2f\n", s[0],s[1]);
-
-    printf("GL_LINE_SMOOTH enabled: %i\n", glIsEnabled(GL_LINE_SMOOTH));
+    
+    //printf("GL_LINE_SMOOTH enabled: %i\n", glIsEnabled(GL_LINE_SMOOTH));
     glGetFloatv(GL_SMOOTH_LINE_WIDTH_RANGE, s);
     printf("GL_SMOOTH_LINE_WIDTH_RANGE: %.2f - %.2f\n", s[0], s[1]);
     glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, s);
@@ -311,7 +311,7 @@ int main(int argc, char* argv[])
     glutInitDisplayString("double rgba depth samples~8");
     glutInitWindowSize(512, 512);
     glutCreateWindow(argv[0]);
-
+    
     //testglut -e reports some OpenGL info:
     if ( argc > 1 )
     {
@@ -319,23 +319,23 @@ int main(int argc, char* argv[])
             sscanf(argv[1], "%f", &angle_inc);
         else
         {
-            if ( 0 == strncmp(argv[1], "ext", 3) )
+            if ( 0 == strncmp(argv[1], "cap", 3) )
                 printExtensions();
             else
                 printInfo();
             return EXIT_SUCCESS;
         }
     }
-
+    
     glutDisplayFunc(display);
-    glutReshapeFunc(reshaped);
+    glutReshapeFunc(reshape);
     glutTimerFunc(50, timerFunction, glutGetWindow());
     glutKeyboardFunc(processNormalKey);
-
+    
     initGL();
-
+    
     glutReportErrors();
     glutMainLoop();
-
+    
     return EXIT_SUCCESS;
 }

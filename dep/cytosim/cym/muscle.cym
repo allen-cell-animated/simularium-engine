@@ -1,25 +1,28 @@
 % Francois Nedelec, July 28 2011 
 
 
-set simul striated_muscle 
+set simul system
 {
     viscosity = 1
     time_step = 0.001
-    display = ( window_size=1200, 300; )
+    display = ( window_size=1024, 128; )
 }
 
 set space cell
 {
-    geometry = ( square 4 1 )
+    shape = rectangle
 }
 
-new space cell
+new cell
+{
+    length = 8, 2
+}
 
 
 set fiber actin
 {
     rigidity = 5
-    segmentation = 0.1
+    segmentation = 0.2
     binding_key = 1
     display = { color=blue; interval=1.0; line_width=4; }
 }
@@ -31,23 +34,35 @@ set solid core
 
 set aster actin_brush
 {
-    solid = core
-    fibers = actin
     stiffness = 1000, 500
 }
 
-new 3 aster actin_brush
+
+new 3 actin_brush
 {
-    position = ( -3 0 )
-    post_translation = ( 3 0 )
-    radius = 0.2
-	point0 = 0 0 0, 0.2
-    nb_fibers = 4
-    anchor0 = 0  0.05 0, -0.18  0.05 0
-    anchor1 = 0 -0.05 0, -0.18 -0.05 0
-    anchor2 = point1,  0.18  0.05 0
-    anchor3 = point3,  0.18 -0.05 0
-    orientation = horizontal
+    solid = core
+    fibers = 12, actin, ( length = 1 )
+    radius = 1
+    range = -3 0, 3 0
+    orientation = 1 0 0
+
+    point1 = 0 -0.2 0, 0.2
+    point2 = 0 +0.2 0, 0.2
+    point3 = 0  0.0 0, 0.2
+
+    fiber1 = 0 -0.25 0, -0.2 -0.25 0
+    fiber2 = 0 -0.15 0, -0.2 -0.15 0
+    fiber3 = 0 -0.05 0, -0.2 -0.05 0
+    fiber4 = 0  0.05 0, -0.2  0.05 0
+    fiber5 = 0  0.15 0, -0.2  0.15 0
+    fiber6 = 0  0.25 0, -0.2  0.25 0
+
+    fiber7 = 0 -0.25 0,  0.2 -0.25 0
+    fiber8 = 0 -0.15 0,  0.2 -0.15 0
+    fiber9 = 0 -0.05 0,  0.2 -0.05 0
+    fiber10 = 0  0.05 0,  0.2  0.05 0
+    fiber11 = 0  0.15 0,  0.2  0.15 0
+    fiber12 = 0  0.25 0,  0.2  0.25 0
 }
 
 
@@ -59,51 +74,27 @@ set fiber myosin_filament
     display = { color=orange; interval=1.0; line_width=1; }
 }
 
-set bundle thick_filament
-{
-    fibers = myosin_filament
-    nb_fibers = 2
-    overlap   = 0.1
-    stiffness = 200
-}
-
-new 3 bundle thick_filament
-{
-    position = ( 1.5 -0.1 )
-    post_translation = ( 0 0.1 )
-    orientation = horizontal
-}
-
-new 3 bundle thick_filament
-{
-    position = ( -1.5 -0.1 )
-    post_translation = ( 0 0.1 )
-    length = 1
-    orientation = horizontal
-}
-
-
 set hand myosin_base
 {
-    binding_rate = 100
+    binding_rate = 0
     binding_range = 0.05
     unbinding_rate = 0
-    unbinding_force = 6
+    unbinding_force = inf
     binding_key = 2
 
-    display = { color=orange; size=5 }
+    display = { color=red, red; size=5 }
 }
 
 set hand myosin_motor
 {
-    binding_rate = 0
-    binding_range = 0.06
+    binding_rate = 100
+    binding_range = 0.1
     unbinding_rate = 0.1
     unbinding_force = 3
     binding_key = 1
 
     activity = move
-    max_speed = -0.5
+    unloaded_speed = -0.5
     stall_force = 6
 
     display = { color=white; size=5 }
@@ -111,58 +102,46 @@ set hand myosin_motor
 
 set couple myosin
 {
-    hand1 = myosin_motor
-    hand2 = myosin_base
+    hand1 = myosin_base
+    hand2 = myosin_motor
     stiffness = 200
     diffusion = 0
-
-    activity = bridge
     length = 0.05
 }
 
-new 20 couple myosin
+
+set bundle bipolar_filament
 {
-    position = ( -0.5 0 )
-    post_translation = ( -0.1 0 )
-}
-new 20 couple myosin
-{
-    position = ( -0.5 0.1 )
-    post_translation = ( -0.1 0 )
-}
-new 20 couple myosin
-{
-    position = ( -0.5 -0.1 )
-    post_translation = ( -0.1 0 )
+    focus = plus_end
+    overlap   = 0.1
+    stiffness = 1000
 }
 
-new 20 couple myosin
+
+new 5 bipolar_filament
 {
-    position = ( 0.5 0 )
-    post_translation = ( 0.1 0 )
-}
-new 20 couple myosin
-{
-    position = ( 0.5 0.1 )
-    post_translation = ( 0.1 0 )
-}
-new 20 couple myosin
-{
-    position = ( 0.5 -0.1 )
-    post_translation = ( 0.1 0 )
+    fibers = 2, myosin_filament, ( length = 1; attach = 20 myosin, 1, plus_end, regular )
+    orientation = horizontal
+    range = -1.5 -0.2, -1.5 0.2
 }
 
-run simul *
+new 5 bipolar_filament
+{
+    fibers = 2, myosin_filament, ( length = 1; attach = 20 myosin, 1, plus_end, regular )
+    orientation = horizontal
+    range =  1.5 -0.2, 1.5 0.2
+}
+
+
+run system
 {
     nb_steps = 100
     solve = 0
 }
 
-change hand:binding_rate myosin_motor { 50 }
-
-run simul *
+run system
 {
-    nb_steps  = 5000
+    nb_steps  = 10000
     nb_frames = 100
 }
 

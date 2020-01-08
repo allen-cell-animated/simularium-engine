@@ -1,71 +1,86 @@
 % Fiber under compression and extension
 % F. Nedelec, August 2013
 
-set simul push_pull 
+set simul system
 {
     time_step = 0.001
     viscosity = 0.01
-    precondition = 1
+    precondition = 0
 }
 
 set space cell
 {
-    geometry = ( sphere 5 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 4.5
+}
 
 set fiber microtubule
 {
-    rigidity = 20
+    rigidity = 10
     segmentation = 0.5
-    confine = inside, 1000
-    display = ( point=6,1; line=10,2; )
+    confine = inside, 100
+    display = ( color=blue; point=3,1; line=10,2; tension=10; )
 }
 
-new 1 fiber microtubule
-{
-    length = 12
-    position = 0 0 0
-    orientation = horizontal
-}
-
-new 1 fiber microtubule
-{
-    length = 6
-    position = 0 0 0
-    orientation = vertical
-}
-
-set hand map
+set hand binder
 {
     binding = 10, 0.05
-    unbinding = 0, 0
- 
-    display = ( width=3; size=12; color=green )
+    unbinding = 0, inf
+    display = ( width=5; size=12; color=green; )
 }
 
+% with a length of 10 um, and a elasticity of 10, the buckling force is
+% PI^2 * 100 / 10^2 ~= 9.98 pN
+new 1 microtubule
+{
+    length = 10
+    position = 0 0 0
+    orientation = align 1 0 0 
+}
+
+new 1 microtubule
+{
+    length = 5
+    position = 0 0 0
+    orientation = 1 0 0
+}
+
+% with an extension of 1um and a stiffness of 10, the tension is ~10 pN
 set single link
 {
-    hand = map
+    hand = binder
     activity = fixed
-    stiffness = 1000
+    stiffness = 10
 }
 
-new single link
+new link
 {
-    position = -4 0 0 
-    attach = 0, 0
+    position = -3.5 0 0
+    attach = last, 0, minus_end
 }
-new single link
+
+new link
 {
-    position = +4 0 0 
-    attach = 0, 6
+    position = +3.5 0 0
+    attach = last, 0, plus_end
 }
 
 
-
-run 20000 simul *
+run 10000 system
 {
     nb_frames = 10
 }
+
+% report forces in the `link`:
+report single:force *
+
+% report internal tensions in the fiber accross a virtual plane:
+report fiber:tension * { plane = 1 0 0, 0; }
+
+% report forces in the points
+report fiber:forces *
+

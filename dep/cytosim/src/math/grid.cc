@@ -1,4 +1,4 @@
+// Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "grid.h"
 
-//all code is in the header file, due to templating

@@ -5,7 +5,7 @@
  F. Nedelec, 2010
 */
 
-set simul demo
+set simul system
 {
     time_step = 0.005
     viscosity = 0.02
@@ -13,10 +13,13 @@ set simul demo
 
 set space cell
 {
-    geometry = ( sphere 10 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 10
+}
 
 set hand strong_hand
 {
@@ -32,28 +35,28 @@ set single pivot
     activity = fixed
 }
 
-set fiber tube
+set fiber filament
 {
     rigidity = 20
     segmentation = 1
     confine = inside, 100
 }
 
-new 32 fiber tube
+new 32 filament
 {
-    orientation = 1 0.2 0 
+    orientation = 1 0.2 0, random
     position = ( -6 0 0 )
     length = 8
-    single = pivot, minus_dir
-    post_rotation = (1 0.2)
+    attach1 = pivot, 0, minus_end
+    attach2 = pivot, 1, minus_end
 }
 
-new 1 fiber tube
+new filament
 {
-    orientation = 1 0 0 
+    orientation = 1 0 0
     position = ( 1.5 0 0 )
     length = 3
-    single = pivot, minus_end
+    attach = pivot, 0, minus_end
 }
 
 set hand kinesin 
@@ -64,7 +67,7 @@ set hand kinesin
     unbinding_force = 3
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     stall_force = 6
     display = ( size=8; color=0x00FF00FF; )
 }
@@ -77,9 +80,9 @@ set couple complex
     stiffness = 100
 }
 
-new 1000 couple complex 
+new 1000 complex 
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 10

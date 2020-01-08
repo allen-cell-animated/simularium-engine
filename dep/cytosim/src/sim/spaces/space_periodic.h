@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SPACE_PERIODIC_H
 #define SPACE_PERIODIC_H
 
@@ -10,59 +9,55 @@
 /**
  Space `periodic` implements periodic boundary condition in all dimensions.
  The volume has no edge and wraps on itself.
+
+ Parameters:
+     - length = total extent in X, Y and Z
+     .
  
- @code
-    periodic sizeX sizeY sizeZ
- @endcode
- 
- With:
- - sizeX = half-width along X
- - sizeY = half-width along Y
- - sizeZ = half-width along Z
- .
- 
+ To display a periodic Space, use simul:display parameter 'tile'.
+ @ingroup SpaceGroup
  */
-class SpacePeriodic : public Space, public Modulo
+class SpacePeriodic : public Space
 {
+    
+    /// dimensions
+    real   length_[3];
+ 
 public:
     
     /// creator
-    SpacePeriodic(const SpaceProp*);
+    SpacePeriodic(SpaceProp const*);
 
-    /// check number and validity of specified lengths
-    void       resize();
+    /// change dimensions
+    void        resize(Glossary& opt);
+    
+    /// initialize Modulo Object
+    Modulo *    makeModulo() const;
 
-    /// true if the Space is periodic in dimension ii
-    bool       isPeriodic(int ii) const { return true; }
-
-    /// maximum extension along each axis
-    Vector     extension()        const;
+    /// return bounding box in `inf` and `sup`
+    void        boundaries(Vector& inf, Vector& sup) const;
     
     /// the volume inside
-    real       volume()           const;
+    real        volume() const;
     
     /// true if the point is inside the Space
-    bool       inside(const real point[]) const;
+    bool        inside(Vector const&) const;
     
-    /// project point on the closest edge of the Space
-    void       project(const real point[], real proj[]) const;
-        
+    /// set `proj` as the point on the edge that is closest to `point`
+    Vector      project(Vector const& pos) const;
     
-    /// the d-th direction of periodicity
-    Vector     period(int d)   const;
+    /// OpenGL display function; returns true if successful
+    bool        draw() const;
     
-    /// set vector to its periodic representation closest to origin
-    void       fold(real[])    const;
-    
-    /// remove periodic repeats in pos[], to bring it closest to ref[]
-    void       fold(real pos[], const real ref[]) const;
-    
-    /// bring ref[] closest to origin, returning translation done in trans[]
-    void       foldOffset(real pos[], real trans[])  const;
-    
-    
-    /// OpenGL display function, return true is display was done
-    bool       display() const;
+    /// write to file
+    void        write(Outputter&) const;
+
+    /// get dimensions from array `len`
+    void        setLengths(const real len[8]);
+
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+
     
 };
 

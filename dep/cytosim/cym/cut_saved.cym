@@ -1,7 +1,7 @@
 % a laser cut with file storage
 % F. Nedelec
 
-set simul contract 
+set simul system
 {
     time_step = 0.001
     viscosity = 0.05
@@ -10,10 +10,13 @@ set simul contract
 
 set space cell
 {
-    geometry = ( circle 5 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 5
+}
 
 set fiber actin
 {
@@ -30,7 +33,7 @@ set hand myosin
     unbinding_force = 3
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     stall_force = 5
     display = { size = 4; color=green }
 }
@@ -50,8 +53,7 @@ set couple motor
     hand1 = myosin
     hand2 = myosin
     stiffness = 250
-    diffusion = 10
-    fast_diffusion = 1
+    diffusion = fast
 }
 
 set couple crosslinker
@@ -59,28 +61,30 @@ set couple crosslinker
     hand1 = binder
     hand2 = binder
     stiffness = 250
-    diffusion = 10
-    fast_diffusion = 1
+    diffusion = fast
 }
 
-new 100 fiber actin
+new 100 actin
 {
     length = 5
 }
 
-new 2500 couple motor
-new 2500 couple crosslinker
+new 2500 motor
+new 2500 crosslinker
 
-run 500 simul *
+run 500 system
 
-write state cut.cmo { append=0; binary=0 }
+export objects cut.cmo { append=0; binary=0 }
 
-cut fiber * { plane = 1 0 0, 0 }
-cut fiber * { plane = 0 1 0, 0 }
+cut actin { plane = 1 0 0, 0 }
+cut actin { plane = 0 1 0, 0 }
 
-write state cut.cmo { append=1; binary=0 }
+run 1000 system
 
-run 1000 simul *
+export objects cut.cmo { append=1; binary=0 }
+import objects cut.cmo { append=0; frame=1; }
 
-write state cut.cmo { append=1; binary=0 }
+run 1000 system
+
+export objects cut.cmo { append=1; binary=0 }
 

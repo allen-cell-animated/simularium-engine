@@ -27,29 +27,23 @@ class BridgeProp;
  */
 class Bridge : public Couple
 {
+public:
+    
     /// property
     BridgeProp const* prop;
     
-public:
-    
-    /// create following the specifications in the CoupleProp
+    /// constructor
     Bridge(BridgeProp const*, Vector const & w = Vector(0,0,0));
 
     /// destructor
     virtual ~Bridge();
     
     //--------------------------------------------------------------------------
-    
-    /// control function for attachements
-    bool    allowAttachment(const FiberBinder & fb);
-    
-    /// simulation step for a free Couple, implementing BridgeProp::trans_activated
-    void    stepFF(const FiberGrid&);
  
     /// force between hands
-    Vector  force1() const;
+    Vector  force() const;
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

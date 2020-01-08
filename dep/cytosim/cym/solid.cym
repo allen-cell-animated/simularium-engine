@@ -1,81 +1,90 @@
-% Francois Nedelec, August, 2010 
+% This config illustrates different way to assemble Solids
+% and to attach Single on the points, or on the surface
+% Francois Nedelec, August 2010, Feb 2017, March 2017
 
-set simul solid 
+set simul system
 {
     time_step = 0.01
-    viscosity = 0.01
-    steric = 1, 500
+    viscosity = 0.001
+    steric = 1, 100
 }
 
 set space cell
 {
-    geometry = ( sphere 15 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 7
+}
 
 
-set hand protein
+set hand binder
 {
     binding = 10, 0.05
     unbinding = 0, 3
-    display = { size=8; color=green; }
+    display = ( size=10; color=green, green; )
 }
 
-set single gprotein
+set single grafted
 {
-    hand = protein
+    hand = binder
     stiffness = 100
 }
 
 set solid blob
 {
-    confine = all_inside, 100
     steric = 1
-    display = ( style=7; coloring=1; visible=transparent; )
+    confine = all_inside, 100
+    display = ( style=7; coloring=1; color=0xFFFFFF88; )
 }
 
-new 10 solid blob
+new 5 blob
 {
-    point0 = center, 0.5
-    point1 = 3, sphere 0.5
-    attach = 2 gprotein
+    point1 = center, 0.7
+    point2 = 4, sphere 0.7, 0, 1 grafted each
 }
 
-new 5 solid blob
+new 4 blob
 {
-    point0 = center, 1.5
-    point1 = 3, sphere 1.5
-    attach = gprotein
+    point1 = center, 1.0
+    point2 = 10, sphere 1.0, 0.0, grafted each
 }
 
-new 10 solid blob
+new 3 blob
 {
-    nb_points = 3
-    point0 = -1 0 0, 1
-    point1 =  0 0 0, 0.75, gprotein
-    point2 =  1 0 0, 1
+    point1 = 0 0 0, 1
+    point2 = 0.99  0.14 0, 0, 2 grafted
+    point3 = 0.99 -0.14 0, 0, 2 grafted
 }
 
-
-new 10 solid blob
+new 2 blob
 {
-    point0 = center, 2
-    point1 = ball 2, 0.1, gprotein
-    point2 = ball 2, 0.1, gprotein
-    point3 = ball 2, 0.1
+    point1 = -1 0 0, 1.0
+    point2 =  0 0 0, 0.5
+    point3 =  1 0 0, 1.0
+    point4 =  0 -0.5 0, 0, grafted
+    point5 =  0  0.5 0, 0, grafted
 }
 
-new 3 solid blob
+new 1 blob
 {
-    point0 = center, 1
-    point1 = 0.95  0.1 0, 0, 2 gprotein
-    point2 = 0.95 -0.1 0, 0, 2 gprotein
+    sphere1 = 0 0 0, 0.5, 50 grafted
+    sphere2 = 1 0 0, 0.5, 50 grafted
+    sphere3 = 2 0 0, 0.5, 50 grafted
 }
 
-
-run simul *
+new 1 blob
 {
-    nb_steps  = 10000
-    nb_frames = 100
+    separation = 1.6
+    deviation = 0.1
+    sphere1 = 0 0 0, 1.0, 16 grafted, 16 grafted, 16 grafted, 16 grafted
 }
+
+run system
+{
+    nb_steps  = 5000
+    nb_frames = 25
+}
+

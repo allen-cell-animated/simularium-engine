@@ -3,7 +3,6 @@
 #include "assert_macro.h"
 #include "bead.h"
 #include "bead_prop.h"
-#include "single_prop.h"
 #include "exceptions.h"
 #include "single.h"
 #include "hand_prop.h"
@@ -13,26 +12,24 @@
 #include "simul.h"
 #include "space.h"
 #include "modulo.h"
-extern Random RNG;
 
-extern bool functionKey[];
 
 //------------------------------------------------------------------------------
 
 Bead::Bead(BeadProp const* p, Vector pos, real rad)
-: prop(p), paRadius(rad), paDrag(0)
+: paRadius(rad), paDrag(0), prop(p)
 {
-    paPos = pos;
-    paForce.set(0,0,0);
+    setNbPoints(1);
+    setPoint(0, pos);
     setDragCoefficient();
 }
 
 
 Bead::~Bead()
 {
-    //Cytosim::MSG(32, "destroying %c%lu\n", TAG, number());
-    prop = 0;
+    prop = nullptr;
 }
+
 
 real Bead::volume() const
 {
@@ -49,60 +46,59 @@ real Bead::volume() const
 
 void Bead::setInteractions(Meca & meca) const
 {
-    switch ( prop->confine )
-    {
-        case CONFINE_NOT:
-            break;
+#if NEW_SOLID_CLAMP
+    if ( prop->clamp_stiff > 0 )
+        meca.addPointClamp(Mecapoint(this,0), prop->clamp_pos, prop->clamp_stiff);
+#endif
 
-        case CONFINE_INSIDE:
-        {            
-            // Confine only the center of gravity
-            Space const* spc = prop->confine_space_ptr;
-            if ( !spc->inside(paPos) )
-                spc->setInteraction(paPos, PointExact(this, 0), meca, prop->confine_stiff);
-        } break;
+    if ( prop->confine != CONFINE_OFF )
+    {
+        Space const* spc = prop->confine_space_ptr;
         
-        case CONFINE_ALL_INSIDE:
+        switch ( prop->confine )
         {
-            // Confine the entire bead
-            Space const* spc = prop->confine_space_ptr;
-            if ( !spc->allInside(paPos, paRadius) )
-                spc->setInteraction(paPos, PointExact(this, 0), paRadius, meca, prop->confine_stiff);
-        } break;
-        
-        case CONFINE_OUTSIDE:
-        {
-            // confine the center outside
-            Space const* spc = prop->confine_space_ptr;
-            if ( spc->inside(paPos) )
-                spc->setInteraction(paPos, PointExact(this, 0), meca, prop->confine_stiff);
-        } break;
-            
-        case CONFINE_SURFACE:
-        {
-            Space const* spc = prop->confine_space_ptr;
-            spc->setInteraction(paPos, PointExact(this, 0), meca, prop->confine_stiff);
-        } break;
-        
-        default:
-            throw InvalidParameter("Invalid bead::confine");
+            case CONFINE_INSIDE:
+            {
+                // Confine only the center
+                Vector cen(pPos);
+                if ( ! spc->inside(cen) )
+                    spc->setInteraction(cen, Mecapoint(this, 0), meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_OUTSIDE:
+            {
+                // confine the center outside
+                Vector cen(pPos);
+                if ( spc->inside(cen) )
+                    spc->setInteraction(cen, Mecapoint(this, 0), meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_ALL_INSIDE:
+            {
+                // Confine the entire bead
+                Vector cen(pPos);
+                if ( ! spc->allInside(cen, paRadius) )
+                    spc->setInteraction(cen, Mecapoint(this, 0), paRadius, meca, prop->confine_stiffness);
+            } break;
+                
+            case CONFINE_ON:
+                spc->setInteraction(position(), Mecapoint(this, 0), meca, prop->confine_stiffness);
+                break;
+                
+            default:
+                throw InvalidParameter("Invalid bead::confine");
+        }
     }
 }
 
-void Bead::foldPosition(const Modulo * s)
-{
-    //modulo around the first point, which is the center
-    s->fold( paPos );
-}
 
-
-real Bead::addBrownianForces(real* rhs, real sc) const
+real Bead::addBrownianForces(real const* rnd, real sc, real* rhs) const
 {
     // Brownian amplitude:
     real b = sqrt( 2 * sc * paDrag );
 
-    for ( unsigned int jj = 0; jj < DIM*nbPoints(); ++jj )
-        rhs[jj] += b * RNG.gauss();
+    for ( unsigned d = 0; d < DIM; ++d )
+        rhs[d] += b * rnd[d];
     
     //the amplitude is needed in Meca
     return b / paDrag;
@@ -110,29 +106,23 @@ real Bead::addBrownianForces(real* rhs, real sc) const
 
 
 /**
- Bead follow Stokes' law.
- 
- Translation:
- @code
-   muT = 6*M_PI*viscosity*soRadius[pp];
-   muT * dx/dt = force
- @endcode
- Rotation:
- @code
-   muR = 8*M_PI*viscosity*cub(soRadius[pp])
-   muR * d(angle)/dt = momentum-of-forces
- @endcode
- */
+ If `drag` is not specified, its value is calculated using Stokes' law:
+
+       drag = 6 * M_PI * viscosity * radius;
+
+*/
 void Bead::setDragCoefficient()
 {
-    paDrag = 6 * M_PI * prop->viscosity * paRadius;
+    if ( prop->drag > 0 )
+        paDrag = prop->drag;
+    else
+        paDrag = 6 * M_PI * prop->viscosity * paRadius;
+        
 #if ( 0 )
     static bool virgin = true;
     if ( paRadius > 0  &&  virgin )
     {
-        std::cerr << "bead     radius   = " << paRadius << std::endl;
-        std::cerr << "         drag     = " << paDrag << std::endl;
-        std::cerr << "         mobility = " << 1.0/paDrag << std::endl;
+        std::clog << "Bead `" << prop->name() << "' (radius " << paRadius << ") has drag " << paDrag << std::endl;
         virgin = false;
     }
 #endif
@@ -142,10 +132,10 @@ void Bead::setDragCoefficient()
 /**
  The projection is trivial
  */
-void Bead::setSpeedsFromForces(const real* X, real* Y, const real sc, bool) const
+void Bead::projectForces(const real* X, real* Y) const
 {
     assert_true( paDrag > 0 );
-    real s = sc / paDrag;
+    real s = 1.0 / paDrag;
     for ( int d = 0; d < DIM; ++d )
         Y[d] = s * X[d];
 }
@@ -153,28 +143,20 @@ void Bead::setSpeedsFromForces(const real* X, real* Y, const real sc, bool) cons
 
 //------------------------------------------------------------------------------
 
-void Bead::write(OutputWrapper& out) const
+void Bead::write(Outputter& out) const
 {
-    out.writeFloatVector(paPos, DIM, '\n');
+    out.writeFloatVector(position(), DIM, '\n');
     out.writeSoftSpace(2);
     out.writeFloat(paRadius);
 }
 
 
-void Bead::read(InputWrapper & in, Simul&)
+void Bead::read(Inputter& in, Simul&, ObjectTag)
 {
-    try {
-
-        in.readFloatVector(paPos, DIM);
-        real r = in.readFloat();
-        resize(r);
-        
-    }
-    catch( Exception & e ) {
-        
-        e << ", in Particle::read()";
-        throw;
-        
-    }
+    Vector pos;
+    in.readFloatVector(pos, DIM);
+    setPoint(0, pos);
+    real r = in.readFloat();
+    resize(r);
 }
 

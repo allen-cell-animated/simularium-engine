@@ -1,12 +1,8 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef TREADMILLING_FIBER_PROP
 #define TREADMILLING_FIBER_PROP
 
 #include "fiber_prop.h"
-
-
-class Glossary;
 
 
 /// additional Property for TreadmillingFiber
@@ -37,13 +33,14 @@ public:
     
     /// Speed of disassembly
     real    shrinking_speed[2];
- 
+    
     /// @}
-    //------------------ derived variables below ----------------
     
 private:
     
+    /// derived variable:
     real    growing_speed_dt[2];
+    /// derived variable:
     real    shrinking_speed_dt[2];
     
 public:
@@ -64,13 +61,13 @@ public:
     void read(Glossary&);
    
     /// check and derive parameter values
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new TreadmillingFiberProp(*this); }
 
     /// write
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
 
 };
 

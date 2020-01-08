@@ -7,621 +7,260 @@
 #include "modulo.h"
 
 #include "fake.h"
-#include "fiber_prop.h"
 #include "fiber_disp.h"
 #include "line_disp.h"
-#include "simul_prop.h"
-#include "hand_prop.h"
-#include "sphere_prop.h"
-#include "solid_prop.h"
 #include "point_disp.h"
 
 #include "opengl.h"
 #include "gle.h"
 #include "gle_color_list.h"
-#include "glapp.h"
+#include "glut.h"
 
 using namespace gle;
-extern Modulo * modulo;
+extern Modulo const* modulo;
 
 
-#define EXPLODE_DISPLAY
+#define ENABLE_EXPLODE_DISPLAY ( DIM < 3 )
 
 
 Display2::Display2(DisplayProp const* dp) : Display(dp)
 {
 }
 
-//------------------------------------------------------------------------------
-void Display2::display(Simul const& sim)
+
+void Display2::drawSimul(Simul const& sim)
 {
-#if ( DIM == 3 )
+    glDepthMask(GL_FALSE);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_CULL_FACE);
+    drawFields(sim.fields);
     
     glEnable(GL_LIGHTING);
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-    prop->inner_color.back();
+#if ( DIM > 2 )
     glEnable(GL_CULL_FACE);
-
-#endif
-
     glDepthMask(GL_TRUE);
-    displayBSpaces(sim.spaces);
+#endif
+    drawSpaces(sim.spaces);
     
     glDisable(GL_LIGHTING);
     glDisable(GL_CULL_FACE);
-    displayFields(sim.fields);
 
-#if ( DIM <= 2 )
-    
     if ( prop->couple_select & 1 )
-        displayFCouples(sim.couples);
-    
+        drawCouplesF(sim.couples);
+
     if ( prop->single_select & 1 )
-        displayFSingles(sim.singles);
+        drawSinglesF(sim.singles);
+    
+#if ( 0 )
+    // bypass the normal display to improve performance:
+    glEnableClientState(GL_VERTEX_ARRAY);
+    // display Fibers in a random (ever changing) order:
+    for ( Fiber * fib = sim.fibers.first(); fib ; fib=fib->next() )
+    {
+        if ( fib->disp->visible )
+        {
+            lineWidth(fib->prop->disp->line_width);
+            fib->disp->color.load();
+            glVertexPointer(DIM, GL_DOUBLE, 0, fib->data());
+            glDrawArrays(GL_LINE_STRIP, 0, fib->nbPoints());
+        }
+    }
+    glDisableClientState(GL_VERTEX_ARRAY);
 #else
-    
-    if ( prop->couple_select & 4 )
-        displayBCouples(sim.couples);
-    
+    drawFibers(sim.fibers);
 #endif
+
+    if ( prop->couple_select & 2 )
+        drawCouplesA(sim.couples);
+    
+#if ( DIM == 3 )
+    
+    glEnable(GL_LIGHTING);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+#endif
+    
+    drawBeads(sim.beads);
+    drawSolids(sim.solids);
+    drawSpheres(sim.spheres);
+    
+#if ( DIM == 3 )
+    
+    glDisable(GL_LIGHTING);
+    glDisable(GL_CULL_FACE);
+
+#endif
+
+    if ( prop->couple_select & 4 )
+        drawCouplesB(sim.couples);
     
     if ( prop->single_select & 2 )
-        displayASingles(sim.singles);
+        drawSinglesA(sim.singles);
     
+#if ( DIM == 3 )
+    
+    glEnable(GL_LIGHTING);
     glEnable(GL_CULL_FACE);
-
-    displayFibers(sim.fibers);
-
-#if ( DIM == 3 )
-    
-    glEnable(GL_LIGHTING);
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-    prop->inner_color.back();
+    glCullFace(GL_BACK);
 
 #endif
-    
-    displaySolids(sim.solids);
-    displayBeads(sim.beads);
-    displaySpheres(sim.spheres);
-    
-    glDisable(GL_LIGHTING);
-    
-    displayOrganizers(sim.organizers);
-    displayMisc(sim);
-    
-    glDepthMask(GL_FALSE);
-    
-    if ( prop->couple_select & 2 )
-        displayACouples(sim.couples);
-    
-#if ( DIM <= 2 )
-    
-    if ( prop->couple_select & 4 )
-        displayBCouples(sim.couples);
-    
-#else
-    
-    if ( prop->couple_select & 1 )
-        displayFCouples(sim.couples);
-    
-    if ( prop->single_select & 1 )
-        displayFSingles(sim.singles);
-    
-#endif
-    
-#if ( DIM == 3 )
-    
-    glEnable(GL_LIGHTING);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
-#endif
-    
-    displayTransparentObjects(sim);
-    displayFSpaces(sim.spaces);
-
-    glDisable(GL_LIGHTING);
-    glDepthMask(GL_TRUE);
+    drawOrganizers(sim.organizers);
+    drawMisc(sim);
 }
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Display2::displayBall(Vector const& pos, real radius)
+void Display2::drawBall(Vector const& pos, real radius)
 {
     glPushMatrix();
     gleTranslate(pos);
     gleScale(radius);
     if ( DIM == 3 )
     {
-        assert_true(glIsEnabled(GL_CULL_FACE));
+        glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
-        gleSphere4B();
+        gleSphere2B();
         glCullFace(GL_BACK);
         gleSphere4B();
     }
     else
-        gleCircleSB();
+        gleDiscB();
     glPopMatrix();
 }
 
 
-/// this version draws a sphere
-void Display2::displayPoint(Vector const& pos, PointDisp const* disp)
+/// this version usually draws a little sphere
+inline void Display2::drawPoint(Vector const& pos, PointDisp const* disp)
 {
-    if ( disp->visible  &&  disp->size*uFactor > 1 )
+    if ( disp->perceptible )
     {
+#if ( 0 )
+        // draw a OpenGL point
+        pointSize(disp->size);
+        glBegin(GL_POINTS);
+        gleVertex(pos);
+        glEnd();
+#else
+        /// draw a little sphere
         glPushMatrix();
         gleTranslate(pos);
         gleScale(disp->size*sFactor);
-        gleSphere2B();
+        gleSphere1B();
         glPopMatrix();
+#endif
     }
 }
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-/**
- Display the MINUS_END of a Fiber, according to \a style:
- - 1: draw a sphere
- - 2: draw a cone
- - 3: draw a flat cylinder
- - 4: draw an arrow-head
- .
- */
-void Display2::displayMinusEnd(const int style, Fiber const& fib, real width) const
-{
-    switch(style)
-    {
-        case 1:
-            gleObject(fib.posPoint(0), width, gleSphere2B);
-            break;
-        case 2:
-            gleCone(fib.posPoint(0), -fib.dirPoint(0), width);
-            break;
-        case 3:
-            gleCylinder(fib.posPoint(0), -fib.dirPoint(0), width);
-            break;
-        case 4:
-            gleArrowTail(fib.posPoint(0), fib.dirPoint(0), width);
-            break;
-        case 5:
-            gleArrowTail(fib.posPoint(0), -fib.dirPoint(0), width);
-            break;
-    }
-}
 
-/**
- Display the PLUS_END of a Fiber, according to \a style:
- - 1: draw a sphere
- - 2: draw a cone
- - 3: draw a flat cylinder
- - 4: draw an arrow-head
- .
- */
-void Display2::displayPlusEnd(const int style, Fiber const& fib, real width) const
+void Display2::drawFiber(Fiber const& fib)
 {
-    switch(style)
-    {
-        case 1:
-            gleObject(fib.posEnd(PLUS_END), width, gleSphere2B);
-            break;
-        case 2:
-            gleCone(fib.posEnd(PLUS_END), fib.dirEnd(PLUS_END), width);
-            break;
-        case 3:
-            gleCylinder(fib.posEnd(PLUS_END), fib.dirEnd(PLUS_END), width);
-            break;
-        case 4:
-            gleArrowTail(fib.posEnd(PLUS_END), fib.dirEnd(PLUS_END), width);
-            break;
-        case 5:
-            gleArrowTail(fib.posEnd(PLUS_END), -fib.dirEnd(PLUS_END), width);
-            break;
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void Display2::displayFiber(Fiber const& fib)
-{
-    const FiberDisp * disp = fib.prop->disp;
-    // diameter of lines and points in pixel:
-    GLfloat pWidth = ( disp->line_width > 0 ) ? disp->line_width * uFactor : 0.25;
-    GLfloat pSize  = ( disp->point_size > 0 ) ? disp->point_size * uFactor : 0.25;
-    const gle_color col = fib.disp->color;
-    
-    if ( disp->line_style == 1 )
-    {
-        // display plain lines:
-        glLineWidth(pWidth);
-        col.color();
-        glBegin(GL_LINE_STRIP);
-        for ( unsigned int ii = 0; ii < fib.nbPoints(); ++ii )
-            gleVertex( fib.posPoint(ii) );
-        glEnd();
-    }
-    else if ( disp->line_style == 2 )
-    {
-        // display segments with color indicating internal tension
-        glLineWidth(pWidth);
-        glBegin(GL_LINES);
-        for ( unsigned int ii = 0; ii < fib.lastPoint(); ++ii )
-        {
-            // the Lagrange multipliers are negative under compression
-            gleJetColor(1-fib.tension(ii)*disp->rainbow, col.alphaf());
-            gleVertex( fib.posPoint(ii) );
-            gleVertex( fib.posPoint(ii+1) );
-        }
-        glEnd();
-    }
-    else if ( disp->line_style == 3 )
-    {
-#if ( DIM == 1 )
-        col.color();
+#if ENABLE_EXPLODE_DISPLAY
+    //translate whole display to display the Fiber
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    gleTranslate(0, fib.disp->explode_shift, 0);
 #endif
-        glLineWidth(pWidth);
-        glBegin(GL_LINES);
-        for ( unsigned int ii = 0; ii < fib.lastPoint(); ++ii )
-        {
-            Vector d = fib.diffPoints(ii);
-#if ( DIM > 1 )
-            // use the angle with respect to the XY-plane:
-            gleHueColor(atan2(d.YY, d.XX) / ( 2 * M_PI ), 1.0);
+    
+    Display::drawFiber(fib);
+
+#if ENABLE_EXPLODE_DISPLAY
+    glPopMatrix();
 #endif
-            gleVertex( fib.posPoint(ii) );
-            gleVertex( fib.posPoint(ii+1) );
-        }
-        glEnd();
-    }
-    else if ( disp->line_style == 4 )
-    {
-        // display colored segments indicating polarity
-        glLineWidth(pWidth);
-        glBegin(GL_LINE_STRIP);
-        glColor4f(0,0,0,0);
-        gleVertex( fib.posPoint(0) );
-        unsigned int ii;
-        for ( ii = 1; ii < fib.nbSegments(); ++ii )
-        {
-            col.color();
-            gleVertex( fib.posPoint(ii) );
-            glColor4f(0,0,0,0);
-            gleVertex( fib.posPoint(ii) );
-        }
-        col.color();
-        gleVertex( fib.posPoint(ii) );
-        glEnd();
-    }
-    
-    
-    // display random speckles:
-    if ( disp->speckle_style == 1 )
-    {
-        /*
-         A simple random number generators is used to distribute
-         points always in the same way for each Fiber, 
-         because it is seeded by fib.signature();
-         */
-        const real grad = 0x3p-32 * disp->interval;
-        
-        glPointSize(pSize);
-        glBegin(GL_POINTS);
-        col.color();
-        
-        if ( fib.abscissaM() < 0 )
-        {
-            uint32_t z = lcrng1(lcrng1(fib.signature()));
-            real ab = -0.5 * grad * z;
-            while ( ab > fib.abscissaP() )
-            {
-                z = lcrng1(z);
-                ab -= grad * z;
-            }
-            while ( ab >= fib.abscissaM() )
-            {
-                gleVertex( fib.pos(ab) );
-                z = lcrng1(z);
-                ab -= grad * z;
-            }
-        }
-        if ( fib.abscissaP() > 0 )
-        {
-            uint32_t z = lcrng2(lcrng2(fib.signature()));
-            real ab = 0.5 * grad * z;
-            while ( ab < fib.abscissaM() )
-            {
-                z = lcrng2(z);
-                ab += grad * z;
-            }
-            while ( ab <= fib.abscissaP() )
-            {
-                gleVertex( fib.pos(ab) );
-                z = lcrng2(z);
-                ab += grad * z;
-            }
-        }
-        glEnd();
-    }
-    else if ( disp->speckle_style == 2 )
-    {
-        // display regular speckles
-        glPointSize(pSize);
-        glBegin(GL_POINTS);
-        col.color();
-        //we distribute points regularly along the tube
-        const real grad = disp->interval;
-        real ab = grad * ceil( fib.abscissaM() / grad );
-        while ( ab <= fib.abscissaP() ) {
-            gleVertex( fib.pos(ab) );
-            ab += grad;
-        }
-        glEnd();
-    }
-    
-    
-    if ( disp->point_style == 1 )
-    {
-        // display model-points:
-        glPointSize(pSize);
-        col.color();
-        glBegin(GL_POINTS);
-        for ( unsigned int ii = 0; ii < fib.nbPoints(); ++ii )
-            gleVertex( fib.posPoint(ii) );
-        glEnd();
-    }
-    else if ( disp->point_style == 2 )
-    {
-        // display arrow-heads along the fiber:
-        col.color();
-        real ab = ceil( fib.abscissaM() );
-        const real grad = disp->interval;
-        while ( ab <= fib.abscissaP() )
-        {
-            gleCone( fib.pos(ab), fib.dir(ab), 0.75*pSize*mPixelSize );
-            ab += grad;
-        }
-    }
-    else if ( disp->point_style == 3 )
-    {
-        // display integral abscissa along the fiber
-        char tmp[16];
-        col.color();
-        snprintf(tmp, sizeof(tmp), "%.2f", fib.abscissaM());
-        gleDrawText(fib.posEnd(MINUS_END), tmp, GLUT_BITMAP_HELVETICA_10);
-        
-        int s = ceil( fib.abscissaM() + disp->interval );
-        int e = floor( fib.abscissaP() - disp->interval );
-        for ( int a = s; a <= e; ++a )
-        {
-            snprintf(tmp, sizeof(tmp), "%i", a);
-            gleDrawText(fib.pos(a), tmp, GLUT_BITMAP_HELVETICA_10);
-        }
-        
-        snprintf(tmp, sizeof(tmp), "%.2f", fib.abscissaP());
-        gleDrawText(fib.posEnd(PLUS_END), tmp, GLUT_BITMAP_HELVETICA_10);
-    }
-    
-    
-    // display forces acting on the points:
-    if ( disp->forces )
-    {
-        glLineWidth(pSize);
-        disp->forces_color.color();
-        glBegin(GL_LINES);
-        for ( unsigned int ii = 0; ii < fib.nbPoints(); ++ii )
-        {
-            gleVertex( fib.posPoint(ii) );
-            gleVertex( fib.posPoint(ii) + disp->forces * fib.netForce(ii) );
-        }
-        glEnd();
-    }
-}
-
-
-void Display2::displayFiberMinusEnd(Fiber const& fib)
-{
-    const int IM = 1;
-    const FiberDisp * disp = fib.prop->disp;
-    const real hlen = disp->end_section[IM];
-
-    if ( hlen > 0 )
-    {
-        glLineWidth(disp->end_size[IM]*uFactor);
-        gle_color ecol = fib.disp->end_color[IM];
-        
-        glBegin(GL_LINE_STRIP);
-        unsigned int ii = 0;
-        real len = 0;
-        while ( len < hlen  &&  ii < fib.nbPoints() )
-        {
-            ecol.colorA(1-0.7*len/hlen);
-            gleVertex(fib.posPoint(ii));
-            len += fib.segmentation();
-            ++ii;
-        }
-        if ( ii < fib.nbPoints() )
-        {
-            ecol.colorA(0.3);
-            gleVertex(fib.pos(hlen, MINUS_END));
-        }
-        glEnd();
-    }
-
-    if ( disp->end_style[IM]  &&  disp->end_size[IM] > 0 )
-    {
-        fib.disp->end_color[IM].color();
-        displayMinusEnd(disp->end_style[IM], fib, disp->end_size[IM]*sFactor);
-    }
-}
-
-
-void Display2::displayFiberPlusEnd(Fiber const& fib)
-{
-    const int IP = 0;
-    const FiberDisp * disp = fib.prop->disp;
-    const real hlen = disp->end_section[IP];
-    
-    if ( hlen > 0 )
-    {
-        glLineWidth(disp->end_size[IP]*uFactor);
-        gle_color ecol = fib.disp->end_color[IP];
-        
-        glBegin(GL_LINE_STRIP);
-        int ii = fib.lastPoint();
-        real len = 0;
-        while ( len < hlen  &&  ii >= 0 )
-        {
-            ecol.colorA(1-0.7*len/hlen);
-            gleVertex(fib.posPoint(ii));
-            len += fib.segmentation();
-            --ii;
-        }
-        if ( ii >= 0 )
-        {
-            ecol.colorA(0.3);
-            gleVertex(fib.pos(hlen, PLUS_END));
-        }
-        glEnd();
-    }
-
-    
-    if ( disp->end_style[IP]  &&  disp->end_size[IP] > 0 )
-    {
-        fib.disp->end_color[IP].color();
-        displayPlusEnd(disp->end_style[IP], fib, disp->end_size[IP]*sFactor);
-    }
-}
-
-
-//------------------------------------------------------------------------------
-void Display2::displayFibers(FiberSet const& set)
-{
-    for ( Fiber* obj = set.first(); obj; obj = obj->next() )
-    {
-        assert_true( obj->disp );
-        if ( obj->disp->visible > 0 )
-        {
-#ifdef EXPLODE_DISPLAY
-            //translate whole display to display the Fiber
-            glMatrixMode(GL_MODELVIEW);
-            glPushMatrix();
-            gleTranslate(obj->disp->explode_shift);
-            
-            // we can also display the box for each shifted Fiber
-            Space * space = 0; //simul.space();
-            if ( space )
-            {
-                const PointDisp * disp = space->prop->disp;
-                if ( disp->width > 0  )
-                    glLineWidth(disp->width*uFactor);
-                disp->color.color();
-                space->display();
-            }
-            
-            displayFiber(*obj);
-            displayFiberMinusEnd(*obj);
-            displayFiberPlusEnd(*obj);
-            glPopMatrix();
-            continue;
-#endif
-            displayFiber(*obj);
-            displayFiberMinusEnd(*obj);
-            displayFiberPlusEnd(*obj);
-        }
-    }
 }
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Display2::displayBead(Bead const& obj)
+void Display2::drawBead(Bead const& obj)
 {
     const PointDisp * disp = obj.prop->disp;
-    gle_color col = bodyColor(disp, obj.number());
 
     // display center:
-    if ( disp->style & 1 )
+    if ( disp->style & 2 )
     {
-        col.color();
-        displayPoint(obj.position(), disp);
+        bodyColor(disp, obj.signature());
+        drawPoint(obj.position(), disp);
     }
     
+#if ( DIM == 2 )
     // display outline:
-    if ( DIM == 2  &&  disp->style & 4  &&  disp->width > 0 )
+    if ( disp->style & 4 )
     {
-        col.color();
-        glLineWidth(disp->width*uFactor);
-        gleObject(obj.position(), obj.radius(), gleCircleLB);
+        bodyColor2(disp, obj.signature());
+        lineWidth(disp->width);
+        gleObject(obj.position(), obj.radius(), gleCircleB);
     }
+#endif
 }
 
+
 /**
- Display a semi-transparent disc / sphere if ( disp->style & 2 ) 
+ Display a semi-transparent disc / sphere
  */
-void Display2::displayTBead(Bead const& obj)
+void Display2::drawBeadT(Bead const& obj)
 {
     const PointDisp * disp = obj.prop->disp;
     
-    if ( disp->style & 2 )
+    if ( disp->style & 1 )
     {
-        bodyColor(disp, obj.number()).color();
-        displayBall(obj.position(), obj.radius());
+        bodyColorT(disp, obj.signature());
+        drawBall(obj.position(), obj.radius());
     }
 }
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Display2::displaySolid(Solid const& obj)
+void Display2::drawSolid(Solid const& obj)
 {
     const PointDisp * disp = obj.prop->disp;
-    gle_color col = bodyColor(disp, obj.number());
     
-    //display points of the Solids
-    if ( disp->size > 0  &&  disp->style & 1 )
+    //display points:
+    if ( disp->style & 2  &&  disp->size > 0 )
     {
-        col.color();
-        for ( unsigned int ii = 0; ii < obj.nbPoints(); ++ii )
-            displayPoint(obj.posPoint(ii), disp);
+        bodyColor(disp, obj.signature());
+        for ( unsigned ii = 0; ii < obj.nbPoints(); ++ii )
+            drawPoint(obj.posP(ii), disp);
     }
     
-#if (DIM==3)
-    //special display for ParM simulations (DYCHE)
-    if ( obj.mark()  &&  disp->style & 2  &&  obj.nbPoints() >= 3 )
+    //display outline of spheres
+    if ( disp->style & 4 )
     {
-        col.color();
-        glLineWidth(uFactor);
-        gleObject(obj.posPoint(0), obj.diffPoints(1, 0), obj.radius(0), gleCircleLB);
-    }
-#endif
-    
-    //display ring of spheres
-    if ( DIM == 2  &&  disp->width > 0  &&  disp->style & 4 )
-    {
-        col.color();
-        glLineWidth(disp->width*uFactor);
-        for ( unsigned int ii = 0; ii < obj.nbPoints(); ++ii )
+        bodyColor2(disp, obj.signature());
+        lineWidth(disp->width);
+#if ( DIM == 2 )
+        for ( unsigned ii = 0; ii < obj.nbPoints(); ++ii )
         {
             if ( obj.radius(ii) > 0 )
-                gleObject(obj.posPoint(ii), obj.radius(ii), gleCircleLB);
+                gleObject(obj.posP(ii), obj.radius(ii), gleCircleB);
         }
+#elif ( DIM == 3 )
+        //special display for ParM simulations (DYCHE)
+        if ( obj.mark()  &&  obj.nbPoints() >= 3 )
+            gleObject(obj.posP(0), obj.diffPoints(1, 0), obj.radius(0), gleCircleB);
+#endif
     }
     
-    //display a signature for each solid
+    //print the number for each Solid
     if ( disp->style & 8 )
     {
         char tmp[8];
-        col.color();
-        snprintf(tmp, sizeof(tmp), "%lu", obj.number());
-        gleDrawText(obj.posPoint(0), tmp, GLUT_BITMAP_HELVETICA_10);
+        bodyColor2(disp, obj.signature());
+        snprintf(tmp, sizeof(tmp), "%u", obj.identity());
+        gleDrawText(obj.posP(0), tmp, GLUT_BITMAP_HELVETICA_10);
     }
-
     
-    //print outline for each solid
+    //draw polygon around vertices of Solid
     if ( disp->style & 16 )
     {
-        col.color();
+        lineWidth(disp->width);
+        bodyColor2(disp, obj.signature());
         glBegin(GL_LINE_LOOP);
         for ( unsigned ii = 0; ii < obj.nbPoints(); ++ii )
             gleVertex(obj.posPoint(ii));
@@ -629,59 +268,63 @@ void Display2::displaySolid(Solid const& obj)
     }
 }
 
-
 /**
- Display a semi-transparent disc / sphere if ( disp->style & 2 ) 
+ Display a semi-transparent disc / sphere
  */
-void Display2::displayTSolid(Solid const& obj, unsigned int ii)
+void Display2::drawSolidT(Solid const& obj, unsigned int ii)
 {
     const PointDisp * disp = obj.prop->disp;
 
-    if ( disp->style & 2 )
+    if ( disp->style & 1  &&  obj.radius(ii) > 0 )
     {
-        bodyColor(disp, obj.number()).color();
-
-        if ( obj.radius(ii) > 0 )
-            displayBall(obj.posPoint(ii), obj.radius(ii));
+        bodyColorT(disp, obj.signature());
+        drawBall(obj.posP(ii), obj.radius(ii));
     }
 }
-
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Display2::displaySphere(Sphere const& obj)
-{    
+void Display2::drawSphere(Sphere const& obj)
+{
     const PointDisp * disp = obj.prop->disp;
     
-    //display the points of the Sphere
-    if ( disp->style & 1 )
+    //display center and surface points
+    if ( disp->style & 2  &&  disp->perceptible )
     {
-        bodyColor(disp, obj.number()).color();
-        for ( unsigned int ii = 0; ii < obj.nbPoints(); ii++ )
-            displayPoint(obj.posPoint(ii), disp);
+        bodyColor(disp, obj.signature());
+        drawPoint(obj.posP(0), disp);
+        for ( unsigned ii = obj.nbRefPoints; ii < obj.nbPoints(); ii++ )
+            drawPoint(obj.posP(ii), disp);
+    }
+    
+    //display reference points
+    if ( disp->style & 8  &&  disp->perceptible )
+    {
+        bodyColor(disp, obj.signature());
+        for ( unsigned ii = 1; ii < obj.nbRefPoints; ii++ )
+            drawPoint(obj.posP(ii), disp);
     }
 }
 
 
-void Display2::displayTSphere(Sphere const& obj)
-{    
+void Display2::drawSphereT(Sphere const& obj)
+{
     const PointDisp * disp = obj.prop->disp;
-    
-    if ( disp->style & 6 )
-    {
-        bodyColor(disp, obj.number()).color();
-        glLineWidth(disp->width*uFactor);
-        
-#if (DIM <= 2)
-        
-        if ( disp->style & 2 )
-            gleObject(obj.posPoint(0), obj.radius(), gleCircleSB);
 
-        if ( disp->style & 4 )
-            gleObject(obj.posPoint(0), obj.radius(), gleCircleLB);
+    if ( disp->style & 5 )
+    {
+        bodyColorT(disp, obj.signature());
+        lineWidth(disp->width);
         
-#elif (DIM == 3)
+#if ( DIM < 3 )
+        
+        if ( disp->style & 1 )
+            gleObject(obj.posP(0), obj.radius(), gleDiscB);
+        else
+            gleObject(obj.posP(0), obj.radius(), gleCircleB);
+        
+#else
         
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
@@ -689,14 +332,17 @@ void Display2::displayTSphere(Sphere const& obj)
          reference points, includes scaling by the radius of the sphere.
          We then use a primitive for a sphere of radius 1.
          */
-        const Vector C = obj.posPoint(0);
-        gleTransRotate(obj.posPoint(1)-C, obj.posPoint(2)-C, obj.posPoint(3)-C, C);
+        const Vector C = obj.posP(0);
+        gleTransRotate(obj.posP(1)-C, obj.posP(2)-C, obj.posP(3)-C, C);
         
         //draw transparent envelope
-        if ( disp->style & 4 )
-            gleDualPass(gleDecoratedSphere);
-        else
+        if ( disp->style & 1 )
             gleDualPass(gleSphere4B);
+        if ( disp->style & 4 )
+        {
+            disp->color2.load_front();
+            gleThreeBands(64);
+        }
         glPopMatrix();
         
 #endif
@@ -704,122 +350,155 @@ void Display2::displayTSphere(Sphere const& obj)
 }
 
 //------------------------------------------------------------------------------
-void Display2::displayOrganizer(Organizer const& obj)
+void Display2::drawOrganizer(Organizer const& obj) const
 {
-    const PointDisp * disp = obj.pointDisp();
+    PointDisp const* disp = obj.disp();
     
-    if ( disp )
+    if ( !disp )
+        return;
+
+    if ( disp->style & 2 )
     {
-        disp->color.color();
-        
-        glLineWidth(disp->size*uFactor);
+        Vector P, Q;
+        glDisable(GL_LIGHTING);
+
+        bodyColor2(disp, obj.signature());
+        pointSize(0.75f*disp->size);
+        glBegin(GL_POINTS);
+        for ( size_t i = 0; obj.getLink(i, P, Q); ++i )
+            gleVertex(P);
+        glEnd();
+
+        bodyColor2(disp, obj.signature());
+        lineWidth(disp->width);
         glBegin(GL_LINES);
-        for ( unsigned int ix = 0 ; ix < obj.nbLinks(); ++ix )
+        for ( size_t i = 0; obj.getLink(i, P, Q); ++i )
         {
-            gleVertex( obj.posLink1(ix) );
-            gleVertex( obj.posLink2(ix) );
+            if ( modulo ) modulo->fold(Q, P);
+            gleVertex(P);
+            gleVertex(Q);
         }
         glEnd();
     }
-    
-#if (DIM==3)
+
     /**
      This display the Solid connecting two Aster as a spindle.
      Used for Cleo Kozlowski simulation of C. elegans
      */
-    if ( obj.tag() == Fake::TAG )
+    if ( disp->style & 1 && obj.tag() == Fake::TAG )
     {
         Solid const* so = static_cast<const Fake&>(obj).solid();
         if ( so && so->nbPoints() >= 4 )
         {
+            bodyColor(disp, obj.signature());
+#if ( DIM == 3 )
             glEnable(GL_LIGHTING);
-            glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-            prop->inner_color.back();
-            so->prop->disp->color.color();
             glPushMatrix();
-            Vector3 a = 0.5*(so->posPoint(0) + so->posPoint(2));
-            Vector3 b = 0.5*(so->posPoint(1) + so->posPoint(3));
-            real diam = 1;
-            Vector3 dir = b-a;
-            Vector3 P1  = dir.orthogonal(diam);
-            Vector3 P2  = vecProd(dir, P1).normalized(diam);
-            gleTransRotate( P1, P2, dir, a );
-            glColor4f(1,1,1,1);
+            Vector3 a = 0.5*(so->posP(0) + so->posP(2));
+            Vector3 b = 0.5*(so->posP(1) + so->posP(3));
+            gleTransAlignZ(a, b, 1);
             gleDualPass(gleBarrel1);
             glPopMatrix();
             glDisable(GL_LIGHTING);
+#else
+            glBegin(GL_LINES);
+            for ( unsigned ii = 0; ii < so->nbPoints(); ++ii )
+                gleVertex(so->posPoint(ii));
+            glEnd();
+#endif
         }
     }
-#endif    
 }
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
 
-inline void drawVertex(const Vector & pos, const PointDisp* disp)
+inline void drawVertex(Vector const& pos, const PointDisp* disp)
 {
-    if ( disp->size > 0 && disp->visible )
+    if ( disp->perceptible )
     {
-        disp->color2.color();
+        disp->color2.load();
         gleVertex(pos);
     }
 }
 
-#ifdef EXPLODE_DISPLAY
+#if ENABLE_EXPLODE_DISPLAY
+
+inline void shiftedVertex(Vector const& pos, const Fiber * fib)
+{
+    real shift = fib->disp->explode_shift;
+#if ( DIM == 3 )
+    gle::gleVertex(pos.XX, pos.YY+shift, pos.ZZ);
+#elif ( DIM == 2 )
+    gle::gleVertex(pos.XX, pos.YY+shift);
+#else
+    gle::gleVertex(pos.XX, shift);
+#endif
+}
 
 inline void drawVertex(Vector const& pos, const Fiber * fib, const PointDisp* disp)
 {
-    if ( disp->size > 0 && disp->visible && fib->disp->visible )
+    if ( disp->perceptible && fib->disp->visible )
     {
-        disp->color.color();
-        gleVertex(pos+fib->disp->explode_shift);
+        disp->color.load();
+        shiftedVertex(pos, fib);
     }
 }
 
 
-inline void drawVertex2(Vector const& pos, const Fiber * fib, const PointDisp* disp)
+inline void drawVertex2(Vector const& pos, Fiber const* fib, PointDisp const* disp)
 {
-    if ( disp->size > 0 && disp->visible && fib->disp->visible )
+    if ( disp->perceptible && fib->disp->visible )
     {
-        disp->color.color();
-        gleVertex(pos+fib->disp->explode_shift);
+        disp->color2.load();
+        shiftedVertex(pos, fib);
     }
 }
 
-
-inline void drawLink(const Vector & a, const Fiber * fib, const PointDisp* disp, const Vector & b)
+inline void drawLink(Vector const& a, Fiber const* fib, PointDisp const* disp, Vector const& b)
 {
     if ( disp->visible && fib->disp->visible )
     {
-        disp->color.color();
-        gleVertex(a+fib->disp->explode_shift);
-        disp->color.colorT(1);
-        gleVertex(b+fib->disp->explode_shift);
+        disp->color.load();
+        shiftedVertex(a, fib);
+        disp->color2.load();
+        shiftedVertex(b, fib);
     }
 }
 
 
 /**
- Draw two segments in case explode_shift is enabled
  */
-inline void drawLink(const Vector & a, const Fiber * fiba, const PointDisp* dispa,
-                     const Vector & b, const Fiber * fibb, const PointDisp* dispb)
+inline void drawLink(Vector const& a, const Fiber * fibA, const PointDisp* dispA,
+                     Vector const& b, const Fiber * fibB, const PointDisp* dispB)
 {
-    if ( dispa->visible && fiba->disp->visible )
+#if ( 1 )
+    //draw two segments if `explode` is enabled
+    if ( dispA->visible && fibA->disp->visible )
     {
-        dispa->color.color();
-        gleVertex(a+fiba->disp->explode_shift);
-        dispb->color.color();
-        gleVertex(b+fiba->disp->explode_shift);
+        dispA->color.load();
+        shiftedVertex(a, fibA);
+        dispB->color.load();
+        shiftedVertex(b, fibA);
     }
-    if ( dispb->visible && fibb->disp->visible && fibb->prop->disp->explode )
+    if ( dispB->visible && fibB->disp->visible && fibB->prop->disp->explode )
     {
-        dispa->color.color();
-        gleVertex(a+fibb->disp->explode_shift);
-        dispb->color.color();
-        gleVertex(b+fibb->disp->explode_shift);
+        dispA->color.load();
+        shiftedVertex(a, fibB);
+        dispB->color.load();
+        shiftedVertex(b, fibB);
     }
+#else
+    if ( fibA->disp->visible || fibB->disp->visible )
+    {
+        //draw one segment
+        dispA->color.load();
+        shiftedVertex(a, fibA);
+        dispB->color.load();
+        shiftedVertex(b, fibB);
+    }
+#endif
 }
 
 #else
@@ -828,33 +507,45 @@ inline void drawLink(const Vector & a, const Fiber * fiba, const PointDisp* disp
 
 inline void drawVertex(Vector const& pos, const Fiber * fib, const PointDisp* disp)
 {
-    if ( disp->size > 0 && disp->visible && fib->disp->visible )
+    assert_true(fib->disp);
+    if ( disp->perceptible && fib->disp->visible )
     {
-        disp->color.color();
+        disp->color.load();
         gleVertex(pos);
     }
 }
 
-inline void drawLink(const Vector & a, const Fiber * fib, const PointDisp* disp, const Vector & b)
+
+inline void drawVertex2(Vector const& pos, const Fiber * fib, const PointDisp* disp)
 {
-    if ( disp->visible && fib->disp->visible )
+    if ( disp->perceptible && fib->disp->visible )
     {
-        disp->color.color();
+        disp->color2.load();
+        gleVertex(pos);
+    }
+}
+
+
+inline void drawLink(Vector const& a, const Fiber * fib, const PointDisp* disp, Vector const& b)
+{
+    if ( disp->perceptible && fib->disp->visible )
+    {
+        disp->color.load();
         gleVertex(a);
-        disp->color.colorT(1);
+        disp->color2.load();
         gleVertex(b);
     }
 }
 
-inline void drawLink(const Vector & a, const Fiber * fiba, const PointDisp* dispa,
-                     const Vector & b, const Fiber * fibb, const PointDisp* dispb)
+inline void drawLink(Vector const& a, const Fiber * fibA, const PointDisp* dispA,
+                     Vector const& b, const Fiber * fibB, const PointDisp* dispB)
 {
-    if ( dispa->visible && fiba->disp->visible 
-        && dispb->visible && fibb->disp->visible )
+    if (   dispA->perceptible && dispB->perceptible
+        && ( fibA->disp->visible || fibB->disp->visible ))
     {
-        dispa->color.color();
+        dispA->color.load();
         gleVertex(a);
-        dispb->color.color();
+        dispB->color.load();
         gleVertex(b);
     }
 }
@@ -864,44 +555,50 @@ inline void drawLink(const Vector & a, const Fiber * fiba, const PointDisp* disp
 //------------------------------------------------------------------------------
 #pragma mark -
 
-void Display2::displayFSingles(const SingleSet & set)
+void Display2::drawSinglesF(const SingleSet & set) const
 {
-    //display the attached position of free singles:
     if ( prop->point_size > 0 )
     {
-        glPointSize(prop->point_size*uFactor);
+        pointSize(prop->point_size);
         glBegin(GL_POINTS);
-        for ( Single * gh=set.firstF(); gh ; gh=gh->next() )
-            drawVertex(gh->posFoot(), gh->hand()->prop->disp);
+        for ( Single * obj=set.firstF(); obj ; obj=obj->next() )
+        {
+#if ENABLE_EXPLODE_DISPLAY && ( DIM == 1 )
+            obj->disp()->color2.load();
+            gleVertex(obj->posFoot().XX, obj->signature() * 0x1p-28 - 4);
+#else
+            drawVertex(obj->posFoot(), obj->disp());
+#endif
+        }
         glEnd();
     }
 }
 
 
-void Display2::displayASingles(const SingleSet & set)
+void Display2::drawSinglesA(const SingleSet & set) const
 {
-    // display the positions
+    // display positions of Hands
     if ( prop->point_size > 0 )
     {
-        glPointSize(prop->point_size*uFactor);
+        pointSize(prop->point_size);
         glBegin(GL_POINTS);
-        for ( Single * gh=set.firstA(); gh ; gh=gh->next() )
-            drawVertex(gh->posHand(), gh->fiber(), gh->hand()->prop->disp);
+        for ( Single * obj=set.firstA(); obj ; obj=obj->next() )
+            drawVertex(obj->posHand(), obj->fiber(), obj->disp());
         glEnd();
     }
     
-    // display the links
-    if ( prop->line_width > 0 )
+    // display links to anchor points
+    if ( prop->link_width > 0 )
     {
-        glLineWidth(prop->line_width*uFactor);
+        lineWidth(prop->link_width);
         glBegin(GL_LINES);
-        for ( Single * gh=set.firstA(); gh ; gh=gh->next() )
-            if ( gh->hasInteraction() )
+        for ( Single * obj=set.firstA(); obj ; obj=obj->next() )
+            if ( obj->hasForce() )
             {
-                Vector ph = gh->posHand();
-                Vector pf = gh->posFoot();
-                if (modulo) modulo->fold(pf, ph);
-                drawLink(ph, gh->fiber(), gh->hand()->prop->disp, pf);
+                Vector ph = obj->posHand();
+                Vector pf = obj->posFoot();
+                if ( modulo ) modulo->fold(pf, ph);
+                drawLink(ph, obj->fiber(), obj->disp(), pf);
             }
         glEnd();
     }
@@ -909,93 +606,102 @@ void Display2::displayASingles(const SingleSet & set)
 
 //------------------------------------------------------------------------------
 #pragma mark -
-
 /**
- Display either Hand1 or Hand2, exposing both sides with equal chances.
- This gives the impression that Couple flicker randomly between frames,
- as if they were two-sided balls 'rotating' very fast.
+Always display Hand1 of Couple
  */
-void Display2::displayFCouples(CoupleSet const& set)
+void Display2::drawCouplesF(CoupleSet const& set) const
 {
     if ( prop->point_size > 0 )
     {
-        Couple * nxt;
-        Couple * obj = set.firstFF();
+        pointSize(prop->point_size);
         
-        glPointSize(prop->point_size*uFactor);
         glBegin(GL_POINTS);
-        if ( set.sizeFF() % 2 )
+        for ( Couple * obj = set.firstFF(); obj ; obj=obj->next() )
         {
-            nxt = obj->next();
+#if ENABLE_EXPLODE_DISPLAY && ( DIM == 1 )
+            const PointDisp * disp = obj->disp1();
+            if ( disp->perceptible )
+            {
+                disp->color2.load();
+                gleVertex(obj->posFree().XX, obj->signature() * 0x1p-28 - 4);
+            }
+#else
             drawVertex(obj->posFree(), obj->disp1());
-            obj = nxt;
-        }
-        while ( obj )
-        {
-            nxt = obj->next();
-            drawVertex(obj->posFree(), obj->disp2());
-            obj = nxt->next();
-            drawVertex(nxt->posFree(), nxt->disp1());
+#endif
         }
         glEnd();
+        
+#if ( DIM > 1 )
+        // display inactive Couples with bitmap:
+        for ( Couple * obj = set.firstFF(); obj ; obj=obj->next() )
+            if ( !obj->active() && obj->disp1()->perceptible )
+                obj->disp1()->drawI(obj->posFree());
+#endif
     }
 }
 
 
-void Display2::displayACouples(CoupleSet const& set)
+void Display2::drawCouplesA(CoupleSet const& set) const
 {
     if ( prop->point_size > 0 )
     {
         // display bound couples
-        glPointSize(prop->point_size*uFactor);
+        pointSize(prop->point_size);
         glBegin(GL_POINTS);
         
-        for (Couple * cx=set.firstAF(); cx ; cx=cx->next() )
-            drawVertex2(cx->pos1(), cx->fiber1(), cx->hand1()->prop->disp);
+        for ( Couple * cx=set.firstAF(); cx ; cx=cx->next() )
+            drawVertex2(cx->posHand1(), cx->fiber1(), cx->disp1());
         
-        for (Couple * cx=set.firstFA(); cx ; cx=cx->next() )
-            drawVertex2(cx->pos2(), cx->fiber2(), cx->hand2()->prop->disp);
+        for ( Couple * cx=set.firstFA(); cx ; cx=cx->next() )
+            drawVertex2(cx->posHand2(), cx->fiber2(), cx->disp2());
         
         glEnd();
     }
 }
 
 
-void Display2::displayBCouples(CoupleSet const& set)
+void Display2::drawCouplesB(CoupleSet const& set) const
 {
     // display bridging couples
     if ( prop->point_size > 0 )
     {
-        glPointSize(prop->point_size*uFactor);
+        pointSize(prop->point_size);
         glBegin(GL_POINTS);
         for ( Couple * cx=set.firstAA(); cx ; cx=cx->next() )
         {
-            // only display couples bound on anti-parallel sections
-            if ( ( prop->couple_select & 8 ) && ( cx->cosAngle() > 0 ) )
+#if ( 0 )
+            // only display if bridging two anti-parallel filaments
+            if ( prop->couple_select & 8  && cx->cosAngle() > 0 )
                 continue;
-            
-            drawVertex(cx->pos1(), cx->fiber1(), cx->hand1()->prop->disp);
-            drawVertex(cx->pos2(), cx->fiber2(), cx->hand2()->prop->disp);
+            // only display if bridging two parallel filaments
+            if ( prop->couple_select & 16 && cx->cosAngle() < 0 )
+                continue;
+#endif
+            drawVertex(cx->posHand1(), cx->fiber1(), cx->disp1());
+            drawVertex(cx->posHand2(), cx->fiber2(), cx->disp2());
         }
         glEnd();
     }
     
     // display the link for bridging couples
-    if ( prop->line_width > 0 )
+    if ( prop->link_width > 0 )
     {
-        glLineWidth(prop->line_width*uFactor);
+        lineWidth(prop->link_width);
         glBegin(GL_LINES);
         for ( Couple * cx=set.firstAA(); cx ; cx=cx->next() )
         {
-            // only display couples bound on anti-parallel sections
-            if ( ( prop->couple_select & 8 ) &&  ( cx->cosAngle() > 0 ) )
+#if ( 0 )
+            // only display if bridging two anti-parallel filaments
+            if ( prop->couple_select & 8  && cx->cosAngle() > 0 )
                 continue;
-            
-            Vector xx = cx->pos1();
-            Vector yy = cx->pos2();
-            if (modulo) modulo->fold( yy, xx );
-            drawLink(xx, cx->fiber1(), cx->hand1()->prop->disp,
-                     yy, cx->fiber2(), cx->hand2()->prop->disp);
+            // only display if bridging two parallel filaments
+            if ( prop->couple_select & 16 && cx->cosAngle() < 0 )
+                continue;
+#endif
+            Vector P = cx->posHand1();
+            Vector Q = cx->posHand2();
+            if ( modulo ) modulo->fold(Q, P);
+            drawLink(P, cx->fiber1(), cx->disp1(), Q, cx->fiber2(), cx->disp2());
         }
         glEnd();
     }

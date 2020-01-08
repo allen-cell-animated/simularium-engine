@@ -4,10 +4,11 @@
 #define ORGANIZER_SET_H
 
 #include "object_set.h"
-#include "organizer.h"
 
-class Simul;
+class Mecable;
+class Organizer;
 class Aster;
+class Simul;
 
 /// a list of Organizer (Aster, Nucleus, Bundle)
 class OrganizerSet : public ObjectSet
@@ -17,48 +18,49 @@ public:
     ///creator
     OrganizerSet(Simul& s) : ObjectSet(s) {}
     
-    ///destructor
-    virtual ~OrganizerSet() {}
-    
     //--------------------------
     
     /// identifies the class
-    std::string kind() const { return "organizer"; }
+    static std::string title() { return "organizer"; }
     
-    /// create a new property for class \a kind with given name
-    Property*   newProperty(const std::string& kind, const std::string& name, Glossary&) const;
+    /// create a new property of category `cat` for a class `name`
+    Property *  newProperty(const std::string& cat, const std::string& name, Glossary&) const;
     
-    //--------------------------
+    /// create objects of class `name`, given the options provided in `opt`
+    ObjectList  newObjects(const std::string& name, Glossary& opt);
     
-    /// create a new object directly from a glossary
-    ObjectList  newObjects(const std::string& kind, const std::string& prop, Glossary&);
+    /// create a new object (used for reading trajectory file)
+    Object *    newObject(ObjectTag, unsigned);
+    
+    /// write all Objects to file
+    void        write(Outputter& out) const;
+        
+    /// print a summary of the content (nb of objects, class)
+    void        report(std::ostream& out) const;
 
-    /// construct object
-    Object *    newObjectT(const Tag tag, int);
-    
+    //--------------------------
+
     /// register Organizer
     void        add(Object *);
     
     /// first Organizer
-    Organizer * first() const
-    {
-        return static_cast<Organizer*>(nodes.first());
-    }
+    Organizer * first() const;
     
-    /// find object with given Number
-    Organizer * find(Number n) const
-    {
-        return static_cast<Organizer*>(inventory.get(n));
-    }
+    /// find object with given ID
+    Organizer * findID(ObjectID n) const;
     
-    /// find Aster with given Number
-    Aster *     findAster(Number n) const;
+    /// find Aster with given ID
+    Aster *     findAster(ObjectID n) const;
+    
+    /// find first Organizer containing given Mecable
+    Organizer*  findOrganizer(Mecable const*) const;
     
     /// modulo the position (periodic boundary conditions)
-    void        foldPosition(const Modulo * s) const;
+    void        foldPosition(Modulo const* s) const;
 
     /// Monte-Carlo simulation step for every Object
     void        step();
+
 };
 
 

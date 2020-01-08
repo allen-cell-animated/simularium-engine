@@ -4,80 +4,97 @@
 #define MOVABLE_H
 
 #include "vector.h"
-#include "rotation.h"
+#include "isometry.h"
 
-class Glossary;
 class Space;
 class Modulo;
 
 
 /// Can be moved and rotated in space
 /**
-This provides a common interface, in which translation and rotation are disabled.
-These features can be enabled by redefining the related functions in a derived class.
+Movable provides a common interface, for Object that can be moves or rotated.
+The actual operations need to be implemented by redefining the virtual functions:
  
- To enable translation:
- - position() should be implemented
- - translate() should be implemented
- - translatable() should return true
- .
- To enable rotation:
- - rotate() should be implemented
- - rotatable() should return true
- .
+    if ( mobile() == 0 ):
+        the object has no position defined
+
+    if ( mobile() == 1 ):
+        position() is implemented
+        translate() is implemented
+
+    if ( mobile() == 2 ):
+        rotate() is implemented
+
+    if ( mobile() == 3 ):
+        position() and translate() are implemented
+        rotate() is implemented
+     .
  To support periodic boundary conditions, foldPosition() should be defined.
  */
 class Movable
 {
     
+    /// read a position primitives, such as 'circle 5', etc.
+    static Vector readPosition0(std::istream&, Space const*);
+    
+    /// read a direction primitives, such as 'horizontal', etc.
+    static Vector readDirection0(std::istream&, Vector const&, Space const*);
+
 public:
     
-    /// read a position specified with primitives, such as 'circle 5', etc.
-    static Vector readPrimitive(std::istream&, const Space*);
-    
     /// read a position in space
-    static Vector readPosition(std::istream&, const Space*);
+    static Vector readPosition(std::istream&, Space const*);
 
     /// read an orientation, and return a normalized vector
-    static Vector readDirection(std::istream&, const Vector&, const Space*);
+    static Vector readDirection(std::istream&, Vector const&, Space const*);
 
-    /// read a rotation specified in \a is, at position \a pos
-    static Rotation readRotation(std::istream&, const Vector&, const Space*);
+    /// read a rotation specified in stream, at position `pos`
+    static Rotation readRotation(std::istream&, Vector const&, Space const*);
     
 public:
     
     /// constructor
     Movable() {}
     
-    /// destructor
-    virtual ~Movable() {}
     
+    /// true if object can be translated (default=false)
+    /**
+     mobile() returns a bit field:
+     
+         ( mobile() & 1 ) indicates if the object can be translated.
+         ( mobile() & 2 ) indicates if the object can be rotated.
+     
+     Thus,
+     
+         if ( mobile() & 1 ):
+             position() and translate() should be implemented
+     
+         if ( mobile() & 2 ):
+             rotate() should be implemented
+     */
+    virtual int       mobile()  const { return 0; }
     
-    /// return the position in space of the object
-    virtual Vector    position()  const { return Vector(0,0,0); } 
+    /// return the spatial position of the Object
+    virtual Vector    position()  const { return Vector(0.0,0.0,0.0); }
     
-    /// move object to specified position
-    virtual void      setPosition(Vector const&);
-    
-    /// true if object accepts translations (default=false)
-    virtual bool      translatable()  const { return false; }
-    
-    /// move the object ( position += given vector )
+    /// move Object ( position += given vector )
     virtual void      translate(Vector const&);
+    
+    /// move Object to specified position
+    virtual void      setPosition(Vector const& x) { translate( x - position() ); }
 
+    /// translate Object by applying rotation around the Origin
+    void              rotateT(Rotation const&);
     
-    /// true if object accepts rotations (default=false)
-    virtual bool      rotatable()  const { return false; }
-    
-    /// rotate the object around the origin of coordinates
+    /// rotate Object around the Origin
     virtual void      rotate(Rotation const&);
     
-    /// rotate the object around its current position
-    virtual void      rotateP(Rotation const&);
+    /// rotate Object around its current position, using translate() and rotate()
+    void              revolve(Rotation const&);
     
     
     /// perform modulo for periodic boundary conditions
-    /** This brings the object to its centered fiMirror image in Modulo */
+    /** This brings the object to the centered mirror image defined by Modulo*/
     virtual void      foldPosition(Modulo const*) {}
     
 };

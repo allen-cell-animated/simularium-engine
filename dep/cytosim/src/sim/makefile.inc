@@ -1,4 +1,12 @@
 # Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
+# Copyright 2018-- Francois J. Nedelec.
+
+
+OBJ_SPACE := space.o space_prop.o space_square.o space_sphere.o space_disc.o\
+             space_dice.o space_torus.o space_polygon.o\
+             space_polygonZ.o space_ellipse.o space_cylinder.o space_ring.o\
+             space_cylinderZ.o space_capsule.o space_strip.o space_periodic.o\
+             space_banana.o space_cylinderP.o
 
 OBJ_HANDS := hand.o hand_prop.o\
              motor.o motor_prop.o\
@@ -7,13 +15,16 @@ OBJ_HANDS := hand.o hand_prop.o\
              nucleator.o nucleator_prop.o\
              tracker.o tracker_prop.o\
              cutter.o cutter_prop.o\
+             chewer.o chewer_prop.o\
              rescuer.o rescuer_prop.o\
-             mighty.o mighty_prop.o\
+             regulator.o regulator_prop.o\
+             mighty.o mighty_prop.o
 
-OBJ_FIBERS := fiber_naked.o fiber.o rigid_fiber.o fiber_prop.o fiber_set.o\
-              dynamic_fiber.o dynamic_fiber_prop.o\
-              classic_fiber.o classic_fiber_prop.o\
-              treadmilling_fiber.o treadmilling_fiber_prop.o
+OBJ_DIGITS := digit.o digit_prop.o\
+              walker.o walker_prop.o\
+              myosin.o myosin_prop.o\
+              dynein.o dynein_prop.o\
+              kinesin.o kinesin_prop.o
 
 OBJ_SINGLES := single.o single_prop.o single_set.o\
                picket.o picket_long.o wrist.o wrist_long.o
@@ -21,104 +32,141 @@ OBJ_SINGLES := single.o single_prop.o single_set.o\
 OBJ_COUPLES := couple.o couple_prop.o couple_set.o couple_long.o\
                crosslink.o crosslink_long.o crosslink_prop.o\
                bridge.o bridge_prop.o\
+               duo.o duo_long.o duo_prop.o\
                shackle.o shackle_long.o shackle_prop.o\
                fork.o fork_prop.o
+         
+OBJ_FIBERS := chain.o fiber.o mecafil.o fiber_prop.o fiber_set.o\
+              fiber_segment.o fiber_site.o lattice.o\
+              dynamic_fiber.o dynamic_fiber_prop.o\
+              classic_fiber.o classic_fiber_prop.o\
+              treadmilling_fiber.o treadmilling_fiber_prop.o\
+              growing_fiber.o growing_fiber_prop.o
 
 OBJ_ORGANIZERS := organizer.o organizer_set.o \
                   aster.o aster_prop.o nucleus.o nucleus_prop.o\
-                  fake.o fake_prop.o bundle.o bundle_prop.o \
+                  fake.o fake_prop.o bundle.o bundle_prop.o
 
-
-OBJ_SIM := movable.o mecable.o point_set.o\
-           point_exact.o point_interpolated.o fiber_locus.o \
-           object.o object_set.o common.o fiber_binder.o\
-           sphere_prop.o sphere.o sphere_set.o \
+OBJ_SIM := modulo.o movable.o mecable.o object.o object_set.o\
+           sphere_prop.o sphere.o sphere_set.o\
            bead_prop.o bead.o bead_set.o\
            solid_prop.o solid.o solid_set.o\
-           meca.o simul_prop.o fiber_grid.o point_grid.o\
-           field.o field_prop.o field_set.o space_set.o\
-           simul.o interface.o parser.o\
+           field.o field_prop.o field_set.o\
+           event.o event_set.o\
+           mecapoint.o interpolation.o interpolation4.o\
+           meca.o fiber_grid.o point_grid.o space_set.o\
+           simul_prop.o simul.o interface.o parser.o
 
 
-OBJ_CYTOSIM:=$(OBJ_SIM) $(OBJ_HANDS) $(OBJ_FIBERS) $(OBJ_SINGLES) $(OBJ_COUPLES) $(OBJ_ORGANIZERS)
+OBJ_CYTOSIM:=$(OBJ_SPACE) $(OBJ_SIM) $(OBJ_HANDS) $(OBJ_DIGITS) $(OBJ_FIBERS)\
+             $(OBJ_SINGLES) $(OBJ_COUPLES) $(OBJ_ORGANIZERS)
 
-OBJ_CYTOSIM_1D:=$(OBJ_CYTOSIM:.o=1D.o)
-OBJ_CYTOSIM_2D:=$(OBJ_CYTOSIM:.o=2D.o)
-OBJ_CYTOSIM_3D:=$(OBJ_CYTOSIM:.o=3D.o)
+OBJ_CYTOSIMD1:=$(OBJ_CYTOSIM:%.o=%D1.o)
+OBJ_CYTOSIMD2:=$(OBJ_CYTOSIM:%.o=%D2.o)
+OBJ_CYTOSIMD3:=$(OBJ_CYTOSIM:%.o=%D3.o)
+
+
+# objects containing graphical code under the DISPLAY keyword:
+OBJ_NEEDG:=$(OBJ_SPACE) field.o fiber_grid.o point_grid.o
+OBJ_CYTOSIMG:=$(filter-out $(OBJ_NEEDG),$(OBJ_CYTOSIM)) $(OBJ_NEEDG:%.o=%G.o)
 
 #----------------------------targets--------------------------------------------
 
-# need to fix the paths of libraries:
-SIM_OBJS=$< $(addprefix build/, $(notdir $(filter-out %.cc, $^)))
+INC_BM=$(addprefix -Isrc/, base math)
+INC_SIM=$(addprefix -Isrc/, base math sim sim/fibers sim/hands sim/singles sim/couples sim/organizers sim/spaces)
+INC_BMD=$(addprefix -Isrc/, base math sim sim/spaces disp)
 
 #--- normal build:
 
-sim: sim.cc libcytosim.a libcytospace.a libcytomath.a libcytobase.a | bin
-	$(COMPILE) $(INC_SIM)  $(SIM_OBJS) $(LINK) -o bin/$@
+sim: sim.cc cytosim.a cytomath.a cytobase.a | bin
+	$(COMPILE) $(INC_BM) $(INFO) $(OBJECTS) $(LINK) -o bin/$@
 	$(DONE)
 vpath sim  bin
 
+#--- build for debuging:
 
-#--- build with debuging flags:
-
-simd: sim.cc libcytosim.a libcytospace.a libcytomath.a libcytobase.a | bin
-	$(CXX) $(FlagsD) $(INC_SIM) $(SIM_OBJS) $(LINK) -o bin/$@
+simd: sim.cc cytosim.a cytomath.a cytobase.a | bin
+	$(CXX) $(FlagsD) $(INC_BM) $(INFO) $(OBJECTS) $(LINK) -o bin/$@
 	$(DONE)
 vpath simd  bin
 
-
 #--- builds with specific dimension:
 
-sim1: sim.cc libcytosim1D.a libcytospace1D.a libcytomath.a libcytobase.a
-	$(COMPILE) $(INC_SIM) -DDIM=1 $(SIM_OBJS) $(LINK) -o bin/$@
+bin1/sim: sim.cc cytosimD1.a cytomathD1.a cytobase.a
+	$(COMPILE) $(INC_BM) $(INFO) -DDIM=1 $(OBJECTS) $(LINK) -o bin1/sim
 	$(DONE)
-vpath sim1  bin
 
-sim2: sim.cc libcytosim2D.a libcytospace2D.a libcytomath.a libcytobase.a
-	$(COMPILE) $(INC_SIM) -DDIM=2 $(SIM_OBJS) $(LINK) -o bin/$@
+bin2/sim: sim.cc cytosimD2.a cytomathD2.a cytobase.a
+	$(COMPILE) $(INC_BM) $(INFO) -DDIM=2 $(OBJECTS) $(LINK) -o bin2/sim
 	$(DONE)
-vpath sim2  bin
 
-sim3: sim.cc libcytosim3D.a libcytospace3D.a libcytomath.a libcytobase.a
-	$(COMPILE) $(INC_SIM) -DDIM=3 $(SIM_OBJS) $(LINK) -o bin/$@
+bin3/sim: sim.cc cytosimD3.a cytomathD3.a cytobase.a
+	$(COMPILE) $(INC_BM) $(INFO) -DDIM=3 $(OBJECTS) $(LINK) -o bin3/sim
 	$(DONE)
-vpath sim3  bin
 
 
+#--- libraries:
 
-libcytosim.a: $(OBJ_CYTOSIM)
+cytosim.a: $(OBJ_CYTOSIM) | lib
 	$(MAKELIB)
 	$(DONE)
 
-
-libcytosim1D.a: $(OBJ_CYTOSIM_1D)
+cytosimD1.a: $(OBJ_CYTOSIMD1)
 	$(MAKELIB)
 	$(DONE)
 
-
-libcytosim2D.a: $(OBJ_CYTOSIM_2D)
+cytosimD2.a: $(OBJ_CYTOSIMD2)
 	$(MAKELIB)
 	$(DONE)
 
-
-libcytosim3D.a: $(OBJ_CYTOSIM_3D)
+cytosimD3.a: $(OBJ_CYTOSIMD3)
 	$(MAKELIB)
 	$(DONE)
 
+#--- libraries with graphical code enabled
 
-#----------------------------rules----------------------------------------------
+cytosimG.a: $(OBJ_CYTOSIMG) | lib
+	$(MAKELIB)
+	$(DONE)
 
-INC_SIM=$(addprefix -Isrc/, SFMT math base sim sim/fibers sim/hands sim/singles sim/couples sim/organizers sim/spaces)
+cytosimGD1.a: $(OBJ_CYTOSIMG:%.o=%D1.o)
+	$(MAKELIB)
+	$(DONE)
 
+cytosimGD2.a: $(OBJ_CYTOSIMG:%.o=%D2.o)
+	$(MAKELIB)
+	$(DONE)
+
+cytosimGD3.a: $(OBJ_CYTOSIMG:%.o=%D3.o)
+	$(MAKELIB)
+	$(DONE)
+
+#----------------------------target rules---------------------------------------
 
 $(OBJ_CYTOSIM): %.o: %.cc %.h | build
-	$(COMPILE) -c $(INC_SIM) $< -o build/$@
+	$(COMPILE) $(INC_SIM) -c $< -o build/$@
 
-$(OBJ_CYTOSIM_1D): %1D.o: %.cc %.h | build
-	$(COMPILE) -c -DDIM=1 $(INC_SIM) $< -o build/$@
+$(OBJ_CYTOSIMD1): %D1.o: %.cc %.h | build
+	$(COMPILE) -DDIM=1 $(INC_SIM) -c $< -o build/$@
 
-$(OBJ_CYTOSIM_2D): %2D.o: %.cc %.h | build
-	$(COMPILE) -c -DDIM=2 $(INC_SIM) $< -o build/$@
+$(OBJ_CYTOSIMD2): %D2.o: %.cc %.h | build
+	$(COMPILE) -DDIM=2 $(INC_SIM) -c $< -o build/$@
 
-$(OBJ_CYTOSIM_3D): %3D.o: %.cc %.h | build
-	$(COMPILE) -c -DDIM=3 $(INC_SIM) $< -o build/$@
+$(OBJ_CYTOSIMD3): %D3.o: %.cc %.h | build
+	$(COMPILE) -DDIM=3 $(INC_SIM) -c $< -o build/$@
+
+
+# builds with DISPLAY enabled:
+
+$(OBJ_NEEDG:%.o=%G.o): %G.o: %.cc %.h | build
+	$(COMPILE) -DDISPLAY $(INC_BMD) -c $< -o build/$@
+
+$(OBJ_NEEDG:%.o=%GD1.o): %GD1.o: %.cc %.h | build
+	$(COMPILE) -DDIM=1 -DDISPLAY $(INC_BMD) -c $< -o build/$@
+
+$(OBJ_NEEDG:%.o=%GD2.o): %GD2.o: %.cc %.h | build
+	$(COMPILE) -DDIM=2 -DDISPLAY $(INC_BMD) -c $< -o build/$@
+
+$(OBJ_NEEDG:%.o=%GD3.o): %GD3.o: %.cc %.h | build
+	$(COMPILE) -DDIM=3 -DDISPLAY $(INC_BMD) -c $< -o build/$@
+

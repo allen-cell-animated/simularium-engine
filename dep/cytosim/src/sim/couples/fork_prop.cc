@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-// Cytosim 3.0 -  Copyright Francois Nedelec et al.  EMBL 2007-2013
 
 #include "dim.h"
 #include "exceptions.h"
@@ -20,7 +19,6 @@ Couple * ForkProp::newCouple(Glossary*) const
 void ForkProp::clear()
 {
     CoupleProp::clear();
-    trans_activated = 0;
     angle   = 0;
     cosinus = 1;
     sinus   = 0;
@@ -33,12 +31,10 @@ void ForkProp::read(Glossary& glos)
 {
     CoupleProp::read(glos);
     
-    glos.set(trans_activated,   "trans_activated");
-
     // compact syntax
     glos.set(angular_stiffness, "torque");
     glos.set(angle,             "torque", 1);
-    
+
     // alternative syntax:
     glos.set(angle,             "angle");
     glos.set(angular_stiffness, "angular_stiffness");
@@ -47,26 +43,27 @@ void ForkProp::read(Glossary& glos)
 }
 
 
-void ForkProp::complete(SimulProp const* sp, PropertyList* plist)
+void ForkProp::complete(Simul const& sim)
 {
-    CoupleProp::complete(sp, plist);
+    CoupleProp::complete(sim);
     
     cosinus = cos(angle);
     sinus   = sin(angle);
     
+#if ( 0 )
     if ( angle < 0 || sinus < 0 )
         throw InvalidParameter("The equilibrium angle should be defined in [0, pi]");
-    
+#endif
+
     if ( angular_stiffness < 0 )
         throw InvalidParameter("The angular stiffness, fork:torque[0] should be set and >= 0");
 }
 
 
-
-void ForkProp::write_data(std::ostream & os) const
+void ForkProp::write_values(std::ostream& os) const
 {
-    CoupleProp::write_data(os);
-    write_param(os, "trans_activated", trans_activated);
-    write_param(os, "torque", angular_stiffness, angle);
-    write_param(os, "flip", flip);
+    CoupleProp::write_values(os);
+    write_value(os, "torque", angular_stiffness, angle);
+    write_value(os, "flip", flip);
 }
+

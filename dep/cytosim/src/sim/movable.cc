@@ -1,9 +1,8 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-#include "dim.h"
+#include "movable.h"
 #include "assert_macro.h"
 #include "stream_func.h"
-#include "movable.h"
 #include "exceptions.h"
 #include "quaternion.h"
 #include "iowrapper.h"
@@ -13,51 +12,41 @@
 #include "random.h"
 #include "space.h"
 #include "simul.h"
-extern Random RNG;
+
 
 /** The default implementation is invalid */
 void Movable::translate(Vector const&)
 {
-    ABORT_NOW("undefined/invalid translate()");
+    ABORT_NOW("Movable::translate() called for immobile Object");
 }
 
-/**
-The default implementation:
-@code
- translate( w - position() );
-@endcode
-can be redefined in derived class for efficiency.
-*/
-void Movable::setPosition(Vector const& vec)
+/** The default implementation is invalid */
+void Movable::rotate(Rotation const& rot)
 {
-    assert_true( translatable() );
-    translate( vec - position() );
+    ABORT_NOW("Movable::rotate() called for immobile Object");
 }
 
 /*
- if mobile() is true,
- the Object is translated by `[ rot * Object::position() - Object::position() ]`
+ if possible, the Object is translated by `[ rot * Object::position() - Object::position() ]`
+ 
+ Note that this has no effect if the Object is at the origin
 */
-void Movable::rotate(Rotation const& rot)
+void Movable::rotateT(Rotation const& rot)
 {
-    if ( translatable() )
-    {
-        Vector pos = position();
-        translate(rot*pos-pos);
-    }
+    assert_true( mobile() == 1 );
+    Vector pos = position();
+    translate(rot*pos-pos);
 }
 
 /**
-The default implementation:
-@code
- Vector G = position();
- translate( -G );
- rotate( T );
- translate(  G ); 
-@endcode
-can be redefined in derived class for efficiency.
+revolve() implements:
+
+    Vector G = position();
+    translate( -G );
+    rotate( T );
+    translate(  G );
 */
-void Movable::rotateP(Rotation const& T)
+void Movable::revolve(Rotation const& T)
 {
     Vector G = position();
     translate( -G );
@@ -69,59 +58,149 @@ void Movable::rotateP(Rotation const& T)
 #pragma mark -
 
 /**
- Geometrical Primitives:
+ There are different ways to specify a position:
  
- Keyword (A, B... are real ) |   Position (X, Y, Z) / Remark
- ----------------------------|----------------------------------------------------
- `A B C`                     | The specified vector (A,B,C)
- `inside`                    | A random position inside the current Space
- `edge E`                    | At distance E from the edge of the current Space
- `surface E`                 | On the surface of the current Space\n By projecting a point at distance E from the surface.
- `line L T`                  | Random with -L/2 < X < L/2; norm(Y,Z) < T
- `sphere R T`                | At distance R +/- T/2 from the origin\n `R-T/2 < norm(X,Y,Z) < R+T/2`
- `ball R`                    | At distance R at most from the origin\n `norm(X,Y,Z) < R`
- `disc R T`                  | in 2D, a disc in the XY-plane \n in 3D, a disc in the XY-plane of thickness T in Z
- `discXZ R T`                | a disc in the XZ-plane of radius R, thickness T
- `discYZ R T`                | a disc in the YZ-plane of radius R, thickness T
- `circle R T`                | A circle of radius R and thickness T \n At distance T from the circle of radius R
- `cylinder W R`              | Cylinder of axis X, W=thickness in X, R=radius in YZ
- `ellipse A B C`             | Inside the ellipse or ellipsoid of main axes 2A, 2B and 2C
- `arc L Theta`               | A piece of circle of length L and covering an angle Theta
- `stripe L R`                | Random Vector with L < X < R
- `square R`                  | Random Vector with -R < X < R; -R < Y < R; -R < Z < R;
- `rectangle A B C`           | Random Vector with -A < X < A; -B < Y < B; -C < Z < C;
- `gradient S E`              | Provides a linear density gradient, from 0 at X=S to 1 at X=E
-
+ keyword & parameters | Position (X, Y, Z)                                     |
+ ---------------------|---------------------------------------------------------
+ `A B C`              | The specified vector (A,B,C)
+ `inside`             | A random position inside the current Space
+ `edge E`             | At distance E from the edge of the current Space
+ `surface E`          | On the surface of the current Space\n By projecting a point at distance E from the surface.
+ `line L T`           | Selected randomly with -L/2 < X < L/2; norm(Y,Z) < T
+ `sphere R T`         | At distance R +/- T/2 from the origin\n `R-T/2 < norm(X,Y,Z) < R+T/2`
+ `ball R`             | At distance R at most from the origin\n `norm(X,Y,Z) < R`
+ `disc R T`           | in 2D, a disc in the XY-plane \n in 3D, a disc in the XY-plane of thickness T in Z
+ `discXZ R T`         | Disc in the XZ-plane of radius R, thickness T
+ `discYZ R T`         | Disc in the YZ-plane of radius R, thickness T
+ `equator R T`        | At distance R from the origin, and T from the XY plane:\n `norm(X,Y) < R` `norm(Z) < T`
+ `circle R T`         | Circle of radius R and thickness T \n At distance T from the circle of radius R
+ `cylinder W R`       | Cylinder of axis X, W=thickness in X, R=radius in YZ
+ `ellipse A B C`      | Inside the ellipse or ellipsoid of main axes 2A, 2B and 2C
+ `arc L Theta`        | A piece of circle of length L and covering an angle Theta
+ `stripe L R`         | Random vector with L < X < R
+ `square R`           | Random vector with -R < X < R; -R < Y < R; -R < Z < R;
+ `rectangle A B C`    | Random vector with -A < X < A; -B < Y < B; -C < Z < C;
+ `gradient S E`       | Linear density gradient along X, of value 0 at X=S and 1 at X=E
+ `gradient S E R`     | Linear density gradient, contained inside a cylinder of radius R
+ `exponential S L`    | Exponential density gradient of length scale L, starting at S
+ `exponential S L R`  | Exponential density gradient, contained inside a cylinder of radius R
+ 
  Each primitive describes a certain area in Space, and in most cases the returned position is
  chosen randomly inside this area following a uniform probability.
  */
 
-Vector Movable::readPrimitive(std::istream& is, const Space* spc)
+Vector Movable::readPosition0(std::istream& is, Space const* spc)
 {
-    char c = Tokenizer::eat_space(is, false);
+    int c = Tokenizer::skip_space(is, false);
 
     if ( c == EOF )
         return Vector(0,0,0);
 
     if ( isalpha(c) )
     {
-        std::string tok = Tokenizer::get_token(is);
-        //std::cerr << "readPosition    `"<<tok<<"'"<<std::endl;
+        std::string tok = Tokenizer::get_symbol(is);
         
-        if ( tok == "inside" || tok == "random" )
+        if ( spc )
         {
-            if ( spc == 0 )
-                throw InvalidParameter("A space must be created first!");
-            return spc->randomPlace();
+            if ( tok == "inside" || tok == "random" )
+                return spc->randomPlace();
+            
+            if ( tok == "edge" )
+            {
+                real R = 0;
+                is >> R;
+                if ( R < REAL_EPSILON )
+                    throw InvalidParameter("distance R must be > 0 in `edge R`");
+                return spc->randomPlaceNearEdge(R);
+            }
+            
+            if ( tok == "surface" )
+            {
+                real e = 0.1;
+                is >> e;
+                return spc->randomPlaceOnEdge(e);
+            }
+
+            if ( tok == "outside_sphere" )
+            {
+                real R = 0;
+                is >> R;
+                if ( R < 0 )
+                    throw InvalidParameter("distance R must be >= 0 in `outside_sphere R`");
+                Vector P;
+                do
+                    P = spc->randomPlace();
+                while ( P.norm() < R );
+                return P;
+            }
+            
+            if ( tok == "stripe" )
+            {
+                real s = -0.5, e = 0.5;
+                is >> s >> e;
+                Vector inf, sup;
+                spc->boundaries(inf, sup);
+                Vector pos = inf + (sup-inf).e_mul(Vector::randP());
+                pos.XX = RNG.real_uniform(s, e);
+                return pos;
+            }
+        
+            if ( tok == "gradient" )
+            {
+                real S = -10, E = 10, R = 0;
+                is >> S >> E >> R;
+                if ( R == 0 )
+                {
+                    Vector vec;
+                    real p;
+                    do {
+                        vec = spc->randomPlace();
+                        p = ( vec.XX - S ) / ( E - S );
+                    } while ( p < 0 || p > 1 || p < RNG.preal() );
+                    return vec;
+                }
+                real x = sqrt(RNG.preal());
+#if ( DIM < 3 )
+                return Vector(S+(E-S)*x, R*RNG.sreal(), 0);
+#else
+                const Vector2 V = Vector2::randU();
+                return Vector(S+(E-S)*x, R*V.XX, R*V.YY);
+#endif
+            }
+        
+            if ( tok == "exponential" )
+            {
+                real S = -10, E = 1, R = 0;
+                is >> S >> E >> R;
+                if ( R == 0 )
+                {
+                    Vector vec;
+                    real p;
+                    do {
+                        vec = spc->randomPlace();
+                        p = exp( ( S - vec.XX ) / E );
+                    } while ( p < 0 || p > 1 || p < RNG.preal() );
+                    return vec;
+                }
+                real x = RNG.exponential();
+#if ( DIM < 3 )
+                return Vector(S+E*x, R*RNG.sreal(), 0);
+#else
+                const Vector2 V = Vector2::randU();
+                return Vector(S+E*x, R*V.XX, R*V.YY);
+#endif
+            }
         }
         
         if ( tok == "sphere" )
         {
-            real R = 0, T = 0;
+            real R = -1, T = 0;
             is >> R >> T;
-            if ( R < 0 ) throw InvalidParameter("sphere:radius must be >= 0");
-            if ( T < 0 ) throw InvalidParameter("sphere:thickness must be >= 0");
-            return Vector::randUnit(R) + Vector::randUnit(T*0.5);
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `sphere R`");
+            if ( T < 0 )
+                throw InvalidParameter("the thickness T must be >= 0 in `sphere R T`");
+            return Vector::randU(R) + Vector::randU(T*0.5);
         }
         
         if ( tok == "equator" )
@@ -129,181 +208,162 @@ Vector Movable::readPrimitive(std::istream& is, const Space* spc)
             real R = 0, T = 0;
             is >> R >> T;
             if ( R < 0 )
-                throw InvalidParameter("you must specify a radius R >= 0 in `equator R T`");
+                throw InvalidParameter("radius R must be >= 0 in `equator R T`");
             if ( T < 0 )
                 throw InvalidParameter("the thickness T must be >= 0 in `equator R T`");
-            Vector2 vec2 = Vector2::randBall();
-            return Vector(R*vec2.XX, R*vec2.YY, T*0.5*RNG.sreal());
+            const Vector2 V = Vector2::randU();
+            return Vector(R*V.XX, R*V.YY, T*RNG.shalf());
         }
-
-        if ( tok == "cylinder" || tok == "discYZ"  )
+       
+        if ( tok == "cylinder" )
         {
-            real L = 0, R = 0;
+            real L = -1, R = -1;
             is >> L >> R;
-            if ( L < 0 ) throw InvalidParameter("cylinder:length must be >= 0");
-            if ( R < 0 ) throw InvalidParameter("cylinder:radius must be >= 0");
-            Vector2 YZ = Vector2::randBall(R);
-            return Vector(L*0.5*RNG.sreal(), YZ.XX, YZ.YY);
+            if ( L < 0 )
+                throw InvalidParameter("length L must be >= 0 in `cylinder L R`");
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `cylinder L R`");
+            const Vector2 V = Vector2::randB(R);
+            return Vector(L*RNG.shalf(), V.XX, V.YY);
         }
         
         if ( tok == "circle" )
         {
-            real R = 1, T = 0;
+            real R = -1, T = 0;
             is >> R >> T;
-            if ( R <= 0 ) throw InvalidParameter("circle:radius must be > 0");
-            if ( T <  0 ) throw InvalidParameter("circle:thickness must be >= 0");
-#if ( DIM == 3 )
-            Vector2 XY = Vector2::randUnit(R);
-            return Vector3(XY.XX, XY.YY, 0) + (0.5*T) * Vector3::randUnit();
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `circle R T`");
+            if ( T < 0 )
+                throw InvalidParameter("the thickness T must be >= 0 in `circle R T`");
+            //StreamFunc::mark_line(std::cout, is, is.tellg(), ">>>>");
+#if ( DIM >= 3 )
+            const Vector2 V = Vector2::randU(R);
+            return Vector3(V.XX, V.YY, 0) + (0.5*T) * Vector3::randU();
 #endif
-            return Vector::randUnit(R) + Vector::randUnit(T*0.5);
+            return Vector::randU(R) + Vector::randU(T*0.5);
         }
         
         if ( tok == "ball" )
         {
-            real R = 0;
+            real R = -1;
             is >> R;
-            if ( R < 0 ) throw InvalidParameter("ball:radius must be >= 0");
-            return Vector::randBall(R);
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `ball R`");
+            return Vector::randB(R);
         }
         
         if ( tok == "disc" || tok == "discXY" )
         {
-            real R = 0, T = 0;
+            real R = -1, T = 0;
             is >> R >> T;
-            if ( R < 0 ) throw InvalidParameter("disc:radius must be >= 0");
-#if ( DIM == 3 )
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `disc R`");
+#if ( DIM >= 3 )
             //in 3D, a disc in the XY-plane of thickness T in Z-direction
-            if ( T < 0 ) throw InvalidParameter("disc:thickness must be >= 0");
-            Vector2 V = Vector2::randBall(R);
-            return Vector(V.XX, V.YY, T*0.5*RNG.sreal());
+            if ( T < 0 )
+                throw InvalidParameter("the thickness T must be >= 0 in `disc R T`");
+            const Vector2 V = Vector2::randB(R);
+            return Vector(V.XX, V.YY, T*RNG.shalf());
 #endif
             //in 2D, a disc in the XY-plane
-            return Vector::randBall(R);
+            return Vector::randB(R);
         }
         
         if ( tok == "discXZ"  )
         {
-            real R = 0, T = 0;
+            real R = -1, T = 0;
             is >> R >> T;
-            if ( T < 0 ) throw InvalidParameter("cylinder:thickness must be >= 0");
-            if ( R < 0 ) throw InvalidParameter("cylinder:radius must be >= 0");
-            Vector2 V = Vector2::randBall(R);
-            return Vector(V.XX, T*0.5*RNG.sreal(), V.YY);
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `discXZ R`");
+            if ( T < 0 )
+                throw InvalidParameter("the thickness T must be >= 0 in `discXZ R T`");
+            const Vector2 V = Vector2::randB(R);
+            return Vector(V.XX, T*RNG.shalf(), V.YY);
         }
-
-        if ( tok == "outside_sphere" )
+        
+        if ( tok == "discYZ"  )
         {
-            real R = 0;
-            is >> R;
-            if ( R < 0 ) throw InvalidParameter("outside_sphere:radius must be >= 0");
-            Vector P;
-            do
-                P = spc->randomPlace();
-            while ( P.norm() < R );
-            return P;
+            real R = -1, T = 0;
+            is >> R >> T;
+            if ( R < 0 )
+                throw InvalidParameter("radius R must be >= 0 in `discYZ R`");
+            if ( T < 0 )
+                throw InvalidParameter("the thickness T must be >= 0 in `discYZ R T`");
+            const Vector2 V = Vector2::randB(R);
+            return Vector(T*RNG.shalf(), V.XX, V.YY);
         }
         
         if ( tok == "ellipse" )
         {
             real x = 1, y = 1, z = 0;
             is >> x >> y >> z;
-            return Vector(x,y,z).e_mul(Vector::randBall());
+            return Vector(x,y,z).e_mul(Vector::randB());
+        }
+        
+        if ( tok == "ellipse_surface" )
+        {
+            real x = 1, y = 1, z = 0;
+            is >> x >> y >> z;
+            return Vector(x,y,z).e_mul(Vector::randU());
         }
         
         if ( tok == "line" )
         {
-            real L = 0, T = 0;
+            real L = -1, T = 0;
             is >> L >> T;
-            if ( L < 0 ) throw InvalidParameter("line:length must be >= 0");
-            if ( T < 0 ) throw InvalidParameter("line:thickness must be >= 0");
-#if ( DIM == 3 )
-            Vector2 V = Vector2::randBall(T);
-            return Vector(L*0.5*RNG.sreal(), V.XX, V.YY);
+            if ( L < 0 )
+                throw InvalidParameter("length L must be >= 0 in `line L`");
+            if ( T < 0 )
+                throw InvalidParameter("the thickness T must be >= 0 in `line L T`");
+#if ( DIM >= 3 )
+            const Vector2 V = Vector2::randB(T);
+            return Vector(L*RNG.shalf(), V.XX, V.YY);
 #endif
-            return Vector(L*0.5*RNG.sreal(), T*0.5*RNG.sreal(), 0);
+            return Vector(L*RNG.shalf(), T*RNG.shalf(), 0);
         }
         
         if ( tok == "arc" )
         {
-            real L = 1, Theta = 1.57;
-            is >> L >> Theta;
+            real L = -1, A = 1.57;
+            is >> L >> A;
             
-            if ( L <= 0 ) throw InvalidParameter("arc:length must be > 0");
+            if ( L <= 0 )
+                throw InvalidParameter("length must be L >= 0 in `arc L`");
+            
             real x = 0, y = 0;
-            
-            if (Theta == 0) {
+            if ( A == 0 ) {
                 x = 0;
-                y = L*RNG.preal() - L/2.0;
+                y = L * RNG.shalf();
             }
             else {
-                real R = L / Theta;
-                real angle = RNG.real_range(-Theta/2.0, Theta/2.0);
-                x = R * cos( angle ) - R;   // origin centered on arc
-                y = R * sin( angle );
+                real R = L / A;
+                real angle = A * RNG.shalf();
+                x = R * cos(angle) - R; // origin centered on arc
+                y = R * sin(angle);
             }
+#if ( DIM < 3 )
             return Vector(x, y, 0);
-        }
-        
-        if ( tok == "stripe" )
-        {
-            if ( spc == 0 )
-                throw InvalidParameter("A space must be created first!");
-            real s = -0.5, e = 0.5;
-            is >> s >> e;
-            Vector pos = spc->extension();
-            pos = pos.e_mul(Vector::randBox());
-            pos.XX = s + RNG.preal() * ( e - s );
-            return pos;
+#else
+            // in 3D this distributes on a portion of the sphere, with a gradient
+            real a = RNG.sreal() * M_PI;
+            return Vector(x, y*cos(a), y*sin(a));
+#endif
         }
         
         if ( tok == "square" )
         {
             real x = 1;
             is >> x;
-            return Vector::randBox(x);
+            return Vector::randS(x);
         }
         
         if ( tok == "rectangle" )
         {
             real x = 0, y = 0, z = 0;
             is >> x >> y >> z;
-            return Vector(x,y,z).e_mul(Vector::randBox());
+            return Vector(x,y,z).e_mul(Vector::randH());
         }
-        
-        if ( tok == "edge" )
-        {
-            if ( spc == 0 )
-                throw InvalidParameter("A space must be created first!");
-            real R = 1;
-            is >> R;
-            if ( R <= 0 ) throw InvalidParameter("edge:radius must be > 0");
-            return spc->randomPlaceNearEdge(R);
-        }
-        
-        if ( tok == "surface" )
-        {
-            if ( spc == 0 )
-                throw InvalidParameter("A space must be created first!");
-            real e = 1;
-            is >> e;
-            return spc->randomPlaceOnEdge(e);
-        }
-        
-        if ( tok == "gradient" )
-        {
-            if ( spc == 0 )
-                throw InvalidParameter("A space must be created first!");
-            real b = spc->extension().norm();  //maximum radius of the volume
-            real s = -10, e = 10;
-            is >> s >> e;
-            real x;
-            do {
-                x = RNG.preal();
-            } while ( RNG.preal() > x );
-            return Vector(s+(e-s)*x, b*RNG.sreal(), b*RNG.sreal());
-        }
-        
+
 #if ( 1 )
         /// A contribution from Beat Rupp
         if ( tok == "segment" || tok == "newsegment" )
@@ -314,61 +374,67 @@ Vector Movable::readPrimitive(std::istream& is, const Space* spc)
             
             // straight
             if ( bending == 0 ) {
-                x = thickness * 0.5*RNG.sreal();
+                x = thickness * RNG.shalf();
                 y = length * RNG.preal();
             } else {
                 real radius = length / (bending * M_PI);
                 real radiusInner = radius - thickness/2.0;
                 real theta = fabs( length / radius );
                 real angle = RNG.preal() * theta;
-                x = (radiusInner + thickness * RNG.preal()) * cos( angle ) - radius;   // substract R to have the arc start from 0,0
-                y = (radiusInner + thickness * RNG.preal()) * sin( angle );            
+                // substract R to have the arc start from 0,0:
+                x = (radiusInner + thickness * RNG.preal()) * cos( angle ) - radius;
+                y = (radiusInner + thickness * RNG.preal()) * sin( angle );
             }
             
-            real c = cos(rotation);
-            real s = sin(rotation);        
+            real cr = cos(rotation);
+            real sr = sin(rotation);
             
             // rotate
-            return Vector(c*x + s*y , -s*x + c*y, 0 );        
+            return Vector(cr*x + sr*y , -sr*x + cr*y, 0 );
         }
 #endif
-        if ( tok == "center" )
+        if ( tok == "center" || tok == "origin" )
             return Vector(0,0,0);
-            
-        throw InvalidParameter("Unknown position `"+tok+"'");
+        
+        if ( spc )
+            throw InvalidParameter("Unknown position specification `"+tok+"'");
+        else
+            throw InvalidParameter("Unknown position specification `"+tok+"' (with no space defined)");
     }
     
-    // expect a vector to be specified:
-    real x = 0, y = 0, z = 0;
-    is >> x >> y >> z;
-    return Vector(x,y,z);
+    // accept a Vector:
+    Vector vec(0,0,0);
+    if ( is >> vec )
+        return vec;
+    throw InvalidParameter("expected a vector specifying a `position`");
 }
 
 
 //------------------------------------------------------------------------------
 /**
- A position is defined with a SHAPE followed by a number of transformations.
+ A position is defined with a SHAPE followed by a number of TRANSFORMATION.
  
- Operation                   |  Result
- ----------------------------|----------------------------------------------------
- `at X Y Z`                  | Translate by specified vector (X,Y,Z)
- `add SHAPE`                 | Translate by a vector chosen according to SHAPE
- `align VECTOR`              | Rotate to align parallel with specified vector
- `turn ROTATION`             | Apply specified rotation
- `blur REAL`                 | Add centered Gaussian noise of variance REAL
- `to X Y Z`                  | Interpolate with the previously specified position
+ TRANSFORMATION         | Result                                               |
+ -----------------------|-------------------------------------------------------
+ `at X Y Z`             | Translate by specified vector (X,Y,Z)
+ `add SHAPE`            | Translate by a vector chosen according to SHAPE
+ `align VECTOR`         | Rotate to align parallel with specified vector
+ `turn ROTATION`        | Apply specified rotation
+ `blur REAL`            | Add centered Gaussian noise of variance REAL
+ `to X Y Z`             | Interpolate with the previously specified position
+ `or POSITION`          | flip randomly between two specified positions
  
- A vector is set according to SHAPE, and the transformations are applied one after 
+ A vector is set according to SHAPE, and the transformations are applied one after
  the other, in the order in which they were given.\n
 
  Examples:
- @code
+ 
    position = 1 0 0
    position = circle 3 at 1 0
-   position = square 3 turn 1 1 0 at 1 1
- @endcode
+   position = square 3 align 1 1 0 at 1 1
+ 
  */ 
-Vector Movable::readPosition(std::istream& is, const Space* spc)
+Vector Movable::readPosition(std::istream& is, Space const* spc)
 {
     std::string tok;
     Vector pos(0,0,0);
@@ -376,22 +442,20 @@ Vector Movable::readPosition(std::istream& is, const Space* spc)
     
     try
     {
-        is.clear();
+        if ( is.fail() )
+            return pos;
         isp = is.tellg();
-        pos = readPrimitive(is, spc);
+        pos = readPosition0(is, spc);
         is.clear();
         
         while ( !is.eof() )
         {
             isp = is.tellg();
-            tok = Tokenizer::get_token(is);
-            
-            if ( !is.good() )
-                break;
-            
-            if ( tok.size() == 0 || !isalpha(tok[0]) )
-                throw InvalidParameter("keyword expected: at, move, add, turn or blur");
+            tok = Tokenizer::get_symbol(is);
 
+            if ( tok.size() == 0 )
+                return pos;
+            
             // Translation is specified with 'at' or 'move'
             if ( tok == "at"  ||  tok == "move" )
             {
@@ -402,14 +466,14 @@ Vector Movable::readPosition(std::istream& is, const Space* spc)
             // Convolve with shape
             else if ( tok == "add" )
             {
-                Vector vec = readPrimitive(is, spc);
+                Vector vec = readPosition0(is, spc);
                 pos = pos + vec;
             }
             // Alignment with a vector is specified with 'align'
             else if ( tok == "align" )
             {
                 Vector vec = readDirection(is, pos, spc);
-                Rotation rot = Rotation::rotationToVector(vec, RNG);
+                Rotation rot = Rotation::randomRotationToVector(vec);
                 pos = rot * pos;
             }
             // Rotation is specified with 'turn'
@@ -423,28 +487,45 @@ Vector Movable::readPosition(std::istream& is, const Space* spc)
             {
                 real blur = 0;
                 is >> blur;
-                pos += Vector::randGauss(blur);
+                pos += Vector::randG(blur);
+            }
+            // returns a random position between the two points specified
+            else if ( tok == "to" )
+            {
+                Vector vec = readPosition0(is, spc);
+                return pos + ( vec - pos ) * RNG.preal();
+            }
+            // returns one of the two points specified
+            else if ( tok == "or" )
+            {
+                Vector alt = readPosition0(is, spc);
+                if ( RNG.flip() ) pos = alt;
             }
             else
             {
-                /*
-                 We need to work around a bug in the stream extration operator,
-                 which eats extra characters ('a','n','e','E') if doubles are extracted
-                 19.10.2015
-                 */
+                // unget last token:
                 is.clear();
                 is.seekg(isp);
+#if 1
+                /*
+                We need to work around a bug in the stream extraction operator,
+                which eats extra characters ('a','n','e','E') if a double is read
+                19.10.2015
+                */
                 is.seekg(-1, std::ios_base::cur);
-                char c = is.peek();
+                int c = is.peek();
                 if ( c=='a' || c=='b' )
                     continue;
-                
-                throw InvalidParameter("unknown transformation `"+tok+"'");
+                is.seekg(1, std::ios_base::cur);
+#endif
+                break;
+                //throw InvalidParameter("unexpected `"+tok+"'");
             }
         }
     }
-    catch ( InvalidParameter& e ) {
-        StreamFunc::show_line(std::cerr, is, isp);
+    catch ( InvalidParameter& e )
+    {
+        e << "\n" << StreamFunc::marked_line(is, isp, PREF);
         throw;
     }
     return pos;
@@ -453,29 +534,31 @@ Vector Movable::readPosition(std::istream& is, const Space* spc)
 
 //------------------------------------------------------------------------------
 /**
- Reads a direction which is a normalized vector:
+ Reads a direction which is a unit vector (norm = 1):
  
- Keyword                                       |  Resulting Vector
- ----------------------------------------------|------------------------------------------------------------
- `REAL REAL REAL`                              | the vector of norm 1 co-aligned with given vector
- `parallel REAL REAL REAL`                     | one of the two vectors of norm 1 parallel with given vector
- `orthogonal REAL REAL REAL`                   | a vector of norm 1 perpendicular to the given vector
- `horizontal` \n `parallel X`                  | (+1,0,0) or (-1,0,0), randomly chosen with equal chance
- `vertical`\n `parallel Y`                     | (0,+1,0) or (0,-1,0), randomly chosen with equal chance
- `parallel Z`                                  | (0,0,+1) or (0,0,-1), randomly chosen with equal chance
- `parallel XY`\n `parallel XZ`\n `parallel YZ` | A random vector in the specified plane
- `radial`                                      | directed from the origin to the current point
- `circular`                                    | perpendicular to axis joining the current point to the origin
- 
+ Keyword                                     | Resulting Vector                                          |
+ --------------------------------------------|------------------------------------------------------------
+ `REAL REAL REAL`                            | the vector of norm 1 co-aligned with given vector
+ `parallel REAL REAL REAL`                   | one of the two vectors of norm 1 parallel with given vector
+ `orthogonal REAL REAL REAL`                 | a vector of norm 1 perpendicular to the given vector
+ `horizontal` \n `parallel X`                | (+1,0,0) or (-1,0,0), randomly chosen with equal chance
+ `vertical`\n `parallel Y`                   | (0,+1,0) or (0,-1,0), randomly chosen with equal chance
+ `parallel Z`                                | (0,0,+1) or (0,0,-1), randomly chosen with equal chance
+ `parallel XY`\n`parallel XZ`\n`parallel YZ` | A random vector in the specified plane
+ `radial`                                    | directed from the origin to the current point
+ `antiradial`                                | directed from the current point to the origin
+ `circular`                                  | perpendicular to axis joining the current point to the origin
+ `or DIRECTION`                              | flip randomly between two specified directions
+
  
  If a Space is defined, one may also use:
  
- Keyword         |   Resulting Vector
- ----------------|----------------------------------------------------
+ Keyword         | Resulting Vector                       |
+ ----------------|-----------------------------------------
  `tangent`       | parallel to the surface of the Space
  `normal`        | perpendicular to the surface
- `centrifuge`    | normal to the surface, directed outward
- `centripete`    | normal to the surface, directed inward
+ `inward`        | normal to the surface, directed outward
+ `outward`       | normal to the surface, directed inward
 
 
  Note: when the rotation is not uniquely determined in 3D (eg. `horizontal`), 
@@ -483,93 +566,104 @@ Vector Movable::readPosition(std::istream& is, const Space* spc)
  */
 
 
-Vector Movable::readDirection(std::istream& is, Vector const& pos, const Space* spc)
+Vector Movable::readDirection0(std::istream& is, Vector const& pos, Space const* spc)
 {
-    char c = Tokenizer::eat_space(is, false);
+    int c = Tokenizer::skip_space(is, false);
     
     if ( c == EOF )
-        return Vector(1,0,0);
+        return Vector::randU();
 
     if ( isalpha(c) )
     {
-        std::string tok = Tokenizer::get_token(is);
+        const std::string tok = Tokenizer::get_symbol(is);
+        
+        if ( tok == "random" )
+            return Vector::randU();
+
+        if ( tok == "X" )
+            return Vector(RNG.sflip(), 0, 0);
+        if ( tok == "Y" )
+            return Vector(0, RNG.sflip(), 0);
+        if ( tok == "XY" )
+        {
+            const Vector2 V = Vector2::randU();
+            return Vector(V.XX, V.YY, 0);
+        }
+#if ( DIM >= 3 )
+        if ( tok == "Z" )
+            return Vector(0, 0, RNG.sflip());
+        if ( tok == "XZ" )
+        {
+            const Vector2 V = Vector2::randU();
+            return Vector(V.XX, 0, V.YY);
+        }
+        if ( tok == "YZ" )
+        {
+            const Vector2 V = Vector2::randU();
+            return Vector(0, V.XX, V.YY);
+        }
+#endif
+
+        if ( tok == "align" )
+        {
+            Vector vec;
+            if ( is >> vec )
+                return vec.normalized(RNG.sflip());
+            throw InvalidParameter("expected vector after `align`");
+        }
         
         if ( tok == "parallel" )
         {
-            char c = Tokenizer::eat_space(is, false);
-            
-            // an axis or a plane can be specified:
-            if ( c == 'X' || c == 'Y' || c == 'Z' )
-            {
-                std::string k = Tokenizer::get_token(is);
-                
-                if ( k == "X" )
-                    return Vector(RNG.sflip(), 0, 0);
-                if ( k == "Y" )
-                    return Vector(0, RNG.sflip(), 0);
-                if ( k == "Z" && DIM == 3 )
-                    return Vector(0, 0, RNG.sflip());
-                if ( k == "XY" )
-                {
-                    Vector2 h = Vector2::randUnit();
-                    return Vector(h.XX, h.YY, 0);
-                }
-                if ( k == "XZ" && DIM == 3 )
-                {
-                    Vector2 h = Vector2::randUnit();
-                    return Vector(h.XX, 0, h.YY);
-                }
-                if ( k == "YZ" && DIM == 3 )
-                {
-                    Vector2 h = Vector2::randUnit();
-                    return Vector(0, h.XX, h.YY);
-                }
-                throw InvalidParameter("Unexpected keyword `"+k+"' after `parallel`");
-            }
-            
-            real x = 1, y = 0, z = 0;
-            is >> x >> y >> z;
-            is.clear();
-            return Vector(x,y,z).normalized();
+            Vector vec;
+            if ( is >> vec )
+                return normalize(vec);
+            throw InvalidParameter("expected vector after `parallel`");
         }
-        
+
         if ( tok == "orthogonal" )
         {
-            real x = 1, y = 0, z = 0;
-            is >> x >> y >> z;
-            is.clear();
-            return Vector(x,y,z).randPerp(1);
+            Vector vec;
+            if ( is >> vec )
+                return vec.randOrthoU(1);
+            throw InvalidParameter("expected vector after `orthogonal`");
         }
-        
+
         if ( tok == "horizontal" )
+        {
+#if ( DIM >= 3 )
+            return Vector(Vector2::randU());
+#else
             return Vector(RNG.sflip(), 0, 0);
+#endif
+        }
         
         if ( tok == "vertical" )
+        {
+#if ( DIM >= 3 )
+            return Vector(0, 0, RNG.sflip());
+#else
             return Vector(0, RNG.sflip(), 0);
+#endif
+        }
         
         if ( tok == "radial" )
-            return pos.normalized();
+            return normalize(pos);
         
-        if ( tok == "circular" )
-            return pos.randPerp(1);
-        
-#if ( DIM == 3 )
-        if ( tok == "orthoradial" )
-        {
-            Vector yz(0, pos.YY, pos.ZZ);
-            return vecProd(yz.normalized(), Vector(RNG.sflip(), 0, 0));
-        }
-#endif
-        
-        if ( tok == "circular" )
-            return pos.randPerp(1);
+        if ( tok == "antiradial" )
+            return -normalize(pos);
 
+        if ( tok == "circular" )
+            return pos.randOrthoU(1.0);
+        
+        if ( tok == "orthoradial" )
+            return pos.randOrthoU(1.0);
+      
         if ( spc )
         {
             if ( tok == "tangent" )
-                return spc->normalToEdge(pos).randPerp(1);
-            
-#if ( DIM == 3 )
+                return spc->normalToEdge(pos).randOrthoU(1.0);
+           
+#if ( DIM >= 3 )
             Vector dir(0,0,1);
 #elif ( DIM == 2 )
             real dir = 1;
@@ -577,30 +671,88 @@ Vector Movable::readDirection(std::istream& is, Vector const& pos, const Space* 
             
 #if ( DIM > 1 )
             if ( tok == "clockwise" )
-                return vecProd(dir, spc->normalToEdge(pos));
+                return cross(dir, spc->normalToEdge(pos));
             
             if ( tok == "anticlockwise" )
-                return -vecProd(dir, spc->normalToEdge(pos));
+                return -cross(dir, spc->normalToEdge(pos));
 #endif
             
             if ( tok == "normal" )
                 return RNG.sflip() * spc->normalToEdge(pos);
             
-            if ( tok == "centrifuge" )
+            if ( tok == "inward" )
                 return -spc->normalToEdge(pos);
             
-            if ( tok == "centripete" )
+            if ( tok == "outward" )
                 return spc->normalToEdge(pos);
         }
         
         throw InvalidParameter("Unknown direction `"+tok+"'");
     }
     
-    // expect a Vector:
-    real x = 1, y = 0, z = 0;
-    is >> x >> y >> z;
-    is.clear();
-    return Vector(x,y,z).normalized();
+    // accept a Vector:
+    Vector vec(0,0,0);
+    if ( is >> vec )
+    {
+        real n = vec.norm();
+        if ( n < REAL_EPSILON )
+            throw InvalidParameter("direction vector appears singular");
+        return vec / n;
+    }
+    throw InvalidParameter("expected a vector specifying a `direction`");
+}
+
+
+Vector Movable::readDirection(std::istream& is, Vector const& pos, Space const* spc)
+{
+    std::string tok;
+    Vector dir(1,0,0);
+    std::streampos isp = 0;
+    
+    try
+    {
+        if ( is.fail() )
+            return dir;
+        isp = is.tellg();
+        dir = readDirection0(is, pos, spc);
+        is.clear();
+        
+        while ( !is.eof() )
+        {
+            isp = is.tellg();
+            tok = Tokenizer::get_symbol(is);
+
+            if ( tok.size() == 0 )
+                return dir;
+            
+            // Gaussian noise specified with 'blur'
+            else if ( tok == "blur" )
+            {
+                real blur = 0;
+                is >> blur;
+                dir = Rotation::randomRotation(blur*RNG.gauss()) * dir;
+            }
+            // returns one of the two points specified
+            else if ( tok == "or" )
+            {
+                Vector alt = readDirection0(is, pos, spc);
+                if ( RNG.flip() ) dir = alt;
+            }
+            else
+            {
+                // unget last token
+                is.clear();
+                is.seekg(isp);
+                break;
+            }
+        }
+    }
+    catch ( InvalidParameter& e )
+    {
+        e << "\n" << StreamFunc::marked_line(is, isp, PREF);
+        throw;
+    }
+    return dir;
 }
 
 
@@ -608,59 +760,78 @@ Vector Movable::readDirection(std::istream& is, Vector const& pos, const Space* 
  The initial orientation of objects is defined by a rotation, which can be
  specified as follows:
  
- Keyword                   |   Rotation / Result
- --------------------------|----------------------------------------------------
- `random`                  | A rotation selected uniformly among all possible rotations
- `identity`                | The object is not rotated
- `angle A B C`             | As specified by 3 Euler angles in radians (in 2D, only A is needed)
- `degree A B C`            | As specified by 3 Euler angles in degrees (in 2D, only A is needed)
- `quat q0 q1 q2 q3`        | As specified by the Quaternion (q0, q1, q2, q3)
- DIRECTION                 | see @ref Movable::readDirection
+ Keyword                 | Rotation / Result                                        |
+ ------------------------|-----------------------------------------------------------
+ `random`                | A rotation selected uniformly among all possible rotations
+ `identity`              | The object is not rotated
+ `angle A B C`           | As specified by 3 (or 1 in 2D) Euler angles in radians
+ `degree A B C`          | As specified by 3 (or 1 in 2D) Euler angles in degrees
+ `quat q0 q1 q2 q3`      | As specified by the Quaternion (q0, q1, q2, q3)
+ DIRECTION               | see @ref Movable::readDirection
+ DIRECTION or DIRECTION  | flip randomly between two specified directions
  
- In the last case, a rotation will be built that transforms (1, 0, 0) into the given vector. 
- In 3D, this does not define the rotation uniquely (eg. `horizontal`), and cytosim 
- will pick uniformly among all the possible rotations that fulfill the requirements.
- 
+ In the last case, a rotation will be built that transforms (1, 0, 0) into the given vector,
+ after normalization. In 3D, this does not define the rotation uniquely (eg. `horizontal`),
+ and cytosim will randomly pick one of the possible rotations that fulfill the requirements,
+ with equal probability for all.
 */
 
-Rotation Movable::readRotation(std::istream& is, Vector const& pos, const Space* spc)
+Rotation Movable::readRotation(std::istream& is, Vector const& pos, Space const* spc)
 {
-    char c = Tokenizer::eat_space(is, false);
+    int c = Tokenizer::skip_space(is, false);
     
     if ( c == EOF )
-        return Rotation::randomRotation(RNG);
+        return Rotation::randomRotation();
 
+    std::streampos isp = is.tellg();
     if ( isalpha(c) )
     {
-        std::streampos isp = is.tellg();
-        std::string tok = Tokenizer::get_token(is);
+        std::string tok = Tokenizer::get_symbol(is);
         
         if ( tok == "random" )
-            return Rotation::randomRotation(RNG);
-        else if ( tok == "identity" || tok == "none" )
+            return Rotation::randomRotation();
+        else if ( tok == "identity" || tok == "off" || tok == "none" )
         {
-            return Rotation::one();
+            return Rotation::identity();
         }
         else if ( tok == "angle" )
         {
-            Torque a;
-            is >> a;
-#if ( 0 )
-            std::string unit;
-            is >> unit;
-            if ( unit == "degree" )
-                a *= M_PI/180.0;
+            real ang = 0;
+            is >> ang;
+#if ( DIM >= 3 )
+            Vector dir(0,0,1);
+            isp = is.tellg();
+            tok = Tokenizer::get_symbol(is);
+            if ( tok == "axis" )
+                is >> dir;
+            else
+                is.seekg(isp);
+            return Rotation::rotationAroundAxis(normalize(dir), cos(ang), sin(ang));
+#else
+            return Rotation::rotation(cos(ang), sin(ang));
 #endif
-            return Rotation::rotationFromEulerAngles(a);
         }
         else if ( tok == "degree" )
         {
-            Torque a;
-            is >> a;
-            a *= M_PI/180.0;
-            return Rotation::rotationFromEulerAngles(a);
+            real ang = 0;
+            is >> ang;
+            ang *= M_PI/180.0;
+#if ( DIM >= 3 )
+            Vector dir(0,0,1);
+            if ( is.good() )
+            {
+                isp = is.tellg();
+                if ( Tokenizer::get_symbol(is) == "axis" )
+                    is >> dir;
+                else
+                    is.seekg(isp);
+            }
+            return Rotation::rotationAroundAxis(normalize(dir), cos(ang), sin(ang));
+#else
+            return Rotation::rotation(cos(ang), sin(ang));
+#endif
         }
-#if ( DIM == 3 )
+#if ( DIM >= 3 )
         else if ( tok == "quat" )
         {
             Quaternion<real> quat;
@@ -673,10 +844,10 @@ Rotation Movable::readRotation(std::istream& is, Vector const& pos, const Space*
 #endif
         
         is.clear();
-        is.seekg(isp, std::ios::beg);
+        is.seekg(isp);
     }
 
-    // The last option is to specity a vector:
+    // The last option is to specity a direction:
     Vector vec = readDirection(is, pos, spc);
     
     /*
@@ -684,6 +855,6 @@ Rotation Movable::readRotation(std::istream& is, Vector const& pos, const Space*
      return a random rotation that is picked uniformly among
      the all possible rotations transforming (1,0,0) in vec.
      */
-    return Rotation::rotationToVector(vec, RNG);
+    return Rotation::randomRotationToVector(vec);
 }
 

@@ -1,17 +1,16 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef WRIST_LONG_H
 #define WRIST_LONG_H
 
 #include "wrist.h"
-#include "point_exact.h"
+#include "mecapoint.h"
 
 
 /// a Wrist with a non-zero resting length.
 /**
- The anchorage is described by PointExact sBase:
- - the Mecable is sBase.object()
- - the index of the model-point on this Mecable is sBase.index()
+ The anchorage is described by Mecapoint sBase:
+ - the Mecable is sBase.mecable()
+ - the index of the vertex on this Mecable is sBase.point()
  .
  It has a non-zero resting length.
  
@@ -22,13 +21,13 @@ class WristLong : public Wrist
     /// the side (top/bottom) of the interaction
     mutable Torque  mArm;
     
-    /// used to calculate \a mArm
-    static Torque calcArm(const PointInterpolated & pt, Vector const& pos, real len);
+    /// used to calculate `mArm`
+    static Torque calcArm(const Interpolation & pt, Vector const& pos, real len);
     
 public:
      
     /// constructor
-    WristLong(SingleProp const*, Mecable const*, unsigned);
+    WristLong(SingleProp const*, Mecable const*, unsigned point);
 
     /// destructor
     ~WristLong();
@@ -41,7 +40,7 @@ public:
     /// force = stiffness * ( posFoot() - posHand() )
     Vector  force() const;
         
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

@@ -12,7 +12,6 @@
 class Meca;
 class Single;
 class SingleProp;
-class Glossary;
 
 /// A single point with a radius
 /**
@@ -29,26 +28,18 @@ class Glossary;
 */
 class Bead : public Mecable
 {
-public:
-    
-    /// Property
-    BeadProp const* prop;
-
 private:
-    
-    /// position
-    Vector      paPos;
     
     /// radius
     real        paRadius;
-    
-    /// force on center, during past simulation step
-    Vector      paForce;
 
     /// the total drag coefficient for translation
     real        paDrag;
     
 public:
+    
+    /// Property
+    BeadProp const* prop;
     
     /// create following specifications
     Bead(BeadProp const*, Vector pos, real rad);
@@ -59,53 +50,30 @@ public:
     //--------------------------------------------------------------------------
     
     /// return the position in space of the object
-    Vector       position()              const { return paPos; } 
-    
-    /// true if object accepts translations (default=false)
-    bool         translatable()          const { return true; }
+    Vector      pos()                  const { return Vector(pPos); }
+
+    /// return the position in space of the object
+    Vector      position()             const { return Vector(pPos); }
     
     /// move the object position ( position += given vector )
-    void         translate(Vector const& w)    { paPos += w; }
+    void        translate(Vector const& x)   { x.add_to(pPos); }
     
     /// set the object position ( position = given vector )
-    void         setPosition(Vector const& w)  { paPos = w; }
-
-    /// modulo the position (periodic boundary conditions)
-    void         foldPosition(const Modulo *);
+    void        setPosition(Vector const& x) { x.store(pPos); }
 
     //--------------------------------------------------------------------------
         
     /// the radius of the Bead
-    real         radius()                const { return paRadius; }
+    real        radius()               const { return paRadius; }
     
     /// the volume of the bead
-    real         radiusSqr()             const { return paRadius * paRadius; }
+    real        radiusSqr()            const { return paRadius * paRadius; }
     
     /// set the radius of the Bead
-    void         resize(real R)                { assert_true(R>0); paRadius = R; setDragCoefficient(); }
+    void        resize(real R)               { assert_true(R>0); paRadius = R; setDragCoefficient(); }
     
     /// the volume of the bead
-    real         volume() const;
-    
-    //--------------------------------------------------------------------------
-
-    /// can only have one point
-    unsigned int nbPoints()              const { return 1; }
-    
-    /// return position of point
-    Vector       posPoint(unsigned n)        const { assert_true(n==0); return paPos; }
-    
-    /// copy coordinates to given array
-    void         putPoints(real * x)     const { paPos.put(x); }
-    
-    /// set position
-    void         getPoints(const real * x)     { paPos.get(x); }
-    
-    /// return Force on point x calculated at previous step by Brownian dynamics
-    Vector       netForce(unsigned n)   const { assert_true(n==0); return paForce; }
-    
-    /// replace current forces by the ones provided
-    void         getForces(const real * x)     { paForce.get(x); }
+    real        volume() const;
     
     //--------------------------------------------------------------------------
     
@@ -113,8 +81,8 @@ public:
     void        setDragCoefficient();
     
     /// the total drag-coefficient of object (force = drag * speed)
-    real        dragCoefficient()        const { return paDrag; }
-    
+    real        dragCoefficient()      const { return paDrag; }
+
     /// sets the mobility (called at every step)
     /**
      setDragCoefficient() is called when the Bead is created,
@@ -123,41 +91,56 @@ public:
     void        prepareMecable() {}
     
     /// calculates the speed of points in Y, for the forces given in X
-    void        setSpeedsFromForces(const real* X, real* Y, real, bool) const;
+    void        projectForces(const real* X, real* Y) const;
     
     /// add contribution of Brownian forces
-    real        addBrownianForces(real* rhs, real sc) const;
+    real        addBrownianForces(real const* rnd, real sc, real* rhs) const;
 
     /// add the interactions due to confinement
-    void        setInteractions(Meca &) const;    
+    void        setInteractions(Meca &) const;
     
-    /// monte-carlo step
-    void        step();
-    
-    //---------------------------- next / prev ---------------------------------
-    
+    //--------------------------------------------------------------------------
+
     /// a static_cast<> of Node::next()
     Bead *      next()  const { return static_cast<Bead*>(nNext); }
     
     /// a static_cast<> of Node::prev()
     Bead *      prev()  const { return static_cast<Bead*>(nPrev); }
     
-    //------------------------------ read/write --------------------------------
+    //--------------------------------------------------------------------------
 
     /// a unique character identifying the class
-    static const Tag TAG = 'b';
+    static const ObjectTag TAG = 'b';
     
     /// return unique character identifying the class
-    Tag         tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
+    /// return associated Property
+    Property const* property() const { return prop; }
     
-    ///read from file
-    void        read(InputWrapper&, Simul&);
+    /// convert pointer to Fiber* if the conversion seems valid; returns 0 otherwise
+    static Bead* toBead(Object * obj)
+    {
+        if ( obj  &&  obj->tag() == TAG )
+            return static_cast<Bead*>(obj);
+        return nullptr;
+    }
     
-    ///write to file
-    void        write(OutputWrapper&) const;
+    /// convert pointer to Fiber* if the conversion seems valid; returns 0 otherwise
+    static Bead const* toBead(Object const* obj)
+    {
+        if ( obj  &&  obj->tag() == TAG )
+            return static_cast<Bead const*>(obj);
+        return nullptr;
+    }
+
+    //--------------------------------------------------------------------------
+
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+    
+    /// write to file
+    void        write(Outputter&) const;
 
 };
 

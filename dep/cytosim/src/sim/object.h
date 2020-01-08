@@ -5,17 +5,28 @@
 
 #include "inventoried.h"
 #include "movable.h"
+#include "random.h"
 #include "array.h"
 #include "node.h"
 
 class Simul;
 class Property;
-class InputWrapper;
-class OutputWrapper;
+class Inputter;
+class Outputter;
+class ObjectSet;
+class Display;
 
+/// Type for unique class identifier used to read/write objects from file
+typedef int ObjectTag;
 
-/// Type for unique class identifier used to read/write from objects from file
-typedef char Tag;
+/// Type used to mark objects
+typedef unsigned long ObjectMark;
+
+/// Type used to flag objects
+typedef unsigned long ObjectFlag;
+
+/// Type used for signature
+typedef unsigned ObjectSignature;
 
 /// Parent class for all simulated objects
 /**
@@ -23,8 +34,8 @@ typedef char Tag;
  
  Three functions identify an Object:
  - tag() [ASCII character] identifies the class of Object.
- - property->index() [integer] identifies its Property.
- - number() [serial-number] derived from Inventoried identifies unique instantiations.
+ - property->number() [integer] identifies its Property.
+ - identity() [serial-number] derived from Inventoried identifies unique instantiations.
  .
  These three qualities are concatenated in reference() and writeReference().
  
@@ -32,86 +43,135 @@ typedef char Tag;
  */
 class Object : public Node, public Inventoried, public Movable
 {
-    
-    friend class ObjectSet;
-    
 private:
     
     /// integer used for custom tasks, which is recorded to file
-    int          oMark;
+    ObjectMark        mark_;
+
+    /// another integer used for various tasks, not saved to file
+    ObjectFlag        flag_;
     
-    /// another integer that can be used for custom tasks, but this one is not saved
-    mutable int  oFleck;
+    /// a random number associated with this object
+    unsigned     signature_;
+    
+    /// upstream pointer to container class
+    ObjectSet *        set_;
     
 public:
     
     /// Object::TAG = 'v' represents the 'void' pointer
-    static const Tag TAG = 'v';
+    static const ObjectTag TAG = 'v';
     
-    /// build a string reference by concatenating (tag, property_index, number, mark)
-    static std::string strReference(char, int, Number, int);
-
-    /// read a reference (property_index, number, mark) from input
-    static void        readReference(InputWrapper&, int&, Number&, int&, char pretag);
+    /// build a reference string by concatenating (tag, property_number, ObjectID)
+    static std::string reference(ObjectTag, unsigned, ObjectID);
     
 public:
     
     /// constructor
-    Object() : oMark(0), oFleck(0) {}
+    Object() : mark_(0), flag_(0), signature_(RNG.pint()), set_(nullptr) { }
     
-    /// an ASCII character identifying the ObjectSet corresponding to this object
-    virtual Tag     tag() const = 0;
+    /// copy constructor
+    Object(Object const& o) : mark_(o.mark_), flag_(o.flag_), signature_(o.signature_), set_(nullptr) {}
+    
+    /// assignment operator
+    Object& operator =(const Object& o) { mark_=o.mark_; flag_=o.flag_; signature_=o.signature_; set_=nullptr; return *this; }
+    
+    /// destructor
+    ~Object();
+    
+    /// a character identifying the class of this object
+    virtual ObjectTag tag() const { return TAG; }
     
     /// Property associated with the Object
-    virtual const Property* property() const = 0;
+    virtual Property const* property() const = 0;
     
     /// write Object data to file
-    virtual void    write(OutputWrapper&) const = 0;
+    virtual void    write(Outputter&) const = 0;
     
     /// read Object from file, within the Simul
-    virtual void    read(InputWrapper&, Simul&) = 0;
+    virtual void    read(Inputter&, Simul&, ObjectTag) = 0;
     
+    //--------------------------
+
+    /// returns container ObjectSet
+    ObjectSet *     objset() const { return set_; }
     
-    /// concatenation of [ tag(), property()->index(), number() ] in plain ascii
+    /// returns container Simul
+    Simul &         simul() const;
+    
+    /// change container class
+    void            objset(ObjectSet* s) { set_ = s; }
+    
+    /// true if Node is registered in a container class
+    bool            linked() const { return set_ != nullptr; }
+
+    /// concatenation of [ tag(), property()->number(), identity() ] in plain ascii
     std::string     reference() const;
+
+    /// write a reference, but using the provided Tag
+    void            writeReference(Outputter&, ObjectTag tag) const;
     
     /// write a reference that identifies the Object uniquely
-    void            writeReference(OutputWrapper &) const;
-    
-    /// write a reference, but using the provided Tag
-    void            writeReference(OutputWrapper &, Tag tag) const;
+    void            writeReference(Outputter& ow) const { writeReference(ow, tag()); }
     
     /// write a reference that does not refer to any Object
-    static void     writeNullReference(OutputWrapper &);
+    static void     writeNullReference(Outputter&);
+
+    /// write header to object data, but using the provided Tag
+    void            writeHeader(Outputter&, ObjectTag tag) const;
+
+    //--------------------------
+
+    /// get mark
+    ObjectMark      mark()          const { return mark_; }
+    
+    /// set mark
+    void            mark(ObjectMark m)    { mark_ = m; }
     
     
-    /// birth mark value
-    int             mark()       const { return oMark; }
+    /// retrieve flag value
+    ObjectFlag      flag()         const  { return flag_; }
     
-    /// set birth mark
-    void            mark(int m)        { oMark = m; }
+    /// set flag (this value is not stored in trajectory files)
+    void            flag(ObjectFlag f)    { flag_ = f; }
     
-    
-    /// fleck value (not stored in trajectory files)
-    int             fleck()      const { return oFleck; }
-    
-    /// set fleck (the value is not stored in trajectory files)
-    void            fleck(int f) const { oFleck = f; }
+    /// set flag to match identity()
+    void            flag_to_identity()    { flag_ = identity(); }
 
     
+    /// a random number that makes objects unique
+    ObjectSignature signature()     const { return signature_; }
+    
+    /// set signature
+    void     signature(ObjectSignature s) { signature_ = s; }
+
+    //--------------------------
+
     /// extends Node::next(), with a cast to preserve type
-    Object *        next()       const { return static_cast<Object*>(nNext); }
+    Object *        next()          const { return static_cast<Object*>(nNext); }
     
     /// extends Node::prev(), with a cast to preserve type
-    Object *        prev()       const { return static_cast<Object*>(nPrev); }
-    
+    Object *        prev()          const { return static_cast<Object*>(nPrev); }
 };
 
 
+/// return always 'true'
+bool match_all(Object const*, void const*);
 
-/// a list of Object
+/// return 'true' if ( obj->mark() == *mark )
+bool match_mark(Object const* obj, void const* mark);
+
+/// return 'true' if ( obj->property() == prop )
+bool match_property(Object const* obj, void const* prop);
+
+
+/// a list of pointers to Object
 typedef Array<Object *> ObjectList;
 //typedef std::vector<Object *> ObjectList;
+
+
+/// output operator
+std::ostream& operator << (std::ostream& os, ObjectList const&);
 
 
 #endif

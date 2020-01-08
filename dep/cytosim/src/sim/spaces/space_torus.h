@@ -1,6 +1,5 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-
 #ifndef SPACE_TORUS_H
 #define SPACE_TORUS_H
 
@@ -9,18 +8,13 @@
 ///a torus of constant diameter centered on the origin
 /**
  Space `torus` is defined by two parameters: 
- @code
-    torus radius width
- @endcode
  
- With:
- - `radius` = the main radius of the torus
- - `width`  = the diameter of the torus in its crosssections.
-  .
- 
- If 'length` is not specified, the torus is endless.
- 
- 
+ Parameters:
+     - `radius` = the main radius of the torus centerline
+     - `width`  = the diameter of the torus in its cross sections.
+     .
+
+ @ingroup SpaceGroup
  */
 class SpaceTorus : public Space
 {
@@ -32,32 +26,47 @@ private:
     /// thickness
     real  bWidth, bWidthSqr;
     
+    /// set bWidthSqr
+    void update() { bWidthSqr = square(bWidth); }
+    
     /// project on the backbone
-    void project0(const real point[], real proj[]) const;
+    Vector backbone(Vector const& pos) const;
     
 public:
         
     /// constructor
-    SpaceTorus(const SpaceProp* p);
+    SpaceTorus(SpaceProp const*);
         
-    /// update following changed dimensions
-    void        resize();
+    /// change dimensions
+    void        resize(Glossary& opt);
 
-    /// maximum extension along each axis
-    Vector      extension() const;
+    /// return bounding box in `inf` and `sup`
+    void        boundaries(Vector& inf, Vector& sup) const;
     
+    /// radius
+    real        thickness() const { return bWidth; }
+
     /// the volume inside
     real        volume() const;
     
     /// true if the point is inside the Space
-    bool        inside(const real point[]) const;
+    bool        inside(Vector const&) const;
     
-    /// project point on the closest edge of the Space
-    void        project(const real point[], real proj[]) const;
+    /// set `proj` as the point on the edge that is closest to `point`
+    Vector      project(Vector const& pos) const;
     
-    /// OpenGL display function, return true is display was done
-    bool        display() const;
+    /// OpenGL display function; returns true if successful
+    bool        draw() const;
     
+    /// write to file
+    void        write(Outputter&) const;
+
+    /// get dimensions from array `len`
+    void        setLengths(const real len[8]);
+    
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+
 };
 
 #endif

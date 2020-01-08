@@ -20,7 +20,7 @@ class NucleatorProp;
  
  By default the nucleator stays attached at the MINUS_END
  of the fiber that it has created.
- This can be changed by setting: @ref NucleatorPar "track_end"
+ This can be changed by setting: @ref NucleatorPar "hold_end"
 
  See Examples and the @ref NucleatorPar.
  @ingroup HandGroup
@@ -28,38 +28,37 @@ class NucleatorProp;
  */
 class Nucleator : public Hand
 {
-
-    /// Gillespie time
-    real     gspTime;
-    
 private:
     
     /// disabled default constructor
     Nucleator();
     
-    /// Property
-    NucleatorProp const* prop;
+    /// Gillespie countdown timer
+    real     gspTime;
     
 public:
     
+    /// Property
+    NucleatorProp const* prop;
+    
     /// constructor
-    Nucleator(NucleatorProp const* p, HandMonitor* h);
+    Nucleator(NucleatorProp const*, HandMonitor*);
 
     /// destructor
     ~Nucleator() {}
     
     
     /// create a new Fiber
-    void   nucleate(Vector pos);
+    void   makeFiber(Simul&, Vector pos, std::string const&, Glossary&);
     
     /// simulate when is not attached
-    void   stepFree(const FiberGrid&, Vector const & pos);
+    void   stepUnattached(const FiberGrid&, Vector const& pos);
 
-    /// simulate when \a this is attached but not under load
+    /// simulate when `this` is attached but not under load
     void   stepUnloaded();
 
-    /// simulate when \a this is attached and under load
-    void   stepLoaded(Vector const & force);
+    /// simulate when `this` is attached and under load
+    void   stepLoaded(Vector const& force, real force_norm);
     
     /// detach from Fiber
     void   detach();

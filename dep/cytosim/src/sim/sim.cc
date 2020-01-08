@@ -1,57 +1,47 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-
 #include "simul.h"
 #include "parser.h"
 #include "messages.h"
 #include "glossary.h"
 #include "exceptions.h"
+#include "ansi_colors.h"
+#include "filepath.h"
+#include "splash.h"
 #include "tictoc.h"
 #include <csignal>
+#include "unistd.h"
 
-using std::endl;
 
-
-void splash(std::ostream & os = std::cout)
+void help(std::ostream& os)
 {
-    os << "  ------------------------------------------------------------- " << endl;
-    os << " |  CytoSIM  -  www.cytosim.org  -  version PI  -  May  2017   |" << endl;
-    os << "  ------------------------------------------------------------- " << endl;
+    os << "sim [OPTIONS] [FILE]\n";
+    os << "  FILE    run specified config file (FILE must end with `.cym')\n";
+    os << "  *       print messages to terminal (and not `messages.cmo')\n";
+    os << "  info    print build options\n";
+    os << "  help    print this message\n";
 }
 
 
-void help(std::ostream & os = std::cout)
+void handle_signal(int sig)
 {
-    os << " Command line options:" << endl;
-    os << "    FILENAME   set config file if FILENAME ends by `.cym'" << endl;
-    os << "    *          send messages to terminal instead of `messages.cmo'" << endl;
-    os << "    info       print build options" << endl;
-    os << "    help       print this message" << endl;
-    os << "    -          do not splash standard output" << endl;
+    /*
+     A signal handler is restricted to call only async-signal-safe-functions
+     practically speaking, most syscalls(2) only
+     */
+    char str[128] = { 0 };
+    strncpy(str, "Cytosim received signal   \n", 128);
+    str[25] = (char)('0' + ( sig     % 10));
+    str[24] = (char)('0' + ((sig/10) % 10));
+    (void) write(STDERR_FILENO, str, 28);
+    _exit(sig);
 }
 
 
-void info(std::ostream & os = std::cout)
+void handle_interrupt(int sig)
 {
-    os << "www.cytosim.org - sim" << endl;
-    os << " https://github.com/nedelec/cytosim" << endl;
-    os << " Compiled at "<<__TIME__<< " on " <<__DATE__<< endl;
-    os << " Precision: " << sizeof(real) << " bytes,  epsilon = " << REAL_EPSILON << endl;
-    
-#ifdef NDEBUG
-    os << " (no assertions)" << endl;
-#else
-    os << " with assertions" << endl;
-#endif
-    
-    os << " DIM = " << DIM << endl;
-}
-
-
-void killed_handler(int sig)
-{
-    Cytosim::MSG("killed\n");
-    exit(sig);
+    Cytosim::out << "killed " << sig << "\n" << std::endl;
+    _exit(sig);
 }
 
 //------------------------------------------------------------------------------
@@ -60,76 +50,93 @@ void killed_handler(int sig)
 
 int main(int argc, char* argv[])
 {
-    
-    // Register a function to be called for Floating point exceptions:
-    if ( signal(SIGINT, killed_handler) == SIG_ERR )
+    // register callback to catch interrupting signals:
+    if ( signal(SIGINT, handle_interrupt) )
         std::cerr << "Could not register SIGINT handler\n";
-    
-    if ( signal(SIGTERM, killed_handler) == SIG_ERR )
+    if ( signal(SIGTERM, handle_interrupt) )
         std::cerr << "Could not register SIGTERM handler\n";
+    if ( signal(SIGSEGV, handle_signal) )
+        std::cerr << "Could not register SIGSEGV handler\n";
+    if ( signal(SIGILL,  handle_signal) )
+        std::cerr << "Could not register SIGILL handler\n";
+    if ( signal(SIGABRT, handle_signal) )
+        std::cerr << "Could not register SIGABRT handler\n";
 
-    Simul simul;
+    Glossary arg;
 
     //parse the command line:
-    Glossary glos;
-    glos.readStrings(argc, argv);
-    
-    if ( glos.use_key("help") )
+    if ( arg.read_strings(argc-1, argv+1) )
+        return EXIT_FAILURE;
+
+    if ( arg.use_key("help") || arg.use_key("--help") )
     {
-        help();
+        splash(std::cout);
+        help(std::cout);
+        return EXIT_SUCCESS;
+    }
+
+    if ( arg.use_key("info") || arg.use_key("--version")  )
+    {
+        splash(std::cout);
+        print_version(std::cout);
+        std::cout << "    DIM = " << DIM << '\n';
         return EXIT_SUCCESS;
     }
     
-    if ( glos.use_key("info") )
+    if ( ! arg.use_key("*") )
     {
-        info();
-        return EXIT_SUCCESS;
+        Cytosim::out.open("messages.cmo");
+        Cytosim::log.redirect(Cytosim::out);
+        Cytosim::warn.redirect(Cytosim::out);
     }
     
-    if ( ! glos.use_key("*") )
+    // change working directory if specified:
+    if ( arg.has_key("directory") )
     {
-        Cytosim::open("messages.cmo");
-    }        
-    
-    if ( !glos.use_key("-") )
-        splash();
-    
-    char date[26];
-    TicToc::date(date, sizeof(date));
-    Cytosim::MSG("CYTOSIM started %s\n", date);
-    
-    
+        FilePath::change_dir(arg.value("directory", 0));
+        //std::clog << "Cytosim working directory is " << FilePath::get_cwd() << '\n';
+    }
+
+#ifdef CODE_VERSION
+    Cytosim::out << "CYTOSIM PI version " << CODE_VERSION << "\n";
+#else
+    Cytosim::out << "CYTOSIM PI\n";
+#endif
+
+    Simul simul;
     try {
-        simul.initialize(glos);
+        simul.initialize(arg);
     }
     catch( Exception & e ) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        print_magenta(std::cerr, "Error: "+e.brief());
+        std::cerr << e.info() << '\n';
         return EXIT_FAILURE;
     }
     catch(...) {
-        std::cerr << "Error: an unknown exception occured during initialization" << std::endl;
+        print_red(std::cerr, "Error: an unknown exception occurred during initialization\n");
         return EXIT_FAILURE;
     }
     
-    glos.warnings(std::cerr);
-
-    Cytosim::MSG("============================== RUNNING ================================\n");
-
+    arg.warnings(std::cerr);
+    time_t sec = TicToc::seconds_since_1970();
+    
     try {
-        Parser(simul, 1, 1, 1, 1, 1).readConfig(simul.prop->config);
+        if ( Parser(simul, 1, 1, 1, 1, 1).readConfig() )
+            std::cerr << "You must specify a config file\n";
     }
     catch( Exception & e ) {
-        std::cerr << std::endl << "Error: " << e.what() << std::endl;
+        print_magenta(std::cerr, "Error: "+e.brief());
+        std::cerr << e.info() << '\n';
         return EXIT_FAILURE;
     }
     catch(...) {
-        std::cerr << std::endl << "Error: an unknown exception occured" << std::endl;
+        std::cerr << "\nError: an unknown exception occurred\n";
         return EXIT_FAILURE;
     }
     
-    TicToc::date(date, sizeof(date));
-    Cytosim::MSG("%s\n", date);
-    Cytosim::MSG("end\n");
-    Cytosim::close();
+    Cytosim::out << "% " << TicToc::date() << "\n";
+    sec = TicToc::seconds_since_1970() - sec;
+    Cytosim::out << "end  " << sec << " s ( " << (real)( sec / 60 ) / 60.0 << " h )\n";
+    Cytosim::out.close();
     return EXIT_SUCCESS;
 }

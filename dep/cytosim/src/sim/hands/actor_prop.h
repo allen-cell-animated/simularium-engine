@@ -28,7 +28,6 @@ public:
     real rate;
     
     /// @}
-    //------------------ derived variables below ----------------
 
 public:
     
@@ -39,7 +38,7 @@ public:
     ~ActorProp() { }
     
     /// return a Hand with this property
-    virtual Hand * newHand(HandMonitor* h) const;
+    virtual Hand * newHand(HandMonitor*) const;
     
     /// set default values
     void clear();
@@ -48,13 +47,13 @@ public:
     void read(Glossary&);
     
     /// compute values derived from the parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new ActorProp(*this); }
     
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

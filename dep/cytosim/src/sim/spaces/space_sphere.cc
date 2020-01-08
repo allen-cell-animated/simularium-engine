@@ -1,165 +1,113 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
 #include "space_sphere.h"
 #include "exceptions.h"
+#include "iowrapper.h"
+#include "glossary.h"
 #include "random.h"
-#include "smath.h"
 #include "meca.h"
 
-extern Random RNG;
-
-SpaceSphere::SpaceSphere(const SpaceProp* p)
-: Space(p)
+SpaceSphere::SpaceSphere(SpaceProp const* p)
+: Space(p), radius_(0), radiusSqr_(0)
 {
-    if ( radius() < 0 )
-        throw InvalidParameter("sphere:radius should be specified and >= 0");
 }
 
 
-#if (DIM == 1)
-
-Vector SpaceSphere::extension() const
+void SpaceSphere::resize(Glossary& opt)
 {
-    return Vector(radius(), 0, 0);
+    real rad = radius_;
+    
+    if ( opt.set(rad, "diameter") )
+        rad *= 0.5;
+    else opt.set(rad, "radius");
+    
+    if ( rad < 0 )
+        throw InvalidParameter(prop->name()+":radius must be >= 0");
+    
+    radius_ = rad;
+    update();
 }
+
+void SpaceSphere::boundaries(Vector& inf, Vector& sup) const
+{
+    inf.set(-radius_,-radius_,-radius_);
+    sup.set( radius_, radius_, radius_);
+}
+
 
 real SpaceSphere::volume() const
 {
-    return 2 * radius();
-}
-
-bool SpaceSphere::inside( const real point[] ) const
-{
-    return point[0] * point[0] <= radiusSqr();
-}
-
-void SpaceSphere::project( const real point[], real proj[] ) const
-{
-    real n = point[0] * point[0];
-    
-    if ( n > 0 ) {
-        n = radius() / sqrt( n );
-        proj[0] = n * point[0];
-    }
-    else {
-        proj[0] = RNG.sflip() * radius();
-    }
-}
-
+#if ( DIM == 1 )
+    return 2 * radius_;
+#elif ( DIM == 2 )
+    return M_PI * square(radius_);
+#else
+    return 4*M_PI/3.0 * cube(radius_);
 #endif
-
-
-//------------------------------------------------------------------------------
-
-
-#if (DIM == 2)
-
-Vector SpaceSphere::extension() const
-{
-    return Vector(radius(), radius(), 0);
 }
 
-real SpaceSphere::volume() const
+bool SpaceSphere::inside(Vector const& pos) const
 {
-    return M_PI * radius() * radius();
+    return pos.normSqr() <= radiusSqr_;
 }
 
-bool SpaceSphere::inside( const real point[] ) const
+Vector SpaceSphere::project(Vector const& pos) const
 {
-    return point[0] * point[0] + point[1] * point[1] <= radiusSqr();
-}
-
-void SpaceSphere::project( const real point[], real proj[] ) const
-{    
-    real n = point[0] * point[0] + point[1] * point[1];
+    real n = pos.normSqr();
     
     if ( n > 0 ) {
-        n = radius() / sqrt( n );
-        proj[0] = n * point[0];
-        proj[1] = n * point[1];
+        return pos * ( radius_ / sqrt(n) );
     }
     else {
         //select a random point on the surface
-        real x, y;
-        do {
-            x = RNG.sreal();
-            y = RNG.sreal();
-            n = x*x + y*y;
-        } while ( n > 1.0  ||  n == 0 );
-        n = radius() / sqrt( n );
-        proj[0] = n * x;
-        proj[1] = n * y;
+        return radius_ * Vector::randU();
     }
 }
-
-#endif
-
 
 //------------------------------------------------------------------------------
 
-#if (DIM == 3)
-
-Vector SpaceSphere::extension() const
+void SpaceSphere::setInteraction(Vector const& pos, Mecapoint const& pe, Meca & meca, real stiff) const
 {
-    return Vector(radius(), radius(), radius());
+    meca.addSphereClamp(pos, pe, Vector(0,0,0), radius_, stiff);
 }
 
-real SpaceSphere::volume() const
-{
-    return 4/3.0 * M_PI * radius() * radius() * radius();
-}
 
-bool SpaceSphere::inside( const real point[] ) const
+void SpaceSphere::setInteraction(Vector const& pos, Mecapoint const& pe, real rad, Meca & meca, real stiff) const
 {
-    return point[0] * point[0] + point[1] * point[1] + point[2] * point[2] <= radiusSqr();
-}
-
-void SpaceSphere::project( const real point[], real proj[] ) const
-{    
-    real n = point[0] * point[0] + point[1] * point[1] + point[2] * point[2];
-    
-    if ( n > 0 ) {
-        n = radius() / sqrt( n );
-        proj[0] = n * point[0];
-        proj[1] = n * point[1];
-        proj[2] = n * point[2];
-    }
+    if ( radius_ > rad )
+        meca.addSphereClamp(pos, pe, Vector(0,0,0), radius_-rad, stiff);
     else {
-        //select a random point on the surface
-        real x, y, z;
-        do {
-            x = RNG.sreal();
-            y = RNG.sreal();
-            z = RNG.sreal();
-            n = x*x + y*y + z*z;
-        } while ( n > 1.0  ||  n == 0 );
-        n = radius() / sqrt( n );
-        proj[0] = n * x;
-        proj[1] = n * y;
-        proj[2] = n * z;
-    }
-}
-
-#endif
-
-//------------------------------------------------------------------------------
-
-void SpaceSphere::setInteraction(Vector const& pos, PointExact const& pe, Meca & meca, real stiff) const
-{
-    meca.interLongClamp( pe, Vector(0,0,0), radius(), stiff );
-}
-
-
-void SpaceSphere::setInteraction(Vector const& pos, PointExact const& pe, real rad, Meca & meca, real stiff) const
-{
-    if ( radius() > rad )
-        meca.interLongClamp( pe, Vector(0,0,0), radius()-rad, stiff );
-    else {
-        meca.interClamp( pe, Vector(0,0,0), stiff );
+        meca.addPointClamp(pe, Vector(0,0,0), stiff);
         std::cerr << "object is too big to fit in SpaceSphere\n";
     }
 }
+
+
+//------------------------------------------------------------------------------
+
+void SpaceSphere::write(Outputter& out) const
+{
+    out.put_characters("sphere", 16);
+    out.writeUInt16(2);
+    out.writeFloat(radius_);
+    out.writeFloat(0.f);
+}
+
+
+void SpaceSphere::setLengths(const real len[])
+{
+    radius_ = len[0];
+    update();
+}
+
+
+void SpaceSphere::read(Inputter& in, Simul&, ObjectTag)
+{
+    real len[8] = { 0 };
+    read_data(in, len, "sphere");
+    setLengths(len);
+}
+
 
 //------------------------------------------------------------------------------
 //                         OPENGL  DISPLAY
@@ -167,45 +115,33 @@ void SpaceSphere::setInteraction(Vector const& pos, PointExact const& pe, real r
 
 #ifdef DISPLAY
 
-#include "glut.h"
 #include "gle.h"
 
-bool SpaceSphere::display() const
+bool SpaceSphere::draw() const
 {
+
 #if ( DIM <= 2 )
+ 
+    //number of sections in the quarter-circle
+    constexpr size_t fin = ((DIM==2) ? 32 : 8) * gle::finesse;
     
-    GLfloat R = radius();
-    glBegin(GL_LINE_LOOP);
-    for ( real aa = 0; aa < 6.28; aa += 0.01 )
-        glVertex2f( R*cosf(aa), R*sinf(aa) );
-    glEnd();
+    GLfloat cir[2*fin+2];
+    gle::circle(fin, cir, (GLfloat)radius_);
+    
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(2, GL_FLOAT, 0, cir);
+    glDrawArrays(GL_LINE_STRIP, 0, fin+1);
+    glDisableClientState(GL_VERTEX_ARRAY);
 
 #else
-
-
-    const int fin = 8*gle::finesse;
+    
+    GLfloat R = (GLfloat)radius_;
     glPushMatrix();
-    gle::gleScale(radius());
-    //draw a transparent sphere with GLU
-    static GLUquadricObj * qobj = 0;
-    if ( qobj == 0 )
-    {
-        qobj = gluNewQuadric();
-        gluQuadricDrawStyle(qobj, GLU_FILL);
-        //gluQuadricOrientation(qobj, GLU_OUTSIDE);
-        gluQuadricNormals(qobj, GLU_SMOOTH);
-    }
-    gluSphere(qobj, 1, fin, fin);
-    if ( 1 )
-    {
-        GLfloat width = 0.02;
-        gle::gleArrowedBand(width);
-        glRotated(-90,1,0,0);
-        gle::gleArrowedBand(width);
-        glRotated(90,0,1,0);
-        gle::gleArrowedBand(width);
-    }
+    glScalef(R, R, R);
+    gle::gleSphere8B();
+    gle::gleThreeBands(128);
     glPopMatrix();
+    
 #endif
     
     return true;
@@ -213,10 +149,9 @@ bool SpaceSphere::display() const
 
 #else
 
-bool SpaceSphere::display() const
+bool SpaceSphere::draw() const
 {
     return false;
 }
-
 
 #endif

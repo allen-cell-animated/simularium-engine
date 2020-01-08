@@ -3,36 +3,67 @@
 #ifndef MECA_H
 #define MECA_H
 
+#include "dim.h"
 #include "array.h"
-#include "bicgstab.h"
 #include "vector.h"
-#include "matsym.h"
-#include "matsparse.h"
-#include "matsparsesym.h"
+#include "matrix.h"
+//#include "matsparse.h"
 #include "matsparsesym1.h"
+#include "matsparsesymblk.h"
+#include "allocator.h"
+
 
 class Mecable;
-class PointExact;
-class PointInterpolated;
+class Mecapoint;
+class Interpolation;
 class SimulProp;
 class Modulo;
+
+/// MatrixBlock is an alias to a matrix class of size DIM * DIM
+class Matrix11;
+class Matrix22;
+class Matrix33;
+
+#if ( DIM == 1 )
+typedef Matrix11 MatrixBlock;
+#elif ( DIM == 2 )
+typedef Matrix22 MatrixBlock;
+#else
+typedef Matrix33 MatrixBlock;
+#endif
+
+/**
+ Option to allow the user to see Links made by Meca in 'play'.
+ This option affects display speed since it requires two calls to setInteractions()
+ This option is normally OFF. Only supported with Xcode compilation.
+ */
+#define DRAW_MECA_LINKS 0
 
 
 /// A class to calculate the motion of objects in Cytosim
 /**
-Meca solves the motion of point-objects defined by the dynamic equation:
+Meca solves the motion of objects defined by points (i.e. Mecable),
+using an equation that includes terms for each interaction between Objects,
+and also forces that are internal to an object, for instance bending elasticity
+for Fibers, and external forces such as confinements.
+The equation is formulated using linear-algebra:
  
- @code
- d vPTS/dt = mobility * mP * ( vBAS + ( mB + mC + mR + mdiffP ) * vPTS )
- @endcode
+    d vPTS/dt = mobility * mP * ( Force + mdiffP * vPTS )
  
- This equation includes internal forces (bending elasticity for RigidFiber), 
- and all the interactions between the Mecalbe in the system. 
- It is solved in the presence of Brownian motion, and at low Reynolds number
- ( mass/inertia effects are negligible ).
+ with
  
- - Vector vPTS contains all the Mecable coordinates (x, y, z): 
-   Fiber, Sphere, Solid and other PointSet. size(vPTS) = DIM * nbPts.
+    Force = vBAS + ( mB + mC + mR ) * vPTS
+ 
+ The equation is solved for a small increment of time `time_step`, in the presence
+ of Brownian motion, and at low Reynolds number, ie. a regime in which inertial
+ forces that are proportional to mass are negligible.
+ 
+ The equation contains `DIM * nbPoints()` degrees of freedom, where `nbPoints()`
+ is the total number of points in the system. It contains vectors and matrices.
+ The different  terms of the equation are:
+ 
+ - Vector vPTS containing all the Mecable coordinates (x, y, z):
+   Fiber, Sphere, Solid and other Mecable. 
  
  - Vector vBAS is of same size as vPTS, and includes the constant part obtained by
    linearization of the forces. It includes for instance the positions of Single,
@@ -41,44 +72,51 @@ Meca solves the motion of point-objects defined by the dynamic equation:
  
  - Matrix mB is the isotropic part obtained after linearization of the forces.
    It operates similarly and independently on the different dimension X, Y and Z.
-   mB is square of size nbPts, symmetric and sparse.
+   mB is square of size nbPoints(), symmetric and sparse.
  
  - Matrix mC is the non-isotropic part obtained after linearization of the forces.
-   mC is square of size DIM*nbPts, symmetric and sparse.
+   mC is square of size DIM*nbPoints(), symmetric and sparse.
  .
  
  Typically, mB and mC will inherit the stiffness coefficients of the interactions, 
- while vBAS will get forces (stiffness * position). They are set by using
- interLink(), interLongLink(), interSideLink(), interSlidingLink(), etc.
+ while vBAS will get forces (stiffness * position). They are set by the member functions
+ addLink(), addLongLink(), addSideLink(), addSlidingLink(), etc.
 
- - mR add the bending elasticity for RigidFiber, or other internal forces.
-   mR is symmetric of size DIM*nbPts, diagonal by blocks, each block corresponding to a Fiber. 
+ - mR add the bending elasticity for Mecafil, or other internal forces.
+   mR is symmetric of size DIM*nbPoints(), diagonal by blocks, each block corresponding to a Fiber.
  
  - mP applies the projection due to constrained dynamics.
-   For RigidFiber, this maintains the distance between neighboring points (longitudinal incompressibility). 
-   mP is symmetric of size DIM*nbPts, diagonal by blocks, each block corresponding to a Fiber. 
+   For Mecafil, this maintains the distance between neighboring points (longitudinal incompressibility). 
+   mP is symmetric of size DIM*nbPoints(), diagonal by blocks, each block corresponding to a Fiber.
    mP is not actually calculated as a matrix:
-   its application on each block is done by Mecable::setSpeedsFromForces()
+   its application on each block is done by Mecable::projectForces()
  
- - mdiffP is a term coming from the derivative of the projection P,
-   and it is added here because it provides better numerical stability in some situations.
-   You can undefine PROJECTION_DIFF in meca.cc to remove mdiffP.
+ - mdiffP is a term coming from the derivative of the projection P.
+   It can provide better numerical stability in some situations where the filament are stretched.
+   You can however define ADD_PROJECTION_DIFF = 0 in meca.cc to remove mdiffP.
  .
  
  
- Note: All Links are disabled if the given PointExacts or PointInterpolated have a point 
- in common, because the matrix elements are not calcuated correctly in that case. 
- Generally, such interactions are anyway not desirable. It would correspond for 
- example to a link inside a segment, or between two successive segments on the same Fiber. 
+ Note: All Links have no effect if the given Mecapoint or Interpolation have a 
+ point in common, because the matrix elements would not be calcuated correctly 
+ in that case. Generally, such interactions are anyway not desirable. It would 
+ correspond for example to a link between two point of the same segment, without 
+ effect since the segment is straight, or between two successive segments on the
+ same Fiber, which at best would fold it in a non-physical way.
 
  */
 
 class Meca
 {
+public:
+
+    /// enables graphical display of all interactions
+    bool            drawLinks;
+
 private:
     
-    /// same as Matrix::index_type
-    typedef Matrix::index_type index_type;
+    /// flag to indicate that result is available
+    int             ready_;
     
     /// local copy of the SimulProp::time_step
     real            time_step;
@@ -87,242 +125,421 @@ private:
     Array<Mecable*> objs;
     
     /// total number of points in the system
-    unsigned int    nbPts;
+    index_t         nbPts;
     
     /// size of the currently allocated memory
-    unsigned int    allocated;
-    
-    /// max block size
-    unsigned int    largestBlock;
+    size_t          allocated_;
 
     //--------------------------------------------------------------------------
-    // Vectors of size DIM * nbPts
+    // Vectors of size DIM * nbPoints()
     
-    real*  vPTS;         ///< position of the points
-    real*  vSOL;         ///< the points at the previous steps
-    real*  vBAS;         ///< base points of forces
-    real*  vRHS;         ///< right hand side of the final system
+    real*  vPTS;         ///< coordinates of Mecable points
+    real*  vSOL;         ///< coordinates after the dynamics has been solved
+    real*  vBAS;         ///< part of the force that is independent of positions
+    real*  vRND;         ///< vector of Gaussian random numbers
+    real*  vRHS;         ///< right hand side of the dynamic system
     real*  vFOR;         ///< the calculated forces, with Brownian components
     real*  vTMP;         ///< intermediate of calculus
-
+    real*  vMEM;         ///< another temporary array
+    
     //--------------------------------------------------------------------------
+
+    /// working memory allocator for BCGS and GMRES used in solve()
+    LinearSolvers::Allocator allocator;
     
-    /// true if the matrix mB is non-zero and used
-    bool   use_mB;
+    /// secondary memory allocator for GMRES
+    LinearSolvers::Allocator temporary;
     
-    /// true if the matrix mC is non-zero and used
-    bool   use_mC;
+    /// Matrices used for GMRES
+    LinearSolvers::Matrix mH, mV;
     
+    /// true if the matrix mC is non-zero
+    bool   useMatrixC;
+
 public:
-    /// isotropic symmetric part of the dynamic, size (nbPts)^2
+
+    /// isotropic symmetric part of the dynamic
     /** 
-        For interactions which have identical coefficients on the X, Y, Z subspaces
+     This is a symmetric square matrix of size `nbPoints()`
+     It contains terms which have identical coefficients on the X, Y, Z subspaces
     */
     MatrixSparseSymmetric1  mB;
 
     
-    /// non-isotropic symmetric part of the dynamic, size (DIM*nbPts)^2
+    /// non-isotropic symmetric part of the dynamic
     /** 
-        For interactions which have different coefficients on the X, Y, Z subspaces,
-        or which create interactions between two different subspaces.
+     This is a symmetric square matrix of size `DIM*nbPoints()`
+     It contains terms which are different in the X, Y, Z subspaces,
+     arising from interactions which link coordinates from different subspaces.
     */
-    MatrixSparseSymmetric1  mC;
+    MatrixSparseSymmetricBlock  mC;
+    
+    /// base for force
+    real*   base()             { return vBAS; }
 
     /// base for force
-    real&   base(index_type ix) { return vBAS[ix]; }
+    real&   base(index_t i) { return vBAS[i]; }
     
-    /// position of a point
-    Vector  pos(index_type ix) const { return Vector::make(vPTS+DIM*ix); }
+    /// position of point stored at vPTS[i]
+    Vector  position1(const index_t inx) const
+    {
+        return Vector(vPTS+inx);
+    }
     
+    /// position interpolated from two points in vPTS[]
+    Vector  position2(const index_t inx[2], const real coef[2]) const
+    {
+        Vector P0(vPTS+inx[0]);
+        Vector P1(vPTS+inx[1]);
+        return coef[0] * P0 + coef[1] * P1;
+    }
+
+    /// position interpolated from three points in vPTS[]
+    Vector  position3(const index_t inx[3], const real coef[3]) const
+    {
+        Vector P0(vPTS+inx[0]);
+        Vector P1(vPTS+inx[1]);
+        Vector P2(vPTS+inx[2]);
+        return ( coef[0] * P0 + coef[1] * P1 ) + coef[2] * P2;
+   }
+
+    /// position interpolated from four points in vPTS[]
+    Vector  position4(const index_t inx[4], const real coef[4]) const
+    {
+        Vector P0(vPTS+inx[0]);
+        Vector P1(vPTS+inx[1]);
+        Vector P2(vPTS+inx[2]);
+        Vector P3(vPTS+inx[3]);
+        return ( coef[0] * P0 + coef[1] * P1 ) + ( coef[2] * P2 + coef[3] * P3 );
+    }
+    
+    /// position interpolated from five points in vPTS[]
+    Vector  position5(const index_t inx[5], const real coef[5]) const
+    {
+        Vector P0(vPTS+inx[0]);
+        Vector P1(vPTS+inx[1]);
+        Vector P2(vPTS+inx[2]);
+        Vector P3(vPTS+inx[3]);
+        Vector P4(vPTS+inx[4]);
+        return ( coef[0] * P0 + coef[1] * P1 ) + ( coef[2] * P2 + coef[3] * P3 ) + coef[4] * P4;
+    }
+    
+    /// position interpolated from six points in vPTS[]
+    Vector  position6(const index_t inx[6], const real coef[6]) const
+    {
+        Vector P0(vPTS+inx[0]);
+        Vector P1(vPTS+inx[1]);
+        Vector P2(vPTS+inx[2]);
+        Vector P3(vPTS+inx[3]);
+        Vector P4(vPTS+inx[4]);
+        Vector P5(vPTS+inx[5]);
+        return ( coef[0] * P0 + coef[1] * P1 ) + ( coef[2] * P2 + coef[3] * P3 ) + ( coef[4] * P4 + coef[5] * P5 );
+    }
+
+    /// add block 'T' to mC at position (i, j)
+    void add_block(index_t i, index_t j, MatrixBlock const& T);
+    
+    /// subtract block 'T' to mC at position (i, j)
+    void sub_block(index_t i, index_t j, MatrixBlock const& T);
+ 
+    /// add block 'alpha*T' to mC at position (i, j)
+    void add_block(index_t i, index_t j, real alpha, MatrixBlock const& T);
+
 private:
+    
+    /// allocate memory
+    void allocate(size_t);
+    
+    /// release memory
+    void release();
+    
+    /// prepare matrices for 'solve'
+    void prepareMatrices();
 
-    /// Y is set as the DIM-duplicate of Y, and symmetrized
-    void  duplicateMat(int ps, const real* X, real* Y) const;
+    /// calculate the linear part of forces:  Y <- B + ( mB + mC ) * X
+    void calculateForces(const real* X, const real* B, real* Y) const;
     
-    /// add the linear part of forces:  Y <- Y + ( mB + mC ) * X;
-    void  addLinearForces(const real* X, real* Y, bool with_rigidity) const;
-    
-    /// calculate the forces for all points: Y <- vBAS + ( mB + mC ) * X
-    void  computeForces(const real* X, real* Y, bool with_rigidity) const;
-    
-    /// extract the matrix diagonal block corresponding to a Mecable
-    void  getBlock(const Mecable *, real*) const;
-    
-    /// extract the matrix diagonal block corresponding to a Mecable
-    void  getBlockS(const Mecable *, real*) const;
+    /// add forces due to bending elasticity
+    void addAllRigidity(const real* X, real* Y) const;
 
-    /// allocate memory, compute preconditionner and return true if completed
-    int   computePreconditionner();
+    /// compute the matrix diagonal block corresponding to a Mecable
+    void getBlock(real* res, const Mecable*) const;
     
-    /// compute preconditionner using the provided temporary memory
-    int   computePreconditionner(Mecable*, int*, real*, int);
+    /// DEBUG: extract the matrix diagonal block corresponding to a Mecable using 'multiply()'
+    void extractBlock(real* res, const Mecable*) const;
     
+    /// DEBUG: compare `blk` with block extracted using extractBlockSlow()
+    void verifyBlock(const Mecable*, const real*);
+    
+    /// DEBUG: test if `blk` is inverse of block extracted using extractBlockSlow()
+    void checkBlock(const Mecable*, const real*);
+    
+    /// compute the preconditionner block corresponding to given Mecable
+    void computePreconditionner(Mecable*);
+    
+    /// compute all blocks of the preconditionner (method=1)
+    void computePreconditionner();
+
 public:
     
-
     /// constructor
     Meca();
     
+    /// destructor
+    ~Meca() { release(); }
+    
     /// Clear list of Mecable
-    void  clear();
+    void clear() { objs.clear(); }
     
     /// Add a Mecable to the list of objects to be simulated
-    void  add(Mecable* ob);
+    void add(Mecable* p) { objs.push_back(p); }
     
     /// Number of Mecable
-    unsigned nbMecables() const { return objs.size(); }
+    size_t   nbMecables() const { return objs.size(); }
+    
+    /// Number of points in the Mecable that has the most number of points
+    unsigned largestMecable() const;
+
+    /// true if system does not contain any object
+    bool     empty() const { return nbPts == 0; }
     
     /// number of points in the system
-    unsigned nbPoints() const { return nbPts; }
+    size_t nb_points() const { return nbPts; }
     
-    /// Implementation of Solver::LinearOperator
-    unsigned size() const { return DIM * nbPts; }
+    /// Implementation of LinearOperator::size()
+    size_t dimension() const { return DIM * nbPts; }
     
-    /// calculate Y = M*X, where M is the matrix associated with the system
+    /// calculate Y <- M*X, where M is the matrix associated with the system
     void multiply(const real* X, real* Y) const;
 
-    /// apply preconditionner: Y = P*X
+    /// apply preconditionner: Y <- P*X (note that X maybe equal to Y)
     void precondition(const real* X, real* Y) const;
     
+    //--------------------------- FORCE ELEMENTS -------------------------------
 
-    /// Add a constant force at a PointExact
-    void  addPureForce(PointExact const&, Vector const& force);
-    /// Add a constant force at a PointInterpolated
-    void  addPureForce(PointInterpolated const&, Vector const& force);
-    /// Add a torque to a segment
-    void  addPureTorque(PointInterpolated const&, Torque const& torque);
-    /// Add a torque to constrain the segment in given direction
-    void  addTorqueClamp(PointInterpolated const&, Vector const& dir, real weight);
+    /// Add a constant force on Mecapoint
+    void addForce(Mecapoint const&, Vector const& force);
     
-    // Hookean interactions between PointExact or PointInterpolated:
+    /// Add a constant force on Interpolated point
+    void addForce(Interpolation const&, Vector const& force);
     
-    /// Force of stiffness weight
-    void  interLink(PointExact const&, PointExact const&, real weight);
-    /// Force of stiffness weight
-    void  interLink(PointInterpolated const&, PointExact const&, real weight);
-    /// Force of stiffness weight
-    void  interLink(PointInterpolated const&, PointInterpolated const&, real weight);
-
-    /// Force of stiffness weight and resting length len
-    void  interLongLink(PointExact const&, PointExact const&, real len, real weight);
-    /// Force of stiffness weight and resting length len
-    void  interLongLink(PointInterpolated const&, PointExact const&, real len, real weight);
-    /// Force of stiffness weight and resting length len
-    void  interLongLink(PointInterpolated const&, PointInterpolated const&, real len, real weight);
-
-#if ( DIM == 2 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideLink2D(PointInterpolated const&, PointExact const&, real arm, real weight);
-#elif ( DIM == 3 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideLinkS(PointInterpolated const&, PointExact const&, Vector const& arm, real len, real weight);
-#endif
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideLink(PointInterpolated const&, PointExact const&, real len, real weight);
-
+    /// Add a torque to the segment indicated by Interpolation
+    void addTorque(Interpolation const&, Torque const& torque);
     
-#if ( DIM == 2 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideLink2D(PointInterpolated const&, PointInterpolated const&, real arm, real weight);
-#elif ( DIM == 3 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideLinkS(PointInterpolated const&, PointInterpolated const&, Vector const& arm, real len, real weight);
-#endif
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideLink(PointInterpolated const&, PointInterpolated const&, real len, real weight);
+    /// Add a torque to constrain the segment to be oriented in direction `dir`
+    void addTorqueClamp(Interpolation const&, Vector const& dir, real weight);
+    
+    /// Add an explicit torque to constrain two segments to be parallel
+    void addTorque(Interpolation const&, Interpolation const&, real weight);
 
-#if ( DIM == 2 )
-    /// Force of stiffness weight and resting length len, on the sides of both fibers
-    void  interSideSideLink2D(PointInterpolated const&, PointInterpolated const&, real len, real weight, int side1, int side2);
-#endif
-    /// Force of stiffness weight and resting length len, on the sides of both fibers
-    void  interSideSideLink(PointInterpolated const&, PointInterpolated const&, real len, real weight);
+    /// Add an explicit torque to constrain two segments to an angle defined by (sinus, cosinus)
+    void addTorque(Interpolation const&, Interpolation const&, real cosinus, real sinus, real weight);
+    
+    /// this only works in 2D
+    void addTorquePoliti(Interpolation const&, Interpolation const&, real cosinus, real sinus, real weight);
 
-    /// Force of stiffness weight and resting length len, which can slide on first fiber
-    void  interSlidingLink(PointInterpolated const&, PointExact const&, real weight);
-    /// Force of stiffness weight and resting length len, which can slide on first fiber
-    void  interSlidingLink(PointInterpolated const&, PointInterpolated const&, real weight);
-
+    /// Force of stiffness `weight` from fixed position `g`
+    void addPointClamp(Mecapoint const&, Vector, real weight);
+    
+    /// Force of stiffness `weight` from fixed position `g`
+    void addPointClamp(Interpolation const&, Vector, real weight);
+    
+    /// Force of stiffness `weight` and sphere of radius `rad` and center `cen`
+    void addSphereClamp(Vector const& pos, Mecapoint const&, Vector const& cen, real rad, real weight);
+    
+    /// Force of stiffness `weight` with cylinder of axis Z and radius `len`
+    void addCylinderClampZ(Mecapoint const&, real len, real weight);
+    
+    /// Force of stiffness `weight` with cylinder of axis X and radius `len`
+    void addCylinderClampX(Mecapoint const&, real len, real weight);
     
 #if ( DIM == 2 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideSlidingLink2D(PointInterpolated const&, PointExact const&, real arm, real weight);
-#elif ( DIM == 3 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideSlidingLinkS(PointInterpolated const&, PointExact const&, Vector const& arm, real len, real weight);
+    /// Force of stiffness `weight` and resting length `len`, on the side of first segment
+    void addSidePointClamp2D(Interpolation const&, Vector const&, real arm, real weight);
+#elif ( DIM >= 3 )
+    /// Force of stiffness `weight` and resting length `len`, on the side of first segment
+    void addSidePointClamp3D(Interpolation const&, Vector const&, Vector const& arm, real weight);
 #endif
-    /// Force of stiffness weight and resting length len, on the side of first point, which can slide
-    void  interSideSlidingLink(PointInterpolated const&, PointExact const&, real len, real weight);
+    /// Force of stiffness `weight` with fixed position `g`, on the side of the segment
+    void addSidePointClamp(Interpolation const&, Vector const&, real len, real weight);
+    
+    /// Force of stiffness `weight` with a line defined by `g` and its tangent `dir`
+    void addLineClamp(Mecapoint const&, Vector const& g, Vector const& dir, real weight);
+    
+    /// Force of stiffness `weight` with a line defined by `g` and its tangent `dir`
+    void addLineClamp(Interpolation const&, Vector const& g, Vector const& dir, real weight);
+    
+    /// Force of stiffness `weight` with a plane defined by `g` and its normal `dir`
+    void addPlaneClamp(Mecapoint const&, Vector const& g, Vector const& dir, real weight);
+    
+    /// Force of stiffness `weight` with a plane defined by `g` and its normal `dir`
+    void addPlaneClamp(Interpolation const&, Vector const& g, Vector const& dir, real weight);
+
+    //------------ ZERO-RESTING LENGTH ELEMENTS LINKING POINTS -----------------
+    
+    /// linear force of stiffness `weight` between two vertices
+    void addLink(Mecapoint const&, Mecapoint const&, real weight);
+    
+    /// linear force of stiffness `weight` (use the other one)
+    void addLink(Interpolation const&, Mecapoint const&, real weight);
+    
+    /// linear force of stiffness `weight` between a vertex and a interpolated point
+    void addLink(Mecapoint const&, Interpolation const&, real weight);
+    
+    /// linear force of stiffness `weight` between two interpolated points
+    void addLink(Interpolation const&, Interpolation const&, real weight);
+    
+    
+    /// linear force of stiffness `weight` between vertex and interpolated point
+    void addLink2(Mecapoint const&, const unsigned[], const real[], real weight);
+    
+    /// linear force of stiffness `weight` between vertex and interpolated point
+    void addLink3(Mecapoint const&, const unsigned[], const real[], real weight);
+
+    /// linear force of stiffness `weight` between vertex and interpolated point
+    void addLink4(Mecapoint const&, const unsigned[], const real[], real weight);
+    
+    
+    /// linear force of stiffness `weight` between Interpolation and vertex
+    void addLink1(Interpolation const&, index_t, real weight);
+
+    /// linear force of stiffness `weight` between Interpolation and interpolated point
+    void addLink2(Interpolation const&, const index_t[], const real[], real weight);
+    
+    /// linear force of stiffness `weight` between Interpolation and interpolated point
+    void addLink3(Interpolation const&, const index_t[], const real[], real weight);
+
+    /// linear force of stiffness `weight` between Interpolation and interpolated point
+    void addLink4(Interpolation const&, const index_t[], const real[], real weight);
+
+    //----------------------- ELEMENTS LINKING POINTS --------------------------
+
+    /// Force of stiffness `weight` and resting length `len`
+    void addLongLink(Mecapoint const&, Mecapoint const&, real len, real weight);
+    
+    /// Force of stiffness `weight` and resting length `len`
+    void addLongLink(Mecapoint const&, Interpolation const&, real len, real weight);
+    
+    /// Force of stiffness `weight` and resting length `len`
+    void addLongLink(Interpolation const&, Interpolation const&, real len, real weight);
+
+#if ( DIM == 2 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment
+    void addSideLink2D(Interpolation const&, Mecapoint const&, real arm, real weight);
+#elif ( DIM >= 3 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment
+    void addSideLink3D(Interpolation const&, Mecapoint const&, Vector const& arm, real weight);
+    
+    /// Force of stiffness `weight`, at distance `arm` on the side of segment supporting the first argument
+    void addSideLinkS(Interpolation const&, Mecapoint const&, Vector const& arm, real len, real weight);
+#endif
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment
+    void addSideLink(Interpolation const&, Mecapoint const&, real arm, real weight);
+
+    
+#if ( DIM == 2 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment
+    void addSideLink2D(Interpolation const&, Interpolation const&, real arm, real weight);
+#elif ( DIM >= 3 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of segment supporting first argument
+    void addSideLinkS(Interpolation const&, Interpolation const&, Vector const& arm, real len, real weight);
+#endif
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment
+    void addSideLink(Interpolation const&, Interpolation const&, real arm, real weight);
+
+#if ( DIM == 2 )
+    /// Force of stiffness `weight` and resting length `arm`, on the sides of both fibers
+    void addSideSideLink2D(Interpolation const&, Interpolation const&, real arm, real weight, real side1, real side2);
+#endif
+    /// Force of stiffness `weight` and resting length `arm`, on the sides of both fibers
+    void addSideSideLink(Interpolation const&, Interpolation const&, real arm, real weight);
+
+    /// Force of stiffness `weight` and perpendicular to first segment
+    void addSlidingLink(Interpolation const&, Mecapoint const&, real weight);
+    
+    /// Force of stiffness `weight` and perpendicular to first segment
+    void addSlidingLink(Interpolation const&, Interpolation const&, real weight);
+
+    
+#if ( DIM == 2 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLink2D(Interpolation const&, Mecapoint const&, real arm, real weight);
+
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLinkS(Interpolation const&, Mecapoint const&, real arm, real weight);
+#elif ( DIM >= 3 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLinkS(Interpolation const&, Mecapoint const&, Vector const& arm, real len, real weight);
+#endif
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLink(Interpolation const&, Mecapoint const&, real arm, real weight);
     
     
 #if ( DIM == 2 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideSlidingLink2D(PointInterpolated const&, PointInterpolated const&, real arm, real weight);
-#elif ( DIM == 3 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideSlidingLinkS(PointInterpolated const&, PointInterpolated const&, Vector const& arm, real len, real weight);
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLink2D(Interpolation const&, Interpolation const&, real arm, real weight);
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLinkS(Interpolation const&, Interpolation const&, real arm, real weight);
+#elif ( DIM >= 3 )
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLinkS(Interpolation const&, Interpolation const&, Vector const& arm, real len, real weight);
 #endif
     
-    /// Force of stiffness weight and resting length len, on the side of first point, which can slide
-    void  interSideSlidingLink(PointInterpolated const&, PointInterpolated const&, real len, real weight);
+    /// Force of stiffness `weight`, at distance `arm` on the side of first segment and perpendicular to this segment
+    void addSideSlidingLink(Interpolation const&, Interpolation const&, real len, real weight);
     
-#if (DIM == 2)
-    void interTorque2D(PointInterpolated const&, PointInterpolated const&, real cosinus, real sinus, real torque_weight);
-#endif
-    
-    /// Force of stiffness weight with fixed position g
-    void  interClamp(PointExact const&, const real g[], real weight);
-    /// Force of stiffness weight with fixed position g
-    void  interClamp(PointInterpolated const&, const real g[], real weight);
-    /// Force of stiffness weight with fixed position g, on the side
-    void  interLongClamp(PointExact const&, Vector const& center, real len, real weight);
-    /// Force of stiffness weight with fixed position g, which can slide
-    void  interSlidingClamp(PointInterpolated const&, Vector const& g, real weight);
-
-#if ( DIM == 2 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideClamp2D(PointInterpolated const&, const real g[], real arm, real weight);
-#elif ( DIM == 3 )
-    /// Force of stiffness weight and resting length len, on the side of first fiber
-    void  interSideClamp3D(PointInterpolated const&, const real g[], Vector const& arm, real weight);
-#endif
-    /// Force of stiffness weight with fixed position g, on the side
-    void  interSideClamp(PointInterpolated const&, const real g[], real len, real weight);
-
-    /// Force of stiffness weight with a plane defined by g and its normal dir 
-    void  interPlane(PointExact const&, Vector const& dir, Vector const& g, real weight);
-    /// Force of stiffness weight with a plane defined by g and its normal dir 
-    void  interPlane(PointInterpolated const&, Vector const& dir, Vector const& g, real weight);
-
-    /// Linearized Coulomb repulsive force (experimental)
-    void  interCoulomb(PointExact const&, PointExact const&, real weight);
+    /// Create a 3-way link with given weights on each branch
+    void addTriLink(Interpolation const& pt1, real w1, Interpolation const& pt2, real w2, Interpolation const& pt3, real w3);
     
     
     /// Allocate the memory necessary to solve(). This must be called after the last add()
-    void  prepare(SimulProp const*);
+    void prepare(SimulProp const*);
     
-    /// Calculate motion of the system
-    void  solve(SimulProp const*, bool precondition);
+    /// Calculate motion of all Mecables in the system
+    void solve(SimulProp const*, int precondition);
     
-    /// calculate Forces on objects and Lagrange multipliers for Fiber, without thermal motion
-    void  computeForces();
-    
-    
-    
-    /// Print the complete matrix (for debugging)
-    void  printMatrix(std::ostream &) const;
-    
-    /// Save complete matrix in binary file
-    void  dumpMatrix(FILE *) const;
+    /// transfer newly calculated point coordinates back to Mecables
+    void apply();
 
-    /// Save complete matrix in binary file
-    void  dumpProjection(FILE *, Mecable const*, bool diff) const;
+    /// calculate Forces on Mecables and Lagrange multipliers for Fiber, without thermal motion
+    void computeForces();
+    
+    
+    //Count number of non-zero entries in the entire system
+    size_t nbNonZeros(real threshold) const;
 
-    /// Save complete matrix in binary file
-    void  dumpDiagonal(FILE *) const;
+    /// Extract the complete dynamic matrix in column-major format in a C-array
+    void getMatrix(unsigned, real * matrix) const;
+    
+    /// Save complete matrix in Matrix Market format
+    void saveMatrix(FILE *, real threshold) const;
+    
+    /// Save right-hand-side vector
+    void saveRHS(FILE *) const;
 
+    /// Save complete matrix in binary format
+    void dumpMatrix(FILE *) const;
+    
+    /// Save elasticity matrix in binary format
+    void dumpElasticity(FILE *) const;
+    
+    /// Save mobility/projection matrix in binary format
+    void dumpMobility(FILE *) const;
+    
+    /// Save preconditionner in binary format
+    void dumpPreconditionner(FILE *) const;
+    
+    /// Save drag coefficients associated with each degree of freedom in binary format
+    void dumpDrag(FILE *) const;
+    
+    /// Save the object ID associated with each degree of freedom
+    void dumpObjectID(FILE *) const;
+    
+    /// Output vectors and matrices, in a format that can be imported in MATLAB
+    void dump() const;
+ 
     /// Output vectors and matrices in various files (for debugging)
-    void  dump() const;
+    void dumpSparse();
     
 };
 

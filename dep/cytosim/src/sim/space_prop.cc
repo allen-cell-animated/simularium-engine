@@ -1,15 +1,17 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "space_prop.h"
+#include "filepath.h"
 #include "glossary.h"
 #include "property_list.h"
 #include "simul_prop.h"
 #include "simul.h"
+#include "sim.h"
 
 #include "space.h"
 #include "space_square.h"
 #include "space_sphere.h"
 #include "space_polygon.h"
+#include "space_polygonZ.h"
 #include "space_capsule.h"
 #include "space_banana.h"
 #include "space_torus.h"
@@ -20,10 +22,7 @@
 #include "space_cylinder.h"
 #include "space_cylinderZ.h"
 #include "space_cylinderP.h"
-
-#if NEW_DYNAMIC_SPACES
-#include "space_dynamic_ellipse.h"
-#endif
+#include "space_ring.h"
 
 /**
  @defgroup SpaceGroup Space and Geometry
@@ -31,79 +30,122 @@
  @ingroup NewObject
  @brief A Space defines a confined region
  
- A Space is created by specifying a geometry:
- @code
- set space NAME
- {
-    geometry = GEOMETRY DIMENSIONS
- }
- @endcode
+ A Space is created by specifying shape and dimensions:
  
- DIMENSIONS is usually a list of numbers.
+     set space NAME
+     {
+        shape = SHAPE
+     }
  
- List of known `geometry`:
+     new NAME
+     {
+        PARAMETER = DIMENSIONS
+     }
  
- GEOMETRY      |   Class          | DIMENSIONS
- --------------|------------------|-----------------------------------
- `rectangle`   | SpaceSquare      | sizeX sizeY sizeZ
- `sphere`      | SpaceSphere      | radius
- `polygon`     | SpacePolygon     | file_name height
- `capsule`     | SpaceCapsule     | half_length radius
- `torus`       | SpaceTorus       | radius thickness
- `banana`      | SpaceBanana      | total_length width radius_of_curvature
- `dice`        | SpaceDice        | sizeX sizeY sizeZ radius
- `strip`       | SpaceStrip       | sizeX sizeY sizeZ
- `periodic`    | SpacePeriodic    | sizeX sizeY sizeZ
- `ellipse`     | SpaceEllipse     | sizeX sizeY sizeZ
- `cylinder`    | SpaceCylinder    | half_length radius
- `cylinderZ`   | SpaceCylinderZ   | half_length radius
- `cylinderP`   | SpaceCylinderP   | half_length radius
+ PARAMETER is usually 'length' or 'radius', but also 'height' or 'width'
+ DIMENSIONS is a single REAL or a comma-separated list of REAL.
  
- Dynamic Space with variable geometry:
+ List of known `shape`:
  
- GEOMETRY           |   Class              | DIMENSIONS
- -------------------|----------------------|-------------------------
- `dynamic_ellipse`  | SpaceDynamicEllipse  | sizeX sizeY sizeZ
-
+ SHAPE         | Class                | PARAMETER
+ --------------|----------------------|-------------------------------------
+ `rectangle`   | SpaceSquare          | sizeX sizeY sizeZ
+ `sphere`      | SpaceSphere          | radius
+ `polygon`     | SpacePolygon         | file_name height
+ `polygonZ`    | SpacePolygonZ        | file_name
+ `capsule`     | SpaceCapsule         | length radius
+ `torus`       | SpaceTorus           | radius width
+ `banana`      | SpaceBanana          | length width radius (for curvature)
+ `dice`        | SpaceDice            | sizeX sizeY sizeZ radius
+ `strip`       | SpaceStrip           | sizeX sizeY sizeZ
+ `periodic`    | SpacePeriodic        | sizeX sizeY sizeZ
+ `ellipse`     | SpaceEllipse         | sizeX sizeY sizeZ
+ `cylinder`    | SpaceCylinder        | length radius
+ `cylinderZ`   | SpaceCylinderZ       | radius bottom top
+ `cylinderP`   | SpaceCylinderP       | length radius
+ `ring`        | SpaceRing            | length radius
  
  Example:
- @code
- set space cell
- {
-   geometry = sphere 5
- }
- @endcode
+ 
+     set space cell
+     {
+         shape = sphere
+     }
+     new cell
+     {
+         radius = 5
+     }
+ 
  */
 Space * SpaceProp::newSpace() const
 {
-    Space * spc = 0;
+    const std::string& s = SpaceProp::shape;
     
-    std::string s = shape;
-    
-    if ( s=="rectangle" || s=="square" )       spc = new SpaceSquare(this);
-    if ( s=="circle" || s=="sphere" )          spc = new SpaceSphere(this);
-    if ( s=="polygon" )                        spc = new SpacePolygon(this, file);
-    if ( s=="capsule" || s=="spherocylinder" ) spc = new SpaceCapsule(this);
-    if ( s=="torus" )                          spc = new SpaceTorus(this);
-    if ( s=="banana" )                         spc = new SpaceBanana(this);
-    if ( s=="dice" )                           spc = new SpaceDice(this);
-    if ( s=="strip" )                          spc = new SpaceStrip(this);
-    if ( s=="periodic" )                       spc = new SpacePeriodic(this);
-    if ( s=="ellipse" || s=="ellipsoid" )      spc = new SpaceEllipse(this);
-    if ( s=="cylinder" )                       spc = new SpaceCylinder(this);
-    if ( s=="cylinderZ" )                      spc = new SpaceCylinderZ(this);
-    if ( s=="cylinderP" )                      spc = new SpaceCylinderP(this);
-    
-#if NEW_DYNAMIC_SPACES
-    if ( s=="dynamic_ellipse" )                spc = new SpaceDynamicEllipse(this);
+    if ( s=="rectangle" || s=="square" )       return new SpaceSquare(this);
+    if ( s=="circle" || s=="sphere" )          return new SpaceSphere(this);
+    if ( s=="polygon" )                        return new SpacePolygon(this);
+    if ( s=="polygonZ" )                       return new SpacePolygonZ(this);
+    if ( s=="capsule" || s=="spherocylinder" ) return new SpaceCapsule(this);
+    if ( s=="banana" )                         return new SpaceBanana(this);
+    if ( s=="torus" )                          return new SpaceTorus(this);
+    if ( s=="dice" )                           return new SpaceDice(this);
+    if ( s=="strip" || s=="half_periodic" )    return new SpaceStrip(this);
+    if ( s=="periodic" )                       return new SpacePeriodic(this);
+    if ( s=="ellipse" || s=="ellipsoid" )      return new SpaceEllipse(this);
+#if ( DIM >= 3 )
+    if ( s=="cubic" )                          return new SpaceSquare(this);
+    if ( s=="cylinder" )                       return new SpaceCylinder(this);
+    if ( s=="cylinderZ" )                      return new SpaceCylinderZ(this);
+    if ( s=="cylinderP" )                      return new SpaceCylinderP(this);
+#elif ( DIM == 2 )
+    if ( s=="cylinder" )                       return new SpaceSquare(this);
+    if ( s=="cylinderP" )                      return new SpaceStrip(this);
+#else
+    if ( s=="cylinder" )                       return new SpaceSquare(this);
+    if ( s=="cylinderP" )                      return new SpacePeriodic(this);
 #endif
+    if ( s=="ring" )                           return new SpaceRing(this);
     
-    if ( spc == 0 )
-        throw InvalidParameter("unknown space:shape `"+shape+"'");
+#if ( 0 )
+    std::cerr << "Warning: substituting unbounded Space for unknown `"+s+"'\n";
+    return new Space(this);
+#endif
+    throw InvalidParameter("unknown space:shape `"+s+"'");
+    return nullptr;
+}
+
+
+Space * SpaceProp::newSpace(Glossary& opt) const
+{
+    Space * spc = newSpace();
     
-    // set dimensions:
-    spc->readLengths(dimensions);
-    
+    if ( spc )
+    {
+#ifdef BACKWARD_COMPATIBILITY
+        std::string str = dimensions_;
+        if ( str.size() || opt.set(str, "dimensions") )
+        {
+            std::stringstream iss(str);
+            real len[8] = { 0 };
+            int d = 0;
+            while ( d < 8 )
+            {
+                real x = 0;
+                iss >> x;
+                if ( iss.fail() )
+                    break;
+                len[d++] = x;
+            }
+            if ( d > 0 )
+            {
+                spc->setLengths(len);
+                return spc;
+            }
+        }
+#endif
+        // normal way to set the size:
+        spc->resize(opt);
+    }
     return spc;
 }
 
@@ -112,94 +154,51 @@ Space * SpaceProp::newSpace() const
 
 void SpaceProp::clear()
 {
-    geometry   = "";
-    shape      = "undefined";
-    dimensions = "";
-    file       = "";
-    display    = "";
-    
-#if NEW_DYNAMIC_SPACES
-    tension    = 0;
-    volume     = 0;
-    viscosity  = INFINITY;
-    viscosity_rot = INFINITY;
-#endif
+    shape         = "";
+    display       = "";
+    display_fresh = false;
 }
+
 
 void SpaceProp::read(Glossary& glos)
 {    
-    glos.set(shape,      "shape");
-    glos.set(dimensions, "dimensions");
+    if ( glos.set(shape, "shape") )
+    {
 #ifdef BACKWARD_COMPATIBILITY
-    glos.set(dimensions, "spec");  //BACKWARD_COMPATIBILITY format 36
-#endif
-    glos.set(geometry,   "geometry");
-    glos.set(display,    "display");
-    
-#if NEW_DYNAMIC_SPACES
-    glos.set(tension,       "tension");
-    glos.set(volume,        "volume");
-    glos.set(viscosity,     "viscosity");
-    glos.set(viscosity_rot, "viscosity", 1);
-#endif
-}
-
-//------------------------------------------------------------------------------
-
-void SpaceProp::complete(SimulProp const* sp, PropertyList*)
-{
-    if ( !geometry.empty() )
+        glos.set(dimensions_, "dimensions");
+    }
+    else
     {
-        std::istringstream iss(geometry);
-        iss >> shape;
-        
-        if ( iss.fail() )
-            throw InvalidParameter("invalid geometry `"+geometry+"' for Space");
-        
-        char c;
-        while ( isspace(iss.peek()) )
-            iss.get(c);
-        
-        if ( isalpha(iss.peek()) )
+        std::string str;
+        if ( glos.set(str, "geometry") )
         {
-            iss >> file;
+            std::stringstream iss(str);
+            iss >> shape >> std::ws;
+            std::getline(iss, dimensions_);
+            if ( dimensions_.empty() )
+                throw InvalidParameter("space:geometry should contains dimensions");
         }
-        
-        // get all remaining characters:
-        if ( iss.good() )
-            dimensions = geometry.substr(iss.tellg());
+#endif
     }
     
-#if NEW_DYNAMIC_SPACES
-    if ( sp )
-    {
-        if ( viscosity > 0 )
-            mobility_dt = sp->time_step / viscosity;
-        else
-            throw InvalidParameter("space:viscosity must be > 0");
-        
-        if ( viscosity_rot > 0 )
-            mobility_rot_dt = sp->time_step / viscosity_rot;
-        else
-            throw InvalidParameter("space:viscosity[1] (rotational viscosity) must be > 0");
-    }
-#endif
+    if ( glos.set(display, "display") )
+        display_fresh = true;
 }
 
 //------------------------------------------------------------------------------
 
-void SpaceProp::write_data(std::ostream & os) const
+void SpaceProp::complete(Simul const& sim)
 {
-    write_param(os, "geometry",   geometry);
-    write_param(os, "shape",      shape);
-    write_param(os, "dimensions", dimensions);
-#if NEW_DYNAMIC_SPACES
-    write_param(os, "tension",    tension);
-    write_param(os, "volume",     volume);
-    write_param(os, "viscosity",  viscosity, viscosity_rot);
-#endif
-    write_param(os, "display",    "("+display+")");
+    if ( shape.empty() )
+        throw InvalidParameter("space:shape must be defined");
 }
 
+//------------------------------------------------------------------------------
 
+void SpaceProp::write_values(std::ostream& os) const
+{
+    //write_value(os, "geometry",   geometry);
+    write_value(os, "shape",      shape);
+    write_value(os, "display",    "("+display+")");
+}
 

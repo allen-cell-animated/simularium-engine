@@ -59,6 +59,7 @@ add_subdirectory(${SOURCE_DIRECTORY})
 
 target_link_libraries(${SERVER_PROGRAM}
     "${TARGET}"
+    "${CYTOSIM_LIBRARIES}"
     Threads::Threads
 )
 

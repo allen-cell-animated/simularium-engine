@@ -1,58 +1,61 @@
-% A contractile actin gel
-% F. Nedelec Dec. 2010
+% A contractile network
+% Dec 2015
 
-set simul contract 
+set simul system
 {
     time_step = 0.001
-    viscosity = 0.05
+    viscosity = 0.2
 }
 
+set system { display = ( style=2; point_size=5; zoom = 2; ) }
+
+change system
+{
+    viscosity = 1
+}
 
 set space cell
 {
-    geometry = ( circle 8 )
+    shape = circle
 }
 
-new space cell
-
-set fiber actin
+new cell
 {
-    rigidity = 0.1
+    radius = 7
+}
+
+set fiber filament
+{
+    rigidity = 0.5
     segmentation = 0.25
-    confine = inside, 100
-    display = ( line=2,2; )
+    display = ( line=0.5, 1; color=gray; )
 }
 
-set hand myosin
+set hand motor
 {
-    binding_rate = 10
-    binding_range = 0.01
-    unbinding_rate = 0.01
-    unbinding_force = 3
-    
+    binding = 10, 0.02
+    unbinding = 0.1, inf
+
     activity = move
-    max_speed = 1
-    stall_force = 5
-    display = ( size = 4; color=green )
+    unloaded_speed = -0.2
+    stall_force = 6
+    display = ( width=0.5; color=green; )
+}
+
+set couple complex
+{
+    hand1 = motor
+    hand2 = motor
+    stiffness = 250
+    diffusion = 10
+    fast_diffusion = 1
 }
 
 set hand binder
 {
-    binding_rate = 10
-    binding_range = 0.01
-    unbinding_rate = 0.01
-    unbinding_force = 3
-    display = ( size = 2; color=blue )
-}
-
-
-set couple motor
-{
-    hand1 = myosin
-    hand2 = myosin
-    stiffness = 250
-    diffusion = 10
-    fast_diffusion = 1
+    binding = 10, 0.02
+    unbinding = 0.2, inf
+    display = ( width=0.5; color=blue; )
 }
 
 set couple crosslinker
@@ -64,16 +67,18 @@ set couple crosslinker
     fast_diffusion = 1
 }
 
-new 150 fiber actin
+new 250 filament
 {
     length = 5
 }
 
-new 5000 couple motor
-new 5000 couple crosslinker
+new 2000 crosslinker
+new 1000 complex
 
-run simul *
+run system
 {   
-    nb_frames = 100
-    nb_steps = 10000
+    nb_frames = 50
+    nb_steps = 100000
 }
+
+

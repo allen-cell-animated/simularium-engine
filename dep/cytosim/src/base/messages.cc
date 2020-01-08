@@ -1,78 +1,36 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "messages.h"
-#include <cstdio>
+#include <cstdarg>
 
 namespace Cytosim
 {
-    FILE * mFile = stdout;
+    /// alias to standard output
+    Output out(std::cout);
     
-    /// verbose level
-    int mVerbose = 4;
+    /// for logs
+    Output log(std::clog);
     
-    /// number  of warning already issued
-    int nWarnings = 0;
+    /// for warnings
+    Output warn(std::cerr, 32U, "WARNING: ");
     
-    ///max. number of output-warnings
-    static const int maxWarnings = 50;
-
-    void MSG(const char* fmt, ...)
+    /// output operator with `printf()` syntax and flush
+    void Output::operator()(const char* fmt, ...)
     {
+        char str[2048] = { 0 };
         va_list args;
         va_start(args, fmt);
-        vfprintf(mFile, fmt, args);
+        vsnprintf(str, sizeof(str), fmt, args);
         va_end(args);
+        operator<<(str);
+        flush();
     }
     
-    void MSG(int v, const char* fmt, ...)
+    /// turn all output off
+    void all_silent()
     {
-        if ( mVerbose >= v )
-        {
-            va_list args;
-            va_start(args, fmt);
-            vfprintf(mFile, fmt, args);
-            va_end(args);
-        }
-    }
-
-    void warning(const char* fmt, ...)
-    {
-        if ( mVerbose >= 0  &&  nWarnings < maxWarnings )
-        {
-            fprintf(mFile, "warning: ");
-            va_list args;
-            va_start(args, fmt);
-            vfprintf(mFile, fmt, args);
-            va_end(args);
-            
-            if (++nWarnings >= maxWarnings)
-                fprintf(mFile, "warning messages are now silent\n");
-        }
-    }
-    
-    void open(char const* name)
-    {
-        if ( mFile != stdout )
-            fclose(mFile);
-        mFile = fopen(name, "w");
-        if ( mFile && ferror(mFile) )
-        {
-            fclose(mFile);
-            mFile = 0;
-        }
-        if ( mFile == 0 )
-            mFile = stdout;
-    }
-    
-    void close()
-    {
-        if ( mFile != stdout )
-            fclose(mFile);
-        mFile = stdout;
-    }
-
-    void flush()
-    {
-        fflush(mFile);
+        Cytosim::out.silent();
+        Cytosim::log.silent();
+        Cytosim::warn.silent();
     }
 }

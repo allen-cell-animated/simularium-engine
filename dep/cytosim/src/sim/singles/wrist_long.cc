@@ -1,23 +1,16 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "wrist_long.h"
 #include "simul.h"
 #include "meca.h"
 #include "modulo.h"
 
 
-extern Modulo * modulo;
+extern Modulo const* modulo;
 
 
-WristLong::WristLong(SingleProp const* p, Mecable const* mec, unsigned pti)
-: Wrist(p, mec, pti)
+WristLong::WristLong(SingleProp const* sp, Mecable const* mec, const unsigned pti)
+: Wrist(sp, mec, pti), mArm(nullTorque)
 {
-#if ( 0 )
-    if ( p->diffusion > 0 )
-        throw InvalidParameter("single:diffusion cannot be > 0 if activity=anchored");
-#endif
-
-    mArm = nullTorque;
 }
 
 
@@ -32,25 +25,31 @@ WristLong::~WristLong()
 /**
  Returns -len or +len
  */
-real WristLong::calcArm(const PointInterpolated & pt, Vector const& pos, real len)
+real WristLong::calcArm(const Interpolation & pt, Vector const& pos, real len)
 {
-    return len * RNG.sign_exc( vecProd( pt.pos()-pos, pt.diff()) );
+    Vector vec = pt.pos() - pos;
+    if ( modulo )
+        modulo->fold(vec);
+    return len * RNG.sign_exc( cross(vec, pt.diff()) );
 }
 
-#elif ( DIM == 3 )
+#elif ( DIM >= 3 )
 
 /**
- Return a vector or norm len, that is perpendicular to the Fiber referenced by \a pt,
+ Return a vector of norm len, that is perpendicular to the Fiber referenced by `pt`,
  and also perpendicular to the link.
  */
-Vector WristLong::calcArm(const PointInterpolated & pt, Vector const& pos, real len)
+Vector WristLong::calcArm(const Interpolation & pt, Vector const& pos, real len)
 {
-    Vector a = vecProd( pt.pos()-pos, pt.diff() );
+    Vector vec = pt.pos() - pos;
+    if ( modulo )
+        modulo->fold(vec);
+    Vector a = cross( vec, pt.diff() );
     real an = a.normSqr();
     if ( an > REAL_EPSILON )
         return a * ( len / sqrt(an) );
     else
-        return pt.diff().randPerp(len);
+        return pt.diff().randOrthoU(len);
 }
 
 #endif
@@ -59,16 +58,13 @@ Vector WristLong::calcArm(const PointInterpolated & pt, Vector const& pos, real 
 //------------------------------------------------------------------------------
 Vector WristLong::force() const
 {
-    if ( sHand->attached() )
-    {
-        Vector d = sBase.pos() - posSide();
+    assert_true( sHand->attached() );
+    Vector d = posFoot() - WristLong::posSide();
     
-        if ( modulo )
-            modulo->fold(d);
-        
-        return prop->stiffness * d;
-    }
-    return Vector(0,0,0);
+    if ( modulo )
+        modulo->fold(d);
+    
+    return prop->stiffness * d;
 }
 
 
@@ -78,7 +74,7 @@ Vector WristLong::force() const
 Vector WristLong::posSide() const
 {
 #if ( DIM > 1 )
-    return sHand->pos() + vecProd(mArm, sHand->dirFiber());
+    return sHand->pos() + cross(mArm, sHand->dirFiber());
 #endif
     return sHand->pos();
 }
@@ -88,7 +84,7 @@ Vector WristLong::posSide() const
  */
 void WristLong::setInteractions(Meca & meca) const
 {
-    PointInterpolated pt = sHand->interpolation();
+    Interpolation const& pt = sHand->interpolation();
     
     /* 
      The 'arm' is recalculated each time, but in 2D at least,
@@ -97,19 +93,18 @@ void WristLong::setInteractions(Meca & meca) const
     
 #if ( DIM == 2 )
     
-    mArm = calcArm(pt, sBase.pos(), prop->length);
-    meca.interSideLink2D(pt, sBase, mArm, prop->stiffness);
+    mArm = calcArm(pt, posFoot(), prop->length);
+    meca.addSideLink2D(pt, anchor.point(), mArm, prop->stiffness);
     
-#elif ( DIM == 3 )
+#elif ( DIM >= 3 )
     
-    mArm = calcArm(pt, sBase.pos(), prop->length);
-    meca.interSideLinkS(pt, sBase, mArm, prop->length, prop->stiffness);
+    mArm = calcArm(pt, posFoot(), prop->length);
+    meca.addSideLinkS(pt, anchor.point(), mArm, prop->length, prop->stiffness);
+    //@todo WristLong:setInteractions() use interSideLink3D()
     
 #endif
 }
 
-
-//------------------------------------------------------------------------------
 #else
 
 Vector WristLong::posSide() const
@@ -122,9 +117,9 @@ Vector WristLong::posSide() const
  */
 void WristLong::setInteractions(Meca & meca) const
 {
-    PointInterpolated pt = sHand->interpolation();
+    Interpolation const& pt = sHand->interpolation();
     mArm = ( sBase.pos() - sHand->pos() ).normalized(prop->length);
-    meca.interLongLink(pt, sBase, prop->length, prop->stiffness);
+    meca.addLongLink(pt, sBase, prop->length, prop->stiffness);
 }
 
 #endif

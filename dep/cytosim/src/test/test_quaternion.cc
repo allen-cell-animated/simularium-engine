@@ -3,63 +3,73 @@
 #include <cstdio>
 #include "real.h"
 #include "random.h"
-#include "random_vector.h"
 #include "quaternion.h"
-#include "matrix3.h"
+#include "matrix33.h"
 #include "vecprint.h"
 
-extern Random RNG;
+
+/// calculate a distance to the subspace of rotations = maxNorm( M'*M - Id )
+real maxDeviationFromRotation(Matrix33 const& mat)
+{
+    Matrix33 mm = mat.transposed() * mat - Matrix33::identity();
+    return mm.norm_inf();
+}
 
 
 void testRotation(Vector3 vec, real angle)
 {
-    Matrix3 mat;
+    Matrix33 mat;
     Quaternion<real> q, p;
     Vector3 V, W, T;
 
     q.setFromAxis(vec, angle);
     real a = q.getAngle(T);
     
-    printf("\nQ = ");
+    printf("Quat ");
     q.print();
-    printf(" ,   norm = %.2f\n", q.norm() );
+    printf("    norm %.2f ", q.norm() );
     
-    printf(" %.2f %.2f %.2f  angle %.3f", vec[0],vec[1],vec[2], angle);
-    printf(" ?=? %.2f %.2f %.2f  angle %.3f\n", T[0],T[1],T[2], a);
+    printf(" |  %+6.2f %+6.2f %+6.2f  =", vec[0],vec[1],vec[2]);
+    printf("%+6.2f %+6.2f %+6.2f  |  ", T[0],T[1],T[2]);
     
     q.setMatrix3(mat);
-    mat.write(std::cout);
-    printf("rotation error = %e", mat.maxDeviationFromRotation());
+    //mat.print(stdout);
+    printf("  deviation = %e", maxDeviationFromRotation(mat));
     
-    real err = ( Matrix3::rotationAroundAxis( vec, angle ) - mat ).maxNorm();
-    printf(", deviation = %e\n", err);
+    Matrix33 rot = Matrix33::rotationAroundAxis(vec, cos(angle), sin(angle));
+    
+    printf("  error = %e  ", ( rot - mat ).norm_inf());
+    printf("  angles  %+6.2f %+6.2f %+6.2f\n", angle, a, mat.rotationAngle());
     
     if ( 0 )
     {
+        real vec[3] = { 0 };
         real m16[16];
-        q.setOpenGLMatrix(m16);
-        VecPrint::matPrint(std::cout, 4, 4, m16);
+        q.setOpenGLMatrix(m16, vec);
+        VecPrint::print(std::cout, 4, 4, m16, 4);
     }
-    
-    V = Vector3::randBox();
-    W = mat*V;
-
-    printf("   MATRIX*V            : ");
-    W.println();
-    
-    p = q * Quaternion<real>(0, V.XX, V.YY, V.ZZ) * q.conjugated();
-    printf("   q * (0, V) * inv(q) : ");
-    p.println();
-    
-    q.rotateVector(W,V);
-    printf("   Q.rotateVector(V)   : ");
-    W.println();
+    if ( 0 )
+    {
+        V = Vector3::randS();
+        W = mat*V;
+        
+        printf("   MATRIX*V            : ");
+        W.println();
+        
+        p = q * Quaternion<real>(0, V.XX, V.YY, V.ZZ) * q.conjugated();
+        printf("   q * (0, V) * inv(q) : ");
+        p.println();
+        
+        q.rotateVector(W,V);
+        printf("   Q.rotateVector(V)   : ");
+        W.println();
+    }
 }
 
 
 void test1()
 {
-    Matrix3 mat;
+    Matrix33 mat;
     Vector3 V, W;
     
     Quaternion<real> q, p;
@@ -69,18 +79,17 @@ void test1()
     
     printf("------------------- rotations of PI/6 -----------------\n");
     
-    for ( int ii = 0; ii<3; ++ii )
+    for ( int ii = 0; ii < 16; ++ii )
     {
-        vec.set(0,0,0);
-        vec[ii] = 1;
+        vec = Vector3::randU();
         testRotation(vec, angle);
     }
     
     printf("------------------- identity ---------------------------\n");
     
-    mat.makeIdentity();
-    mat.write(std::cout);
-    q.setFromMatrix3(mat);
+    mat = Matrix33::identity();
+    mat.print(stdout);
+    q.setFromMatrix3(mat.data());
     q.println(stdout);
     
     printf("-------------- quat-quat multiplication ----------------\n");
@@ -108,12 +117,12 @@ void test1()
     real error = 0, e;
     for ( int ii = 0; ii < 1000; ++ii )
     {
-        vec = Vector3::randUnit();
+        vec = Vector3::randU();
         real a = RNG.sreal() * M_PI;
         p.setFromAxis(vec, a);
         p.setMatrix3(mat);
-        q.setFromMatrix3(mat);
-        //p.print(); q.print();
+        q.setFromMatrix3(mat.data());
+        //printf("%f  :", a); p.print(); q.println();
         if ( q[0] * p[0] < 0 ) q = -q;
         e = (q-p).norm();
         if ( e > error ) error = e;
@@ -140,7 +149,7 @@ void test1()
     {
         q.setFromPrincipalAxis(ii, angle);
         q.setMatrix3(mat);
-        mat.write(std::cout);
+        mat.print(stdout);
         printf("\n");
     }
 }
@@ -150,14 +159,14 @@ void test2(const int max)
     //this test a way to generate a random matrix:
     Quaternion<real> Q;
     Quaternion<real> pos;
-    Matrix3 rot;
+    Matrix33 rot;
     Vector3 vec;
     
-    for(int s = 0; s < max; ++s)
+    for(int i = 0; i < max; ++i)
     {
-        Q = Quaternion<real>::randomRotation(RNG);
+        Q = Quaternion<real>::randomRotation();
         pos = Q * Quaternion<real>(0,1,0,0) * Q.conjugated();
-        rot = Matrix3::randomRotation(RNG);
+        rot = Matrix33::randomRotation();
         vec = rot * Vector3(0,0,1);
         vec.println();
     }
@@ -166,6 +175,7 @@ void test2(const int max)
 
 int main(int argc, char* argv[])
 {
+    RNG.seed();
     test1();
     //test2(10000);
     return 0;

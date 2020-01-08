@@ -8,10 +8,8 @@ class CrosslinkProp;
 
 /// A specialized kind of Couple
 /**
- The Crosslink can have:
- - specificity (parallel/antiparallel)
- - trans_activated (hand2 is active only if hand1 is bound)
- .
+ The Crosslink is a simpler kind of Couple, which does not support `trans_activated`
+ 
  It has a zero resting length, and uses Meca:interLink()
  
  CrosslinkLong has a non-zero resting length, and is selected automatically 
@@ -19,25 +17,23 @@ class CrosslinkProp;
  */
 class Crosslink : public Couple
 {
-protected:
+public:
     
     /// property
     CrosslinkProp const* prop;
     
-public:
-    
-    /// create following the specifications in the CoupleProp
+    /// constructor
     Crosslink(CrosslinkProp const*, Vector const & w = Vector(0,0,0));
 
     /// destructor
-    virtual ~Crosslink();
+    virtual      ~Crosslink();
     
-    /// control function for attachements
-    bool allowAttachment(const FiberBinder & fb);
+    /// simulation step for a free Couple: diffusion
+    virtual void  stepFF(FiberGrid const&);
     
-    /// simulation step for a free Couple, implementing CrosslinkProp::trans_activated
-    void    stepFF(const FiberGrid&);
-    
+    /// add interactions to a Meca
+    void          setInteractions(Meca &) const;
+
 };
 
 

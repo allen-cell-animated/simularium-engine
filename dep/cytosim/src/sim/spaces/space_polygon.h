@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SPACE_POLYGON_H
 #define SPACE_POLYGON_H
 
@@ -9,69 +8,84 @@
 /// a polygonal convex region in space
 /**
  Space `polygon` implements a polygon. It works best for convex polygon.
- In 3D, and additional HEIGHT can be specified to describe a generalized 
+ In 3D, the thickness in Z can be specified to describe a generalized 
  cylinder of axis Z, that has the 2D polygon as cross-section.
  
- The coordinates of the polygon are read from a file.
+ Parameters:
+     - file: name of file with polygon data
+     - height: height of polygon in Z
+    .
 
- @code
-    polygon file_name HEIGHT
- @endcode
-
+ Alternatively:
+     - order : number of sides
+     - radius : distance from center
+     - angle : rotation offset in radian
+     .
+ 
+ Example:
+ 
+     change cell { order=4; radius=13; angle=0.7853; }
+ 
  @ingroup SpaceGroup
+ @todo add SpacePolygon::setInteraction() for re-entrant corners
 */
 class SpacePolygon : public Space
 {
 private:
-    
-    ///number of points defining the polygon. Must be > 2.
-    unsigned          nPoints;
-    
-    ///pointer to the points defining the polygon in 2D
-    Polygon::Point2D *mPoints;
-        
-    ///pre-calculated bounding box since this is called often
-    Vector            boundingBox;
-    
-    /// Volume calculated from polygon
-    real              mVolume;
-    
-    /// half the total height (alias to mLength[0])
-    real &            height;
 
+    /// The 2D polygon object
+    Polygon     poly_;
+        
+    /// pre-calculated bounding box derived from poly_
+    Vector      inf_, sup_;
+    
+    /// Surface of polygon
+    real        surface_;
+    
+    /// half the total height in Z
+    real        height_;
+
+    /// update
+    void        update();
 
 public:
         
-    ///creator
-    SpacePolygon(const SpaceProp *, std::string const& file);
+    /// constructor
+    SpacePolygon(const SpaceProp *);
     
-    ///destructor
+    /// destructor
     ~SpacePolygon();
     
-    /// maximum extension along each axis
-    Vector      extension() const { return boundingBox; }
+    /// change dimensions
+    void        resize(Glossary& opt);
+    
+    /// return bounding box in `inf` and `sup`
+    void        boundaries(Vector& inf, Vector& sup) const { inf=inf_; sup=sup_; }
     
     /// the volume inside
-    real        volume() const { return mVolume; }
+    real        volume() const { return ( DIM>2 ? 2*height_ : 1 ) * surface_; }
     
     /// true if the point is inside the Space
-    bool        inside(const real point[]) const;
+    bool        inside(Vector const&) const;
     
-    /// project point on the closest edge of the Space
-    void        project(const real point[], real proj[]) const;
+    /// a random position inside the volume
+    Vector      randomPlace() const;
+
+    /// set `proj` as the point on the edge that is closest to `point`
+    Vector      project(Vector const& pos) const;
 
     /// apply a force directed towards the edge of the Space
-    void        setInteraction(Vector const& pos, PointExact const&, Meca &, real stiff) const;
+    void        setInteraction(Vector const& pos, Mecapoint const&, Meca &, real stiff) const;
     
     /// apply a force directed towards the edge of the Space
-    void        setInteraction(Vector const& pos, PointExact const&, real rad, Meca &, real stiff) const;
+    void        setInteraction(Vector const& pos, Mecapoint const&, real rad, Meca &, real stiff) const;
     
-    /// update since length have changed
-    void        resize();
-    
-    /// OpenGL display function, return true is display was done
-    bool        display() const;
-    
+    /// add interactions between fibers and reentrant corners
+    void        setInteractions(Meca &, FiberSet const&) const;
+
+    /// OpenGL display function; returns true if successful
+    bool        draw() const;
+
 };
 
 #endif

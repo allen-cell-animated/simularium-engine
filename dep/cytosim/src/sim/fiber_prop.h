@@ -6,16 +6,21 @@
 #include "real.h"
 #include "property.h"
 #include "common.h"
+#include "sim.h"
 
+class Field;
 class Fiber;
-class Glossary;
 class FiberDisp;
 class SingleProp;
 class SingleSet;
 class Space;
 
-typedef char Tag;
 
+/// compile switches to enable advanced features:
+#define OLD_SQUEEZE_FORCE       0
+#define NEW_COLINEAR_FORCE      0
+#define NEW_FIBER_CHEW          0
+#define NEW_FIBER_LOOP          1
 
 /// Property for a Fiber
 /**
@@ -35,125 +40,212 @@ public:
      @{
      */
     
-    /// length or initial-length for dynamic fibers
-    real         length;
     
-    /// effective viscosity (if not specified, simul:viscosity is used)
-    real         viscosity;
-    
-    /// can be set to control which Hands may bind
-    /** 
-     To decide if a Hand may bind to a Fiber, the two keys are compared:
-     attachement is forbiden if the BITWISE-AND is 0:
-     @code
-     if ( fiber:binding_key & hand:binding_key )
-        allowed = true;
-     else
-        allowed = false;
-     @endcode   
-     It is thus recommended to use powers of 2: 1, 2, 4, etc.
-     */
-    unsigned int binding_key;
-    
-    /// modulus for bending elasticity
+    /// elastic modulus for bending elasticity
     /**
-     This has units of pN.um^2, and it is related to the persitence length:
-     @code
-     L_p = rigidity / kT
-     @endcode
+     The bending elasticity modulus `rigidity` has units of pN * um^2,
+     and is related to the persitence length `Lp` via the Boltzman constant and
+     absolute temperature (kT = k_B * T):
+    
+         rigidity = Lp * kT
      
-     Many measurments have been made and they agree somewhat.\n
-     According to Gittes et al. (1993):
-     Filament      |   L_p       | rigidity
-     --------------|-------------|-----------------
-     Microtubule   | ~ 5200 um   | ~22 pN.um^2
-     Actin         |  ~ 18 um    | ~0.075 pN.um^2
+     Many measurments have been made and they agree somewhat:\n
+     
+     Filament                      |    Lp        | rigidity       |
+     ------------------------------|--------------|-----------------
+     Microtubule                   |   ~ 7200 um  | ~ 30 pN.um^2
+     Stabilized Microtubule        |   ~ 2200 um  | ~ 10 pN.um^2
+     F-actin                       | ~  9--10 um  | ~ 0.04 pN.um^2
+     Phalloidin-stabilized F-actin | ~ 17--18 um  | ~ 0.08 pN.um^2
      
      <em>
-     Flexural rigidity of microtubules and actin filaments measured from thermal fluctuations in shape.
-     JCB vol. 120 no. 4 923-934
+     Flexural rigidity of microtubules and actin filaments measured from thermal fluctuations in shape.\n
+     Gittes et al.\n JCB vol. 120 no. 4 923-934 (1993)\n
      http://dx.doi.org/10.1083/jcb.120.4.923 \n
      http://jcb.rupress.org/content/120/4/923
+     </em>
+     
+     <em>
+     Flexibility of actin filaments derived from thermal fluctuations.\n
+     Isambert, H. et al.\n  J Biol Chem 270, 11437–11444 (1995)\n
+     http://www.jbc.org/content/270/19/11437
      </em>
      */
     real         rigidity;
     
-    /// desired distance between model points
+    
+    /// desired distance between vertices
     /**
-     This is a distance.
-     As a rule of thumb, segmentation should scale with rigidity,
-     depending on the expected external forces:
-     @code
-     segmentation = sqrt(rigidity/force)
-     force ~ rigidity / segmentation^2
-     @endcode
+     `segmentation` is a distance, which affects the precision by which the
+     shape of a filament is simulated. Specificially, the number of segments 
+     used for a filament of length `L` is the integer `N` that minimizes:
+
+         fabs( L / N - segmentation )
      
-     Furthermore, if any filament contains kinks 
-     (the angle between consecutive segments is above 45 deg),
-     the simulation should not be trusted and instead should 
-     be recalculated with a reduced segmentation.
+     As a rule of thumb, segmentation should scale with rigidity, depending on 
+     the expected magnitude of the forces experienced by the filament:
+
+         segmentation = sqrt(rigidity/force)
+         force ~ rigidity / segmentation^2
+     
+     Generally, a simulation should not be trusted if any filament contains kinks
+     (i.e. if the angle between consecutive segments is greater then 45 degrees).
+     In that case, the simulation should be redone with a segmentation divided by 2,
+     and the segmentation should be reduced until kinks do not appear.
      */
     real         segmentation;
     
-    /// amount of polymer available for this type of fiber
+    /// Minimum length (this limits the length in some cases)
+    real         min_length;
+    
+    /// Maximum length (this limits the length in some cases)
+    real         max_length;
+
+    /// amount of monomer available to make this type of fiber
+    /**
+     If set, this parameter will limit the total length of all the Fibers of this
+     class, by making the assembly rate of the fibers dependent on the amount of
+     unused material (ie. 'monomers'):
+
+         assembly_speed = ( 1 - sum_of_all_fiber_length / total_polymer ) * [...]
+
+     This links the assembly for all the fibers within one class.
+     Thus assembly speed decreases linearly with the total amount of polymer in the cell,
+     i.e. proportional to the normalized concentration of 'monomers'.
+     
+     By default `total_polymer = infinite`, and the assembly rate is not reduced.
+     */
     real         total_polymer;
     
-    /// Minimum authorized length
-    /**
-     When the fiber becomes shorter than \a min_length,
-     the action specified by \a fate is applied.
-     */
-    real         min_length;
+    /// if `false`, the fiber will be destroyed if it is shorter than `min_length` (default=`false`)
+    bool         persistent;
 
+    /// effective viscosity (if unspecified, simul:viscosity is used)
+    /**
+     Set the effective `viscosity` to lower or increase the drag coefficient of a particular class of fibers. This makes it possible for example to reduce the total drag coefficient of an aster.
+     If unspecified, the global `simul:viscosity` is used.
+     */
+    real         viscosity;
+    
     /// radius used to calculate mobility
     /**
-     hydrodynamic_radius[0] corresponds to the radius of the fiber
-     hydrodynamic_radius[1] is a cut-off for the length of the fiber
+     These length are used in the formula for the mobility of a cylinder:
+     - hydrodynamic_radius[0] corresponds to the radius of the fiber
+     - hydrodynamic_radius[1] is a cut-off for the length of the fiber
+     .
      */
     real         hydrodynamic_radius[2];
 
     /// if true, the mobility of a cylinder moving near a plane will be used
     /**
      You can select between two possible formulas to calculate viscous drag coefficient:
-     @code
-     if ( fiber:surface_effect )
-         setDragCoefficientSurface();
-     else
-         setDragCoefficientVolume();
-     @endcode
+
+         if ( fiber:surface_effect )
+             drag = dragCoefficientSurface();
+         else
+             drag = dragCoefficientVolume();
+
      <hr>
-     @copydetails Fiber::setDragCoefficientVolume
+     @copydetails Fiber::dragCoefficientVolume
      <hr>
-     @copydetails Fiber::setDragCoefficientSurface
+     @copydetails Fiber::dragCoefficientSurface
      */
     bool         surface_effect;
     
-    /// distance of fluid between slide and cylinder surface (set as \c surface_effect[1])
+    /// distance of fluid between slide and cylinder surface (set as `surface_effect[1]`)
     real         cylinder_height;
 
-    /// set forces between fiber and Space [none, inside, outside, surface]
+    
+    /// can be set to control which Hands may bind
+    /**
+     To decide if a Hand may bind to a Fiber, the two binding_keys are compared:
+
+         allowed = ( fiber:binding_key & hand:binding_key )
+
+     Attachement is forbiden if the bitwise AND returns false, which is true if the two binding_key do not share any common digit in base 2. For most usage, you would thus use powers of 2 to distinguish fibers:
+     - microtubule: binding_key = 1,
+     - actin: binding_key = 2,
+     - etc.
+     .
+     More complex combinations can be created by using all the bits of binding_key.
+     */
+    unsigned int binding_key;
+
+    /// if true, a Lattice is associated to this fiber
+    int          lattice;
+    
+    /// unit length associated with Lattice
+    real         lattice_unit;
+    
+    /// flag controlling the forces exerted by Space on fiber points
+    /**
+     Possible values:
+     - `off` (default)
+     - `on` or `surface`
+     - `inside`
+     - `outside`
+     - `plus_end`
+     - `minus_end`
+     - `both_ends`
+     .
+     */
     Confinement  confine;
     
-    /// stiffness of confinement (set as \c confine[1])
-    real         confine_stiff;
+    /// stiffness of confinement (also known as `confine[1]`)
+    real         confine_stiffness;
     
-    /// name of space for confinement (set as \c confine[2])
+    /// name of space used for confinement (also known as `confine[2]`)
     std::string  confine_space;
     
     /// if true, include steric interaction for this object
+    /**
+     The steric interaction generates a force derived from the potential energy:
+     
+         E = 1/2 k * ( d - d_0 ) ^ 2
+     
+     where `d` is the distance between two sections of filament. 
+     The force is controlled by two parameters:
+     - a stiffness `k`,
+     - and equilibrium length `d_0`
+     .
+     
+     This force is repulsive at short range ( d < d_0 ),
+     and attractive elsewhere ( d > d_0 ).
+     */
     int          steric;
     
-    /// radius of repulsive steric interaction (also known as \c steric[1])
+    /// radius of repulsive steric interaction (also known as `steric[1]`)
     real         steric_radius;
     
-    /// extra radius of attractive steric interaction (also known as \c steric[2])
+    /// extra radius of attractive steric interaction (also known as `steric[2]`)
     real         steric_range;
     
-    /// type of glue (interaction between fiber tip and Space)
+    /// type of glue (interaction between fiber PLUS_END and Space)
+    /**
+     Parameter fiber:glue is used to create interactions with the boundaries:
+     - it creates a Single, everytime a fiber contacts the surface.
+     - the Single is deleted if the associated Hand detaches.
+     .
+    */
     int          glue;
     
-    /// name of Single used for glue (set a \c glue[1])
+    /// name of Single used for glue (set a `glue[1]`)
     std::string  glue_single;
+    
+#if NEW_COLINEAR_FORCE
+    /// a force parallel to the fiber (force per fiber length)
+    /**
+     This has unit of force per unit length:
+     - a positive 'colinear_force' is directed toward the plus end,
+     - a negative 'colinear_force' is directed toward the minus end.
+     .
+     */
+    real         colinear_force;
+#endif
+#if NEW_FIBER_CHEW
+    /// maximum speed of disassembly due to chewing (speed)
+    real         max_chewing_speed;
+#endif
     
     /// specialization
     /**
@@ -164,28 +256,43 @@ public:
     /// display string (see @ref FiberDispPar)
     std::string  display;
     
+#if OLD_SQUEEZE_FORCE
+    /// add a force toward the X-axis
+    int  squeeze;
+    /// max norm of squeezing force (set as \c squeeze[1])
+    real squeeze_force;
+    /// range below which squeezing is linear (set as \c squeeze[2])
+    real squeeze_range;
+#endif
+    
+#if NEW_FIBER_LOOP
+    /// if `true`, link MINUS and PLUS ends together to form a loop
+    bool         loop;
+#endif
     /// @}
-    //------------------ derived variables below ----------------
-    
-    /// display
-    FiberDisp *  disp;
 
-    /// used for confinement
-    Space const* confine_space_ptr;
+    /// derived variable: flag to indicate that `display` has a new value
+    bool         display_fresh;
     
+    /// derived variable: display
+    FiberDisp *  disp;
+    
+    /// pointer to actual confinement Space, derived from `confine_space`
+    Space const* confine_space_ptr;
+
 protected:
     
+    /// maximum speed of shrinkage
+    real    max_chewing_speed_dt;
+
     /// local copy of SimulProp::time_step
     real    time_step;
     
-    /// fraction in [0, 1]
+    /// fraction of unpolymerized monomers in [0, 1]
     real    free_polymer;
     
     /// total length of fiber for this type
-    real    total_length;
-    
-    /// SingleSet where glue are stored
-    SingleSet  * glue_set;
+    mutable real used_polymer;
     
     /// SingleProp used for glue
     SingleProp * glue_prop;
@@ -193,7 +300,7 @@ protected:
 public:
     
     /// constructor
-    FiberProp(const std::string& n) : Property(n), disp(0) { clear(); }
+    FiberProp(const std::string& n) : Property(n), disp(nullptr) { clear(); }
     
     /// destructor
     ~FiberProp() { }
@@ -202,10 +309,10 @@ public:
     virtual Fiber* newFiber() const;
     
     /// return a Fiber with this property, initialized
-    Fiber* newFiber(Glossary&) const;
+    Fiber* newFiber(Glossary& opt) const;
     
     /// identifies the property
-    std::string kind() const { return "fiber"; }
+    std::string category() const { return "fiber"; }
     
     /// set default values
     virtual void clear();
@@ -214,13 +321,13 @@ public:
     virtual void read(Glossary&);
    
     /// check and derive parameter values
-    virtual void complete(SimulProp const*, PropertyList*);
+    virtual void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new FiberProp(*this); }
 
     /// write
-    virtual void write_data(std::ostream &) const;
+    virtual void write_values(std::ostream&) const;
 
 };
 

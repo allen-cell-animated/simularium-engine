@@ -1,126 +1,144 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
 #include "space_torus.h"
 #include "exceptions.h"
+#include "iowrapper.h"
+#include "glossary.h"
 
-SpaceTorus::SpaceTorus(const SpaceProp* p)
+SpaceTorus::SpaceTorus(SpaceProp const* p)
 : Space(p)
-
 {
     if ( DIM == 1 )
         throw InvalidParameter("torus is not usable in 1D");
+    bWidth  = 2;
+    bRadius = INFINITY;
 }
 
-void SpaceTorus::resize()
+
+void SpaceTorus::resize(Glossary& opt)
 {
-    checkLengths(2, true);
+    real rad = bRadius, wid = bWidth;
+    
+    if ( opt.set(wid, "width") )
+        wid *= 0.5;
+    opt.set(bRadius, "radius");
 
-    bRadius   = mLength[0];
-    bWidth    = mLength[1];
-    bWidthSqr = bWidth * bWidth;
-
-    if ( bWidth > bRadius )
+    if ( rad <= 0 )
+        throw InvalidParameter("torus:radius must be > 0");
+    if ( wid <= 0 )
+        throw InvalidParameter("torus:width must be > 0");
+    if ( wid > rad )
         throw InvalidParameter("torus:width must be < radius");
+    
+    bWidth = wid;
+    bRadius = rad;
+    update();
 }
 
 
 real SpaceTorus::volume() const
 {
-#if (DIM == 3)
-    return 2 * M_PI * M_PI * bRadius * bWidthSqr;
-#else
+#if ( DIM == 2 )
     return 4 * M_PI * bRadius * bWidth;
+#else
+    return 2 * M_PI * M_PI * bRadius * bWidthSqr;
 #endif
 }
 
 
-Vector SpaceTorus::extension() const
+void SpaceTorus::boundaries(Vector& inf, Vector& sup) const
 {
-    return Vector( bRadius+bWidth, bRadius+bWidth, bWidth );
+    inf.set(-bRadius-bWidth,-bRadius-bWidth,-bWidth);
+    sup.set( bRadius+bWidth, bRadius+bWidth, bWidth);
 }
 
 
 ///project on the backbone circle in the XY plane:
-void SpaceTorus::project0(const real pos[], real prj[]) const
+Vector SpaceTorus::backbone(Vector const& pos) const
 {
-    real n = bRadius / sqrt( pos[0]*pos[0] + pos[1]*pos[1] );
-
-    prj[0] = n * pos[0];
-    prj[1] = n * pos[1];
-    
-    if ( DIM == 3 )
-        prj[2] = 0;
+#if ( DIM > 1 )
+    real n = bRadius / pos.normXY();
+    return Vector(n * pos.XX, n * pos.YY, 0);
+#else
+    return Vector(0, 0, 0);
+#endif
 }
 
 
-bool SpaceTorus::inside( const real pos[] ) const
+bool SpaceTorus::inside(Vector const& pos) const
 {
-    real prj[3];
-    project0(pos, prj);
-    
-    real n = ( pos[0] - prj[0] ) * ( pos[0] - prj[0] );
-    for( int d=1; d<DIM; ++d )
-        n += ( pos[d] - prj[d] ) * ( pos[d] - prj[d] );
-    
-    return ( n <= bWidthSqr );
+    Vector prj = backbone(pos);
+    return ( distanceSqr(prj, pos) <= bWidthSqr );
 }
 
 
-void SpaceTorus::project( const real pos[], real prj[]) const
+Vector SpaceTorus::project(Vector const& pos) const
 {
-    real cen[3], ax[3];
-    
-    project0(pos, cen);
-    
-    for( int d=0; d<DIM; ++d )
-        ax[d] = pos[d] - cen[d];
-
-    real n = ax[0] * ax[0];
-    for( int d=1; d<DIM; ++d )
-        n += ax[d] * ax[d];
-    
+    Vector cen = backbone(pos);
+    Vector ax = pos - cen;
+    real n = ax.normSqr();
     n = bWidth / sqrt(n);
-    
-    for( int d=0; d<DIM; ++d )
-        prj[d] = cen[d] + n * ax[d];
+    return cen + n * ax;
 }
 
+
+//------------------------------------------------------------------------------
+
+void SpaceTorus::write(Outputter& out) const
+{
+    out.put_characters("torus", 16);
+    out.writeUInt16(2);
+    out.writeFloat(bRadius);
+    out.writeFloat(bWidth);
+}
+
+
+void SpaceTorus::setLengths(const real len[])
+{
+    bRadius = len[0];
+    bWidth = len[2];
+    update();
+}
+
+void SpaceTorus::read(Inputter& in, Simul&, ObjectTag)
+{
+    real len[8] = { 0 };
+    read_data(in, len, "torus");
+    setLengths(len);
+}
 
 //------------------------------------------------------------------------------
 //                         OPENGL  DISPLAY
 //------------------------------------------------------------------------------
 
 #ifdef DISPLAY
-#include "glut.h"
+
 #include "gle.h"
 using namespace gle;
 
-bool SpaceTorus::display() const
+bool SpaceTorus::draw() const
 {
 #if ( DIM == 2 )
     
-    GLfloat r1 = bRadius - bWidth;
-    GLfloat r2 = bRadius + bWidth;
-    const GLfloat da = M_PI / 360;
-    
-    glBegin(GL_LINE_LOOP);
-    //inner ring
-    for ( GLfloat a = -M_PI; a <= M_PI;  a += da )
-        gleVertex(r1*cosf(a), r1*sinf(a), 0);
-    glEnd();
-    
-    //outer ring
-    glBegin(GL_LINE_LOOP);
-    for ( GLfloat a = -M_PI; a <= M_PI;  a += da )
-        gleVertex(r2*cosf(a), r2*sinf(a), 0);
-    glEnd();
+    constexpr size_t fin = 16 * gle::finesse;
+    GLfloat cir[2*fin+2];
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+
+    gle::circle(fin, cir, GLfloat(bRadius-bWidth));
+    glVertexPointer(2, GL_FLOAT, 0, cir);
+    glDrawArrays(GL_LINE_STRIP, 0, fin+1);
+
+    gle::circle(fin, cir, GLfloat(bRadius+bWidth));
+    glVertexPointer(2, GL_FLOAT, 0, cir);
+    glDrawArrays(GL_LINE_STRIP, 0, fin+1);
+
+    glDisableClientState(GL_VERTEX_ARRAY);
     return true;
     
-#elif ( DIM == 3 )
+#elif ( DIM > 2 )
     
-    const int fin = 4 * gle::finesse;
-        glutSolidTorus(bWidth, bRadius, fin, fin);
+    gleTorus(bRadius, bWidth);
     return true;
     
 #else
@@ -130,7 +148,7 @@ bool SpaceTorus::display() const
 
 #else
 
-bool SpaceTorus::display() const
+bool SpaceTorus::draw() const
 {
     return false;
 }

@@ -26,7 +26,7 @@ class LineDisp
     
 public:
 
-    /// visibility flag : 0=hidden, 1=opaque (-1 is used in 3D for transparent objects)
+    /// visibility flag
     int          visible;
     
     /// color of body
@@ -35,8 +35,8 @@ public:
     /// colors of PLUS_END and MINUS_END
     gle_color    end_color[2];
 
-    /// shift of display in the Y direction
-    Vector       explode_shift;
+    /// amount of lateral displacement added during display
+    real         explode_shift;
     
 public:
     

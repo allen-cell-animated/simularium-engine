@@ -2,20 +2,24 @@
 
 set space cell
 {
-    geometry = ( periodic 10 10 )
+    shape = periodic
 }
 
-new space cell
-
-set simul glide_flip 
+new cell
 {
+    length = 20, 20, 20
+}
+
+set simul system
+{
+    dim = 2
     viscosity = 0.01
     time_step = 0.0025
-    display = {
+    display = (
         style = 2;
         delay = 10;
-        point_size = 8
-    }
+        point_size = 8;
+    )
     precondition = 0
 }
 
@@ -23,7 +27,7 @@ set fiber microtubule
 {
     rigidity = 10
     segmentation = 0.5
-    display = { line_width = 10; plus_end=24, 2; }
+    display = ( line_width = 10; plus_end=24, 2; )
 }
 
 set hand fast
@@ -35,7 +39,7 @@ set hand fast
     stall_force = 6
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     display = {
         color = 0xE69F00FF;
         size = 5
@@ -51,11 +55,8 @@ set hand slow
     stall_force = 6
     
     activity = move
-    max_speed = 0.1
-    display = {
-        color = 0x0072B2FF;
-        size = 5
-    }
+    unloaded_speed = 0.1
+    display = ( color = 0x0072B2FF; size = 5 )
 }
 
 set single graftedF
@@ -72,25 +73,24 @@ set single graftedS
     stiffness = 200
 }
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 10
-    position = ( -10 0 0 )
-    orientation = ( -1 0 0 )
+    position = -10 0 0 
+    orientation = -1 0 0
 }
 
 % --------------
 
-new 250  single graftedF ( line 11 at -5 0 )
-new 350  single graftedF ( arc 15.7 3.14 turn -1 0 0 at 0 0 ) 
-new 100  single graftedS ( line 1 at 2.5 0 ) 
+new 250 graftedF ( line 11 at -5 0 )
+new 350 graftedF ( arc 15.7 3.14 turn -1 0 0 at 0 0 ) 
+new 100 graftedS ( line 1 at 2.5 0 ) 
 
 
-run simul *
+run system
 {
     nb_frames = 400
     nb_steps = 80000
 }
-
 
 

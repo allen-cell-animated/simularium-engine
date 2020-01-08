@@ -1,93 +1,86 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SPACE_CYLINDERP_H
 #define SPACE_CYLINDERP_H
 
 #include "space.h"
 #include "modulo.h"
 
-///a cylinder of axis X that is periodic along X
+/// a periodic cylinder aligned with X
 /**
- Space `cylinderP' is a cylinder with periodic boundary conditions
- along the X-axis. It has no ends and loops on itself like a thorus,
+ Space `cylinderP` is a cylinder with periodic boundary conditions
+ along the X-axis. It has no ends and loops on itself like a torus,
  but without the curvature.
 
- @code
-    cylinderP length radius
- @endcode
+ Parameters:
+     - length = length of the cylinder in X
+     - radius = radius of the cylinder
+     .
 
- With:
- - length = half-length of the cylinder along X
- - radius = radius of the cylinder
- .
- 
-
+ To display a periodic Space, use simul:display parameter 'tile'.
  @ingroup SpaceGroup
  */
-class SpaceCylinderP : public Space, public Modulo
-{    
-    /// apply a force directed towards the edge of the Space
-    static void setInteraction(Vector const& pos, PointExact const&, Meca &, real stiff, real len, real rad);
-
+class SpaceCylinderP : public Space
+{
 private:
     
     /// half the length of the central cylinder
-    real        length() const { return Space::length(0); }
+    real  length_;
     
-    /// the radius of the hemisphere
-    real        radius() const { return Space::length(1); }
-    
-    /// the square of the radius
-    real        radiusSqr() const { return Space::lengthSqr(1); }
-    
+    /// the radius of the cylinder
+    real  radius_;
+
 public:
         
     ///creator
-    SpaceCylinderP(const SpaceProp*);
+    SpaceCylinderP(SpaceProp const*);
+
+    /// change dimensions
+    void        resize(Glossary& opt);
+ 
+    /// initialize Modulo Object
+    Modulo *    makeModulo() const;
     
-    /// check number and validity of specified lengths
-    void        resize() { Space::checkLengths(2, true); }
+    /// return bounding box in `inf` and `sup`
+    void        boundaries(Vector& inf, Vector& sup) const;
     
-    /// true if the Space is periodic in dimension ii
-    bool isPeriodic(int ii) const { return ( ii == 0 ); }
-        
-    /// maximum extension along each axis
-    Vector      extension() const;
-    
+    /// radius
+    real        thickness() const { return radius_; }
+
     /// the volume inside
     real        volume() const;
     
     /// true if the point is inside the Space
-    bool        inside(const real point[]) const;
+    bool        inside(Vector const&) const;
     
     /// true if the bead is inside the Space
-    bool        allInside(const real point[], real rad) const;
+    bool        allInside(Vector const&, real rad) const;
     
-    /// project point on the closest edge of the Space
-    void        project(const real point[], real proj[]) const;
+    /// a random position inside the volume
+    Vector      randomPlace() const;
     
-    /// the i-th direction of periodicity
-    Vector      period(int d) const;
-    
-    /// set x to its periodic representation closest to origin by removing periodic repeats
-    void        fold(real x[]) const;
-    
-    /// remove from x (1st arg) the periodic repeats, around given reference
-    void        fold(real x[], const real ref[]) const;
-    
-    /// calculate the periodic offset between x and y
-    void        foldOffset(real x[], real off[]) const;
-    
-    /// apply a force directed towards the edge of the Space
-    void        setInteraction(Vector const& pos, PointExact const&, Meca &, real stiff) const;
-    
-    /// apply a force directed towards the edge of the Space
-    void        setInteraction(Vector const& pos, PointExact const&, real rad, Meca &, real stiff) const;
+    /// set `proj` as the point on the edge that is closest to `point`
+    Vector      project(Vector const& pos) const;
 
     
-    /// OpenGL display function, return true is display was done
-    bool        display() const;
+    /// apply a force directed towards the edge of the Space
+    void        setInteraction(Vector const& pos, Mecapoint const&, Meca &, real stiff) const;
     
+    /// apply a force directed towards the edge of the Space
+    void        setInteraction(Vector const& pos, Mecapoint const&, real rad, Meca &, real stiff) const;
+
+    
+    /// OpenGL display function; returns true if successful
+    bool        draw() const;
+    
+    /// write to file
+    void        write(Outputter&) const;
+
+    /// get dimensions from array `len`
+    void        setLengths(const real len[8]);
+    
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+
 };
 
 #endif

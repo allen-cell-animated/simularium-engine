@@ -4,44 +4,44 @@
 #define INVENTORIED_H
 
 
-/// type for the serial-number of an Object
-typedef unsigned long Number;
+/// type for the serial number of an Object
+typedef unsigned int ObjectID;
 
 
-/// Object that can be entered in a Inventory
+/// Class that can be registered in the Inventory
 /**
- Inventoried provides a serial-number of type Number, used to identify objects in the simulation.
+ Inventoried provides a serial-number of type ObjectID, used to identify objects in the simulation.
  A serial-number is strictly positive, and it is given only once in each class.
  
  Inventoried [and any derived class] can be registered in a Inventory.
  The Inventory keeps track of all assigned serial-numbers, 
- and can be used to find back an object of a given serial-number.
+ and can be used to retrieve back an object given its serial-number.
 */
 class Inventoried
 {
-    
-    friend class Inventory;
-    
 protected:
     
-    /// object identifier, unique within the class defined by tag()
-    Number   nNumber;
+    /// object identifier, unique within each class
+    ObjectID   ID_;
     
 public:
     
-    /// initialize (name=0)
-    Inventoried() : nNumber(0) {}
+    /// set identity to 0
+    Inventoried() : ID_(0) {}
     
-    /// destructor
+    /// passive destructor
     ~Inventoried() {}
     
     
-    /// change the serial number
-    void    number(Number n)   { nNumber = n; }
+    /// change the identity of this object
+    void      identity(ObjectID n) { ID_ = n; }
     
-    /// serial number : a integer identifier, unique within each class
-    Number  number()     const { return nNumber; }
+    /// returns identity (strictly positive integer, unique within each class)
+    ObjectID  identity()     const { return ID_; }
     
+    /// returns modifiable identity
+    ObjectID& identity()           { return ID_; }
+
 };
 
 

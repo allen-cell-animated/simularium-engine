@@ -1,21 +1,22 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "stream_func.h"
+#include <algorithm>
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <cctype>
 
-
-void StreamFunc::clean_stream(std::ostream & os, std::istream& is)
+void StreamFunc::clean_stream(std::ostream& os, std::istream& is)
 {
-    char c;
+    char c = 0;
     while ( is.good() )
     {
         is.get(c);
         
         // terminate the line for new-line and cariage-return
         if ( c == '\r' )
-            os << std::endl;
+            os << '\n';
         // all type of spaces are substituted
         else if ( isspace(c) )
             os << ' ';
@@ -23,12 +24,12 @@ void StreamFunc::clean_stream(std::ostream & os, std::istream& is)
         else if ( isprint(c) )
             os << c;
         else
-            std::cerr << "unprintable ascii "<< (int)c << " found" << std::endl;
+            std::cerr << "unprintable ascii "<< (int)c << " found\n";
     }
 }
 
 
-void StreamFunc::diff_stream(std::ostream & os, std::istream& val, std::istream& ref)
+void StreamFunc::diff_stream(std::ostream& os, std::istream& val, std::istream& ref)
 {
     std::string val_l, ref_l;
     val.seekg(0);
@@ -46,28 +47,29 @@ void StreamFunc::diff_stream(std::ostream & os, std::istream& val, std::istream&
         if ( val_l != ref_l )
 #endif
         {
-            os << val_l << std::endl;
-            //os << val_l << "  (" << ref_l << ")" << std::endl;
+            os << val_l << '\n';
+            //os << val_l << "  (" << ref_l << ")\n";
         }
     }
 }
 
 
-void StreamFunc::skip_lines(std::ostream & os, std::istream& is, char skip)
+void StreamFunc::skip_lines(std::ostream& os, std::istream& is, char skip)
 {
     std::string line;
     
     while ( is.good() )
     {
         std::getline(is, line);
-        if ( line[0] != skip )
-            os << line << std::endl;
+        if ( line.size() < 1 )
+            continue;
+        else if ( line[0] != skip )
+            os << line << '\n';
     }
 }
 
 
-
-void StreamFunc::prefix_lines(std::ostream & os, std::istream& is, std::string const& prefix,
+void StreamFunc::prefix_lines(std::ostream& os, std::istream& is, const char prefix[],
                               char keep, char skip)
 {
     std::string line;
@@ -75,14 +77,14 @@ void StreamFunc::prefix_lines(std::ostream & os, std::istream& is, std::string c
     while ( is.good() )
     {
         std::getline(is, line);
-        if ( line[0] == 0 )
-            os << line << std::endl;
+        if ( line.size() < 1 )
+            continue;
         else if ( line[0] == keep )
-            os << line << std::endl;
+            os << line << '\n';
         else if ( line[0] == skip )
             ;
         else
-            os << prefix << line << std::endl;
+            os << prefix << line << '\n';
     }
 }
 
@@ -90,69 +92,91 @@ void StreamFunc::prefix_lines(std::ostream & os, std::istream& is, std::string c
 /**
  The alignment of the vertical bar should match the one in PREF
  */
-void print_line(std::ostream & os, unsigned int cnt, std::string line)
+void print_line(std::ostream& os, int num, std::string const& line)
 {
-    os << std::setw(8) << cnt << "  " << line << std::endl;
+    os << std::setw(9) << num << " | " << line << '\n';
+}
+
+/**
+ The alignment of the vertical bar should match the one in PREF
+ */
+void print_line(std::ostream& os, const char prefix[], std::string const& line)
+{
+    if ( prefix && *prefix )
+        os << prefix << " " << line << '\n';
+    else
+        os << line << '\n';
 }
 
 
 /**
- show_line() will output one line extracted from `is',
- and indicate the position `pos` with a arrowhead in a second line.
+ Print the one line extracted from `is` containing `pos` and indicate
+ the position `pos` with a arrowhead in a second line below.
  */
-void StreamFunc::show_line(std::ostream & os, std::istream & is, std::streampos pos)
+void StreamFunc::mark_line(std::ostream& os, std::istream& is, std::streampos pos, const char prefix[])
 {
-    if ( !is.good() )
-        is.clear();
-    
-    std::streampos isp = is.tellg();
-    is.seekg(0, std::ios::beg);
+    is.clear();
+    std::streampos isp, sos = is.tellg();
+    is.seekg(0);
 
-    unsigned int cnt = 0;
+    // get the line containing 'pos'
     std::string line;
-    
     while ( is.good()  &&  is.tellg() <= pos )
     {
+        isp = is.tellg();
         std::getline(is, line);
-        ++cnt;
     }
-    
-    print_line(os, cnt, line);
-    
-    std::streampos lip = line.size() + 1 + pos - is.tellg();
-    os << "        | ";
-    for ( int n = 0; n < lip; ++n )
-        os << " ";
-    os << "^" << std::endl;
-    
+    std::streamoff off = pos - isp;
+    // reset stream
     is.clear();
-    is.seekg(isp, std::ios::beg);
+    is.seekg(sos);
+
+    std::string sub;
+    unsigned i = 0;
+    while ( i < off )
+    {
+        int c = line[i++];
+        if ( c == 0 )
+            break;
+        sub.push_back(isspace(c)?(char)c:' ');
+    }
+    sub.push_back('^');
+    //sub.append(" ("+std::string(1, is.peek())+")");
+    print_line(os, prefix, line);
+    print_line(os, prefix, sub);
 }
 
 
-std::string StreamFunc::show_line(std::istream & is, std::streampos pos)
+void StreamFunc::mark_line(std::ostream& os, std::istream& is)
+{
+    is.clear();
+    mark_line(os, is, is.tellg(), nullptr);
+}
+
+
+std::string StreamFunc::marked_line(std::istream& is, std::streampos pos, const char prefix[])
 {
     std::ostringstream oss;
-    show_line(oss, is, pos);
+    mark_line(oss, is, pos, prefix);
     return oss.str();
 }
 
 
 /**
  Output enough lines to cover the area specified by [start, end].
- Each line is printed with a line number
+ Each line is printed in full and preceded with a line number
  */
-void StreamFunc::print_lines(std::ostream & os, std::istream & is,
+void StreamFunc::print_lines(std::ostream& os, std::istream& is,
                              std::streampos start, std::streampos end)
 {
     if ( !is.good() )
         is.clear();
     
     std::streampos isp = is.tellg();
-    is.seekg(0, std::ios::beg);
+    is.seekg(0);
     std::string line;
     
-    unsigned int cnt = 0;
+    size_t cnt = 0;
     while ( is.good()  &&  is.tellg() <= start  )
     {
         std::getline(is, line);
@@ -164,23 +188,16 @@ void StreamFunc::print_lines(std::ostream & os, std::istream & is,
     {
         std::getline(is, line);
         ++cnt;
-        print_line(os, cnt, line);
+        if ( !std::all_of(line.begin(),line.end(),isspace) )
+            print_line(os, cnt, line);
     }
 
     is.clear();
-    is.seekg(isp, std::ios::beg);
+    is.seekg(isp);
 }
 
 
-void StreamFunc::show_lines(std::ostream & os, std::istream & is,
-                            std::streampos start, std::streampos end)
-{
-    os << "in\n";
-    print_lines(os, is, start, end);
-}
-
-
-std::string StreamFunc::get_lines(std::istream & is, std::streampos s, std::streampos e)
+std::string StreamFunc::get_lines(std::istream& is, std::streampos s, std::streampos e)
 {
     std::ostringstream oss;
     print_lines(oss, is, s, e);
@@ -188,16 +205,57 @@ std::string StreamFunc::get_lines(std::istream & is, std::streampos s, std::stre
 }
 
 
+std::string StreamFunc::get_line(std::istream& is, std::streampos pos)
+{
+    if ( !is.good() )
+        is.clear();
+    
+    is.seekg(0);
+    std::string line;
+    
+    while ( is.good()  &&  is.tellg() <= pos )
+        std::getline(is, line);
+
+    return line;
+}
+
+
+size_t StreamFunc::line_number(std::istream& is, std::streampos pos)
+{
+    if ( !is.good() )
+        is.clear();
+    
+    std::streampos sos = is.tellg();
+    is.seekg(0);
+    
+    if ( pos == -1 )
+        pos = sos;
+    
+    size_t cnt = 0;
+    std::string line;
+    
+    while ( is.good()  &&  is.tellg() <= pos )
+    {
+        std::getline(is, line);
+        ++cnt;
+    }
+    
+    is.clear();
+    is.seekg(sos);
+    return cnt;
+}
+
+
 int StreamFunc::find_and_replace(std::string & src,
                                  std::string const& fnd, std::string const& rep)
 {
     int num = 0;
-    size_t fLen = fnd.size();
-    size_t rLen = rep.size();
-    size_t pos = src.find(fnd, 0);
+    std::string::size_type fLen = fnd.size();
+    std::string::size_type rLen = rep.size();
+    std::string::size_type pos = src.find(fnd, 0);
     while ( pos != std::string::npos )
     {
-        ++num;
+        num++;
         src.replace(pos, fLen, rep);
         pos += rLen;
         pos = src.find(fnd, pos);

@@ -1,49 +1,60 @@
-% Changing the confining space
-% Francois Nedelec, January 2012 26
+% A confined fiber
+% F. Nedelec, April 2010
 
-
-set simul ring
+set simul system
 {
-    viscosity = 1
-    time_step = 0.001
-    steric = 1, 100
+    time_step = 0.005
+    viscosity = 0.02
 }
 
-set space small
+set space cell
 {
-    geometry = ( sphere 1 )
+    shape = sphere
 }
 
-set space big
+set space capsule
 {
-    geometry = ( sphere 2 )
+    shape = capsule
 }
 
-new space big
-new space small
-
-set bead balls
+new cell
 {
-    confine = all_inside, 10
-    steric = 1
-    display = ( coloring=1; style=5 )
+    radius = 5;
 }
 
-new 100 bead balls
+new capsule
 {
-    radius = 0.1
+    length = 11
+    radius = 3
 }
 
-run 1000 simul *
-{   
-    nb_frames = 10
+set fiber microtubule
+{
+    rigidity = 20
+    segmentation = 0.5
+    confine = inside, 100
 }
 
+new 1 microtubule
+{
+    length = 12
+}
 
-change bead:confine balls ( inside, 50, small )
+run 100 system
+change all space { radius = 4.8 }
+run 100 system
+change cell { radius = 4.6 }
+change all space { length = 12 }
+run 100 system
+change all space { radius = 4.4 }
+change capsule { length = 11 }
+run 100 system
+change cell { radius = 4.2 }
+run 100 system
+change cell { radius = 4.0 }
 
-
-run 1000 simul *
-{   
+run system
+{
+    nb_steps = 1000
     nb_frames = 10
 }

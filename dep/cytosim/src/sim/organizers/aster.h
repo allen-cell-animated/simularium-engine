@@ -9,89 +9,180 @@
 #include "solid.h"
 #include "fiber.h"
 
-class Glossary;
-
-#pragma mark -
-
-/// defines a connection between Solid and Fiber
-class AsterClamp
+/// A connection between a Fiber and a Solid
+//@todo new Interpolation4() to replace coef1[] and coef2[]
+class AsterLink
 {
+    friend class Aster;
+    
+private:
+    
+    /// type of link:
+    /**
+     0 = no link
+     1 = link fiber-end with coef1, fiber-side with coef2
+     2 = the interpolation corresponds exactly to point 'ref'
+     */
+    int      ord;
+
+    /// index of reference point on the Solid
+    unsigned ref;
+    
+    /// interpolation coefficient for Fiber end
+    real     coef1[4];
+    
+    /// interpolation coefficient for Fiber side
+    real     coef2[4];
+    
+    /// distance between the two anchoring points
+    real     len;
+    
+    /// index used for backward compatibility
+    unsigned alt;
+    
 public:
     
-    /// index of the Solid-point corresponding to MT end
-    unsigned int  clamp1;
+    /// constructor
+    AsterLink()
+    {
+        reset();
+    }
     
-    /// index of the Solid-point corresponding to MT secondary point
-    unsigned int  clamp2;
+    void reset()
+    {
+        ord = 0;
+        ref = 0;
+        len = 0;
+        for ( int i = 0; i < 4; ++i )
+        {
+            coef1[i] = 0.0;
+            coef2[i] = 0.0;
+        }
+        alt = 0;
+    }
     
-    /// abscissa of the MT secondary point
-    real clampA;
+    void set(Vector const& A, Vector const& B)
+    {
+        len = ( A - B ).norm();
+        
+        coef1[1] = A.XX;
+        coef2[1] = B.XX;
+#if ( DIM == 1 )
+        coef1[2] = 0.0;
+        coef2[2] = 0.0;
+        coef1[3] = 0.0;
+        coef2[3] = 0.0;
+        coef1[0] = 1.0 - A.XX;
+        coef2[0] = 1.0 - B.XX;
+#elif ( DIM == 2 )
+        coef1[2] = A.YY;
+        coef2[2] = B.YY;
+        coef1[3] = 0.0;
+        coef2[3] = 0.0;
+        coef1[0] = 1.0 - A.XX - A.YY;
+        coef2[0] = 1.0 - B.XX - B.YY;
+#elif ( DIM == 3 )
+        coef1[2] = A.YY;
+        coef2[2] = B.YY;
+        coef1[3] = A.ZZ;
+        coef2[3] = B.ZZ;
+        coef1[0] = 1.0 - A.XX - A.YY - A.ZZ;
+        coef2[0] = 1.0 - B.XX - B.YY - B.ZZ;
+#endif
+        if ( A.norm_inf() < REAL_EPSILON )
+            ord = 1;
+        else
+            ord = 1+DIM;
+    }
+
+    void write(Outputter& out) const
+    {
+        out.writeUInt16(ref);
+        for ( int d = 1; d < 4; ++d )
+            out.writeFloat(coef1[d]);
+        for ( int d = 1; d < 4; ++d )
+            out.writeFloat(coef2[d]);
+    }
     
-    /// clear member values
-    void clear() { clamp1 = 0; clamp2 = 0; clampA = 0; }
+    void read(Inputter& in)
+    {
+        ref = in.readUInt16();
+        
+        for ( int d = 1; d < 4; ++d )
+            coef1[d] = in.readFloat();
+        coef1[0] = 1.0 - coef1[1] - coef1[2] - coef1[3];
+        
+        for ( int d = 1; d < 4; ++d )
+            coef2[d] = in.readFloat();
+        coef2[0] = 1.0 - coef2[1] - coef2[2] - coef2[3];
+        
+        len = (Vector3(coef1+1)-Vector3(coef2+1)).norm();
+        
+        if ( fabs(coef1[1]) + fabs(coef1[2]) + fabs(coef1[3]) < REAL_EPSILON )
+            ord = 1;
+        else
+            ord = DIM;
+    }
     
-    /// constructor calls clear()
-    AsterClamp() { clear(); }
-    
-    /// set member values
-    void set(unsigned int c1, unsigned int c2, real ca) { clamp1 = c1; clamp2 = c2; clampA = ca; }
-    
+    void print(std::ostream& out) const
+    {
+        const unsigned w = 9;
+        out << std::setw(w) << coef1[0];
+        for ( int d = 1; d < 4; ++d )
+            out << " " << std::setw(w) << coef1[d];
+        out << "   " << std::setw(w) << coef2[0];
+        for ( int d = 1; d < 4; ++d )
+            out << " " << std::setw(w) << coef2[d];
+        out << "\n";
+    }
 };
 
-
-#pragma mark -
 
 /// A radial configuration of Fiber(s) built around a Solid
 /**
  The parameters are defined in AsterProp.
  
- Each Fiber is attached to two points on the Solid:
- - a primary point that is tied to the end of the Fiber
- - a secondary point that is tied to the Fiber at some distance from the its end.
+ Each Fiber is attached to the Solid:
+ - at the end of the Fiber
+ - at a secondary point that is tied to the Fiber at some distance from this end.
  .
- Together they link the Fiber to the Solid, both in position and direction.
- Their stiffness is defined in AsterProp::stiffness.
- To hold \a N fibers in different directions, the Aster uses multiple anchoring points.
- How they are distributed on the Solid depends on the dimensionality, and on: 
- - aster_radius = AsterProp::radius[0] + AsterProp::radius[1]
- - inner_radius = AsterProp::radius[1]
+ This anchors the Fiber to the Solid, both in position and direction.
+ The stiffness of the links is defined in AsterProp::stiffness, and can be adjusted independently.
  .
  
- In short:
- -# If inner_radius == 0:
-   - The Solid has one primary point, located in the center.
-   - in 1D, only two secondary points are used: left and right,
-   - in 2D, \a N secondary points are distributed on a circle of radius \a aster_radius.
-   - in 3D, \a N secondary points are distributed on the surface of a sphere of radius aster_radius, using PointsOnSphere.
-   .
- -# If inner_radius > 0:
-   - the secondary points are distributed as if inner_radius==0, 
-   - an equal number of primary points are obtained by scaling the secondary points,
-     to bring them at distance inner_radius from the center.
-   .
- .
- 
- The distribution of the points could easily be changed to create non-isotropic fiber arrangements.
+ @ingroup OrganizerGroup
  */
 class Aster : public Organizer
 {
 private:
     
-    /// store the information needed to make the links between Solid and Fiber
-    Array<AsterClamp> asClamp;
+    /// scale of local reference frame
+    real       asRadius;
     
+    /// store the coefficients needed to make the links between Solid and Fiber
+    Array<AsterLink> asLinks;
+
     /// create and configure the Solid
-    Solid *       buildSolid(Glossary& opt, Simul&);
-    
-public:
+    ObjectList makeSolid(Simul&, Glossary& opt, unsigned& origin);
+
+    /// create a Fiber for position 'inx'
+    ObjectList makeFiber(Simul&, size_t inx, std::string const&, Glossary& opt);
+
+    /// define the attachment position of fiber 'inx'
+    void       placeAnchor(Vector const&, Vector const&, unsigned origin);
+
+    /// define the anchor points of Fibers
+    void       placeAnchors(Glossary& opt, unsigned origin, unsigned nbf);
     
     /// Property
     AsterProp const* prop;
     
-    /// constructor
-    Aster(AsterProp const* p) : prop(p) { }
+public:
     
-    /// destructor  
+    /// constructor
+    Aster(AsterProp const* p) : prop(p) { asRadius = 0; }
+    
+    /// destructor
     virtual      ~Aster();
     
     /// construct all the dependent Objects of the Organizer
@@ -101,45 +192,59 @@ public:
     Solid *       solid() const { return static_cast<Solid*>(organized(0)); }
     
     /// return the center of the Solid
-    Vector        position() const { return solid()->posPoint(0); }
+    Vector        position() const { return solid()->posP(0); }
     
-    /// return Fiber \a n
-    Fiber *       fiber(unsigned int n) const { return static_cast<Fiber*>(organized(n+1)); }
+    /// return Fiber `n`
+    Fiber *       fiber(size_t n) const { return Fiber::toFiber(organized(n+1)); }
     
     /// perform one Monte-Carlo step
     void          step();
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void          setInteractions(Meca &) const;
     
+    /// position of first clamp for Fiber n
+    Vector        posLink1(size_t n) const;
+    
+    /// position of second clamp for Fiber n
+    Vector        posLink2(size_t n) const;
 
-    ///number of connections between the sphere() and fiber()
-    unsigned int  nbLinks() const;
+    /// position of attachment point on Fiber corresponding to second link
+    Vector        posFiber2(size_t n) const;
     
-    ///the position on the Sphere to which Fiber ii is attached
-    Vector        posLink1(unsigned int ii) const;
+    /// retrieve links end-points for display
+    bool          getLink(size_t, Vector&, Vector&) const;
     
-    ///the position of the Fiber ii which is attached
-    Vector        posLink2(unsigned int ii) const;
+    /// return PointDisp of Solid
+    PointDisp const* disp() const { if ( solid() ) return solid()->prop->disp; return nullptr; }
     
-    /// display parameters 
-    PointDisp *   pointDisp() const { return solid()->prop->disp; }
-        
+    //--------------------------------------------------------------------------
+
     /// a unique character identifying the class
-    static const Tag TAG = 'a';
+    static const ObjectTag TAG = 'a';
     
     /// return unique character identifying the class
-    Tag           tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
+
+    /// return associated Property
+    Property const* property() const { return prop; }
+
+    /// convert pointer to Aster* if the conversion seems valid; returns 0 otherwise
+    static Aster* toAster(Object * obj)
+    {
+        if ( obj  &&  obj->tag() == TAG )
+            return static_cast<Aster*>(obj);
+        return nullptr;
+    }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
-    
+    //--------------------------------------------------------------------------
+
     /// read from IO
-    void          read(InputWrapper&, Simul&);
+    void          read(Inputter&, Simul&, ObjectTag);
     
     /// write to IO
-    void          write(OutputWrapper&) const;
-    
+    void          write(Outputter&) const;
+
 };
 
 

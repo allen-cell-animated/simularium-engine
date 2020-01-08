@@ -25,7 +25,8 @@ public:
     {
         NUCLEATE_ORIENTATED,
         NUCLEATE_PARALLEL, 
-        NUCLEATE_ANTIPARALLEL
+        NUCLEATE_ANTIPARALLEL, 
+        NUCLEATE_PARALLEL_IF
     };
     
 public:
@@ -34,56 +35,66 @@ public:
      @defgroup NucleatorPar Parameters of Nucleator
      @ingroup Parameters
      Inherits @ref HandPar.
-     Check the examples!
      @{
      */
     
-    /// rate for nucleation (also known as \c nucleate[0])
+    /// rate for nucleation (also known as `nucleate[0]`)
     real         rate;
 
-    /// type of fiber that is nucleated (also known as \c nucleate[1])
-    std::string  fiber;
+    /// type of fiber that is nucleated (also known as `nucleate[1]`)
+    std::string  fiber_type;
     
-    /// specifications of a new fiber (also known as \c nucleate[2])
+    /// specifications of a new fiber (also known as `nucleate[2]`)
     /**
-     Options valid for the command 'new fiber' may be specified here:
+     Options for the newly created Fiber may be specified here:
      see @ref FiberGroup.
      */
-    std::string  spec;
+    std::string  fiber_spec;
     
     /// specifies the direction of the new Fiber
     /**
      The `specificity` can be:
-     - none (default)
+     - off (default)
      - parallel
      - antiparallel
      .
      
      With 'specificity=none', the direction will follow the value of 'orientation',
-     specified within `nucleation_spec`.
+     specified within the spec `nucleation[2]`.
      */
     Specificity  specificity;
     
-    /// option to track a specified end [none, plus_end, minus_end, nearest_end]
+    /// defines if nucleator attaches to fibers that it creates [none, minus_end, plus_end]
     /**
-     By default the Hand will remain attached at the MINUS_END of any fiber that it has nucleated.
-     But other values are possible:
-     - none
+     This option controls if the nucleator will be attached or not to a fiber that it creates.
+     Possible values for `hold_end`:
+     - off
      - plus_end
      - minus_end
-     - nearest_end
+     .
+     Note that a nucleator remains innactive as long as it is bound to a fiber.
+     Thus, setting `hold_end = minus_end` in combination with a detachment rate of zero
+     will limit nucleation to one fiber at a time.
+     (default value is `minus_end`)
+     */
+    FiberEnd     hold_end;
+
+    /// option to track a specified end [none, minus_end, plus_end]
+    /**
+     If `track_end` is set to `plus_end` or `minus_end`, the hand will stay always
+     positionned at the given fiber end, even if this end is growing or shrinking.
+     Possible values:
+     - off
+     - plus_end
+     - minus_end
      .
      */
     FiberEnd     track_end;
     
     /// if true, set the Dynamic State of the nearest filament end to STATE_RED upon detachment
-    bool         addictive;
+    int          addictive;
     
     /// @}
-    //------------------ derived variables below ----------------
-
-    /// global Simul
-    Simul * simul;
 
 private:
     
@@ -99,7 +110,7 @@ public:
     ~NucleatorProp() { }
     
     /// return a Hand with this property
-    virtual Hand * newHand(HandMonitor* h) const;
+    virtual Hand * newHand(HandMonitor*) const;
     
     /// set default values
     void clear();
@@ -108,13 +119,13 @@ public:
     void read(Glossary&);
     
     /// compute values derived from the parameters
-    void complete(SimulProp const*, PropertyList*);
+    void complete(Simul const&);
     
     /// return a carbon copy of object
     Property* clone() const { return new NucleatorProp(*this); }
 
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
    
 };
 

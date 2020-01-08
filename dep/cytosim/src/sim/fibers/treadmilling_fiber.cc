@@ -1,97 +1,95 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
-#include "smath.h"
 #include "assert_macro.h"
 #include "treadmilling_fiber.h"
 #include "treadmilling_fiber_prop.h"
-#include "fiber_locus.h"
 #include "exceptions.h"
 #include "iowrapper.h"
 #include "simul.h"
 #include "space.h"
 
-extern Random RNG;
 
 //------------------------------------------------------------------------------
 
 TreadmillingFiber::TreadmillingFiber(TreadmillingFiberProp const* p) : Fiber(p), prop(p)
 {
-    stateM   = STATE_WHITE;
+    mStateM  = STATE_WHITE;
     mGrowthM = 0;
     
-    stateP   = STATE_WHITE;
+    mStateP  = STATE_WHITE;
     mGrowthP = 0;
 }
 
 
 TreadmillingFiber::~TreadmillingFiber()
 {
-    prop = 0;
+    prop = nullptr;
 }
 
 
 //------------------------------------------------------------------------------
 #pragma mark -
 
-int TreadmillingFiber::dynamicState(const FiberEnd which) const
+state_t TreadmillingFiber::dynamicStateM() const
 {
-    assert_true( which==PLUS_END || which==MINUS_END );
-    
-    if ( which == PLUS_END )
-        return stateP;
-    else if ( which == MINUS_END )
-        return stateM;
-    
-    return 0;
+    return mStateM;
 }
 
 
-void TreadmillingFiber::setDynamicState(const FiberEnd which, const int state)
+void TreadmillingFiber::setDynamicStateM(state_t s)
 {
-    assert_true( which==PLUS_END || which==MINUS_END );
-
-    if ( state!=STATE_GREEN && state!=STATE_RED && state!=STATE_WHITE )
-        throw InvalidParameter("fiber:treadmilling invalid AssemblyState");
-    
-    if ( which == PLUS_END )
-        stateP = state;
-    else if ( which == MINUS_END )
-        stateM = state;
-}
-
-
-real TreadmillingFiber::freshAssembly(const FiberEnd which) const
-{
-    assert_true( which==PLUS_END || which==MINUS_END );
-
-    if ( which == PLUS_END )
-        return mGrowthP;
+    if ( s == STATE_WHITE || s == STATE_GREEN || s == STATE_RED )
+        mStateM = s;
     else
-        return mGrowthM;
+        throw InvalidParameter("Invalid AssemblyState for TreadmillingFiber MINUS_END");
 }
+
+
+real TreadmillingFiber::freshAssemblyM() const
+{
+    return mGrowthM;
+}
+
+
+state_t TreadmillingFiber::dynamicStateP() const
+{
+    return mStateP;
+}
+
+
+void TreadmillingFiber::setDynamicStateP(state_t s)
+{
+    if ( s == STATE_WHITE || s == STATE_GREEN || s == STATE_RED )
+        mStateP = s;
+    else
+        throw InvalidParameter("Invalid AssemblyState for TreadmillingFiber PLUS_END");
+}
+
+
+real TreadmillingFiber::freshAssemblyP() const
+{
+    return mGrowthP;
+}
+
 
 //------------------------------------------------------------------------------
 
 void TreadmillingFiber::step()
 {    
-    //we start by Fiber::step(), which may cut this fiber, but not destroy it!
-    Fiber::step();
-
-
-    if ( stateP == STATE_GREEN )
+    if ( mStateP == STATE_GREEN )
     {
         // calculate the force acting on the point at the end:
-        real forceP = projectedForceOnEnd(PLUS_END);
+        real forceP = projectedForceEndP();
         
         // growth is reduced if free monomers are scarce:
         mGrowthP = prop->growing_speed_dt[0] * prop->free_polymer;
         
+        assert_true(mGrowthP>=0);
         // antagonistic force (< 0) decreases assembly rate exponentially
         if ( forceP < 0  &&  prop->growing_force[0] < INFINITY )
             mGrowthP *= exp(forceP/prop->growing_force[0]);
     }
-    else if ( stateP == STATE_RED )
+    else if ( mStateP == STATE_RED )
     {
         mGrowthP = prop->shrinking_speed_dt[0];
     }
@@ -101,19 +99,20 @@ void TreadmillingFiber::step()
     }
     
     
-    if ( stateM == STATE_GREEN )
+    if ( mStateM == STATE_GREEN )
     {
         // calculate the force acting on the point at the end:
-        real forceM = projectedForceOnEnd(MINUS_END);
+        real forceM = projectedForceEndM();
         
         // growth is reduced if free monomers are scarce:
         mGrowthM = prop->growing_speed_dt[1] * prop->free_polymer;
-        
+
+        assert_true(mGrowthM>=0);
         // antagonistic force (< 0) decreases assembly rate exponentially
-        if ( forceM < 0 )
+        if ( forceM < 0  &&  prop->growing_force[1] < INFINITY  )
             mGrowthM *= exp(forceM/prop->growing_force[1]);
     }
-    else if ( stateM == STATE_RED )
+    else if ( mStateM == STATE_RED )
     {
         mGrowthM = prop->shrinking_speed_dt[1];
     }
@@ -123,92 +122,62 @@ void TreadmillingFiber::step()
     }
     
     
-    if ( length() + mGrowthP + mGrowthM < prop->min_length )
+    real len = length();
+    real inc = mGrowthP + mGrowthM;
+    if ( inc < 0  &&  len + inc < prop->min_length )
     {
         // the fiber is too short, we delete it:
-        objset()->erase(this);
+        delete(this);
+        return;
     }
-    else
+    else if ( len + inc < prop->max_length )
     {
-        growM(mGrowthM);
-        growP(mGrowthP);
-        
-        /*
-         FiberNaked::adjustSegmentation and Fiber::updateBinder
-         should be called every time as needed from growP or growM,
-         but it is more efficient to call them here once per time-step.
-         */
-        adjustSegmentation();
-        updateBinders();
+        if ( mGrowthM ) growM(mGrowthM);
+        if ( mGrowthP ) growP(mGrowthP);
     }
-}
-
-
-
-//------------------------------------------------------------------------------
-#pragma mark -
-
-/**
- Calls Fiber::severM(abs),
- Set the dynamic state of newly created fiber tips:
- - PLUS_END to STATE_RED
- - MINUS_END to STATE_GREEN
- .
- */
-Fiber * TreadmillingFiber::severM(real abs)
-{
-    // the new part 'fib' will have the PLUS_END section
-    Fiber* fib = Fiber::severM(abs);
-    
-    if ( fib )
+    else if ( len < prop->max_length )
     {
-        assert_true( fib->prop == prop );
-        
-        // new MINUS_END is stable
-        fib->setDynamicState(MINUS_END, STATE_GREEN);
-        
-        // old PLUS_END is transfered with the same state:
-        fib->setDynamicState(PLUS_END, dynamicState(PLUS_END));
-        
-        // new PLUS_END is unstable (shrinking state)
-        setDynamicState(PLUS_END, STATE_RED);
+        // the remaining possible growth is distributed to the two ends:
+        inc = ( prop->max_length - len ) / inc;
+        if ( mGrowthM ) growM(inc*mGrowthM);
+        if ( mGrowthP ) growP(inc*mGrowthP);
     }
-    
-    return fib;
+
+    Fiber::step();
 }
 
-
-void TreadmillingFiber::join(Fiber * fib)
-{
-    assert_true( fib->prop == Fiber::prop );
-    Fiber::join(fib);
-    //transfer dynamic state of MINUS_END:
-    setDynamicState(MINUS_END, fib->dynamicState(MINUS_END));
-}
                   
 //------------------------------------------------------------------------------
 #pragma mark -
 
 
-void TreadmillingFiber::write(OutputWrapper& out) const
+void TreadmillingFiber::write(Outputter& out) const
 {
-    out.writeUInt16(stateM);
-    out.writeUInt16(stateP);
     Fiber::write(out);
+
+    /// write variables describing the dynamic state of the ends:
+    writeHeader(out, TAG_DYNAMIC);
+    out.writeUInt16(mStateM);
+    out.writeUInt16(mStateP);
 }
 
 
-void TreadmillingFiber::read(InputWrapper & in, Simul& sim)
+void TreadmillingFiber::read(Inputter& in, Simul& sim, ObjectTag tag)
 {
-    try {
-        stateM = in.readUInt16();
-        stateP = in.readUInt16();
+#ifdef BACKWARD_COMPATIBILITY
+    if ( tag == TAG_DYNAMIC || ( tag == TAG && in.formatID() < 44 ) )
+#else
+    if ( tag == TAG_DYNAMIC )
+#endif
+    {
+        mStateM = in.readUInt16();
+        mStateP = in.readUInt16();
     }
-    catch( Exception & e ) {
-        e << ", while importing " << reference();
-        throw;
-    }
-    
-    Fiber::read(in, sim);
+#ifdef BACKWARD_COMPATIBILITY
+    if ( tag != TAG_DYNAMIC || in.formatID() < 44 )
+#else
+    else
+#endif
+        Fiber::read(in, sim, tag);
 }
 

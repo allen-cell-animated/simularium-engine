@@ -1,6 +1,5 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-
 #ifndef SPACE_BANANA_H
 #define SPACE_BANANA_H
 
@@ -9,16 +8,13 @@
 /// a bent cylinder of constant diameter terminated by hemispheric caps
 /**
  Space `banana` is comprised from a section of a torus,
- terminated by two hemispheres. It is defined by three parameters:
- @code
-    banana length width radius
- @endcode
+ terminated by two hemispheres.
  
- With:
- - `length` = the overall length minus 2*width
- - `width`  = the diameter of the torus in its crosssections.
- - `radius` = the main radius of the torus, which defines curvature
- .
+ Parameters:
+     - `length` = the overall length
+     - `width` = the diameter of the torus in its cross sections
+     - `curvature` = the main radius of the torus centerline
+     .
  
  This class was first conceived by Dietrich Foethke, to simulate S. pombe.
  
@@ -28,9 +24,9 @@ class SpaceBanana : public Space
 private:
     
     /// dimensions
+    real  bRadius;
     real  bLength;
     real  bWidth, bWidthSqr;
-    real  bRadius;
 
     /// angle covered by torus section
     real bAngle;
@@ -39,33 +35,47 @@ private:
     real bEnd[2];
 
     /// coordinates of the center of the torus
-    real bCenter[3];
+    Vector bCenter;
+    
+    void update();
     
     /// project on the backbone circle
-    void project0(const real point[], real proj[]) const;
-    
+    Vector backbone(Vector const& pos) const;
+
 public:
         
     /// constructor
-    SpaceBanana(const SpaceProp* p);
-        
-    /// check number and validity of specified lengths
-    void        resize();
-
-    /// maximum extension along each axis
-    Vector      extension() const;
+    SpaceBanana(SpaceProp const*);
     
+    /// change dimensions
+    void        resize(Glossary& opt);
+ 
+    /// return bounding box in `inf` and `sup`
+    void        boundaries(Vector& inf, Vector& sup) const;
+    
+    /// radius
+    real        thickness() const { return bWidth; }
+
     /// the volume inside
     real        volume() const;
     
     /// true if the point is inside the Space
-    bool        inside(const real point[]) const;
+    bool        inside(Vector const&) const;
     
-    /// project point on the closest edge of the Space
-    void        project(const real point[], real proj[]) const;
+    /// set `proj` as the point on the edge that is closest to `point`
+    Vector      project(Vector const& pos) const;
     
-    /// OpenGL display function, return true is display was done
-    bool        display() const;
+    /// OpenGL display function; returns true if successful
+    bool        draw() const;
+    
+    /// write to file
+    void        write(Outputter&) const;
+
+    /// get dimensions from array `len`
+    void        setLengths(const real len[8]);
+    
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
     
 };
 

@@ -1,26 +1,28 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
 #include "fiber_set.h"
+#include "fiber_segment.h"
 #include "iowrapper.h"
+#include "messages.h"
 #include "glossary.h"
 #include "fiber_prop.h"
+#include "growing_fiber_prop.h"
 #include "dynamic_fiber_prop.h"
 #include "classic_fiber_prop.h"
 #include "treadmilling_fiber_prop.h"
-#include "messages.h"
-#include "picket.h"
+#include "clapack.h"
 #include "simul.h"
 #include "sim.h"
 
-extern Random RNG;
+//#include "vecprint.h"
 
 //------------------------------------------------------------------------------
 
 /**
- @defgroup FiberGroup Fiber and Derived Activities
+ @defgroup FiberGroup Fiber and related
  @ingroup ObjectGroup
  @ingroup NewObject
- @brief The default Fiber is of fixed length, but derived class can change length.
+ @brief The Fiber has fixed length, but derived classes can change length.
 
  A fiber is a filament of constant length.
  Derived classes are available, where different models of how length may change
@@ -28,190 +30,210 @@ extern Random RNG;
  
  List of classes accessible by specifying `fiber:activity`.
  
- `activity`    |   Class             | Parameter
- --------------|---------------------|-----------------------------------
+ `activity`    | Class               | Parameter                  |
+ --------------|---------------------|-----------------------------
  `none`        | Fiber               | @ref FiberPar (default)
+ `grow`        | GrowingFiber        | @ref GrowingFiberPar
  `classic`     | ClassicFiber        | @ref ClassicFiberPar
  `dynamic`     | DynamicFiber        | @ref DynamicFiberPar
  `treadmill`   | TreadmillingFiber   | @ref TreadmillingFiberPar
+ `tubule`      | Tubule (disabled)   | @ref TubulePar
  
  */
-Property* FiberSet::newProperty(const std::string& kd, const std::string& nm, Glossary& opt) const
+Property* FiberSet::newProperty(const std::string& cat, const std::string& nom, Glossary& opt) const
 {
-    if ( kd == kind() )
+    if ( cat == "fiber" )
     {
         std::string a;
         if ( opt.peek(a, "activity") )
         {
             if ( a == "classic" )
-                return new ClassicFiberProp(nm);
-            else if ( a == "dynamic" )
-                return new DynamicFiberProp(nm);
-            else if ( a == "treadmill" || a == "grow" )
-                return new TreadmillingFiberProp(nm);
-            else if ( a == "none" )
-                return new FiberProp(nm);
-            else
-                throw InvalidParameter("unknown fiber:activity `"+a+"'");
+                return new ClassicFiberProp(nom);
+            if ( a == "grow" )
+                return new GrowingFiberProp(nom);
+            if ( a == "dynamic" )
+                return new DynamicFiberProp(nom);
+            if ( a == "treadmill" )
+                return new TreadmillingFiberProp(nom);
+            if ( a == "none" )
+                return new FiberProp(nom);
+
+
+            std::cerr << "INCIDENT: substituting generic Fiber class for `"+a+"'\n";
+            return new FiberProp(nom);
+            //throw InvalidParameter("unknown fiber:activity `"+a+"'");
         }
-        return new FiberProp(nm);
+        return new FiberProp(nom);
     }
-    return 0;
+    return nullptr;
 }
 
 
 /**
- @addtogroup FiberGroup 
- @{
+ Split string `arg` into an integer, a space, and the remaining string.
+ Any space after the integer is discarded. `arg` is truncated.
+ */
+bool splitNumber(std::string& arg, unsigned& num)
+{
+    char const* ptr = arg.c_str();
+    char * end;
+    errno = 0;
+    unsigned long var = strtoul(ptr, &end, 10);
+    if ( !errno && end > ptr && isspace(*end) )
+    {
+        num = (unsigned)var;
+        while ( isspace(*end) )
+            ++end;
+        arg.erase(0, (size_t)(end-ptr));
+        return true;
+    }
+    return false;
+}
+
+/**
+ The initialization options depend on the type of fiber: Fiber, DynamicFiber, ClassicFiber, etc.
+
  <hr>
  
- You may add a Picket to immobilize a Fiber to the ground:
+ You may directly attach Single or Couple to the fiber, in different ways:
  
- @code
- new fiber microtubule
- {
-   single = NAME_OF_SINGLE, MODE
- }
- @endcode
+     new filament
+     {
+        attach1 = [NUMBER] NAME
+     }
  
- NAME should be the name of a defined single.
- Possible MODE:
- - minus_end
- - plus_end
- - minus_dir, [distance]
- - center
- .
- 
- For MODE == minus_dir, 2 Singles are added, 
- and their distance should be specified as the third argument:
- @code
- new fiber actin
- {
-   single = NAME_OF_SINGLE, MODE, DISTANCE
- }
- @endcode
- 
- 
- Add Couple pre-attached to the Fiber:
- 
- @code
- new fiber microtubule
- {
-   couple = NAME_OF_COUPLE, NUMBER, LEN
- }
- @endcode
+ `NAME` should designate the Single or Couple that will be attached to the Fiber.
+ `NUMBER` will specify how many Single/Couple will be attached (by default: 1).
+ Note that for a Couple, the first Hand is attached to the fiber (and not the second).
+ In this case, the Single/Couple are anchored at random position distributed 
+ uniformly along the Fiber.
 
- Couples are attached via their first Hand,
- and they are distributed along Fiber, at distance LEN from the MINUS_END.
- If LEN is not specified, they are distributed all along the fiber.
+     new filament
+     {
+        attach1 = [NUMBER] NAME, ABSCISSA, REFERENCE [, MODIFIER] [, POSITION]
+     }
+ 
+ If `ABSCISSA` is specified (in micrometers), the Single/Couple will be attached
+ at the specified distance from the `REFERENCE = { minus_end, plus_end, center }
+ (default is `minus_end`). The distance is counted towards the other end.
+ Moreover, a `MODIFIER = { uniform, exponential, regular }` can be specified (default: `uniform`).
+ With `uniform` Single/Couple are attached uniformly over distance `[0, DISTANCE]` from the `REFERENCE`.
+ With `regular`, they are distributed regularly.
+ Finally, `POSITION` can be specified. This is mostly relevant for `SINGLE` with
+ activity `fixed`.
+ 
+ One can specify multiple attachement instructions with `attach1`, `attach2`, etc.
+ For example, this attaches one `simplex` at each end of the filaments:
+ 
+     new filament
+     {
+        attach1 = simplex, 0.0, minus_end
+        attach2 = simplex, 0.0, plus_end
+     }
 
  @}
  */
-ObjectList FiberSet::newObjects(const std::string& kd, const std::string& nm, Glossary& opt)
+ObjectList FiberSet::newObjects(const std::string& name, Glossary& opt)
 {
-    ObjectList res;
-    Fiber * obj = 0;
-    if ( kd == kind() )
+    FiberProp * p = simul.findProperty<FiberProp>("fiber", name);
+    Fiber * fib = p->newFiber(opt);
+    assert_true( fib->tag()==Fiber::TAG );
+    fib->birthTime(simul.time());
+
+    ObjectList res(2);
+    res.push_back(fib);
+ 
+    unsigned inp = 1;
+    std::string spe, var = "attach1";
+    
+    if ( opt.has_key("attach") )
     {
-        Property * p = simul.properties.find_or_die(kd, nm);
-        obj = static_cast<FiberProp*>(p)->newFiber(opt);
+        var = "attach";
+        inp = 0;
     }
     
-    //add optional singles to the Fiber:
-    if ( obj )
+    //can add Singles or Couples to the Fiber:
+    while ( opt.set(spe, var) )
     {
-        res.push_back(obj);
-        assert_true( obj->tag()==Fiber::TAG );
-        Fiber * fib = static_cast<Fiber*>(obj);
-
-        std::string nam, mod;
-        if ( opt.set(nam, "single") && opt.set(mod, "single", 1) )
+        unsigned cnt = 1;
+        splitNumber(spe, cnt);
+        
+        // search for Single and Couple:
+        SingleProp * sip = static_cast<SingleProp*>(simul.properties.find("single", spe));
+        CoupleProp * cop = static_cast<CoupleProp*>(simul.properties.find("couple", spe));
+        
+        if ( sip && cop )
+            throw InvalidParameter("ambiguous fiber:attach single/couple `"+spe+"'");
+        if ( !sip && !cop )
+            throw InvalidParameter("could not find fiber:attach single/couple `"+spe+"'");
+        
+        for ( unsigned n = 0; n < cnt; ++n )
         {
-            SingleProp * sip = simul.findSingleProp(nam);
-            
-            if ( mod == "minus_end" )
+            FiberSite fs(fib, fib->someAbscissa(var, opt, n/std::max(1U, cnt-1)));
+            Object * cs = nullptr;
+            Hand * h = nullptr;
+            if ( sip )
             {
-                Single * gh = sip->newSingle();
-                gh->setPosition(fib->posEnd(MINUS_END));
-                gh->attachToEnd(fib, MINUS_END);
-                res.push_back(gh);
-            }
-            else if ( mod == "plus_end" )
-            {
-                Single * gh = sip->newSingle();
-                gh->setPosition(fib->posEnd(PLUS_END));
-                gh->attachToEnd(fib, PLUS_END);
-                res.push_back(gh);
-            }   
-            else if ( mod == "center" )
-            {
-                Single * gh = sip->newSingle();
-                gh->setPosition(fib->posEnd(CENTER));
-                gh->attachToEnd(fib, CENTER);
-                res.push_back(gh);
-            }   
-            else if ( mod == "minus_dir" )
-            {
-                real len = 1;
-                opt.set(len, "single", 2);
-                
-                Single * gh = sip->newSingle();
-                gh->setPosition(fib->posEnd(MINUS_END));
-                gh->attachToEnd(fib, MINUS_END);
-                res.push_back(gh);
-                
-                gh = sip->newSingle();
-                gh->setPosition(fib->pos(len, MINUS_END));
-                gh->attachTo(fib, len, MINUS_END);
-                res.push_back(gh);
+                Single * s = sip->newSingle();
+                h = s->hand();
+                cs = s;
             }
             else
             {
-                throw InvalidParameter("unknown fiber:single type");
+                Couple * c = cop->newCouple();
+                h = c->hand1();
+                cs = c;
             }
-        }
-
-        if ( opt.set(nam, "couple") )
-        {
-            CoupleProp * cop = static_cast<CoupleProp*>(simul.properties.find_or_die("couple", nam));
-            int cnt = 1;
-            opt.set(cnt, "couple", 1);
-            real len = fib->length();
-            opt.set(len, "couple", 2);
-            
-            for ( int n = 0; n < cnt; ++n )
+            if ( h->attachmentAllowed(fs) )
             {
-                real abs = fib->abscissa(len * n / (cnt-1), MINUS_END);
-                if ( fib->within(abs) )
-                {
-                    Couple * cp = new Couple(cop, fib->posM(abs));
-                    cp->attachTo1(fib, abs);
-                    res.push_back(cp);
-                }
+                h->attach(fs);
+                Vector vec;
+                if ( opt.set(vec, var, 4) )
+                    cs->setPosition(vec);
+                else
+                    cs->setPosition(fs.pos());
+                res.push_back(cs);
+            }
+            else
+            {
+                delete(cs);
+                throw InvalidParameter("hand cannot attach to specified fiber");
             }
         }
-        
+        var = "attach" + std::to_string(++inp);
     }
+
     return res;
 }
 
 /**
- The fiber is not initialized, since this is used for file input
+ The returned object is not initialized, since this is used for file input
  */
-Object * FiberSet::newObjectT(const Tag tag, int idx)
+Object * FiberSet::newObject(const ObjectTag tag, unsigned num)
 {
-    Property * p = simul.properties.find_or_die(kind(), idx);
-    Fiber* fib = static_cast<FiberProp*>(p)->newFiber();
-
 #ifdef BACKWARD_COMPATIBILITY
-    assert_true( fib  &&  fib->tag()==tag  || tag=='m' );
+    if ( tag == Fiber::TAG || tag == 'm' )
 #else
-    assert_true( fib  &&  fib->tag()==tag );
+    if ( tag == Fiber::TAG )
 #endif
-    
-    return fib;
+    {
+        FiberProp * p = simul.findProperty<FiberProp>("fiber", num);
+        Fiber * obj = p->newFiber();
+        obj->birthTime(simul.time());
+        return obj;
+    }
+    return nullptr;
 }
 
+
+void FiberSet::write(Outputter& out) const
+{
+    if ( size() > 0 )
+    {
+        out.put_line("\n#section "+title(), out.binary());
+        writeNodes(out, nodes);
+    }
+}
 
 //------------------------------------------------------------------------------
 #pragma mark -
@@ -223,42 +245,35 @@ Object * FiberSet::newObjectT(const Tag tag, int idx)
 
 void FiberSet::step()
 {
-    PropertyList plist = simul.properties.find_all(kind());
+    PropertyList plist = simul.properties.find_all("fiber");
     
-    // calculate the total length for each kind of Fiber:
-    for ( unsigned int k = 0; k < plist.size(); ++k )
-        static_cast<FiberProp*>(plist[k])->total_length = 0;
+    // calculate the total length used for each kind of Fiber:
+    for ( Property * i : plist )
+        static_cast<FiberProp*>(i)->used_polymer = 0;
 
     for ( Fiber const* fib = first(); fib; fib = fib->next() )
-        const_cast<FiberProp*>(fib->prop)->total_length += fib->length();
+        fib->prop->used_polymer += fib->length();
     
-    // calculate the ratio of free polymer:
-    for ( unsigned int k = 0; k < plist.size(); ++k )
+    // calculate the ratio of free polymer for each class of Fiber:
+    for ( Property * i : plist )
     {
-        FiberProp * p = static_cast<FiberProp*>(plist[k]);        
-        if ( p->total_polymer > 0 )
+        FiberProp * p = static_cast<FiberProp*>(i);
+
+        // update the normalized monomer concentration:
+        p->free_polymer = 1.0 - p->used_polymer / p->total_polymer;
+        
+        if ( p->free_polymer < 0 )
         {
-            // update the normalized monomer concentration:
-            p->free_polymer = 1.0 - p->total_length / p->total_polymer;
-            
-            if ( p->free_polymer < 0 )
-            {
-                Cytosim::warning("Uhoo: The free monomer concentration is negative!!!\n");
-                //this should not happen
-                p->free_polymer = 0;
-            }
+            Cytosim::warn << "The free monomer concentration would be negative !!!" << std::endl;
+            //this should not happen
+            p->free_polymer = 0;
         }
-        else
-            p->free_polymer = 1.0;
     }
 
-    
     /*
-     Fiber::step() may call Fiber::sever(), and that will add
-     new fibers at the end of the fiber_list.
-     Hence we continue until the end of the list, to consider all Fibers.
-     
-     In short, this calls step() once for every Fiber
+     We call step() here exactly once for every Fiber.
+     New Fiber may be created, for instance by Fiber::sever(), but they should
+     be linked at the start of the list, and thus not considered here.
      */
     Fiber * obj = first();
 
@@ -271,65 +286,233 @@ void FiberSet::step()
 }
 
 
-//------------------------------------------------------------------------------
 /**
- Cut all Fibers along the plane defined by n.x + a = 0.
- function argument `func` can be specified to specify which fibers can be cut.
- If ( func != 0 ), a fiber `fib` will be cut only if
- @code
- func(fib, arg) == true
- @endcode
+ Cut all Fibers along the plane defined by n.pos + a = 0.
  */
-void FiberSet::cutAlongPlane(Vector const& n, const real a,
-                             bool (*func)(Object const*, void* arg), void* arg)
+void FiberSet::planarCut(Vector const& n, const real a, state_t stateP, state_t stateM)
 {
     /*
-     we make sure here that each Fiber is processed only once.
-     Cutting a Fiber effectively creates a new Fiber,
-     but these are added at the end of the list, 
-     after 'end' that is stored before starting
+     We must ensure here that each Fiber is processed only once.
+     This code works if newly created Fiber are linked at the head of the list
      */
-    Fiber * obj, * nxt = first();
-    
-    if ( nxt )
+    Fiber * obj = first();
+
+    while ( obj )
     {
-        Fiber *const end = last();
-        if ( func )
-        {
-            do {
-                obj = nxt;
-                nxt = nxt->next();
-                if ( func(obj, arg) )
-                    obj->cutAlongPlane(this, n, a);
-            } while ( obj != end );
-        }
-        else
-        {
-            do {
-                obj = nxt;
-                nxt = nxt->next();
-                obj->cutAlongPlane(this, n, a);
-            } while ( obj != end );
-        }
+        Fiber * nxt = obj->next();
+        obj->planarCut(n, a, stateP, stateM);
+        obj = nxt;
+    }
+}
+
+/**
+ Cut given Fibers along the plane defined by n.pos + a = 0.
+ */
+void FiberSet::planarCut(ObjectList& objs, Vector const& n, const real a, state_t stateP, state_t stateM)
+{
+    for ( Object * i : objs )
+    {
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
+            fib->planarCut(n, a, stateP, stateM);
     }
 }
 
 
-void FiberSet::foldPosition(const Modulo * s) const
+void FiberSet::foldPosition(Modulo const* s) const
 {
     for ( Fiber * o=first(); o; o=o->next() )
         o->foldPosition(s);
 }
 
 
+/**
+ Calculate intersection between all fibers,
+ and report the corresponding abscissa in arrays 'res1' and 'res2'.
+ */
+void FiberSet::allIntersections(Array<FiberSite>& res1, Array<FiberSite>& res2,
+                                const real max_distance) const
+{
+    const real sup = max_distance * max_distance;
+    res1.clear();
+    res2.clear();
+
+    for ( Fiber * fib1 = first(); fib1; fib1 = fib1->next() )
+    {
+        for ( unsigned s1 = 0; s1 < fib1->nbSegments(); ++s1 )
+        {
+            FiberSegment seg1(fib1, s1);
+            // check against other segments of this fiber
+            for ( unsigned s2 = s1+2; s2 < fib1->nbSegments(); ++s2 )
+            {
+                FiberSegment seg2(fib1, s2);
+                real abs1, abs2, dis = INFINITY;
+                if ( seg1.shortestDistance(seg2, abs1, abs2, dis) )
+                {
+                    if ( dis < sup )
+                    {
+                        res1.push_back(FiberSite(fib1, abs1+fib1->abscissaPoint(s1)));
+                        res2.push_back(FiberSite(fib1, abs2+fib1->abscissaPoint(s2)));
+                    }
+                }
+            }
+            // check against other fibers:
+            for ( Fiber * fib2 = fib1->next(); fib2; fib2 = fib2->next() )
+            {
+                for ( unsigned s2 = 0; s2 < fib2->nbSegments(); ++s2 )
+                {
+                    FiberSegment seg2(fib2, s2);
+                    real abs1, abs2, dis = INFINITY;
+                    if ( seg1.shortestDistance(seg2, abs1, abs2, dis) )
+                    {
+                        if ( dis < sup )
+                        {
+                            res1.push_back(FiberSite(fib1, abs1+fib1->abscissaPoint(s1)));
+                            res2.push_back(FiberSite(fib2, abs2+fib2->abscissaPoint(s2)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 /**
  Set a list of Locations on the fibers, chosen randomly with uniform sampling.
- The number of site over a stretch of length `len` should be `len/spread` .
+ The number of sites returned on a section of length `L` is  `L / spread`.
+ `spread` is thus the average distance between sites.
  
  Condition: ( spread > 0 )
  */
-void FiberSet::uniFiberSites(Array<FiberBinder>& res, const real spread) const
+void FiberSet::uniFiberSites(Array<FiberSite>& res, const real spread) const
+{
+    assert_true( spread > 0 );
+
+    res.clear();
+    Fiber * fib = first();
+    real abs = spread * RNG.exponential();
+    while ( fib )
+    {
+        real len = fib->length();
+        while ( abs < len )
+        {
+            res.push_back(FiberSite(fib, abs+fib->abscissaM()));
+            abs += spread * RNG.exponential();
+        }
+        abs -= len;
+        fib = fib->next();
+    }
+}
+
+
+/// a random site on the fiber, equidistributed over length
+/**
+ This method is unefficient if multiple sites are desired
+ */
+FiberSite FiberSet::randomSite() const
+{
+    real abs = 0;
+    for ( Fiber const* fib=first(); fib; fib=fib->next() )
+        abs += fib->length();
+
+    assert_true( abs > 0 );
+    
+    abs *= RNG.preal();
+
+    for ( Fiber* fib=first(); fib; fib=fib->next() )
+    {
+        real len = fib->length();
+        if ( abs <= len )
+            return FiberSite(fib, fib->abscissaM()+abs);
+        abs -= len;
+    }
+    
+    ABORT_NOW("unexpected abscissa overrun");
+    return FiberSite(first(), 0);
+}
+
+
+/// a random site on the fiber of class 'prop'
+/**
+ This method is unefficient if multiple sites are desired
+ */
+FiberSite FiberSet::randomSite(FiberProp * arg) const
+{
+    real abs = 0;
+    for ( Fiber const* fib=first(); fib; fib=fib->next() )
+        if ( fib->property() == arg )
+            abs += fib->length();
+
+    if ( abs == 0 )
+        throw InvalidParameter("randomSite() called with no fibers!");
+
+    abs *= RNG.preal();
+    
+    for ( Fiber* fib=first(); fib; fib=fib->next() )
+        if ( fib->property() == arg )
+        {
+            real len = fib->length();
+            if ( abs <= len )
+                return FiberSite(fib, fib->abscissaM()+abs);
+            abs -= len;
+        }
+    
+    ABORT_NOW("unexpected abscissa overrun");
+    return FiberSite(first(), 0);
+}
+
+
+/**
+ Returns a Fiber location corresponding to what is specified in opt[var]:
+ 
+       attach = FIBER, ABSCISSA, REFERENCE
+ 
+ with
+ 
+       FIBER = microtubule1, fiber1, fiber2, etc.
+       ABSCISSA = a distance
+       REFERENCE = [ plus_end, minus_end, center ]
+ 
+ */
+FiberSite FiberSet::someSite(std::string const& key, Glossary& opt) const
+{
+    std::string str;
+    if ( opt.set(str, key) )
+    {
+        if ( str == "all" )
+            return randomSite();
+        else
+        {
+            Fiber* fib = Fiber::toFiber(findObject(str, title()));
+            
+            if ( !fib )
+            {
+                // without argument, a fiber name specifies uniform attachment:
+                if ( opt.nb_values(key) == 1 )
+                {
+                    Property * p = simul.findProperty(title(), str);
+                    if ( p )
+                        return randomSite(static_cast<FiberProp*>(p));
+                }
+                throw InvalidParameter("Could not find fiber specified for attachment");
+            }
+            
+            return FiberSite(fib, fib->someAbscissa(key, opt, 1.0));
+        }
+    }
+    throw InvalidParameter("unrecognized site specification");
+    return FiberSite();
+}
+
+/**
+ Set a list of Locations near the tip of the fibers, on sections that were recently assembled.
+ This relies on Fiber::freshAssembly() returning the length of polymer made in the last time_step
+ The number of binding sites returned will thus be proportional to simul:time_step
+ 
+ This is for the PLUS_END
+ */
+void FiberSet::newFiberSitesP(Array<FiberSite>& res, const real spread) const
 {
     assert_true( spread > 0 );
     
@@ -338,28 +521,54 @@ void FiberSet::uniFiberSites(Array<FiberBinder>& res, const real spread) const
     real abs = spread * RNG.exponential();
     while ( fib )
     {
-        while ( abs < fib->length() )
+        real len = fib->freshAssemblyP();
+        while ( abs < len )
         {
-            res.push_back(FiberBinder(fib, abs+fib->abscissaM()));
+            res.push_back(FiberSite(fib, fib->abscissaP()-abs));
             abs += spread * RNG.exponential();
         }
-        abs -= fib->length();
+        abs -= len;
         fib = fib->next();
     }
 }
 
 
+/**
+ Set a list of Locations near the tip of the fibers, on sections that were recently assembled.
+ This relies on Fiber::freshAssembly() returning the length of polymer made in the last time_step
+ The number of binding sites returned will thus be proportional to simul:time_step
+ 
+ This is for the MINUS_END
+ */
+void FiberSet::newFiberSitesM(Array<FiberSite>& res, const real spread) const
+{
+    assert_true( spread > 0 );
+    
+    res.clear();
+    Fiber * fib = first();
+    real abs = spread * RNG.exponential();
+    while ( fib )
+    {
+        real a = fib->freshAssemblyM();
+        while ( abs < a )
+        {
+            res.push_back(FiberSite(fib, fib->abscissaM()+abs));
+            abs += spread * RNG.exponential();
+        }
+        abs -= a;
+        fib = fib->next();
+    }
+}
+
+
+void FiberSet::flipAllFibers()
+{
+    for ( Fiber* fib=first(); fib; fib=fib->next() )
+        fib->flipPolarity();
+}
+
 //------------------------------------------------------------------------------
 #pragma mark -
-
-int FiberSet::count(bool (*func)(Fiber const*, void* arg), void* arg) const
-{
-    int cnt = 0;
-    for ( Fiber * fib=first(); fib; fib=fib->next() )
-        if ( func==0  ||  func(fib, arg) )
-            ++cnt;
-    return cnt;
-}
 
 
 real FiberSet::totalLength() const
@@ -385,21 +594,26 @@ real FiberSet::totalLength(FiberProp const* p) const
 }
 
 
-void FiberSet::infoLength(unsigned int& cnt, real& avg, real& dev,
-                          bool (*func)(Fiber const*, void*),
-                          void* arg) const
+void FiberSet::infoLength(ObjectList const& objs,
+                          unsigned& cnt, real& avg, real& dev, real& mn, real& mx)
 {
     cnt = 0;
     avg = 0;
     dev = 0;
+    mn = INFINITY;
+    mx = 0;
 
-    for ( Fiber const* fib=first(); fib; fib=fib->next() )
+    for ( Object * i : objs )
     {
-        if ( func==0  ||  func(fib, arg) ) 
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
         {
             ++cnt;
-            avg += fib->length();
-            dev += fib->length() * fib->length();
+            real x = fib->length();
+            avg += x;
+            dev += x * x;
+            if ( x < mn ) mn = x;
+            if ( x > mx ) mx = x;
         }
     }
     
@@ -416,27 +630,59 @@ void FiberSet::infoLength(unsigned int& cnt, real& avg, real& dev,
 }
 
 
-void FiberSet::infoSegments(unsigned& cnt, unsigned& joints, unsigned& kinks,
-                            real& mn, real& mx,
-                            bool (*func)(Fiber const*, void*),
-                            void* arg) const
+void FiberSet::infoBirthtime(ObjectList const& objs, unsigned& cnt,
+                             real& avg, real& dev, real& mn, real& mx)
+{
+    cnt = 0;
+    avg = 0;
+    dev = 0;
+    mn  = INFINITY;
+    mx  = 0;
+    
+    for ( Object * i : objs )
+    {
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
+        {
+            ++cnt;
+            real x = fib->birthTime();
+            avg += x;
+            dev += x * x;
+            if ( x < mn ) mn = x;
+            if ( x > mx ) mx = x;
+        }
+    }
+    
+    if ( cnt )
+    {
+        avg /= cnt;
+        real v = dev/cnt - avg*avg;
+        // the variance can be numerically negative, which is mathematically impossible
+        if ( v > 0 )
+            dev = sqrt(v);
+        else
+            dev = 0;
+    }
+}
+
+
+void FiberSet::infoSegments(ObjectList const& objs,
+                            unsigned& cnt, unsigned& joints, real& mn, real& mx)
 {
     cnt = 0;
     joints = 0;
-    kinks = 0;
     mn = INFINITY;
     mx = 0;
     
-    for ( Fiber const* fib=first(); fib; fib=fib->next() )
+    for ( Object * i : objs )
     {
-        real n = fib->segmentation();
-        real x = fib->segmentation();
-        if ( func==0  ||  func(fib, arg) )
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
         {
             ++cnt;
+            real n, x;
             joints += fib->nbPoints() - 2;
-            kinks += fib->nbKinks();
-            fib->minMaxSegments(n, x);
+            fib->segmentationMinMax(n, x);
             if ( n < mn )
                 mn = n;
             if ( x > mx )
@@ -446,98 +692,313 @@ void FiberSet::infoSegments(unsigned& cnt, unsigned& joints, unsigned& kinks,
 }
 
 
+unsigned FiberSet::nbKinks(ObjectList const& objs)
+{
+    unsigned cnt = 0;
+    
+    for ( Object * i : objs )
+        cnt += Fiber::toFiber(i)->nbKinks();
+
+    return cnt;
+}
+
+
 /**
  Each Fiber segment is weigthed by its length.
+ 
  @return G = average center of gravity
  @return D = average direction
- @return N = average nematic direction
  
- To calculate the Nematic direction, we average the square of 
- the imaginary number representing the direction vector.
- 
- This works in 2D by producing a nematic tensor, but in 3D this is only correct
- if the average direction is roughly already aligned with the X-axis.
- 
- @todo better nematic tensor calculation in 3D.
+ The average direction is the average of the filament's tangents at each segment.
  */
-real FiberSet::infoDirection(Vector& G, Vector& D, Vector& N,
-                             bool (*func)(Fiber const*, void*),
-                             void* arg) const
+real FiberSet::infoPosition(ObjectList const& objs, Vector& M, Vector& G, Vector& P)
 {
     real S = 0;
-    G.set(0,0,0);
-    D.set(0,0,0);
-    N.set(0,0,0);
+    G.reset();
+    P.reset();
+    M.reset();
     
-    /* To align the Nematic direction, we average the square of 
-     the imaginary number representing the direction vector */
-    
-    for ( Fiber const* fib=first(); fib; fib=fib->next() )
+    for ( Object * i : objs )
     {
-        if ( func==0  ||  func(fib, arg) ) 
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
         {
-            Vector G1 = 0.5 * ( fib->posEnd(PLUS_END) + fib->posEnd(MINUS_END) );
-            for ( unsigned int n = 1; n < fib->lastPoint(); ++n )
-                G1 += fib->posPoint(n);
-            
-            Vector N1(0,0,0);
-            for ( unsigned int n = 0; n < fib->nbSegments(); ++n )
-            {
-                Vector m = fib->dirPoint(n);
-#if ( DIM == 2 )
-                N1 += Vector(m.XX*m.XX-m.YY*m.YY, 2*m.XX*m.YY);
-#elif ( DIM == 3 )
-                // this works only near the X-axis:
-                N1 += Vector(m.XX*m.XX-m.YY*m.YY-m.ZZ*m.ZZ, 2*m.XX*m.YY, 2*m.XX*m.ZZ);
-#endif
-            }
-            const real w = fib->segmentation();
-            S += w * fib->nbSegments();
-            G += w * G1;
-            D += fib->posEnd(PLUS_END) - fib->posEnd(MINUS_END);
-            N += w * N1;
+            const real w = fib->length();
+            S += w;
+            M += w * fib->posEndM();
+            P += w * fib->posEndP();
+ 
+            Vector G1 = 0.5 * ( fib->posEndM() + fib->posEndP() );
+            for ( unsigned n = 1; n < fib->nbSegments(); ++n )
+                G1 += fib->posP(n);
+            G += G1 * ( w / fib->nbSegments() );
         }
     }
     
     if ( S > 0 )
     {
         G /= S;
-        D /= S;
-        N.normalize();
-        // extract the 'square-root' of the nematic direction
-        real x = sqrt((N.XX+1)/2);
-#if ( DIM == 2 )
-        N.set(x, N.YY/(2*x), 0);
-#elif ( DIM == 3 )
-        N.set(x, N.YY/(2*x), N.ZZ/(2*x));
-#endif
+        M /= S;
+        P /= S;
     }
     return S;
 }
 
+/**
+ Each Fiber segment is weigthed by its length.
+ The Nematic direction is an eigenvector of the second rank tensor order parameter.
+ 
+@return `res`, a 9-elements matrix containing the first two principal component vectors
+ 
+ if DIM == 2:
+ Component 1 is { vec[0], vec[1] }
+ if DIM == 3:
+ Component 1 is { vec[0], vec[1], vec[2] }
+ Component 2 is { vec[3], vec[4], vec[5] }
+ */
+real FiberSet::infoNematic(ObjectList const& objs,
+                           real res[9])
+{
+    real S = 0;
+    real M[9] = { 0 };
+    
+    for ( Object * i : objs )
+    {
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
+        {
+            const real w = fib->segmentation();
+            for ( unsigned n = 0; n < fib->nbSegments(); ++n )
+            {
+                Vector p = fib->dirSegment(n);
+                
+                M[0] += w * ( DIM * p.XX * p.XX - 1 );
+#if ( DIM > 1 )
+                M[1] += w * ( DIM * p.YY * p.XX );
+                M[4] += w * ( DIM * p.YY * p.YY - 1 );
+#endif
+#if ( DIM > 2 )
+                M[2] += w * ( DIM * p.ZZ * p.XX );
+                M[5] += w * ( DIM * p.ZZ * p.YY );
+                M[8] += w * ( DIM * p.ZZ * p.ZZ - 1 );
+#endif
+            }
+            
+            S += w * fib->nbSegments();
+        }
+    }
+    
+    
+    if ( S == 0 )
+        return 0;
+    // rescale matrix:
+    for ( unsigned d = 0; d < 9; ++d )
+        M[d] = M[d] / S;
+    
+    int nv;
+    real vec[9] = { 0 };
+    real val[3] = { 0 };
+    real work[32];
+    int iwork[16];
+    int ifail[4];
+    
+    // calculate two largest eigenvalues in 3D, one in 2D:
+    int info = 0;
+    lapack::xsyevx('V','I','L', DIM, M, 3, 0, 0, 2, DIM, REAL_EPSILON,
+                   &nv, val, vec, 3, work, 32, iwork, ifail, &info);
+
+#if ( DIM > 2 )
+    //std::clog << "Eigen value1 " << val[0] << "  vector  " << Vector(vec) << std::endl;
+    //std::clog << "Eigen value2 " << val[1] << "  vector  " << Vector(vec+3) << std::endl;
+    real u = std::copysign(1, vec[3]);
+    real v = std::copysign(1, vec[0]);
+    // order the 2 vectors in decreasing eigenvalues (reverse order from LAPACK).
+    res[0] = u * vec[3];
+    res[1] = u * vec[4];
+    res[2] = u * vec[5];
+    res[3] = v * vec[0];
+    res[4] = v * vec[1];
+    res[5] = v * vec[2];
+    // calculate third vector as vector product of first two:
+    res[6] = res[1]*res[5] - res[2]*res[4];
+    res[7] = res[2]*res[3] - res[0]*res[5];
+    res[8] = res[0]*res[4] - res[1]*res[3];
+#else
+    //std::clog << "Eigen value1 " << val[0] << "  vector  " << Vector(vec) << std::endl;
+    real u = std::copysign(1, vec[0]);
+    res[0] =  u * vec[0];
+    res[1] =  u * vec[1];
+    res[2] =  0;
+    // second vector is orthogonal:
+    res[3] = -u * vec[1];
+    res[4] =  u * vec[0];
+    res[5] =  0;
+    // third vector set in Z-direction
+    res[6] =  0;
+    res[7] =  0;
+    res[8] =  1;
+#endif
+    
+    return val[nv-1];
+}
+
 
 /**
- Counts the number of fiber intersecting the plane defined by <em> n.x + a = 0 </em>
+ Return the principal component directions of the cloud of vertices.
+ Each fiber is weighted by its length.
+ 
+ @return G = average center of gravity
+ @return `mom`, a 9-elements matrix containing the moments in its lower part:
+ - mom[0] = sum( ( X - mean(X) ) * ( X - mean(X) ) ) / S
+ - mom[1] = sum( ( X - mean(X) ) * ( Y - mean(Y) ) ) / S
+ - mom[2] = sum( ( X - mean(X) ) * ( Z - mean(Z) ) ) / S
+ - mom[4] = sum( ( Y - mean(Y) ) * ( Y - mean(Y) ) ) / S
+ - mom[5] = sum( ( Y - mean(Y) ) * ( Z - mean(Z) ) ) / S
+ - mom[8] = sum( ( Z - mean(Z) ) * ( Z - mean(Z) ) ) / S
+ .
+ 
+ @return `res`, a 9-elements matrix containing the first two principal component vectors
+ 
+ if DIM == 2:
+   Component 1 is { vec[0], vec[1] }
+ if DIM == 3:
+   Component 1 is { vec[0], vec[1], vec[2] }
+   Component 2 is { vec[3], vec[4], vec[5] }
+ 
+ */
+int FiberSet::infoComponents(ObjectList const& objs,
+                             real& sum, real avg[3], real mom[9], real res[9])
+{
+    sum = 0;
+    avg[0] = 0.0;
+    avg[1] = 0.0;
+    avg[2] = 0.0;
+    real M[9] = { 0 };
+    
+    for ( Object * i : objs )
+    {
+        Fiber * fib = Fiber::toFiber(i);
+       if ( fib )
+        {
+            const real w = fib->length() / fib->nbPoints();
+            for ( unsigned n = 0; n < fib->nbPoints(); ++n )
+            {
+                Vector p = fib->posP(n);
+                avg[0] += w * p.XX;
+                M[0]   += w * p.XX * p.XX;
+#if ( DIM > 1 )
+                avg[1] += w * p.YY;
+                M[1]   += w * p.YY * p.XX;
+                M[4]   += w * p.YY * p.YY;
+#endif
+#if ( DIM > 2 )
+                avg[2] += w * p.ZZ;
+                M[2]   += w * p.ZZ * p.XX;
+                M[5]   += w * p.ZZ * p.YY;
+                M[8]   += w * p.ZZ * p.ZZ;
+#endif
+            }
+            sum += w * fib->nbPoints();
+        }
+    }
+    
+    if ( sum == 0 )
+        return 0;
+    
+    /**
+     Remove the mean:
+       (x-a)*(x-a) = x*x - 2x*a + a*a
+       (x-a)*(y-b) = x*y - x*b - y*a + a*b
+     */
+    
+    avg[0] /= sum;
+    M[0] = M[0]/sum - avg[0] * avg[0];
+#if ( DIM > 1 )
+    avg[1] /= sum;
+    M[1] = M[1]/sum - avg[1] * avg[0];
+    M[4] = M[4]/sum - avg[1] * avg[1];
+#endif
+#if ( DIM > 2 )
+    avg[2] /= sum;
+    M[2] = M[2]/sum - avg[2] * avg[0];
+    M[5] = M[5]/sum - avg[2] * avg[1];
+    M[8] = M[8]/sum - avg[2] * avg[2];
+#endif
+    
+    // copy moments:
+    for ( int i = 0; i < 9; ++i )
+        mom[i] = M[i];
+    
+    int nv;
+    real vec[9] = { 0 };
+    real val[3] = { 0 };
+    real work[32];
+    int iwork[16];
+    int ifail[4];
+    
+    // calculate two largest eigenvalues in 3D, one in 2D:
+    int info = 0;
+    lapack::xsyevx('V','I','L', DIM, M, 3, 0, 0, 2, DIM, REAL_EPSILON,
+                   &nv, val, vec, 3, work, 32, iwork, ifail, &info);
+    
+#if ( DIM > 2 )
+    real u = std::copysign(1, vec[3]);
+    real v = std::copysign(1, vec[0]);
+    // order the 2 vectors in decreasing eigenvalues.
+    res[0] = u * vec[3];
+    res[1] = u * vec[4];
+    res[2] = u * vec[5];
+    res[3] = v * vec[0];
+    res[4] = v * vec[1];
+    res[5] = v * vec[2];
+    // calculate third vector as vector product for first two:
+    res[6] = res[1]*res[5] - res[2]*res[4];
+    res[7] = res[2]*res[3] - res[0]*res[5];
+    res[8] = res[0]*res[4] - res[1]*res[3];
+#else
+    real u = std::copysign(1, vec[0]);
+    res[0] =  u * vec[0];
+    res[1] =  u * vec[1];
+    res[2] =  0;
+    // second vector is orthogonal:
+    res[3] = -u * vec[1];
+    res[4] =  u * vec[0];
+    res[5] =  0;
+    res[6] =  0;
+    res[7] =  0;
+    res[8] =  1;
+#endif
+
+    //VecPrint::print(std::clog, 3, 3, vec);
+    
+    return ( info == 0  &&  nv == DIM-1 );
+}
+
+
+/**
+ Counts the number of fiber intersecting the plane defined by <em> n.pos + a = 0 </em>
  in two categories, depending on the direction with which they cross the plane:
  - `np` = number of parallel segments ( the scalar product dir.n is strictly positive )
  - `na` = number of anti-parallel segments ( dir.n < 0 )
  .
  */
-void FiberSet::infoIntersections(int& np, int& na, Vector const& n, real a) const
+void FiberSet::infoPlane(int& np, int& na, Vector const& n, real a) const
 {
     np = 0;
     na = 0;
-    for ( Fiber * fib=first(); fib; fib=fib->next() )
+    for ( Fiber const* fib=first(); fib; fib=fib->next() )
     {
-        for ( unsigned int s = 0; s < fib->nbSegments(); ++s )
+        for ( unsigned s = 0; s < fib->nbSegments(); ++s )
         {
-            real abs;
-            FiberLocus const& seg = fib->segment(s);
-            int sec = seg.intersectPlane(n, a, abs);
-            if ( sec == 1 )
-                ++np;
-            else if ( sec == -1 )
-                ++na;
+            real abs = fib->planarIntersect(s, n, a);
+            if ( 0 <= abs  &&  abs < 1 )
+            {
+                real sec = dot(n, fib->dirSegment(s));
+                if ( sec > 0 )
+                    ++np;
+                else if ( sec < 0 )
+                    ++na;
+            }
         }
     }
 }
@@ -551,13 +1012,13 @@ void FiberSet::infoIntersections(int& np, int& na, Vector const& n, real a) cons
  where:
  - `o` = number of fiber pointing outward (away from the mid-plane),
  - `i` = number of fiber pointing inward (toward the mid-plane),
- - `r` = number of fiber pointing right (in direction of \c n),
+ - `r` = number of fiber pointing right (ie. in the direction of `n`),
  - `l` = number of fiber pointing left.
  .
  
  The indices are averaged over planar sections taken every `dm` units of space,
  and the values for each planar section are weighted by the number of fibers.
- The central symmetry plane is defined by n.x+a=0, and the edges correspond to n.x+a=+/-m.
+ The central symmetry plane is defined by `n.x+a=0`, and the edges correspond to `n.x+a=+/-m`.
  
  The results characterize broadly the type of fiber organization:
  - `ixa =  1, ixp = 0`:   aster,
@@ -575,7 +1036,7 @@ void FiberSet::infoSpindle(real& ixa, real& ixp, Vector const& n, real a, real m
     for ( real p = dm/2 ; p < m ; p += dm )
     {
         // left side
-        infoIntersections(ni, no, n, a+p);
+        infoPlane(ni, no, n, a+p);
         nio = ni + no;
         if ( nio )
         {
@@ -585,7 +1046,7 @@ void FiberSet::infoSpindle(real& ixa, real& ixp, Vector const& n, real a, real m
         }
     
         // right side
-        infoIntersections(no, ni, n, a-p);
+        infoPlane(no, ni, n, a-p);
         nio = ni + no;
         if ( nio )
         {
@@ -603,30 +1064,65 @@ void FiberSet::infoSpindle(real& ixa, real& ixp, Vector const& n, real a, real m
 
 
 /**
- Sum tension of all the segments that intersect the plane
- defined by <em> n.x + a = 0 </em>
- The tension dipole along the segment is obtained from the Lagrange
- multiplier associated with the length of each segment.
- The magnitude of the dipole is multiplied by the cosine of the angle
- between the segment and the plane normal.
+ Sum elastic bending energy of all the fibers `fib` for which func(fib, arg) == true
+ */
+void FiberSet::infoBendingEnergy(ObjectList const& objs,
+                                 unsigned& cnt, real& avg, real& dev)
+{
+    cnt = 0;
+    avg = 0;
+    dev = 0;
+    
+    for ( Object * i : objs )
+    {
+        Fiber * fib = Fiber::toFiber(i);
+        if ( fib )
+        {
+            ++cnt;
+            real x = fib->bendingEnergy();
+            avg += x;
+            dev += x * x;
+        }
+    }
+    
+    if ( cnt )
+    {
+        avg /= cnt;
+        real v = dev/cnt - avg*avg;
+        // the variance can be numerically negative, which is mathematically impossible
+        if ( v > 0 )
+            dev = sqrt(v);
+        else
+            dev = 0;
+    }
+}
+
+/**
+ Sum tension of all segments intersecting the plane defined by <em> n.pos + a = 0 </em>
+ 
+ The intersecting segments are determined by testing all Fibers.
+ The tension dipole along a segment is obtained from the Lagrange multiplier 
+ associated with the length of this segment. It is positive if the segment is stretched.
+ The magnitude of the dipole is multiplied by the cosine of the angle measured between 
+ the segment and the plane normal, yielding components that can be summed.
  
  @return cnt = number of segments intersecting the plane
- @return ten = sum of tension
+ @return ten = sum of tension in these segments
  */
-void FiberSet::infoTension(unsigned int& cnt, real& ten, Vector const& n, real a) const
+void FiberSet::infoTension(unsigned& cnt, real& ten, Vector const& n, real a) const
 {
     cnt = 0;
     ten = 0;
     
+    Vector dir = normalize(n);
     for ( Fiber const* fib=first(); fib; fib=fib->next() )
     {
         for ( unsigned s = 0; s < fib->nbSegments(); ++s )
         {
-            real abs;
-            FiberLocus const& seg = fib->segment(s);
-            if ( seg.intersectPlane(n, a, abs) )
+            real abs = fib->planarIntersect(s, n, a);
+            if ( 0 <= abs  &&  abs < 1 )
             {
-                ten += fabs( n * fib->dirPoint(s) ) * fib->tension(s);
+                ten += fabs(dot(dir, fib->dirSegment(s))) * fib->tension(s);
                 ++cnt;
             }
         }
@@ -637,10 +1133,10 @@ void FiberSet::infoTension(unsigned int& cnt, real& ten, Vector const& n, real a
 /**
  Sum tension of all the segments
  
- @return cnt = number of segments intersecting the plane
+ @return cnt = total number of segments
  @return ten = sum of tension
  */
-void FiberSet::infoTension(unsigned int& cnt, real& ten) const
+void FiberSet::infoTension(unsigned& cnt, real& ten) const
 {
     cnt = 0;
     ten = 0;
@@ -656,16 +1152,16 @@ void FiberSet::infoTension(unsigned int& cnt, real& ten) const
 }
 
 
-void FiberSet::infoRadius(unsigned int & cnt, real& rad) const
+void FiberSet::infoRadius(unsigned& cnt, real& rad) const
 {
     real r = 0;
     cnt = 0;
     
     for ( Fiber const* f=first(); f; f=f->next() )
     {
-        for ( unsigned int p = 0; p < f->nbPoints() ; ++p )
+        for ( unsigned p = 0; p < f->nbPoints() ; ++p )
         {
-            r += f->posPoint(p).norm();
+            r += f->posP(p).norm();
             ++cnt;
         }
     }
@@ -674,7 +1170,7 @@ void FiberSet::infoRadius(unsigned int & cnt, real& rad) const
 }
 
 
-void FiberSet::infoRadius(unsigned int & cnt, real& rad, FiberEnd end) const
+void FiberSet::infoRadius(unsigned& cnt, real& rad, FiberEnd end) const
 {
     real r = 0;
     cnt = 0;
@@ -687,6 +1183,4 @@ void FiberSet::infoRadius(unsigned int & cnt, real& rad, FiberEnd end) const
     if ( cnt )
         rad = r / cnt;
 }
-
-
 

@@ -9,36 +9,40 @@
 
 /// Attributes and remember serial-numbers to Inventoried
 /**
- A Inventory assigns serial-numbers (of type Number) to Inventoried,
- and it records a pointer to these objects.
+A Inventory assigns serial-numbers (of type ObjectID) to Inventoried, 
+and it records a pointer to these objects.
  
- The pointers can be recovered from their 'number' in constant time.
- 
- \author Nedelec, August 2003. EMBL Heidelberg. nedelec@embl.de
- */
+The pointers can be recovered from their 'number' in constant time.
+
+\author Nedelec, August 2003. EMBL Heidelberg. nedelec@embl.de
+*/
 class Inventory
 {
 private:
     
-    /// array of objects, by their name
-    /* Stores pointers to the objects, such that byNames[N]->nNumber == N ) for any N > 0. */
+    /// array of objects, stored at the index of their ID
+    /**
+     This stores pointers to the objects, such that
+     byNames[i]->identity() == i
+     for any i > 0. 
+     */
     Inventoried ** byNames;
     
     
     /// size of memory allocated
-    Number    allocated;
+    size_t    allocated_;
     
     /// lowest i > 0 for which byNames[i] == 0
-    Number    lowest;
+    ObjectID  lowest_;
     
     /// highest i > 0 for which byNames[i] != 0
-    Number    highest;
+    ObjectID  highest_;
     
     /// memory allocation function
-    void      allocate(Number size);
+    void      allocate(size_t size);
     
     ///update available when the spot has been taken
-    void      updateFirstFree(Number start = 0);
+    void      updateFirstFree(ObjectID start = 0);
     
     /// Disabled copy constructor
     Inventory(Inventory const&);
@@ -47,7 +51,7 @@ private:
     Inventory& operator=(Inventory const&);
     
 public:
-    
+        
     /// Constructor
     Inventory();
     
@@ -55,28 +59,28 @@ public:
     ~Inventory();
     
     /// the smallest assigned number
-    Number         first_assigned() const;
-    
+    ObjectID       first_assigned() const;
+
     /// the largest assigned number
-    Number         last_assigned() const;
+    ObjectID       last_assigned() const;
     
     /// lowest assigned number strictly greater than `n`
-    Number         next_assigned(Number n) const;
+    ObjectID       next_assigned(ObjectID n) const;
     
     /// the smallest unassigned number
-    Number         first_unassigned();
-    
+    ObjectID       first_unassigned();
+
     /// current size of array
-    Number         capacity() const { return allocated; }
+    size_t         capacity() const { return allocated_; }
     
-    /// remember `obj`, assign a new Number if necessary
+    /// remember `obj`, assign a new ObjectID if necessary
     void           assign(Inventoried * obj);
     
     /// forget the object and release its serial number
     void           unassign(const Inventoried * obj);
     
     /// return the object with given serial number, or 0 if not found
-    Inventoried*   get(Number number) const;
+    Inventoried*   get(ObjectID number) const;
     
     /// object with the smallest inventory number
     Inventoried*   first() const;
@@ -89,24 +93,26 @@ public:
     
     /// return object just after in the inventory
     Inventoried*   next(Inventoried const*) const;
-    
+
     /// return object with given number
-    Inventoried*   operator[](Number n) const { assert_true(n<allocated); return byNames[n]; }
-    
+    Inventoried*   operator[](ObjectID n) const { assert_true(n<allocated_); return byNames[n]; }
+
     /// number of non-zero entries in the registry
     unsigned int   count() const;
-    
+
     /// reattribute all serial numbers consecutively and pack the array
     void           reassign();
     
     /// clear all entries
     void           clear();
+    
+    /// Human friendly ouput
+    void           print(std::ostream&) const;
 };
 
 
-
 /// output of all values
-std::ostream & operator << (std::ostream&, const Inventory&);
+std::ostream& operator << (std::ostream&, Inventory const&);
 
 
 #endif

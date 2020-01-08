@@ -1,7 +1,8 @@
-% One of the first config file, Woods-hole, July 2009
+% Self-organized system with attachment on the margin
+% Woods-hole, 23 July 2009
 
 
-set simul self_cortex 
+set simul system
 {
     time_step = 0.01
     kT = 0.0042
@@ -10,10 +11,13 @@ set simul self_cortex
 
 set space cell
 {
-    geometry = ( circle 5 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 5
+}
 
 set fiber microtubule
 {
@@ -32,7 +36,7 @@ set hand kinesin
     hold_shrinking_end = 0
     
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     stall_force = 6
 }
 
@@ -59,16 +63,16 @@ set couple complex
     stiffness = 100
 }
 
-new 80 fiber microtubule
+new 80 microtubule
 {
     length = 7
 }
 
-new 5000 couple complex
-new 1000 single grafted ( edge 0.1 )
+new 5000 complex
+new 1000 grafted ( edge 0.1 )
 
 
-run simul *
+run system
 {
     nb_frames  = 100
     nb_steps   = 10000

@@ -6,32 +6,30 @@
 #include "simul.h"
 
 
-//------------------------------------------------------------------------------
 Organizer::~Organizer()
 {
-    //Cytosim::MSG(31, "destroying Organizer %p\n", this);
+    //Cytosim::log("destroying Organizer %p\n", this);
 }
 
 
 void Organizer::grasp(Mecable * m)
 {
-    hello(m);    
-    objs.push_back(m);
+    Buddy::connect(m);
+    mObjects.push_back(m);
 }
 
 
-void Organizer::grasp(Mecable * m, unsigned int ix)
+void Organizer::grasp(Mecable * m, size_t ix)
 {
-    if ( ix >= objs.size() )
-        objs.resize(ix+1, 0);
+    assert_true( ix < mObjects.size() );
 
-    if ( m != objs[ix] )
+    if ( m != mObjects[ix] )
     {
-        Buddy::goodbye(objs[ix]);
-        hello(m);
+        Buddy::disconnect(mObjects[ix]);
+        Buddy::connect(m);
     }
     
-    objs[ix] = m;
+    mObjects[ix] = m;
 }
 
 
@@ -39,12 +37,43 @@ void Organizer::goodbye(Buddy * b)
 {
     if ( b )
     {
-        MecableList::iterator oi = std::find(objs.begin(), objs.end(), b);
-        if ( oi != objs.end() )
-            *oi = 0;
+        //std::clog << this << " organizer lost " << b << "\n";
+        MecableList::iterator oi = std::find(mObjects.begin(), mObjects.end(), b);
+        if ( oi != mObjects.end() )
+            *oi = nullptr;
     }
 }
 
+
+void Organizer::addOrganized(Simul & simul)
+{
+    for ( Mecable * i : mObjects )
+    {
+        if ( i && ! i->linked() )
+        {
+            std::clog << " Registering " << i->reference() << "\n";
+            simul.add(i);
+        }
+        //i->mark(identity());
+    }
+}
+
+/**
+ delete all objects and clear Organizer object list
+ */
+void Organizer::eraseOrganized()
+{
+    for ( Mecable * i : mObjects )
+    {
+        if ( i )
+        {
+            if ( i->linked() )
+                i->objset()->remove(i);
+            delete(i);
+        }
+    }
+    mObjects.clear();
+}
 
 //------------------------------------------------------------------------------
 /**
@@ -53,75 +82,102 @@ void Organizer::goodbye(Buddy * b)
 Vector Organizer::position() const
 {
     Vector res(0,0,0);
-    for ( MecableList::const_iterator oi = objs.begin(); oi < objs.end(); ++oi )
-        res += (*oi)->position();
-    return res / objs.size();
+    for ( Mecable const* i : mObjects )
+        res += i->position();
+    return res / (real)mObjects.size();
 }
 
 
-Vector Organizer::positionP(unsigned int ix) const
+Vector Organizer::positionP(unsigned ix) const
 {
     Vector res(0,0,0);
-    for ( MecableList::const_iterator oi = objs.begin(); oi < objs.end(); ++oi )
-        res += (*oi)->posPoint(ix);
-    return res / objs.size();
+    for ( Mecable const* i : mObjects )
+        res += i->posPoint(ix);
+    return res / (real)mObjects.size();
 }
 
 
-void Organizer::translate( Vector const& T )
+void Organizer::moveOrganized(Isometry const& iso)
 {
-    for ( MecableList::iterator oi = objs.begin(); oi < objs.end(); ++oi )
+    for ( Mecable * mec : mObjects )
     {
-        Movable * mv = *oi;
-        if ( mv ) mv->translate(T);
+        if ( mec )
+        {
+            if ( mec->mobile() & 2 )  mec->rotate(iso);
+            if ( mec->mobile() & 1 )  mec->translate(iso);
+            mec->flag(0);
+        }
+    }
+}
+/*
+void Organizer::translate(Vector const& T)
+{
+    for ( Mecable * mec : mObjects )
+    {
+        if ( mec && mec->mobile() & 1 )
+        {
+            mec->translate(T);
+            mec->flag(0);
+        }
     }
 }
 
 
-void Organizer::rotate( Rotation const& T )
+void Organizer::rotate(Rotation const& T)
 {
-    for ( MecableList::iterator oi = objs.begin(); oi < objs.end(); ++oi )
+    for ( Mecable * mec : mObjects )
     {
-        Movable * mv = *oi;
-        if ( mv ) mv->rotate(T);
+        if ( mec && mec->mobile() & 2 )
+        {
+            mec->rotate(T);
+            mec->flag(0);
+        }
     }
+}
+*/
+
+real Organizer::dragCoefficient() const
+{
+    real res = 0;
+    for ( Mecable const* i : mObjects )
+        res += i->dragCoefficient();
+    return res;
 }
 
 
 //------------------------------------------------------------------------------
-void Organizer::write(OutputWrapper& out) const
+
+void Organizer::write(Outputter& out) const
 {
-    out.writeUInt16(objs.size());
-    out.writeSoftNewLine();
-    for ( MecableList::const_iterator oi = objs.begin(); oi < objs.end(); ++oi )
+    out.writeUInt16(mObjects.size());
+    out.writeSoftNewline();
+    for ( Mecable const* i : mObjects )
     {
         out.writeSoftSpace();
-        if ( *oi )
-            (*oi)->writeReference(out);
+        if ( i )
+            i->writeReference(out);
         else
             Object::writeNullReference(out);
     }
 }
 
 
-void Organizer::read(InputWrapper & in, Simul& sim)
+void Organizer::read(Inputter& in, Simul& sim, ObjectTag tag)
 {
-    try
+    unsigned nbo = in.readUInt16();
+    nbOrganized(nbo);
+    
+    //std::clog << " Organizer::read with " << nb << " objects" << std::endl;
+    ObjectTag g;
+    for ( unsigned i = 0; i < nbo; ++i )
     {
-        unsigned int nb = in.readUInt16();
-        
-        //std::cerr << " Organizer::read with " << nb << " objects" << std::endl;
-        for ( unsigned int mi = 0; mi < nb; ++mi )
+        Object * w = sim.readReference(in, g);
+        if ( w )
         {
-            Tag tag = 0;
-            Object * w = sim.readReference(in, tag);
-            ///@todo check that tag corresponds to a Mecable
-            grasp(static_cast<Mecable*>(w), mi);
+            //std::clog << " Organized(" << i << ") is " << w->reference() << std::endl;
+            grasp(Simul::toMecable(w), i);
         }
-    }
-    catch( Exception & e )
-    {
-        e << ", in Organizer::read()";
-        throw;
+        else
+            grasp(nullptr, i);
     }
 }

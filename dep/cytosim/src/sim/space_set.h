@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SPACE_SET_H
 #define SPACE_SET_H
 
@@ -10,22 +9,40 @@ class Simul;
 ///a list of Space
 class SpaceSet : public ObjectSet
 {
+    /// the master space
+    static Space const* master_;
+
 public:
-    
-    /// creator
+
+    /// return master
+    static Space const* master() { return master_; }
+
+    /// change master
+    void setMaster(Space const* s);
+
+    /// constructor
     SpaceSet(Simul& s) : ObjectSet(s) {}
-    
-    /// destructor
-    virtual ~SpaceSet() {}
     
     //--------------------------
     
     /// identifies the property
-    std::string kind() const { return "space"; }
-
-    /// create a new property for class \a kind with given name
-    Property * newProperty(const std::string& kind, const std::string& name, Glossary&) const;
+    static std::string title() { return "space"; }
     
+    /// create a new property of category `cat` for a class `name`
+    Property *  newProperty(const std::string& cat, const std::string& name, Glossary&) const;
+    
+    /// create objects of class `name`, given the options provided in `opt`
+    ObjectList  newObjects(const std::string& name, Glossary& opt);
+    
+    /// create a new object (used for reading trajectory file)
+    Object *    newObject(ObjectTag, unsigned);
+    
+    /// write all Objects to file
+    void        write(Outputter& out) const;
+        
+    /// print a summary of the content (nb of objects, class)
+    void        report(std::ostream& out) const { writeAssets(out, title()); }
+
     //--------------------------
     
     /// add Object
@@ -37,33 +54,33 @@ public:
     /// erase all Object and all Property
     void erase();
     
-    /// create a new object from the corresponding property
-    ObjectList newObjects(const std::string& kind, const std::string& prop, Glossary& opt);
-    
-    /// construct object
-    Object * newObjectT(const Tag tag, int prop_index);
-    
     /// Monte-Carlo step for every Space
     void step();
     
     /// first Space
     Space * first() const
     {
-        return static_cast<Space*>(nodes.first());
+        return static_cast<Space*>(nodes.front());
     }
 
     /// first Space with this Property
-    Space * first(const Property * prop) const
+    Space * findObject(const Property * prop) const
     {
-        return static_cast<Space*>(ObjectSet::first(prop));
+        return static_cast<Space*>(ObjectSet::findObject(prop));
+    }
+    
+    /// last Space
+    Space * last() const
+    {
+        return static_cast<Space*>(nodes.back());
     }
 
-    /// return pointer to the Object of given Number, or zero if not found
-    Space * find(Number n) const
+    /// return pointer to the Object of given ID, or zero if not found
+    Space * findID(ObjectID n) const
     {
         return static_cast<Space*>(inventory.get(n));
     }
-        
+
 };
 
 

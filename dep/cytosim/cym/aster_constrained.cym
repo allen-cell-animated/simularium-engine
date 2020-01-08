@@ -1,7 +1,7 @@
 % An aster that can only move along the X-axis
 % F. Nedelec, Sept 2012
 
-set simul aster 
+set simul system
 {
     time_step = 0.005
     viscosity = 0.01
@@ -9,10 +9,13 @@ set simul aster
 
 set space cell
 {
-    geometry = ( sphere 10 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 10
+}
 
 set fiber microtubule
 {
@@ -25,34 +28,36 @@ set fiber microtubule
 
 set space rail
 {
-    geometry = ( rectangle 10 0 0 )
+    shape = rectangle
     display = ( color = red )
 }
 
-new space rail
+new rail
+{
+    length = 20, 0, 0
+}
 
 set solid core
 {
     display = ( style=3 )
-    confine = inside, 1000, rail
+    confine = surface, 1000, rail
 }
 
 set aster centrosome
 {
-    solid = core
-    fibers = microtubule
     stiffness = 1000, 500
 }
 
-new 1 aster centrosome
+new centrosome
 {
+    solid = core
+    point1 = center, 0.5
     radius = 0.5
-    nb_fibers = 32
-    length = 12
+    fibers = 32, microtubule, ( length = 12; )
 }
 
 
-run simul *
+run system
 {
     nb_steps = 20000
     nb_frames = 100

@@ -7,9 +7,10 @@
 #include "real.h"
 #include "opengl.h"
 #include "vector.h"
-class PointDisp;
+#include "point_disp.h"
 
-///Cytosim display class - style 3
+
+///Cytosim display class for style=3
 /**
  This style is for rendering in 3D.
  It uses Lighting for better volume rendering
@@ -17,19 +18,31 @@ class PointDisp;
 class Display3 : public Display
 {
 private:
-     
-    /// display list for one Space
-    GLuint spaceDL;
     
-    /// Space for which the spaceDL was built
-    const Space * dlSpace;
-    
-    
-    ///display a ball
-    void displayBall(Vector const&, real radius);
+    /// draw a fine spherical object
+    void drawBall(Vector const&, real radius) const;
 
-    ///display a point
-    void displayPoint(Vector const&, PointDisp const*);
+    /// draw a point with a small sphere
+    void drawPoint(Vector const&, PointDisp const*) const;
+
+    /// draw a point with a small sphere
+    inline void drawHand(Vector const& p, PointDisp const* d) const { d->color.load_both(); drawPoint(p, d); }
+
+    /// draw a point with a small sphere
+    inline void drawHand2(Vector const& p, PointDisp const* d) const { if ( d->visible ) { d->color2.load_both(); drawPoint(p, d); } }
+    
+    /// draw Fiber linear features
+    void drawJoinedFiberLines(Fiber const&, bool minus_cap, bool plus_cap, real rad, unsigned seg, unsigned last,
+                              void (*set_color)(Fiber const&, unsigned, real), real) const;
+    
+    /// draw Fiber liner features
+    void drawJoinedFiberLinesL(Fiber const&, bool minus_cap, bool plus_cap, real rad, long inx, long last, real abs, real inc,
+                               void (*set_color)(Fiber const&, long, real), real) const;
+    
+    void drawFiberSegment(Fiber const&, bool minus_cap, bool plus_cap, real rad, real abs1, real abs2) const;
+    
+    /// display lattice subtance using specified color function
+    void drawFiberLattice(Fiber const&, FiberLattice const&, real width, void (*set_color)(Fiber const&, long, real)) const;
 
 public:
         
@@ -37,71 +50,82 @@ public:
     Display3(DisplayProp const*);
     
     ///destructor
-    ~Display3();
+    ~Display3() {}
     
-    ///display the given simulation state using OpenGL commands
-    void display(Simul const&);
+    /// draw the given simulation state using OpenGL commands
+    void drawSimul(Simul const&);
     
-    ///display back of Space
-    void displayBSpace(Space const&);
+    /// draw Fiber MINUS_END
+    void drawFiberMinusEnd(Fiber const&, int style, real size) const;
     
-    ///display front of Space
-    void displayFSpace(Space const&);
+    /// draw Fiber PLUS_END
+    void drawFiberPlusEnd(Fiber const&, int style, real size) const;
     
-    ///display a Fiber
-    void displayFiberMinusEnd(Fiber const&);
+    /// draw Fiber linear features
+    void drawFiberLines(Fiber const&) const;
     
-    ///display a Fiber
-    void displayFiberPlusEnd(Fiber const&);
-    
-    ///display a Fiber
-    void displayFiber(Fiber const&);
-    
-    ///display the Fiber points
-    void displayFiberPoints(Fiber const&);
-    
-    ///display Fibers
-    virtual void displayFibersPoints(FiberSet const&);
+    /// draw one segment of a Fiber
+    void drawFiberLinesT(Fiber const&, unsigned) const;
 
-    ///display the Solids
-    void displaySolid(Solid const&);
+    /// draw Fiber linear features over length `len` near the MINUS_END
+    void drawFiberLinesM(Fiber const&, real len, real width) const;
+    
+    /// draw Fiber linear features over length `len` near the PLUS_END
+    void drawFiberLinesP(Fiber const&, real len, real width) const;
+
+    /// display lattice subtance using color
+    void drawFiberLattice1(Fiber const&, FiberLattice const&, real width) const;
+    
+    /// display lattice subtance using color
+    void drawFiberLattice2(Fiber const&, FiberLattice const&, real width) const;
+
+    /// draw Edges of Lattice
+    void drawFiberLatticeEdges(Fiber const&, FiberLattice const&, real size) const;
+
+    /// draw Fiber point-like features
+    void drawFiberPoints(Fiber const&) const;
+    
+    /// draw Fiber speckles
+    void drawFiberSpeckles(Fiber const&) const;
+    
+    /// draw the Solids
+    void drawSolid(Solid const&);
  
-    ///display the transparent parts of Solid
-    void displayTSolid(Solid const&, unsigned int);
+    /// draw the transparent parts of Solid
+    void drawSolidT(Solid const&, unsigned int);
 
-    ///display a Bead
-    void displayBead(Bead const&);
+    /// draw a Bead
+    void drawBead(Bead const&);
     
-    ///display transparent membrane of Bead
-    void displayTBead(Bead const&);
+    /// draw transparent membrane of Bead
+    void drawBeadT(Bead const&);
     
-    ///display a Sphere
-    void displaySphere(Sphere const&);
+    /// draw a Sphere
+    void drawSphere(Sphere const&);
     
-    ///display transparent membrane of Sphere
-    void displayTSphere(Sphere const&);
+    /// draw transparent membrane of Sphere
+    void drawSphereT(Sphere const&);
     
-    //display an Organizer
-    void displayOrganizer(Organizer const&);
-    
-    ///display points on the Nucleus
-    void displayPointsOnNucleus(Simul const&);
+    /// draw the free Single
+    void drawSinglesF(SingleSet const&) const;
 
-    ///display free Couple
-    void displayFCouples(CoupleSet const&);
-    
-    ///display attahed Couple
-    void displayACouples(CoupleSet const&);
+    /// draw the attached Single
+    void drawSinglesA(SingleSet const&) const;
 
-    ///display bridging Couple
-    void displayBCouples(CoupleSet const&);
-    
-    ///display the free Single
-    void displayFSingles(SingleSet const&);
-    
-    ///display the attached Single
-    void displayASingles(SingleSet const&);
+    /// draw free Couple
+    void drawCouplesF(CoupleSet const&) const;
+
+    /// draw attached Couple
+    void drawCouplesA(CoupleSet const&) const;
+
+    /// draw one bridging Couple
+    void drawCoupleB(Couple const*) const;
  
+    /// draw one bridging Couple
+    void drawCoupleBfast(Couple const*) const;
+
+    /// draw an Organizer
+    void drawOrganizer(Organizer const&) const;
 };
 
 #endif

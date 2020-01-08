@@ -6,7 +6,7 @@
 #include "interface.h"
 
 
-/// Cytosim Parser to read and execute config files
+/// Parser to read and execute Cytosim config files
 /**
  This is where the syntax of the config file is defined
  */
@@ -14,98 +14,95 @@ class Parser : public Interface
 {
 private:
     
+    /// disabled default constructor
+    Parser();
+    
     /// control switch to enable command 'set' (creating a property)
     bool      do_set;
     
     /// control switch to enable command 'change' (change a property)
     bool      do_change;
     
-    /// control switch to enable command 'new' and 'delete' (create object)
+    /// control switch to enable command 'new' and 'delete' (object)
     bool      do_new;
     
     /// control switch to enable command 'run' (run simulation)
     bool      do_run;
     
-    /// control switch to enable command 'write' and 'report' (write files)
+    /// control switch to enable command 'write' (write files)
     bool      do_write;
     
-    /// check validity of string for being the name of an object
-    void      read_property_name(std::istream & is, std::string & nm, const std::string&) const;
+    //--------------------------------------------------------------------------
 
-    /// read 'CLASS' or 'CLASS:FIELD'
-    bool      read_class_name(std::istream & is, std::string & kd, std::string & fd) const;
-   
-    /// position in current stream
-    std::streampos spos;
+    /// print the lines located between `pos` and current position
+    void      show_lines(std::istream&, std::streampos);
     
-    /// disabled default constructor
-    Parser();
-    
-public:
-    
-    /// set the permission of the parser
-    Parser(Simul& s, bool allow_set, bool allow_change, bool allow_new, bool allow_run, bool allow_write);
-    
-    /// destructor
-    virtual  ~Parser() {}
-    
-    //-------------------------------------------------------------------------------
-    
-    /// parse command \b set
+    /// parse command `set
     void      parse_set(std::istream&);
     
-    /// parse command \b change
+    /// parse command `change`
     void      parse_change(std::istream&);
     
-    /// parse command \b new
+    /// parse command `new`
     void      parse_new(std::istream&);
     
-    /// parse command \b delete
+    /// parse command `delete`
     void      parse_delete(std::istream&);
     
-    /// parse command \b mark
+    /// parse command `mark`
     void      parse_mark(std::istream&);
 
-    /// parse command \b cut
+    /// parse command `cut`
     void      parse_cut(std::istream&);
 
-    /// parse command \b run
+    /// parse command `run`
     void      parse_run(std::istream&);
     
-    /// parse command \b include
+    /// parse command `read`
     void      parse_read(std::istream&);
     
-    /// parse command \b read
-    void      parse_import(std::istream&);
-    
-    /// parse command \b read
-    void      parse_export(std::istream&);
-    
-    /// parse command \b write
+    /// parse command `write`
     void      parse_report(std::istream&);
     
-    /// parse command \b call
+    /// parse command `import`
+    void      parse_import(std::istream&);
+    
+    /// parse command `export`
+    void      parse_export(std::istream&);
+    
+    /// parse command `call`
     void      parse_call(std::istream&);
     
-    /// parse command \b repeat
+    /// parse command `repeat`
     void      parse_repeat(std::istream&);
+
+    /// parse command `for`
+    void      parse_for(std::istream&);
     
-    /// parse command \b stop
-    void      parse_stop(std::istream&);
+    /// parse command `end`
+    void      parse_end(std::istream&);
+    
+    //--------------------------------------------------------------------------
 
-    /// Parse a std::istream
-    void      parse(std::istream&, std::string const& file_name);
+public:
+        
+    /// construct a Parser with given permissions
+    Parser(Simul& s, bool can_set, bool can_change, bool can_new, bool can_run, bool can_write);
 
-    //-------------------------------------------------------------------------------
+    /// Parse next command in stream, return 0 if success
+    int       evaluate_one(std::istream&);
+    
+    /// Parse commands in stream
+    void      evaluate(std::istream&);
+
+    /// Parse code in string, and report errors
+    void      evaluate(std::string const&);
 
     /// Open and parse the config file with the given name
-    void      readConfig(std::string const& name);
+    int       readConfig(std::string const& name);
 
-    /// Parse the default config file (SimulProp::config)
-    void      readConfig() { readConfig(simul.prop->config); }
-
-    /// Parse the default output property file (SimulProp::property_file)
-    void      readProperties() { readConfig(simul.prop->property_file); }
+    /// Parse the default config file i.e. calls readConfig(simul.prop->config)
+    int       readConfig();
 
 };
 

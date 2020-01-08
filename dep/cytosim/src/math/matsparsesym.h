@@ -3,49 +3,59 @@
 #ifndef MATSPARSESYM_H
 #define MATSPARSESYM_H
 
-#include <cstdio>
+#include "real.h"
 #include "matrix.h"
-
+#include <cstdio>
+#include <string>
 
 ///real symmetric sparse Matrix
 /**
-MatrixSparseSymmetric uses a sparse storage, with arrays of elements for each column.
+ MatrixSparseSymmetric uses a sparse storage, with arrays of elements for each column.
  */
-class MatrixSparseSymmetric : public Matrix
+class MatrixSparseSymmetric
 {
+public:
     
-private:
-    
-    ///Element describes an element in a sparse matrix
-    // The elements are stored per columns, that is how the column index is known
-    struct Element {
-        real val;    ///< The value of the element
-        index_type line;   ///< The index of the line
+    /// An element of the sparse matrix
+    struct Element
+    {
+        real     val;   ///< The value of the element
+        index_t  inx;   ///< The index of the line
+        
+        void reset(index_t i)
+        {
+            inx = i;
+            val = 0.0;
+        }
     };
-
+    
 private:
+    
     /// size of matrix
-    unsigned int mxSize;
-    
+    index_t    size_;
+
     /// amount of memory which has been allocated
-    unsigned int mxAllocated;
-            
-    /// array col[c][] holds Elements of column 'c'
-    Element ** col;
+    size_t     allocated_;
     
-    /// colSize[c] is the number of Elements in column 'c'
-    unsigned int  * colSize;
+    /// array col_[c][] holds Elements of column 'c'
+    Element ** col_;
     
-    /// colMax[c] number of Elements allocated in column 'c'
-    unsigned int  * colMax;
+    /// col_size_[c] is the number of Elements in column 'c'
+    unsigned * col_size_;
+    
+    /// col_max_[c] is the number of Elements allocated in column 'c'
+    size_t   * col_max_;
     
     /// allocate column to hold specified number of values
-    void allocateColumn( index_type column_index, unsigned int nb_values );
+    void allocateColumn(index_t col, size_t nb);
     
 public:
     
-    //size of (square) matrix
-    unsigned int size() const { return mxSize; }
+    /// return the size of the matrix
+    index_t size() const { return size_; }
+    
+    /// change the size of the matrix
+    void resize(index_t s) { allocate(s); size_=s; }
 
     /// base for destructor
     void deallocate();
@@ -57,53 +67,66 @@ public:
     virtual ~MatrixSparseSymmetric()  { deallocate(); }
     
     /// set all the element to zero
-    void makeZero();
+    void reset();
     
     /// allocate the matrix to hold ( sz * sz )
-    void allocate( unsigned int sz );
-        
+    void allocate(size_t sz);
+    
     /// returns the address of element at (x, y), no allocation is done
-    real* addr( index_type x, index_type y ) const;
+    real* addr(index_t x, index_t y) const;
     
     /// returns the address of element at (x, y), allocating if necessary
-    real& operator()( index_type x, index_type y );
+    real& operator()(index_t x, index_t y);
     
     /// scale the matrix by a scalar factor
-    void scale( real a );
+    void scale(real);
     
     /// add the diagonal block ( x, x, x+sx, x+sx ) from this matrix to M
-    void addDiagonalBlock( real* M, index_type x, unsigned int sx) const;
+    void addDiagonalBlock(real* mat, unsigned ldd, index_t si, unsigned nb) const;
     
-    /// add the upper triagular block ( x, x, x+sx, x+sx ) from this matrix to M
-    void addTriangularBlock( real* M, index_type x, unsigned int sx) const;
+    /// add upper triangular half of 'this' block ( idx, idx, idx+siz, idx+siz ) to `mat`
+    void addTriangularBlock(real* mat, index_t ldd, index_t si, unsigned nb, unsigned dim) const;
     
-    ///optional optimization that may accelerate multiplications by a vector
-    void prepareForMultiply();
+    /// prepare matrix for multiplications by a vector (must be called)
+    void prepareForMultiply(int dim);
     
-    /// multiplication of a vector: Y = Y + M * X, dim(X) = dim(M)
-    void vecMulAdd( const real* X, real* Y ) const;
+    /// multiplication of a vector: Y = Y + M * X with dim(X) = dim(M)
+    void vecMulAdd(const real* X, real* Y) const;
     
-    /// 2D isotropic multiplication of a vector: Y = Y + M * X
-    void vecMulAddIso2D( const real* X, real* Y ) const;
+    /// multiplication of a vector: Y = Y + M * X with dim(X) = dim(M)
+    void vecMulAdd_ALT(const real* X, real* Y) const { vecMulAdd(X, Y); }
+
+    /// 2D isotropic multiplication of a vector: Y = Y + M * X with dim(X) = 2 * dim(M)
+    void vecMulAddIso2D(const real* X, real* Y) const;
     
-    /// 3D isotropic multiplication of a vector: Y = Y + M * X
-    void vecMulAddIso3D( const real* X, real* Y ) const;
+    /// 3D isotropic multiplication of a vector: Y = Y + M * X with dim(X) = 3 * dim(M)
+    void vecMulAddIso3D(const real* X, real* Y) const;
     
     /// true if matrix is non-zero
     bool nonZero() const;
     
-    /// number of element which are non-zero
-    unsigned int  nbNonZeroElements() const;
+    /// number of element which are not null
+    size_t nbElements(index_t start, index_t stop) const;
     
+    /// number of blocks which are not null
+    size_t nbElements() const { return nbElements(0, size_); }
+
     /// returns a string which a description of the type of matrix
     std::string what() const;
     
     /// printf debug function in sparse mode: i, j : value
-    void printSparse(std::ostream &) const;
+    void printSparse(std::ostream&) const;
     
+    /// print content of one column
+    void printColumn(std::ostream&, index_t);
+    
+    /// print content of one column
+    void printColumns(std::ostream&);
+
     /// debug function
     int bad() const;
 };
 
 
 #endif
+

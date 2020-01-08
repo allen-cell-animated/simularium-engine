@@ -1,6 +1,6 @@
 % Francois Nedelec, April 23, 2013
 
-set simul transport 
+set simul system
 {
     time_step = 0.001
     display = ( style=2; point_size=1; window_size = 1200, 600; )
@@ -8,31 +8,35 @@ set simul transport
 
 set space cell
 {
-    geometry = ( capsule 4 2 )
+    shape = capsule
     display = ( visible=0 )
 }
 
-new space cell
+new cell
+{
+    length = 12
+    radius = 2
+}
 
 set hand motor
 {
     binding = 10, 0.1
     unbinding = 1, 3
     activity = move;
-    max_speed = 10;
+    unloaded_speed = 10;
     stall_force = 1;
     display = ( size=2; color=green )
 }
 
-set single protein
+set single simplex
 {
     hand = motor
     diffusion = 1
 }
 
-new 100000 single protein
+new 100000 simplex
 
-set fiber tube
+set fiber filament
 {
     rigidity = 20
     segmentation = 0.5
@@ -40,26 +44,24 @@ set fiber tube
     display = ( color=0xFFFFFFAA; line_width=4; end_size=4,4 )
 }
     
-new 4 fiber tube
+new 4 filament
 {
     length = 8
-    position = 0 -0.7 0
-    post_translation = 0 0.5 0
+    range = 0 -1 0, 0 1 0
     orientation = 1 0 0
 }
 
-new 4 fiber tube
+new 4 filament
 {
     length = 8
-    position = 0 0.7 0
-    post_translation = 0 -0.5 0
+    range = 0 0.9 0, 0 -1.1 0
     orientation = -1 0 0
 }
 
-run simul *
+run system
 {
     nb_steps  = 500
-    nb_frames = 100
+    nb_frames = 10
     solve = 0
 }
 

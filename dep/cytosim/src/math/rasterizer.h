@@ -1,10 +1,11 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef RASTERIZER_H
 #define RASTERIZER_H
 
 #include "real.h"
-
+#include "vector1.h"
+#include "vector2.h"
+#include "vector3.h"
 
 /// 2D and 3D rasterizer
 /**
@@ -19,54 +20,177 @@
 
  Important note:   The points defining the polygon do not need to be integers.
 
- F.Nedelec, EMBL 2002-2012, nedelec@embl.de
+ F.Nedelec, EMBL 2002-2017, nedelec@embl.de
 
- ///\todo implement a rasterizer in variable precision, keeping arguments as 'real'
 */
 namespace Rasterizer 
 {
     
-    /// a point in 3D, with information for connectivity
-    struct Vertex
+    /// a point in 3D, with a bitfield for connectivity
+    struct Vertex3
     {
         /// coordinates of the point
-        real x, y, z;
+        real XX, YY, ZZ;
         
         /// bit-field used to describe the connectivity between the points.
         /**
-         Two points A and B are connected if ( A.u & B.u ) using the bit-wise AND.
+         Two points A and B are connected if ( A.UU & B.UU ) using the bit-wise AND.
          With a long integer, this limits the number of edges to 64.
          A bigger integer could be used if needed.
         */
-        unsigned long u;
+        unsigned long UU;
+        
+        void set(Vector3 const& vec, unsigned long u)
+        {
+            XX = vec.XX;
+            YY = vec.YY;
+            ZZ = vec.ZZ;
+            UU = u;
+        }
+        
+        void print(std::ostream& os) const
+        {
+            os << "( " << std::setw(9) << XX;
+            os << "  " << std::setw(9) << YY;
+            os << "  " << std::setw(9) << ZZ << " )";
+        }
     };
     
-    //-------------------------- Rasterizer functions in 1D -------------------------
-    
-    /// Rasterizer function in 1D:
-    void paintFatLine1D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        const real p[],       ///< first end of the segment [dim=1]
-                        const real q[],       ///< second end of the segment [dim=1]
-                        const real radius,    ///< width by which the segment [pq] is inflated
-                        const real offset[],  ///< phase of the grid [dim=1]
-                        const real delta[]    ///< period for the grid [dim=1]
-                        );
-    
-    
-    //-------------------------- Rasterizer functions in 2D -------------------------
+    /// helper function for qsort() of Vertex3
+    int compareVertex3(const void * a, const void * b);
 
-    /// Calculate the convex hull from a set of 2D-points
-    /** 
-     - input:   xy[] contains the coordinates of 'nbpts' points: x,y,x,y...
-     - output:  xy[] is the anti-clockwise convex hull, starting from the bottom most point
+    /// a point in 2D, with slopes in Z
+    struct Vertex2
+    {
+        /// coordinates of the point
+        real XX, YY;
+        
+        /// derivatives of the line with respect to Z
+        real dX, dY;
+        
+        void set(real x, real y, real dx, real dy)
+        {
+            XX = x;
+            YY = y;
+            dX = dx;
+            dY = dy;
+        }
+        
+        void move()
+        {
+            XX += dX;
+            YY += dY;
+        }
+        
+        void print(std::ostream& os) const
+        {
+            os << "( " << std::setw(9) << XX;
+            os << "  " << std::setw(9) << YY << " )";
+        }
+    };
 
-     \return The number of points in the convex hull.
+    /// accessory data swap function
+    template<typename VEC> void swap(VEC& A, VEC& B) { VEC T = A; A = B; B = T; }
+    
+    /// Compute the Convex Hull of a set of points
+    /**
+     on entry, pts[] contains 'n_pts' points with coordinates members XX and YY.
+     on exit, pts[] is the anti-clockwise polygon hull, starting with the point of lowest Y.
+     
+     @returns The number of points in the convex hull (at most n_pts).
      */
-    unsigned int convexHull2D(unsigned int nbpts, ///< number of points
-                              real xy[]           ///< coordinates of the points
-                              );
+    template<typename VEC>
+    unsigned convexHull2D(unsigned n_pts, VEC pts[])
+    {
+        //---------- find bottom and top points:
+        unsigned inx = 0, top = 0;
+        real y_bot = pts[0].YY;
+        real y_top = pts[0].YY;
+        
+        for ( unsigned n = 1; n < n_pts; ++n )
+        {
+            if ( pts[n].YY < y_bot || ( pts[n].YY == y_bot  &&  pts[n].XX > pts[inx].XX ) )
+            {
+                inx = n;
+                y_bot = pts[n].YY;
+            }
+            if ( pts[n].YY > y_top || ( pts[n].YY == y_top  &&  pts[n].XX < pts[top].XX ) )
+            {
+                top = n;
+                y_top = pts[n].YY;
+            }
+        }
+        
+        if ( inx == top )  //all points are equal ?
+            return 1;
+        
+        // put the bottom point at index zero:
+        if ( inx )
+        {
+            swap(pts[0], pts[inx]);
+            if ( top == 0 )
+                top = inx;
+        }
+        // reset
+        inx = 0;
+        
+        // wrap upward on the right side of the hull
+        unsigned nxt;
+        while ( 1 )
+        {
+            real pX = pts[inx].XX;
+            real pY = pts[inx].YY;
+            ++inx;
+            
+            nxt = top;
+            real dx = pts[top].XX - pX;
+            real dy = pts[top].YY - pY;
+            
+            for ( unsigned n = inx; n < n_pts; ++n )
+            {
+                real dxt = pts[n].XX - pX;
+                real dyt = pts[n].YY - pY;
+                // keep if slope is lower:
+                if ( dxt * dy > dyt * dx )
+                {
+                    nxt = n;
+                    dx = dxt;
+                    dy = dyt;
+                }
+            }
+            
+            // if we reached bottom point, sweep is complete
+            if ( nxt == 0 )
+                break;
+            
+            swap(pts[inx], pts[nxt]);
+            
+            // if we reached topmost point, change reference for downward sweep:
+            if ( nxt == top )
+                top = 0;
+            else if ( inx == top )
+                top = nxt;  // this compensates the swap
+        }
+        
+        return inx;
+    }
     
+    //------------------------------------ 1D --------------------------------------
+#pragma mark - 1D
+
+    /// Rasterizer function in 1D
+    void paintFatLine1D(void (*paint)(int, int, int, int, void*),
+                        void * arg,            ///< last argument to paint()
+                        const Vector1& P,      ///< first end of the segment
+                        const Vector1& Q,      ///< second end of the segment
+                        real radius,           ///< width by which the segment [PQ] is inflated
+                        const Vector1& offset, ///< phase of the grid
+                        const Vector1& delta   ///< period for the grid
+    );
+    
+    
+    //------------------------------------ 2D --------------------------------------
+#pragma mark - 2D
     
     /// Paint a polygon in 2D
     /**
@@ -74,32 +198,33 @@ namespace Rasterizer
      integral coordinates, which are inside the polygon given in xy[]. 
      The polygon should be convex, and ordered anti-clockwise.
      */  
-    void paintPolygon2D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        unsigned int nbpts,   ///< number of points
-                        const real xy[],      ///< coordinates of the points ( x y, x y...)
-                        const int zz = 0      ///< third coordinate, passed as argument to paint()
+    void paintPolygon2D(void (*paint)(int, int, int, int, void*),
+                        void * arg,           ///< last argument to paint
+                        unsigned n_pts,       ///< number of points
+                        const Vector2[],      ///< the 2D points ( x0 y0 x1 y1 ...)
+                        int zz                ///< third coordinate, passed as argument to paint()
                         );
     
     
-    /// Paint the inside of a rectangle with edges parallel to the segment [pq]
-    void paintFatLine2D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        const real p[],       ///< first end of the segment [dim=2]
-                        const real q[],       ///< second end of the segment [dim=2]
-                        const real radius     ///< width by which [pq] is inflated
+    /// Paint the inside of a rectangle with edges parallel to the segment PQ
+    void paintFatLine2D(void (*paint)(int, int, int, int, void*),
+                        void * arg,           ///< last argument to paint
+                        const Vector2& P,     ///< first end of the segment [dim=3]
+                        const Vector2& Q,     ///< second end of the segment [dim=3]
+                        real  length,         ///< length of segment PQ
+                        real  radius          ///< width by which PQ is inflated
                         );
     
     
-    /// Paint the inside of a rectangle with edges parallel to the segment [pq]
-    void paintFatLine2D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        const real p[],       ///< first end of the segment [dim=2]
-                        const real q[],       ///< second end of the segment [dim=2]
-                        const real width,     ///< width by which the line [pq] is extended, to make a round cylinder
-                        const real offset[],  ///< phase of the grid [dim=2]
-                        const real delta[],   ///< period for the grid [dim=2]
-                        real lengthPQ = 0     ///< length of segment PQ, or zero if unknown    
+    /// Paint the inside of a rectangle with edges parallel to the segment PQ
+    void paintFatLine2D(void (*paint)(int, int, int, int, void*),
+                        void * arg,           ///< last argument to paint
+                        const Vector2& P,     ///< first end of the segment
+                        const Vector2& Q,     ///< second end of the segment
+                        real  length,         ///< length of segment PQ
+                        const real radius,    ///< width by which the line PQ is extended, to make a round cylinder
+                        const Vector2& offset,  ///< phase of the grid
+                        const Vector2& delta    ///< period for the grid
                         );
     
     /// Paint a 2D rectangular volume with edges parallel to the main axes
@@ -110,77 +235,38 @@ namespace Rasterizer
      However, the volume is nearly optimal if PQ is aligned with one of the main axis, 
      and paintBox3D is then the best choice.
      */
-    void paintBox2D(void (*paint)(int, int, int, int, void*, void*),
-                    void * arg1, void * arg2,
-                    const real p[],       ///< first end of the segment [dim=3]
-                    const real q[],       ///< second end of the segment [dim=3]
-                    const real radius,    ///< radius of cylinder contained in the volume
-                    const real offset[],  ///< phase of the grid [dim=3]
-                    const real delta[]    ///< period for the grid [dim=3]
+    void paintBox2D(void (*paint)(int, int, int, int, void*),
+                    void * arg,            ///< last argument to paint
+                    const Vector2& P,      ///< first end of the segment
+                    const Vector2& Q,      ///< second end of the segment
+                    real radius,           ///< radius of cylinder contained in the volume
+                    const Vector2& offset, ///< phase of the grid
+                    const Vector2& delta   ///< period for the grid
                     );
     
-    //-------------------------- 2D-functions useful for 3D -------------------------
-
-    /// Find convex hull from a set of 2D-points given in an array with leading-dimension 4
-    /**
-     - input:  xy[] contains the coordinates of 'nbpts' points: x,y,a,b,x,y...
-               - For each point xy[] has 4 slots (X, Y, A, B)
-               - A, B are not used, but are moved together with X,Y as the array is reordered.
-     - output: xy[] is the anti-clockwise convex hull, starting from the bottom most point.
-     
-     \return The number of points in the convex hull.
-     */
-    unsigned int convexHull2D_4(unsigned int nbpts, ///< number of points
-                                real xy[]           ///< coordinates of the points
-                                );
     
+    //------------------------------------ 3D --------------------------------------
+#pragma mark - 3D
     
-    /// Polygon rasterizer function in 2D, when leading-dimension of xy[] is 4
-    void paintPolygon2D_4(void (*paint)(int, int, int, int, void*, void*),
-                          void * arg1, void * arg2,
-                          unsigned int nbpts,   ///< number of points
-                          const real xy[],      ///< coordinates of the points ( x y, *, *, x y...)
-                          const int zz = 0      ///< third coordinate, passed as argument to paint()
-                          );
-    
-    
-    //-------------------------- Rasterizer functions in 3D -------------------------
-    
-    /// Paint a polygon in 3D
-    /** 
-     Rasterize the convex hull of the 'nbpts' points given in xyz[].
-     Simplistic algorithm: for each section at integral Z, the intersection of
-     all possible lines connecting any two points are calculated, and the 
-     convex-hull of all this points is given to paintPolygon2D.
-     */
-    void paintPolygon3D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        unsigned int nbpts,       ///< number of points
-                        real xyz[]                ///< coordinates
+    /// Polygon rasterizer function in 2D, for Vertex2
+    void paintPolygon2D(void (*paint)(int, int, int, int, void*),
+                        void * arg,           ///< last argument to paint
+                        unsigned nbpts,       ///< number of points
+                        const Vertex2[],      ///< points containing additional data
+                        int zz = 0            ///< third coordinate, passed as argument to paint()
                         );
     
-    
-    /// old Rasterizer function in 3D (slower)
-    void paintFatLine3D_old(void (*paint)(int, int, int, int, void*, void*),
-                            void * arg1, void * arg2,
-                            const real p[],       ///< first end of the segment [dim=3]
-                            const real q[],       ///< second end of the segment [dim=3]
-                            const real radius,    ///< radius of cylinder contained in the volume
-                            const real offset[],  ///< phase of the grid [dim=3]
-                            const real delta[]    ///< period for the grid [dim=3]
-                            );
-    
-    
+         
     /// Paint a 3D polygon for which the edges of the convex hull are known
     /**
      The polygon is the convex hull of the 'nbpts' vertices given in pts[].
      Each Vertex contains coordinates and information on the connectivity to other points.
      The connections between Vertices are the edge of the 3D polygon.
      */
-    void paintPolygon3D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        unsigned int  nbpts,  ///< number of points
-                        Vertex pts[]          ///< coordinates + connectivity
+    void paintPolygon3D(void (*paint)(int, int, int, int, void*),
+                        void * arg,           ///< last argument to paint
+                        unsigned n_pts,       ///< number of points
+                        Vertex3 pts[]         ///< coordinates + connectivity
                         );
     
     
@@ -190,14 +276,14 @@ namespace Rasterizer
      all the points located at a distance 'radius' or less from [p,q].
      The volume is a right cylinder with a square section.
      */
-    void paintFatLine3D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        const real p[],       ///< first end of the segment [dim=3]
-                        const real q[],       ///< second end of the segment [dim=3]
-                        const real radius,    ///< radius of cylinder contained in the volume
-                        const real offset[],  ///< phase of the grid [dim=3]
-                        const real delta[],   ///< period for the grid [dim=3]
-                        real lengthPQ = 0     ///< length of segment PQ if known    
+    void paintFatLine3D(void (*paint)(int, int, int, int, void*),
+                        void * arg,            ///< last argument to paint
+                        const Vector3& P,      ///< first end of the segment
+                        const Vector3& Q,      ///< second end of the segment
+                        real  length,          ///< length of segment PQ
+                        real  radius,          ///< radius of cylinder contained in the volume
+                        const Vector3& offset, ///< phase of the grid
+                        const Vector3& delta   ///< period for the grid
                         );
     
     
@@ -208,14 +294,14 @@ namespace Rasterizer
      The volume is a right cylinder with hexagonal section.
      This is a tighter approximation of the cylinder than the square cylinder of paintFatLine3D.
      */
-    void paintHexLine3D(void (*paint)(int, int, int, int, void*, void*),
-                        void * arg1, void * arg2,
-                        const real p[],       ///< first end of the segment [dim=3]
-                        const real q[],       ///< second end of the segment [dim=3]
-                        const real radius,    ///< radius of cylinder contained in the volume
-                        const real offset[],  ///< phase of the grid [dim=3]
-                        const real delta[],   ///< period for the grid [dim=3]
-                        real lengthPQ = 0     ///< length of segment PQ if known    
+    void paintHexLine3D(void (*paint)(int, int, int, int, void*),
+                        void * arg,            ///< last argument to paint
+                        const Vector3& P,      ///< first end of the segment
+                        const Vector3& Q,      ///< second end of the segment
+                        real  length,          ///< length of segment PQ
+                        real radius,           ///< radius of cylinder contained in the volume
+                        const Vector3& offset, ///< phase of the grid
+                        const Vector3& delta   ///< period for the grid
                         );
 
     
@@ -229,16 +315,16 @@ namespace Rasterizer
      and paintBox3D is then a better choice than the rasterizers that paint a cylinder,
      because it is much faster.
      */
-    void paintBox3D(void (*paint)(int, int, int, int, void*, void*),
-                    void * arg1, void * arg2,
-                    const real p[],       ///< first end of the segment [dim=3]
-                    const real q[],       ///< second end of the segment [dim=3]
-                    const real radius,    ///< radius of cylinder contained in the volume
-                    const real offset[],  ///< phase of the grid [dim=3]
-                    const real delta[]    ///< period for the grid [dim=3]
-                    );
-    
-};
+    void paintBox3D(void (*paint)(int, int, int, int, void*),
+                    void * arg,           ///< last argument to paint
+                    const Vector3& P,     ///< first end of the segment
+                    const Vector3& Q,     ///< second end of the segment
+                    real radius,          ///< radius of cylinder contained in the volume
+                    const Vector3& offset, ///< phase of the grid
+                    const Vector3& delta   ///< period for the grid
+                   );
+
+}
 
 #endif
 

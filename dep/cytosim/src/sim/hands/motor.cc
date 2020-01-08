@@ -7,7 +7,6 @@
 #include "iowrapper.h"
 #include "simul.h"
 
-//------------------------------------------------------------------------------
 
 Motor::Motor(MotorProp const* p, HandMonitor* h)
 : Hand(p,h), prop(p)
@@ -15,46 +14,79 @@ Motor::Motor(MotorProp const* p, HandMonitor* h)
 }
 
 
-//------------------------------------------------------------------------------
 void Motor::stepUnloaded()
 {
     assert_true( attached() );
+    real a = fbAbs + prop->set_speed_dt;
+
+    if ( a <= fbFiber->abscissaM() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaM();
+    }
     
-    // detach or move
-    if ( testDetachment() )
-        return;
-    
-    moveBy(prop->max_speed_dt);
+    if ( a >= fbFiber->abscissaP() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaP();
+    }
+
+    if ( !testDetachment() )
+        moveTo(a);
 }
 
-//------------------------------------------------------------------------------
 
-void Motor::stepLoaded(Vector const& force)
+void Motor::stepLoaded(Vector const& force, real force_norm)
 {
     assert_true( attached() );
     
-    // detachment depends on magnitude of force:
-    if ( testKramersDetachment(force.norm()) )
-        return;
-    
     // the load is the projection of the force on the local direction of Fiber
-    real load = force * dirFiber();
+    real load = dot(force, dirFiber());
     
     // calculate load-dependent displacement:
-    real dabs = prop->max_speed_dt + load * prop->var_speed_dt;
+    real dab = prop->set_speed_dt + load * prop->var_speed_dt;
 
     // possibly limit the range of the speed:
     if ( prop->limit_speed )
     {
-        if ( dabs < prop->min_dabs )
-            dabs = prop->min_dabs;
-        
-        else if ( dabs > prop->max_dabs )
-            dabs = prop->max_dabs;
+        dab = std::max(dab, prop->min_dab);
+        dab = std::min(dab, prop->max_dab);
     }
     
-    moveBy(dabs);
+    real a = fbAbs + dab;
+    
+    if ( a <= fbFiber->abscissaM() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaM();
+    }
+    
+    if ( a >= fbFiber->abscissaP() )
+    {
+        if ( RNG.test_not(prop->hold_growing_end) )
+        {
+            detach();
+            return;
+        }
+        a = fbFiber->abscissaP();
+    }
+    
+    if ( testKramersDetachment(force_norm) )
+        return;
+
+    //std::cerr << this << " > " << fbAbs << "  " << dab << "\n";
+    moveTo(a);
 }
-
-
 

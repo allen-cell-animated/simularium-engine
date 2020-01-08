@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SHACKLE_LONG_H
 #define SHACKLE_LONG_H
 
@@ -23,16 +22,13 @@ class ShackleLong : public Shackle
     /// the side (top/bottom) of the interaction
     mutable Torque mArm;
     
-    /// used to calculate \a mArm
-    static Torque calcArm(const PointInterpolated & pt, Vector const& pos, real len);
+    /// used to calculate `mArm`
+    static Torque calcArm(const Interpolation & pt, Vector const& pos, real len);
     
 public:
     
-    /// create following the specifications in the CoupleProp
+    /// constructor
     ShackleLong(ShackleProp const*, Vector const & w = Vector(0,0,0));
-
-    /// destructor
-    virtual ~ShackleLong() {}
     
     //--------------------------------------------------------------------------
     
@@ -40,9 +36,9 @@ public:
     Vector  posSide() const;
 
     /// force between hands
-    Vector  force1() const;
+    Vector  force() const;
     
-    /// add interactions to the Meca
+    /// add interactions to a Meca
     void    setInteractions(Meca &) const;
     
 };

@@ -11,9 +11,9 @@
 #include "slider.h"
 
 
-Hand * SliderProp::newHand(HandMonitor* h) const
+Hand * SliderProp::newHand(HandMonitor* m) const
 {
-    return new Slider(this, h);
+    return new Slider(this, m);
 }
 
 
@@ -22,6 +22,7 @@ void SliderProp::clear()
     HandProp::clear();
 
     mobility = 0;
+    stiffness = -1;
 }
 
 
@@ -30,24 +31,42 @@ void SliderProp::read(Glossary& glos)
     HandProp::read(glos);
     
     glos.set(mobility,    "mobility");
+    glos.set(stiffness,   "stiffness");
 }
 
 
-void SliderProp::complete(SimulProp const* sp, PropertyList* plist)
+void SliderProp::complete(Simul const& sim)
 {
-    HandProp::complete(sp, plist);
+    HandProp::complete(sim);
 
     if ( mobility < 0 )
         throw InvalidParameter("slider:mobility must be >= 0");
+    
+    if ( sim.ready() && mobility <= 0 )
+        std::clog << "WARNING: slider `" << name() << "' will not slide because mobility=0\n";
 
     /*
      Explicit
      */
     
-    mobility_dt = sp->time_step * mobility;
+    mobility_dt = sim.prop->time_step * mobility;
     
-    if ( sp->strict && mobility <= 0 )
-        std::clog << "WARNING: slider `" << name() << "' will not slide because mobility=0\n";
+    if ( stiffness > 0 )
+    {
+        /*
+         We devise here an implicit integration approach, assuming:
+         - that all other elements of the simulation are static
+         - that the link is Hookean of zero resting length:
+         force = stiffness * offset
+         However, this is true only if the Slider is part of a Single or a plain Couple.
+         This does not hold in particular for any of the non-zero resting length Couple or Single.
+         J. Ward found that in this case, the numerical precision is not improved compared to
+         the explicit integration above.
+         */
+        std::clog << "         slider:mobility explicit = " << mobility_dt;
+        mobility_dt = -std::expm1( - mobility_dt * stiffness ) / stiffness;
+        std::clog << "   implicit = " << mobility_dt << std::endl;
+    }
 }
 
 
@@ -62,17 +81,19 @@ void SliderProp::checkStiffness(real stiff, real len, real mul, real kT) const
     if ( e > 0.5 )
     {
         std::ostringstream oss;
-        oss << "Slider `" << name() << "' may be unstable:\n";
-        oss << PREF << "time_step * mobility * stiffness = " << e << "\n";
-        oss << PREF << "reduce time_step\n";
-        throw InvalidParameter(oss.str());
+        oss << "Simulating `" << name() << "' may fail as:\n";
+        oss << PREF << "time_step * mobility * stiffness = " << e << '\n';
+        oss << PREF << "-> reduce mobility or time_step\n";
+        //throw InvalidParameter(oss.str());
+        std::clog << oss.str();
     }
 }
 
 
-void SliderProp::write_data(std::ostream & os) const
+void SliderProp::write_values(std::ostream& os) const
 {
-    HandProp::write_data(os);
-    write_param(os, "mobility",  mobility);
+    HandProp::write_values(os);
+    write_value(os, "mobility",  mobility);
+    write_value(os, "stiffness", stiffness);
 }
 

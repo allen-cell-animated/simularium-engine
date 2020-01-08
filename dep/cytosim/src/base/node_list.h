@@ -3,26 +3,27 @@
 #ifndef NODE_LIST_H
 #define NODE_LIST_H
 
+#include <stddef.h>
 #include "node.h"
-class ObjectSet;
 class Random;
 
 /// Doubly linked list of Nodes
 /**
-This class is similar to STL::dequeue<OBJ>
-and the naming of the functions is consistent with STL whenever possible.
  
- NodeList has pointers to the first and last elements of the list.
- The List also keeps track of how many objects are linked.
+ This class is similar to the standard template library <std::list>
+ and the naming of the functions is consistent with STL whenever possible.
+ 
+ The NodeList holds pointers to the first and last elements of the list,
+ and it keeps track of the number of objects linked.
  Functions are given to link and unlink Nodes in constant time.\n
  
- A function mix() randomize the order of the Nodes in the list. 
- Such randomization are necessary in the simulation
- to avoid any bias which could derive from a fixed ordering.
+ A function mix() randomize the order of the Nodes in the list, which is
+ necessary in a simulation to avoid any bias which could derive from fixed ordering.
  
  The list is zero-terminated on both sides, and it can be traversed in either ways:
- for ( Node * n = first(); n ; n = n->next() );
- for ( Node * n = last(); n ; n = n->prev() );
+ for ( Node * n = front(); n ; n = n->next() );
+ for ( Node * n = back() ; n ; n = n->prev() );
+ 
  */
 
 class NodeList
@@ -31,13 +32,13 @@ class NodeList
 private:
         
     /// First Node of the list
-    Node *          nFirst;
+    Node *   nFront;
     
     /// Last Node of the list
-    Node *          nLast;
+    Node *   nBack;
     
     /// Number of Node in the list
-    unsigned int    nSize;
+    size_t   nSize;
     
     /// Disabled copy constructor
     NodeList(NodeList const&);
@@ -45,36 +46,25 @@ private:
     /// Disabled copy assignment
     NodeList& operator=(NodeList const&);
     
-protected:
-    
-    /// Pointer to embedding ObjectSet 
-    ObjectSet * nSet;
-    
 public:
     
-    /// Constructor
-    NodeList() : nFirst(0), nLast(0), nSize(0), nSet(0) { }
+    /// default constructor
+    NodeList() : nFront(nullptr), nBack(nullptr), nSize(0) { }
     
-    /// Constructor
-    NodeList(ObjectSet * s) : nFirst(0), nLast(0), nSize(0), nSet(s) { }
-
     /// Destructor
-    virtual         ~NodeList()         { erase(); }
+    virtual         ~NodeList()    { clear(); }
     
-    /// First Node
-    Node *          first()       const { return nFirst; }
+    /// First Node in list
+    Node *          front()  const { return nFront; }
     
-    /// First Node
-    Node *          last()        const { return nLast; }
-    
+    /// Last Node in list
+    Node *          back()   const { return nBack; }
+
     /// Number of objects in the list
-    unsigned int    size()        const { return nSize; }
+    size_t          size()   const { return nSize; }
     
-    /// true if no element
-    bool            empty()       const { return nFirst == 0; }
-    
-    /// return associated ObjectSet
-    ObjectSet *     objset()      const { return nSet; }
+    /// true if list has zero elements
+    bool            empty()  const { return nFront == nullptr; }
     
     /// put Node first in the list
     void            push_front(Node *);
@@ -83,42 +73,56 @@ public:
     void            push_back(Node *);
     
     /// import all objects from given list, and empty it
-    void            transfer(NodeList& list);
+    void            merge(NodeList& list);
     
-    /// put new Node np after existing one p
-    void            push_after(Node * p, Node * np);
+    /// link `n` after already linked `p`
+    void            push_after(Node * p, Node * n);
     
-    /// put new Node np before existing one p
-    void            push_before(Node * p, Node * np);
+    /// link `n` before already linked `p`
+    void            push_before(Node * p, Node * n);
     
-    /// Remove Node op from the list
-    void            pop(Node * op);
+    /// Remove Node `n` from list
+    void            pop(Node * n);
     
-    /// Remove Node op from the list
-    Node *          pop_front();
+    /// Remove top Node from list
+    void            pop_front();
 
+    /// Remove top Node from list
+    void            pop_back();
+   
+    /// clear the list
+    void            clear();
     
-    /// clear the list by calling pop(first) until empty
-    virtual void    clear();
+    /// delete all nodes, clearing the list on the way
+    void            erase();
     
-    /// clear the list as above, calling delete( ) for each node
-    virtual void    erase();
+    /// sort according to given function
+    void            sort(int (*comp)(const void*, const void*));
     
-    /// Rearrange (first--P-Pnext--last) as (Pnext--last-first--P)
-    void            swap(Node * p);
-    
-    /// Rearrange (first--P-Pnext--Qprev-Q--last) as (Pnext--Qprev-first--P-Q--last)
-    void            shuffle1(Node * p, Node * q);
-    
-    /// Rearrange (first--P-Pnext--Qprev-Q--last) as (first--P-Q--last-Pnext--Qprev)
-    void            shuffle2(Node * p, Node * q);
-    
-    /// Mix using swap() and shuffle() functions  
-    void            mix(Random&);
-    
-    /// call mix() five times  
-    void            mix5(Random&);
+    /// quicksort according to given function
+    void            quicksort(int (*comp)(const void*, const void*));
 
+    /// Rearrange the list by exchanging the portions before and after `p`
+    void            permute(Node *);
+    
+    /// Rearrange the list by moving a central portion to the top
+    void            shuffle_up(Node *, Node *);
+    
+    /// Rearrange the list by moving a central portion to the bottom
+    void            shuffle_down(Node *, Node *);
+    
+    /// Mix list using permute() and shuffle() functions
+    void            shuffle();
+    
+    /// call mix() three times
+    void            shuffle3();
+
+    /// count number of elements in the list
+    unsigned int    count() const;
+    
+    /// return `true` if element appears in the list
+    bool            check(Node const* n) const;
+    
     /// test coherence of list
     int             bad() const;
 };

@@ -1,192 +1,170 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "space_cylinderP.h"
-#include "point_exact.h"
 #include "exceptions.h"
-#include "smath.h"
+#include "iowrapper.h"
+#include "mecapoint.h"
+#include "glossary.h"
 #include "meca.h"
 
 
-SpaceCylinderP::SpaceCylinderP(const SpaceProp* p)
+SpaceCylinderP::SpaceCylinderP(SpaceProp const* p)
 : Space(p)
 {
-    if ( DIM != 3 )
+    if ( DIM < 3 )
         throw InvalidParameter("cylinderP is only valid in 3D: use strip instead");
+    length_ = 0;
+    radius_ = 0;
 }
 
-//------------------------------------------------------------------------------
-Vector SpaceCylinderP::extension() const
+void SpaceCylinderP::resize(Glossary& opt)
 {
-    return Vector(length(), radius(), radius());
+    real len = length_, rad = radius_;
+    
+    if ( opt.set(rad, "diameter") )
+        rad *= 0.5;
+    else opt.set(rad, "radius");
+
+    if ( opt.set(len, "length") )
+        len *= 0.5;
+
+    if ( rad < 0 )
+        throw InvalidParameter("cylinderP:radius must be >= 0");
+
+    if ( len <= 0 )
+        throw InvalidParameter("cylinderP:length must be > 0");
+    
+    length_ = len;
+    radius_ = rad;
 }
 
 
-real  SpaceCylinderP::volume() const
+Modulo * SpaceCylinderP::makeModulo() const
 {
-    return 2 * M_PI * length() * radius() * radius();
+    Modulo * mod = new Modulo();
+    mod->enable(0, length_);
+    return mod;
 }
 
-//------------------------------------------------------------------------------
-bool  SpaceCylinderP::inside( const real w[] ) const
+
+void SpaceCylinderP::boundaries(Vector& inf, Vector& sup) const
 {
-    return ( w[1]*w[1]+ w[2]*w[2] <= radiusSqr() );
+    inf.set(-length_,-radius_,-radius_);
+    sup.set( length_, radius_, radius_);
 }
 
-bool  SpaceCylinderP::allInside( const real w[], const real rad ) const
+
+real SpaceCylinderP::volume() const
 {
-    return ( sqrt( w[1]*w[1]+ w[2]*w[2] ) + rad <= radius() );
+    return 2 * M_PI * length_ * radius_ * radius_;
 }
 
-//------------------------------------------------------------------------------
-void SpaceCylinderP::project( const real w[], real p[] ) const
-{    
-    
-    p[0] = w[0];
-    p[1] = w[1];
-    p[2] = w[2];
-    
-    real n = sqrt( w[1]*w[1]+ w[2]*w[2] );
-    n = radius() / n;
-    p[1] = n * w[1];
-    p[2] = n * w[2]; 
-    
-}
 
-//------------------------------------------------------------------------------
-
-/**
- This applies the correct forces in the cylindrical and spherical parts.
- */
-void SpaceCylinderP::setInteraction(Vector const& pos, PointExact const& pe, Meca & meca, real stiff, const real len, const real rad)
+bool SpaceCylinderP::inside(Vector const& w) const
 {
-
-#if ( DIM == 3 )
-
-    const Matrix::index_type inx = DIM * pe.matIndex();
-    
-    Vector axis(0, pos.YY, pos.ZZ);
-    real axis_n = axis.norm();
-    axis /= axis_n;
-    
-    if ( rad < axis_n )
-    {
-        // outside cylinder radius
-        real len = rad / axis_n;
-        
-        meca.mC(inx+1, inx+1) += stiff * ( len * ( 1.0 - axis[1] * axis[1] ) - 1.0 );
-        meca.mC(inx+1, inx+2) -= stiff * len * axis[1] * axis[2];
-        meca.mC(inx+2, inx+2) += stiff * ( len * ( 1.0 - axis[2] * axis[2] ) - 1.0 );
-        
-        real facX = stiff * len * axis_n;            
-        meca.base(inx+1) += facX * axis[1];
-        meca.base(inx+2) += facX * axis[2];
-    }
-    else
-    {
-        // inside cylinder radius
-        real p, d;
-        if ( pos.XX > 0 )
-        {
-            p = len;
-            d = len - pos.XX;
-        }
-        else
-        {
-            p = -len;
-            d = len + pos.XX;
-        }
-        
-        if ( d > rad - axis_n )
-        {
-            meca.mC(inx+1, inx+1) -= stiff * axis[1] * axis[1];
-            meca.mC(inx+1, inx+2) -= stiff * axis[1] * axis[2];
-            meca.mC(inx+2, inx+2) -= stiff * axis[2] * axis[2];
-            
-            real facX = stiff * rad;
-            meca.base(inx+1) += facX * axis[1];
-            meca.base(inx+2) += facX * axis[2];
-        }
-        else
-        {
-            meca.mC(inx, inx) -= stiff;
-            meca.base(inx)    += stiff * p;
-        }
-    }
-    
+#if ( DIM > 2 )
+    const real RT = w.YY * w.YY + w.ZZ * w.ZZ;
+    return ( RT <= radius_ * radius_ );
+#elif ( DIM > 1 )
+    return ( fabs(w.YY) <= radius_ );
+#else
+    return false;
 #endif
 }
 
 
-/**
- This applies the correct forces in the cylindrical and spherical parts.
- */
-void SpaceCylinderP::setInteraction(Vector const& pos, PointExact const& pe, Meca & meca, real stiff) const
+bool SpaceCylinderP::allInside(Vector const& w, const real rad ) const
 {
-    setInteraction(pos, pe, meca, stiff, length(), radius());
+    assert_true( rad >= 0 );
+#if ( DIM > 2 )
+    const real RT = w.YY * w.YY + w.ZZ * w.ZZ;
+    return ( RT <= square(radius_-rad) );
+#elif ( DIM > 1 )
+    return ( fabs(w.YY) <= radius_-rad );
+#else
+    return false;
+#endif
+}
+
+
+Vector SpaceCylinderP::randomPlace() const
+{
+#if ( DIM >= 3 )
+    const Vector2 V = Vector2::randB(radius_);
+    return Vector(length_*RNG.sreal(), V.XX, V.YY);
+#elif ( DIM > 1 )
+    return Vector(length_*RNG.sreal(), radius_*RNG.sreal());
+#else
+    return Vector(length_*RNG.sreal());
+#endif
+}
+
+//------------------------------------------------------------------------------
+Vector SpaceCylinderP::project(Vector const& w) const
+{
+    Vector p;
+    p.XX = w.XX;
+    
+#if ( DIM > 2 )
+    real n = w.normYZ();
+    if ( n > REAL_EPSILON )
+    {
+        p.YY = w.YY * ( radius_ / n );
+        p.ZZ = w.ZZ * ( radius_ / n );
+    }
+    else
+    {
+        const Vector2 V = Vector2::randU();
+        p.YY = radius_ * V.XX;
+        p.ZZ = radius_ * V.YY;
+    }
+#endif
+    return p;
+}
+
+//------------------------------------------------------------------------------
+
+/**
+ This applies forces towards the cylindrical surface only
+ */
+void SpaceCylinderP::setInteraction(Vector const& pos, Mecapoint const& pe, Meca & meca, real stiff) const
+{
+    meca.addCylinderClampX(pe, radius_, stiff);
 }
 
 /**
- This applies the correct forces in the cylindrical and spherical parts.
+ This applies forces towards the cylindrical surface only
  */
-void SpaceCylinderP::setInteraction(Vector const& pos, PointExact const& pe, real rad, Meca & meca, real stiff) const
+void SpaceCylinderP::setInteraction(Vector const& pos, Mecapoint const& pe, real rad, Meca & meca, real stiff) const
 {
-    real eRadius = radius() - rad;
+    real eRadius = radius_ - rad;
     if ( eRadius < 0 ) eRadius = 0;
-    real eLength = length() - rad;
-    if ( eLength < 0 ) eLength = 0;
     
-    setInteraction(pos, pe, meca, stiff, eLength, eRadius);
+    meca.addCylinderClampX(pe, eRadius, stiff);
 }
 
 //------------------------------------------------------------------------------
-#pragma mark -
 
-Vector SpaceCylinderP::period(int d)   const
+void SpaceCylinderP::write(Outputter& out) const
 {
-    Vector off(0, 0, 0);
-    if ( d == 0  )
-        off[d] = length2(d);
-    return off;
+    out.put_characters("cylinderP", 16);
+    out.writeUInt16(2);
+    out.writeFloat(length_);
+    out.writeFloat(radius_);
 }
 
 
-//------------------------------------------------------------------------------
-
-/**
- Apply periodicity, only in first dimension
- */
-void  SpaceCylinderP::fold( real point[] ) const
+void SpaceCylinderP::setLengths(const real len[])
 {
-
-    point[0] = remainder( point[0], length2(0) );
+    length_ = len[0];
+    radius_ = len[1];
 }
 
 
-//------------------------------------------------------------------------------
-//this makes modulo around the center o
-void SpaceCylinderP::fold( real x[], const real o[] ) const
+void SpaceCylinderP::read(Inputter& in, Simul&, ObjectTag)
 {
-    for ( int dd = 0; dd < DIM; ++dd )
-        x[dd] -= o[dd];
-    
-    fold(x);
-    
-    for ( int dd = 0; dd < DIM; ++dd )
-        x[dd] += o[dd];
-}
-
-
-//------------------------------------------------------------------------------
-//calculate both the integral part (in div) and the reminder (in x)
-void SpaceCylinderP::foldOffset( real x[], real div[] ) const
-{
-    for ( int dd = 0; dd < DIM; ++dd )
-        div[dd] = x[dd];
-    
-    fold(x);
-    
-    for ( int dd = 0; dd < DIM; ++dd )
-        div[dd] -= x[dd];
+    real len[8] = { 0 };
+    read_data(in, len, "cylinderP");
+    setLengths(len);
 }
 
 //------------------------------------------------------------------------------
@@ -195,34 +173,52 @@ void SpaceCylinderP::foldOffset( real x[], real div[] ) const
 
 #ifdef DISPLAY
 #include "opengl.h"
+#include "gle.h"
 
-bool SpaceCylinderP::display() const
+bool SpaceCylinderP::draw() const
 {
-#if ( DIM == 3 )
+#if ( DIM > 2 )
 
-    const int  fin = 512;
-    
-    GLfloat L = length();
-    GLfloat R = radius();
-    
+    const size_t fin = 512;
+    GLfloat c[fin+1], s[fin+1];
+    gle::circle(fin, c, s, 1);
+
+    GLfloat L = (GLfloat)length_;
+    GLfloat R = (GLfloat)radius_;
+
     glBegin(GL_TRIANGLE_STRIP);
-    for ( int ii = 0; ii <= fin; ++ii )
+    for ( size_t n = 0; n <= fin; ++n )
     {
-        GLfloat ang = ii * 2 * M_PI / (GLfloat) fin;
-        GLfloat ca = cosf(ang), sa = sinf(ang);
-        glNormal3f( 0, ca, sa );
-        glVertex3f( +L, R*ca, R*sa );
-        glVertex3f( -L, R*ca, R*sa );
+        glNormal3f( 0, c[n], s[n] );
+        glVertex3f( +L, R*c[n], R*s[n] );
+        glVertex3f( -L, R*c[n], R*s[n] );
     }
     glEnd();
     
+    if ( 1 )
+    {
+        //draw dotted-rings to indicate periodicity
+        glLineStipple(1, 0x000F);
+        glEnable(GL_LINE_STIPPLE);
+        glPushMatrix();
+        glTranslatef(L, 0, 0);
+        glScalef(R, R, R);
+        glRotated(90, 0, 1, 0);
+        gle::gleCircle();
+        glTranslatef(0, 0, -2*L/R);
+        glRotated(180, 0, 1, 0);
+        gle::gleCircle();
+        glPopMatrix();
+        glDisable(GL_LINE_STIPPLE);
+    }
+
 #endif
     return true;
 }
 
 #else
 
-bool SpaceCylinderP::display() const
+bool SpaceCylinderP::draw() const
 {
     return false;
 }

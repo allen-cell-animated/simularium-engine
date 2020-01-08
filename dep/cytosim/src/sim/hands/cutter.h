@@ -26,13 +26,16 @@ private:
     /// disabled default constructor
     Cutter();
     
+    /// Gillespie countdown timer
+    real     gspTime;
+
+public:
+    
     /// Property
     CutterProp const* prop;
     
-public:
-    
     /// constructor
-    Cutter(CutterProp const* p, HandMonitor* h);
+    Cutter(CutterProp const*, HandMonitor*);
     
     /// destructor
     ~Cutter() {}
@@ -40,11 +43,11 @@ public:
     /// cut current fiber at attachement position
     void   cut();
     
-    /// simulate when \a this is attached but not under load
+    /// simulate when `this` is attached but not under load
     void   stepUnloaded();
     
-    /// simulate when \a this is attached and under load
-    void   stepLoaded(Vector const & force);
+    /// simulate when `this` is attached and under load
+    void   stepLoaded(Vector const& force, real force_norm);
     
 };
 

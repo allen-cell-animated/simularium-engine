@@ -7,15 +7,15 @@
 #include <algorithm>
 
 
-/// Maintains mutual relationship between objects.
+/// Maintains a list of mutual relationship between objects.
 /**
  Buddy implements mutual relationship between objects.
  
+ The class keeps track of a list of `buddies`.
  Relationship is established with hello().
- Then goodbye() will be called for all buddies, when the object is destroyed.
+ When an object is destroyed, it calls goodbye() for all its buddies.
  
- This is the only thing that the class does.
- This class can be used if an object needs to know when another object is destroyed,
+ This class can be used when an object needs to know if another object is destroyed,
  and vice-versa.
  
  F. Nedelec 11 Aug. 2012
@@ -29,86 +29,131 @@ private:
     typedef std::vector<Buddy *> BuddyList;
     
     /// list of buddies
-    BuddyList buddies;
+    BuddyList buddies_;
     
+private:
     
-    /// this will add \a b into the list of buddies, if not already present
-    void hello1(Buddy * b)
+    /// add `b` into the list of buddies, or complain if already present
+    void enlist(Buddy * b)
     {
-        // do nothing if buddy is know already:
-        BuddyList::iterator bi = std::find(buddies.begin(), buddies.end(), b);
-        if ( bi != buddies.end() )
-            return;
-        
-        bi = std::find(buddies.begin(), buddies.end(), (Buddy*)0);
-        if ( bi != buddies.end() )
+#if ( 1 )
+        // complain if buddy is known already:
+        BuddyList::iterator bi = std::find(buddies_.begin(), buddies_.end(), b);
+        if ( bi != buddies_.end() )
         {
+            std::cerr << " Warning: duplicate Buddy::enlist()\n";
+            return;
+        }
+#endif
+        
+        // find an empty spot:
+        bi = std::find(buddies_.begin(), buddies_.end(), nullptr);
+        if ( bi != buddies_.end() )
             *bi = b;
-            return;
-        }
-        buddies.push_back(b);
-    }
-        
-    /// removes \a b from the list of known buddy, and call goodbye()
-    bool goodbye1(Buddy * b)
-    {
-        BuddyList::iterator bi = std::find(buddies.begin(), buddies.end(), b);
-        if ( bi != buddies.end() )
-        {
-            *bi = 0;
-            goodbye(b);
-            return true;
-        }
-        return false;
+        else
+            buddies_.push_back(b);
     }
     
+    
+    /// replace the buddy that may have been at index `ix`
+    void enlist(Buddy * b, unsigned ix)
+    {
+        if ( ix < buddies_.size() )
+        {
+            if ( buddies_[ix]  &&  buddies_[ix] != b )
+            {
+                goodbye(buddies_[ix]);
+                buddies_[ix]->goodbye(this);
+                buddies_[ix]->unlist(this);
+            }
+        }
+        else
+            buddies_.resize(ix+1, nullptr);
+        
+        buddies_[ix] = b;
+    }
+
+    
+    /// removes `b` from the list of known buddy, do not call goodbye()
+    Buddy * unlist(Buddy * b)
+    {
+        BuddyList::iterator bi = std::find(buddies_.begin(), buddies_.end(), b);
+        if ( bi != buddies_.end() )
+        {
+            *bi = nullptr;
+            return b;
+        }
+        return nullptr;
+    }
+
 public:
     
+    /// constructor
     Buddy() {}
     
     /// upon destruction, goodbye is called for all buddies
     virtual ~Buddy()
     {
-        for ( BuddyList::iterator bi = buddies.begin(); bi < buddies.end(); ++bi )
-            if ( *bi )
-                (*bi)->goodbye1(this);
+        for ( Buddy * b : buddies_ )
+        {
+            if ( b )
+            {
+                goodbye(b);
+                b->goodbye(this);
+                b->unlist(this);
+                b = nullptr;
+            }
+        }
     }
 
-    /// will make \a this and \a b mutual buddies
-    void hello(Buddy * b)
+    /// will make `this` and `guy` mutual buddies
+    void connect(Buddy * guy)
     {
-        if ( b )
+        if ( guy )
         {
-            hello1(b);
-            b->hello1(this);
+            enlist(guy);
+            guy->enlist(this);
         }
     }
     
+    /// will the association, without calling goodbye()
+    void disconnect(Buddy * guy)
+    {
+        if ( guy )
+        {
+            unlist(guy);
+            guy->unlist(this);
+        }
+    }
+
     /// this is called everytime a known buddy is destroyed
     virtual void goodbye(Buddy *)
     {
     }
     
-    /// return buddy at index \a ix
-    Buddy * buddy(unsigned int ix) const
+
+    /// returns the number of registered buddies
+    size_t nbBuddies() const
     {
-        if ( ix < buddies.size() )
-            return buddies[ix];
-        return 0;
+        return buddies_.size();
     }
     
-    /// replace the buddy that may have been at index \a ix
-    void buddy(Buddy * b, unsigned int ix)
+    
+    /// return buddy at index `ix`
+    Buddy * buddy(unsigned ix) const
     {
-        if ( ix < buddies.size() )
-        {
-            if ( buddies[ix] )
-                buddies[ix]->goodbye1(this);
-        }
-        else
-            buddies.resize(ix+1, 0);
+        if ( ix < buddies_.size() )
+            return buddies_[ix];
+        return nullptr;
+    }
+    
+    
+    /// returns true if `guy` is a buddy
+    int check(Buddy * guy) const
+    {
+        BuddyList::const_iterator bi = std::find(buddies_.begin(), buddies_.end(), guy);
         
-        buddies[ix] = b;
+        return ( bi != buddies_.end() );
     }
     
 };

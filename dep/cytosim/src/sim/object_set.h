@@ -9,12 +9,11 @@
 #include "inventory.h"
 #include <vector>
 
-class OutputWrapper;
+class Outputter;
 class Property;
 class PropertyList;
 class Glossary;
 class Simul;
-extern Random RNG;
 
 /// A set of Object
 /**
@@ -31,9 +30,9 @@ extern Random RNG;
  
  Functions are used to manage:
  - object creation: newProperty(), newObjects().
- - object lists: size(), add(), remove(), relink(), erase().
+ - object lists: size(), add(), remove(), erase().
  - object access: first(), find().
- - simulation: step(), mix().
+ - simulation: step(), shuffle().
  - I/O: readObject(), read(), write(), freeze(), thaw().
  .
  */
@@ -42,136 +41,171 @@ class ObjectSet
 private:
     
     ObjectSet();
-    
+
 public:
 
-    /// holds pointers to the Objects in a array of Numbers
+    /// holds pointers to the Objects organized by ObjectID
     Inventory         inventory;
     
     /// holds pointers to the Objects in a doubly linked list
     NodeList          nodes;
     
-    /// the Simul containing this ObjectSet
+    /// the Simul containing this set
     Simul&            simul;
-        
+    
 protected:
     
-    /// a list used to store the objects temporarily while a state is imported
-    NodeList          ice;
+    /// mark all objects from given list with value `f`
+    static void       flag(NodeList const&, ObjectFlag f);
     
-    /// remove all nodes in the list from the inventory
-    void              forget(NodeList&);
+    /// delete objects which are marked as `f` from given list, and mark objects with `s`
+    static void       prune(NodeList const&, ObjectFlag f, ObjectFlag g);
     
+    /// collect objects from NodeList for which func(obj, val) == true
+    static unsigned   count(NodeList const&, bool (*func)(Object const*, void const*), void const*);
+
+    /// collect all objects
+    static ObjectList collect(NodeList const&);
+
+    /// collect objects from NodeList for which func(obj, val) == true
+    static ObjectList collect(NodeList const&, bool (*func)(Object const*, void const*), void const*);
+
+    /// write Object in NodeList to file
+    static void       writeNodes(Outputter&, NodeList const&);
+    
+    /// print a list of the content (nb of objects, class)
+    void              writeAssets(std::ostream&, const std::string& title) const;
+
 public:
     
-    /// transfer all nodes to list \a ice
-    virtual void      freeze();
+    /// mark objects before import
+    virtual void      freeze(ObjectFlag f) { flag(nodes, f); }
     
-    /// erase objects, or put them back in normal list
-    virtual void      thaw(bool erase);
+    /// delete marked objects
+    virtual void      prune(ObjectFlag f)  { prune(nodes, f, 0); }
+    
+    /// unmark objects after import
+    virtual void      thaw()               { flag(nodes, 0); }
     
     /// apply translation to all Objects in ObjectList
     static void       translateObjects(ObjectList const&, Vector const&);
     
     /// apply rotation to all Objects in ObjectList
     static void       rotateObjects(ObjectList const&, Rotation const&);
+    
+    /// apply Isometry to all Objects in ObjectList
+    static void       moveObjects(ObjectList const&, Isometry const&);
 
-protected:
-    
-    /// collect Object from NodeList for which func(obj, val) == true
-    static ObjectList collect(const NodeList&, bool (*func)(Object const*, void*), void*);
+    /// flag all Objects in ObjectList
+    static void       flagObjects(ObjectList const&, ObjectFlag f);
 
-    /// write Object in NodeList to file
-    static void       write(const NodeList&, OutputWrapper&);
+    /// apply translation to unflagged Objects in list
+    static void       translateObjects(ObjectList const&, Vector const&, ObjectFlag f);
     
-    /// place all Objects in ObjectList using the same combinations of translation/rotation
-    static Vector     placeObjects(ObjectList const&, Glossary& opt, const Space*);
-    
-    /// link the object last in the list
-    virtual void      link(Object *);
-    
+    /// apply rotation to unflagged Objects in list
+    static void       rotateObjects(ObjectList const&, Rotation const&, ObjectFlag f);
+
+    /// apply Isometry to unflagged Objects in list
+    static void       moveObjects(ObjectList const&, Isometry const&, ObjectFlag f);
+
 public:
     
     /// creator
-    ObjectSet(Simul& s) : nodes(this), simul(s), ice(0) { }
+    ObjectSet(Simul& s) : simul(s) { }
     
     /// destructor
     virtual ~ObjectSet() { erase(); }    
     
     //--------------------------
-    
-    /// identifies the sort of objects stored in the set
-    virtual std::string kind() const { return "undefined"; };
 
-    /// create a new property for class \a kind with given name
-    virtual Property*  newProperty(const std::string& kind, const std::string& name, Glossary&) const = 0;
+    /// create a new property of category `cat` for a class `name`
+    virtual Property * newProperty(const std::string& cat, const std::string& name, Glossary&) const = 0;
     
-    //--------------------------
-    
-    /// create new objects, given Property and options in \a opt
-    virtual ObjectList newObjects(const std::string& kind, const std::string& name, Glossary& opt) = 0;
-    
-    /// create new objects, translate and rotate them according to specifications in \a opt
-    virtual ObjectList newPlacedObjects(const std::string& kind, const std::string& name, Glossary& opt);
-    
-    /// create a non-initialized Object with the corresponding Tag (used for reading trajectory file)
-    virtual Object *   newObjectT(const Tag, int prop_index) = 0;
-    
+    /// create objects of class `name`, given the options provided in `opt`
+    virtual ObjectList newObjects(const std::string& name, Glossary& opt) = 0;
+   
+    /// create new Object with given Tag and Property `num` (used for reading trajectory file)
+    virtual Object *   newObject(ObjectTag, unsigned num) = 0;
+
     //--------------------------
     
     /// register Object, and add it at the end of the list
     virtual void       add(Object *);
     
-    /// remove Object in ObjectList
-    void               add(ObjectList&);
+    /// add multiple Objects
+    void               add(ObjectList const&);
     
     /// remove Object
     virtual void       remove(Object *);
 
-    /// remove Object in ObjectList
-    void               remove(ObjectList&);
+    /// remove all Objects in list
+    void               remove(ObjectList const&);
     
-    /// unlink and relink object. This places it last in the list
-    virtual void       relink(Object *);
+    /// link the object last in the list
+    virtual void       link(Object *);
+    
+    /// link the object last in the list
+    virtual void       unlink(Object *);
 
     /// remove Object, and delete it
     void               erase(Object *);
+    
+    /// delete  Objects specified in given list
+    void               erase(NodeList&);
 
     /// delete all Objects in list and forget all serial numbers
     virtual void       erase();
     
     /// number of elements
-    virtual unsigned   size()                 const { return nodes.size(); }
+    virtual size_t     size()             const { return nodes.size(); }
 
     /// mix the order of elements in the doubly linked list nodes
-    virtual void       mix()                        { nodes.mix(RNG); }
+    virtual void       shuffle()                { nodes.shuffle(); }
     
     /// first Object in the list
-    Object *           first()                const { return static_cast<Object*>(nodes.first()); }
-    
-    /// return an Object which has this property
-    Object *           first(const Property*) const;
+    Object *           first()            const { return static_cast<Object*>(nodes.front()); }
     
     /// last Object
-    Object *           last()                 const { return static_cast<Object*>(nodes.last()); }
+    Object *           last()             const { return static_cast<Object*>(nodes.back()); }
     
-    /// find Object of given serial-number (see Inventoried)
-    Object *           find(const Number n)   const { return static_cast<Object*>(inventory.get(n)); }
+    /// find Object of given serial-number (see Inventory)
+    Object *           findID(ObjectID n) const { return static_cast<Object*>(inventory.get(n)); }
     
-    /// return Object with serial-number \a if ( n > 0 ) or object from the end of the list if ( n <= 0 )
-    Object *           findObject(long n) const;
-    
-    /// collect Object for which func(obj, val) == true
-    virtual ObjectList collect(bool (*func)(Object const*, void*), void*) const;
+    /// return an Object which has this property
+    Object *           findObject(Property const*) const;
 
+    /// return Object corresponding to specifications
+    Object *           findObject(std::string spec, long identity, const std::string&) const;
+    
+    /// return Object corresponding to a certain criteria (eg. 'first' or 'last')
+    Object *           findObject(std::string spec, const std::string&) const;
+    
     //--------------------------
     
-    /// read one Object from file
-    void               readObject(InputWrapper&, Tag, char pretag);
+    /// number of objects for which ( func(obj, val) == true )
+    virtual unsigned   count(bool (*func)(Object const*, void const*), void const*) const;
 
-    /// write all Objects to file
-    virtual void       write(OutputWrapper& out) const { write(nodes, out); }
+    /// collect all objects
+    virtual ObjectList collect() const;
+ 
+    /// collect objects for which ( func(obj, val) == true )
+    virtual ObjectList collect(bool (*func)(Object const*, void const*), void const*) const;
+
+    /// collect objects for which ( obj->property() == prop )
+    ObjectList         collect(Property* prop) const;
+
+    /// read one Object from file
+    Object *           readObject(Inputter&, ObjectTag tag, bool fat);
     
+    /// load one Object from file, or skip it if `skip==true`
+    void               loadObject(Inputter&, ObjectTag tag, bool fat, bool skip);
+    
+    /// write all Objects to file
+    virtual void       write(Outputter&) const = 0;
+    
+    /// print a summary of the content (nb of objects, class)
+    virtual void       report(std::ostream&) const = 0;
+
 };
 
 #endif

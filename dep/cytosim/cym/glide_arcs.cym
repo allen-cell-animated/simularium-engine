@@ -1,12 +1,13 @@
 % A directional gliding assay using arcs
 % run in 2D
 
-set simul glide_arcs 
+set simul system
 {
+    dim = 2
     viscosity = 0.02
     time_step = 0.01
     display = {
-        tiled = 1, 1;
+        tile = 1, 1;
         zoom = 0.5;
         style = 2;
         delay = 10;
@@ -16,10 +17,13 @@ set simul glide_arcs
 
 set space cell
 {
-    geometry = ( periodic 4 8.4 )
+    shape = periodic
 }
 
-new space cell
+new cell
+{
+    length = 8, 16.8
+}
 
 set fiber microtubule
 {
@@ -36,7 +40,7 @@ set hand kinesin
     unbinding_force = 3
         
     activity = move
-    max_speed = 1
+    unloaded_speed = 1
     stall_force = 6
     display = {
         color = 0xE69F00FF;
@@ -52,18 +56,18 @@ set single graftedK
 }
 
 
-new 1 fiber microtubule
+new 1 microtubule
 {
     length = 10
-    orientation = horizontal
+    orientation = XY
 }
 
-new 500 single graftedK ( arc 12.56 3.14 at -1 4.2 )
+new 500 graftedK ( arc 12.56 3.14 at -1 4.2 )
 
-new 500 single graftedK ( arc 12.56 3.14 at 3 -4.2 )
+new 500 graftedK ( arc 12.56 3.14 at 3 -4.2 )
 
 
-run simul *
+run system
 {
     nb_frames = 400
     nb_steps = 20000

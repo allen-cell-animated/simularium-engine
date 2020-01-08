@@ -22,24 +22,24 @@ private:
     
     /// disabled default constructor
     Actor();
-    
-    /// Property
-    ActorProp const* prop;
 
 public:
     
+    /// Property
+    ActorProp const* prop;
+    
     /// constructor
-    Actor(ActorProp const* p, HandMonitor* h);
+    Actor(ActorProp const*, HandMonitor*);
     
     /// destructor
     ~Actor() {}
     
     
-    /// simulate when \a this is attached but not under load
+    /// simulate when `this` is attached but not under load
     void   stepUnloaded();
     
-    /// simulate when \a this is attached and under load
-    void   stepLoaded(Vector const & force);
+    /// simulate when `this` is attached and under load
+    void   stepLoaded(Vector const & force, real force_norm);
     
 };
 

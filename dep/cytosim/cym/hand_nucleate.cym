@@ -5,67 +5,58 @@
  F. Nedelec, April 2011
 */
 
-set simul hand_nucleate 
+set simul system
 {
-    time_step = 0.005
+    time_step = 0.01
     viscosity = 10
 }
 
 set space cell
 {
-    geometry = ( capsule 3 1 )
+    shape = capsule
 }
 
-new space cell
+new cell
+{
+    length = 6
+    radius = 2
+}
 
 set fiber microtubule
 {
     rigidity = 20
     segmentation = 0.5
     confine = inside, 100
-}
 
-new 1 fiber microtubule
-{
-    length = 5
-    position = ( 0 0 0 )
-    orientation = horizontal
-}
-
-set hand activator
-{
-    binding_rate = 1
-    binding_range = 0.05
-    unbinding_rate = 0
-    unbinding_force = 3
-    display = { size=8; color=white; }
+    activity        = dynamic
+    unit_length     = 0.008
+    growing_speed   = 0.2
+    shrinking_speed = -0.5
+    hydrolysis_rate = 1
+    growing_force   = 1.7
 }
 
 set hand nucleator
 {
-    unbinding_rate = 0
-    unbinding_force = 3
+    unbinding = 0, 3
     activity = nucleate
-    nucleate = 10, microtubule, ( fiber_length=1; )
-    specificity = parallel
-    display = { size=10; color=green; }
+    nucleate = 0.1, microtubule, ( length=0.1; plus_end=grow; )
+    display = { size=5; color=green, gray; }
 }
 
-set couple complex
+set single simplex
 {
-    hand1 = activator
-    hand2 = nucleator
-    diffusion = 1
-    stiffness = 100
-    activity = crosslink
-    length = 0.1
-    trans_activated = 1
+    hand = nucleator
+    activity = fixed
+    stiffness = 1000
 }
 
-new 1000 couple complex
-
-run simul *
+new 100 simplex
 {
-    nb_steps = 5000
+    position = 1 0 0
+}
+
+run 10000 system
+{
     nb_frames = 10
 }

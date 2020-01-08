@@ -1,209 +1,205 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-#include "dim.h"
 #include "space_capsule.h"
-#include "point_exact.h"
 #include "exceptions.h"
-#include "smath.h"
+#include "iowrapper.h"
+#include "mecapoint.h"
 #include "meca.h"
 
-inline real sqr(const real x) { return x*x; }
 
-
-SpaceCapsule::SpaceCapsule(const SpaceProp* p)
+SpaceCapsule::SpaceCapsule(SpaceProp const* p)
 : Space(p)
 {
     if ( DIM == 1 )
-        throw InvalidParameter("capsule is only defined for DIM = 2 or 3");
+        throw InvalidParameter("capsule is only defined for DIM = 2 and 3");
 }
 
-//------------------------------------------------------------------------------
 
-Vector SpaceCapsule::extension() const
+void SpaceCapsule::resize(Glossary& opt)
 {
-    return Vector(radius()+length(), radius(), radius());
+    real len = length_, rad = radius_;
+    
+    if ( opt.set(rad, "diameter") )
+        rad *= 0.5;
+    else opt.set(rad, "radius");
+    // total length is specified:
+    if ( opt.set(len, "length") )
+        len = ( len - 2 * rad ) * 0.5;
+
+    if ( len < 0 )
+        throw InvalidParameter("capsule:length must be >= 2 * radius");
+    if ( rad < 0 )
+        throw InvalidParameter("capsule:radius must be >= 0");
+    
+    length_ = len;
+    radius_ = rad;
+    update();
+}
+
+
+void SpaceCapsule::boundaries(Vector& inf, Vector& sup) const
+{
+    inf.set(-radius_-length_,-radius_,-radius_);
+    sup.set( radius_+length_, radius_, radius_);
 }
 
 
 real SpaceCapsule::volume() const
 {
-#if (DIM == 3)
-    return ( length() + (2/3.0) * radius() ) * radiusSqr() * ( 2 * M_PI );
+#if ( DIM >= 3 )
+    return ( length_ + (2/3.0) * radius_ ) * radiusSqr_ * ( 2 * M_PI );
 #else
-    return 4 * length() * radius() + M_PI * radiusSqr();
+    return 4 * length_ * radius_ + M_PI * radiusSqr_;
 #endif
 }
 
-
-//------------------------------------------------------------------------------
-bool SpaceCapsule::inside( const real w[] ) const
+bool SpaceCapsule::inside(Vector const& w) const
 {
-    real nrm, x = fabs( w[0] );
+    real n = w.normYZSqr() + square(std::max((real)0, fabs(w.XX)-length_));
     
-    if ( x > length() )
-        nrm = sqr( x - length() );
-    else
-        nrm = 0;
-    
-#if ( DIM == 2 )
-    nrm += w[1] * w[1];
-#else
-    nrm += w[1] * w[1] + w[2] * w[2];
-#endif
-    
-    return ( nrm <= radiusSqr() );
+    return ( n <= radiusSqr_ );
 }
 
 
-bool SpaceCapsule::allInside( const real w[], const real rad ) const
+bool SpaceCapsule::allInside(Vector const& w, const real rad) const
 {
-    real nrm, x = fabs( w[0] );
+    assert_true( rad >= 0 );
+    real n = w.normYZSqr() + square(std::max((real)0, fabs(w.XX)-length_));
     
-    if ( x > length() )
-        nrm = sqr( x - length() );
-    else
-        nrm = 0;
-    
-#if ( DIM == 2 )
-    nrm += w[1] * w[1];
-#else
-    nrm += w[1] * w[1] + w[2] * w[2];
-#endif
-    
-    return ( nrm <= sqr(radius()-rad) );
+    return ( n <= square(radius_-rad) );
 }
 
 //------------------------------------------------------------------------------
-void SpaceCapsule::project( const real w[], real p[] ) const
+Vector SpaceCapsule::project(Vector const& w) const
 {
-    real nrm;
-#if ( DIM == 2 )
-    nrm = w[1] * w[1];
-#else
-    nrm = w[1] * w[1] + w[2] * w[2];
-#endif
+    Vector p;
+    real n = w.normYZSqr();
     
     //calculate the projection on the axis, within boundaries:
-    if ( w[0] >  length() )
+    if ( fabs(w.XX) > length_ )
     {
-        nrm  += sqr( w[0] - length() );
+        real L = std::copysign(length_, w.XX);
+        n += square( w.XX - L );
         //normalize from this point on the axis
-        if ( nrm > 0 ) nrm = radius() / sqrt( nrm );
+        if ( n > 0 ) n = radius_ / sqrt(n);
         
-        p[0] = length() + nrm * ( w[0] - length() );
+        p.XX = L + n * ( w.XX - L );
     }
     else
     {
-        if ( w[0] < -length() )
-        {
-            nrm  += sqr( length() + w[0] );
-            //normalize from this point on the axis
-            if ( nrm > 0 ) nrm = radius() / sqrt( nrm );
-            
-            p[0]  = -length() + nrm * ( w[0] + length() );
-        }
-        else
-        {
-            //normalize from this point on the axis
-            if ( nrm > 0 ) nrm = radius() / sqrt( nrm );
-            
-            p[0] = w[0];
-        }
+        //normalize from this point on the axis
+        if ( n > 0 ) n = radius_ / sqrt(n);
+        
+        p.XX = w.XX;
     }
     
-    if ( nrm > 0 )
+    if ( n > 0 )
     {
-        p[1] = nrm * w[1];
-#if ( DIM == 3 )
-        p[2] = nrm * w[2];
+#if ( DIM > 1 )
+        p.YY = n * w.YY;
+#endif
+#if ( DIM >= 3 )
+        p.ZZ = n * w.ZZ;
 #endif
     }
     else
     {
         //we project on a arbitrary point on the cylinder
-        p[1] = radius();
-#if ( DIM == 3 )
-        p[2] = 0;
+#if ( DIM > 1 )
+        p.YY = radius_;
+#endif
+#if ( DIM >= 3 )
+        p.ZZ = 0;
 #endif
     }
+    return p;
 }
 
+
+Vector SpaceCapsule::randomPlace() const
+{
+    size_t nb_trials = 1<<13;
+    size_t ouf = 0;
+    Vector res;
+
+    do {
+        
+#if ( DIM == 1 )
+        res.set((length_+radius_)*RNG.sreal());
+#elif ( DIM == 2 )
+        res.set((length_+radius_)*RNG.sreal(), radius_*RNG.sreal());
+#else
+        const Vector2 V = Vector2::randB(radius_);
+        res.set((length_+radius_)*RNG.sreal(), V.XX, V.YY);
+#endif
+        
+        if ( ++ouf > nb_trials )
+        {
+            std::clog << "placement failed in SpaceCapsule::randomPlace()" << std::endl;
+            return Vector(0,0,0);
+        }
+        
+    } while ( ! inside(res) );
+    
+    return res;
+}
 
 //------------------------------------------------------------------------------
 
 /**
  This applies the correct forces in the cylindrical and spherical parts.
  */
-void SpaceCapsule::setInteraction(Vector const& pos, PointExact const& pe, Meca & meca, real stiff, const real len, const real rad)
+void SpaceCapsule::setInteraction(Vector const& pos, Mecapoint const& pe, Meca & meca, real stiff, const real len, const real rad)
 {
-    if ( pos.XX > len )
-        meca.interLongClamp( pe, Vector( len,0,0), rad, stiff );
-    else if ( pos.XX < -len )
-        meca.interLongClamp( pe, Vector(-len,0,0), rad, stiff );
+    if ( fabs(pos.XX) > len )
+        meca.addSphereClamp(pos, pe, Vector(std::copysign(len, pos.XX),0,0), rad, stiff);
     else
-    {
-        const Matrix::index_type inx = DIM * pe.matIndex();
-        
-#if ( DIM == 2 )
-        if ( pos.YY > 0 )
-        {
-            meca.mC(inx+1, inx+1) -= stiff;
-            meca.base(inx+1)      += stiff * rad;
-        }
-        else
-        {
-            meca.mC(inx+1, inx+1) -= stiff;
-            meca.base(inx+1)      -= stiff * rad;
-        }
-#elif ( DIM == 3 )
-        Vector axis(0, pos.YY, pos.ZZ);
-        real axis_n = axis.norm();
-        axis /= axis_n;
-        
-        if ( rad < axis_n )
-        {
-            real len = rad / axis_n;
-         
-            meca.mC(inx+1, inx+1) += stiff * ( len * ( 1.0 - axis[1] * axis[1] ) - 1.0 );
-            meca.mC(inx+1, inx+2) -= stiff * len * axis[1] * axis[2];
-            meca.mC(inx+2, inx+2) += stiff * ( len * ( 1.0 - axis[2] * axis[2] ) - 1.0 );
-            
-            real facX = stiff * len * axis_n;            
-            meca.base(inx+1) += facX * axis[1];
-            meca.base(inx+2) += facX * axis[2];
-        }
-        else
-        {
-            meca.mC(inx+1, inx+1) -= stiff * axis[1] * axis[1];
-            meca.mC(inx+1, inx+2) -= stiff * axis[1] * axis[2];
-            meca.mC(inx+2, inx+2) -= stiff * axis[2] * axis[2];
-            
-            real facX = stiff * rad;
-            meca.base(inx+1) += facX * axis[1];
-            meca.base(inx+2) += facX * axis[2];
-        }
-#endif
-    }
+        meca.addCylinderClampX(pe, rad, stiff);
 }
 
 
 /**
  This applies the correct forces in the cylindrical and spherical parts.
  */
-void SpaceCapsule::setInteraction(Vector const& pos, PointExact const& pe, Meca & meca, real stiff) const
+void SpaceCapsule::setInteraction(Vector const& pos, Mecapoint const& pe, Meca & meca, real stiff) const
 {
-    setInteraction(pos, pe, meca, stiff, length(), radius());
+    setInteraction(pos, pe, meca, stiff, length_, radius_);
 }
 
 /**
  This applies the correct forces in the cylindrical and spherical parts.
  */
-void SpaceCapsule::setInteraction(Vector const& pos, PointExact const& pe, real rad, Meca & meca, real stiff) const
+void SpaceCapsule::setInteraction(Vector const& pos, Mecapoint const& pe, real rad, Meca & meca, real stiff) const
 {
-    if ( rad < radius() )
-        setInteraction(pos, pe, meca, stiff, length(), radius()-rad);
+    if ( rad < radius_ )
+        setInteraction(pos, pe, meca, stiff, length_, radius_-rad);
     else
-        setInteraction(pos, pe, meca, stiff, length(), 0);
+        setInteraction(pos, pe, meca, stiff, length_, 0);
+}
+
+//------------------------------------------------------------------------------
+
+void SpaceCapsule::write(Outputter& out) const
+{
+    out.put_characters("capsule", 16);
+    out.writeUInt16(2);
+    out.writeFloat(length_);
+    out.writeFloat(radius_);
+}
+
+
+void SpaceCapsule::setLengths(const real len[])
+{
+    length_ = len[0];
+    radius_ = len[1];
+    update();
+}
+
+void SpaceCapsule::read(Inputter& in, Simul&, ObjectTag)
+{
+    real len[8] = { 0 };
+    read_data(in, len, "capsule");
+    setLengths(len);
 }
 
 
@@ -215,36 +211,34 @@ void SpaceCapsule::setInteraction(Vector const& pos, PointExact const& pe, real 
 #include "opengl.h"
 #include "gle.h"
 
-bool SpaceCapsule::display() const
+bool SpaceCapsule::draw() const
 {
     //number of sections in the quarter-circle
-    const int  fin = (DIM==2) ? 256 : 32;
+    constexpr size_t fin = ((DIM==2) ? 32 : 8) * gle::finesse;
     
     GLfloat c[4*fin+1], s[4*fin+1];
-    for ( int ii = 0; ii <= 4*fin; ++ii )
-    {
-        GLfloat ang = ii * 0.5 * M_PI / (GLfloat) fin;
-        c[ii] = cosf(ang);
-        s[ii] = sinf(ang);
-    }
+    gle::circle(4*fin, c, s, 1);
     
-    GLfloat L = length();
-    GLfloat R = radius();
+    GLfloat L = (GLfloat)length_;
+    GLfloat R = (GLfloat)radius_;
     
 #if ( DIM <= 2 )
     
     //display a loop in X/Y plane
     glBegin(GL_LINE_LOOP);
-    for ( int ii = 0;     ii <= 2*fin; ++ii )
-        glVertex2f( +L+R*s[ii], R*c[ii] );
-    for ( int ii = 2*fin; ii <= 4*fin; ++ii )
-        glVertex2f( -L+R*s[ii], R*c[ii] );
+    
+    for ( size_t n = 0;     n <= 2*fin; ++n )
+        glVertex2f(R*s[n]+L, R*c[n]);
+    
+    for ( size_t n = 2*fin; n <= 4*fin; ++n )
+        glVertex2f(R*s[n]-L, R*c[n]);
+    
     glEnd();
     
 #else
     
     //display strips along the side of the volume:
-    for ( int sc = 0; sc < 4*fin; ++sc )
+    for ( size_t sc = 0; sc < 4*fin; ++sc )
     {
         //compute the transverse angles:
         GLfloat ctb  = c[sc  ],   stb  = s[sc  ];
@@ -254,7 +248,7 @@ bool SpaceCapsule::display() const
         
         //draw one strip of the oval:
         glBegin(GL_TRIANGLE_STRIP);
-        for ( int ii=0; ii <= fin; ++ii )
+        for ( size_t ii=0; ii <= fin; ++ii )
         {
             GLfloat ca = c[ii], sa = s[ii];
             glNormal3f( ca, cta*sa, sta*sa );
@@ -276,15 +270,14 @@ bool SpaceCapsule::display() const
     if ( 1 )
     {
         //draw 2 rings on the surface
-        GLfloat width = 0.01 * R;
         glPushMatrix();
-        gle::gleTranslate(L, 0, 0);
-        gle::gleScale(R, R, R);
+        glTranslatef(L, 0, 0);
+        glScalef(R, R, R);
         glRotated(90, 0, 1, 0);
-        gle::gleArrowedBand(width);
-        gle::gleTranslate(0, 0, -2*L/R);
+        gle::gleArrowedBand(24, 0.25);
+        glTranslatef(0, 0, -2*L/R);
         glRotated(180, 0, 1, 0);
-        gle::gleArrowedBand(width);
+        gle::gleArrowedBand(24, 0.25);
         glPopMatrix();
     }
 
@@ -294,7 +287,7 @@ bool SpaceCapsule::display() const
 
 #else
 
-bool SpaceCapsule::display() const
+bool SpaceCapsule::draw() const
 {
     return false;
 }

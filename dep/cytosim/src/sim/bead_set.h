@@ -16,49 +16,57 @@ public:
     /// creator
     BeadSet(Simul& s) : ObjectSet(s) {}
     
-    /// destructor
-    virtual ~BeadSet() {}
-    
     //--------------------------
     
     /// identifies the class
-    std::string kind() const { return "bead"; }
+    static std::string title() { return "bead"; }
     
-    /// create a new property for class \a kind with given name
-    Property*   newProperty(const std::string& kind, const std::string& name, Glossary&) const;
+    /// create a new property of category `cat` for a class `name`
+    Property *  newProperty(const std::string& cat, const std::string& name, Glossary&) const;
+    
+    /// create objects of class `name`, given the options provided in `opt`
+    ObjectList  newObjects(const std::string& name, Glossary& opt);
+    
+    /// create a new object (used for reading trajectory file)
+    Object *    newObject(ObjectTag, unsigned);
+    
+    /// write all Objects to file
+    void        write(Outputter& out) const;
+        
+    /// print a summary of the content (nb of objects, class)
+    void        report(std::ostream& out) const { writeAssets(out, title()); }
 
     //--------------------------
-    
-    /// create a new object directly from a glossary
-    ObjectList  newObjects(const std::string& kind, const std::string& prop, Glossary&);
-
-    /// construct object
-    Object *    newObjectT(const Tag tag, int prop_index);
-    
-    
-    /// register a Bead into the list
-    void        add(Object *);
     
     /// remove from the list
     void        remove(Object *);
     
-    /// erase all Object and all Property
-    void        erase();
-    
-    /// first Solid
+    /// first Object
     Bead *      first() const
     {
-        return static_cast<Bead*>(nodes.first());
+        return static_cast<Bead*>(nodes.front());
     }
-        
+    
+    /// first Bead in inventory
+    Bead *      firstID() const
+    {
+        return static_cast<Bead*>(inventory.first());
+    }
+    
+    /// next Bead in inventory
+    Bead *      nextID(Bead const* obj) const
+    {
+        return static_cast<Bead*>(inventory.next(obj));
+    }
+
     /// find object from its Number
-    Bead *      find(Number n) const
+    Bead *      findID(ObjectID n) const
     {
         return static_cast<Bead*>(inventory.get(n));
     }
     
     /// modulo the position (periodic boundary conditions)
-    void        foldPosition(const Modulo *) const;
+    void        foldPosition(Modulo const*) const;
     
     /// Monte-Carlo simulation step for every Object
     void        step() {}

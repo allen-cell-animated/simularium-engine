@@ -1,7 +1,7 @@
-% Francois Nedelec, July 24, 2009 
+% Francois Nedelec, 2010-01-24
 
 
-set simul motif 
+set simul system
 {
     time_step = 0.01
 }
@@ -9,19 +9,22 @@ set simul motif
 
 set space cell
 {
-    geometry = ( sphere 8 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 8
+}
 
-set fiber tube
+set fiber filament
 {
     segmentation = 0.5
     rigidity = 20
     confine = inside, 100
 }
 
-new 10 fiber tube
+new 10 filament
 {
     length = 10
 }
@@ -34,7 +37,7 @@ set hand kinesin
     unbinding_force = 2
     
     activity = move
-    max_speed = 0.8
+    unloaded_speed = 0.8
     stall_force = 6
 
     display = { color=0x0000FFFF }
@@ -56,7 +59,7 @@ set hand dynein
     unbinding_force = 2
     
     activity = move
-    max_speed = -0.8
+    unloaded_speed = -0.8
     stall_force = 6
 
     display = { color=0xFFFFFFFF }
@@ -72,24 +75,24 @@ set single gDynein
 
 
 % female motif
-new 3000  single gKinesin ( circle 3 0.2 at -3 2 )
-new  500  single gKinesin ( rectangle 0.1 2 0.1 at -3 -3.0 )
-new  500  single gKinesin ( rectangle 2 0.1 0.1 at -3 -2.9 )
+new 3000  gKinesin ( circle 3 0.3 at -3 2 )
+new  500  gKinesin ( rectangle 0.3 4 0.1 at -3 -3.0 )
+new  500  gKinesin ( rectangle 4 0.3 0.1 at -3 -2.9 )
 
 
 % male motif
-new 3000  single gDynein ( circle 3 0.2 at +3 -2 )
-new  500  single gDynein ( rectangle 1.5 0.1 at 4.5 0 turn 1 1.5 at 3 -2 )
+new 3000  gDynein ( circle 3 0.3 at +3 -2 )
+new  500  gDynein ( rectangle 3.0 0.3 at 4.5 0 align 1 1.5 at 3 -2 )
 
-new  500  single gDynein ( rectangle 1.0 0.1 at -1.0 0 turn 1 +1 at 6 0 turn 1 1.5 at 3 -2 )
-new  500  single gDynein ( rectangle 1.0 0.1 at -1.0 0 turn 1 -1 at 6 0 turn 1 1.5 at 3 -2 )
+new  500  gDynein ( rectangle 2.0 0.3 at -1.0 0 align 1 +1 at 6 0 align 1 1.5 at 3 -2 )
+new  500  gDynein ( rectangle 2.0 0.3 at -1.0 0 align 1 -1 at 6 0 align 1 1.5 at 3 -2 )
 
 % cortical pool
-new 500  single gKinesin ( edge 0.1 )
-new 500  single gDynein  ( surface 0.1 )
+new 500   gKinesin ( edge 0.1 )
+new 500   gDynein  ( surface 0.1 )
 
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 50

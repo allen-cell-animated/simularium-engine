@@ -1,4 +1,6 @@
-set simul aster 
+% F. Nedelec 2001
+
+set simul system
 {
     time_step = 0.005
     viscosity = 0.01
@@ -6,10 +8,13 @@ set simul aster
 
 set space cell
 {
-    geometry = ( sphere 10 )
+    shape = sphere
 }
 
-new space cell
+new cell
+{
+    radius = 10
+}
 
 set fiber microtubule
 {
@@ -24,18 +29,16 @@ set fiber microtubule
     hydrolysis_rate = 0.06
     growing_force   = 1.7
     
-    display = ( line_width=6; plus_end=10, 2; )
+    display = ( line=2; plus_end=10, 2; )
 }
 
 set solid core
 {
-    display = ( style=3 )
+    display = ( style=4 )
 }
 
 set aster centrosome
 {
-    solid = core
-    fibers = microtubule
     stiffness = 1000, 500
 }
 
@@ -47,7 +50,8 @@ set hand cutter
     unbinding_force = 3
     activity = cut
     cutting_rate = 0.5
-    display = ( size=7; color=red; )
+    new_end_state = red, green
+    display = ( size=7; color=orange; )
 }
 
 set single katanin
@@ -56,17 +60,18 @@ set single katanin
     stiffness = 0
     diffusion = 10
 }
-new 100 single katanin
+new 100 katanin
 
-new aster centrosome
+new centrosome
 {
-    position = circle 3
-    nb_fibers = 32
+    solid = core
+    point1 = center, 0.5
     radius = 0.5
-    length = 5, 4
+    position = circle 3
+    fibers = 32, microtubule, ( plus_end=grow; length = 5, 4; )
 }
 
-run simul *
+run system
 {
     nb_steps = 20000
     nb_frames = 20

@@ -1,64 +1,68 @@
 % Francois Nedelec, January 27, 2010 
 
-set simul field 
+set simul system
 {
     time_step = 0.001
+    display = ( window_size = 1024, 384 )
 }
 
 set space cell
 {
-    geometry = ( capsule 4 2 )
+    shape = capsule
     display = ( visible=0 )
 }
 
-new space cell
+new cell
+{
+    length = 12
+    radius = 2
+}
 
 set field blue
 {
-    step = 0.2
-    diffusion = 1
+    step = 0.1
+    diffusion = 0.5
+    display_scale = 0.25
 }
 
-new field blue
+new blue
 {
     value = 1
 }
 
-set fiber tube
+set fiber filament
 {
+    lattice = 1
+    lattice_unit = 0.1
+    lattice_flux_speed = -1
+    lattice_binding_rate = 2
+    lattice_unbinding_rate = 0.25
     rigidity = 20
     segmentation = 0.5
-        
-    display = { color=0xFFFFFFAA; interval=1.0; line_width=4; end_size=4,4 }
+    field = blue
+    
+    display = ( lattice=1, 1; lines=10, 1; )
 }
     
-new 4 fiber tube
+new 4 filament
 {
     length = 8
-    position = 0 -0.7 0
-    post_translation = 0 0.5 0
-    orientation = 1 0 0
-}
-
-new 4 fiber tube
-{
-    length = 8
-    position = 0 0.7 0
-    post_translation = 0 -0.5 0
+    range = 0 0.66 0, 0 -0.66 0
     orientation = -1 0 0
 }
 
-set simul:display *
+new 3 filament
 {
-    field_max = 1
-    window_size = 1200, 600
+    length = 8
+    range = 0 -0.44 0, 0 0.44 0
+    orientation = 1 0 0
 }
 
 
-run simul *
+run system
 {
-    nb_steps  = 500
-    nb_frames = 100
+    nb_steps  = 30000
+    nb_frames = 50
     solve = 0
 }
 

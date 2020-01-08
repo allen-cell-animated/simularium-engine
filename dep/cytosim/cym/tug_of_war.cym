@@ -1,34 +1,39 @@
 % After 2 seconds, the link is cut betwen two fibers pulled appart
 % F. Nedelec, 24 Feb 2011
 
-set simul break 
+set simul system
 {
     time_step = 0.005
     viscosity = 0.05
+    display = ( point_size=8; line_width=8; style=2; window_size=1024,256 )
 }
 
 set space cell
 {
-    geometry = ( capsule 6 1 )
+    shape = capsule
 }
 
-new space cell
+new cell
+{
+    length = 14
+    radius = 1
+}
 
-set fiber tubule
+set fiber microtubule
 {
     rigidity = 30
     segmentation = 0.5
-    display = { line_width=1; minus_tip=3, 4 }
+    display = ( line_width=1; minus_end=3, 4 )
 }
 
-new fiber tubule
+new microtubule
 {
     position = ( 2 0 0 )
     orientation = ( 1 0 0 )
     length = 4
 }
 
-new fiber tubule
+new microtubule
 {
     position = ( -2 0 0 )
     orientation = ( -1 0 0 )
@@ -41,17 +46,17 @@ set hand dynein
     unbinding = 0.5, 2
     
     activity    = move
-    max_speed   = -1
+    unloaded_speed   = -1
     stall_force = 5
     limit_speed = 1
-    display = ( size=6; color=orange )
+    display = ( size=8; color=orange )
 }
 
 set hand binder 
 {
     binding = 50, 0.01
     unbinding = 0, 1
-    display = ( width=9; size=12; color=blue )
+    display = ( width=9; size=12; color=0x0000FF99 )
 }
 
 set couple crosslinker 
@@ -59,10 +64,10 @@ set couple crosslinker
     hand1 = binder
     hand2 = binder
     diffusion = 0
-    stiffness = 500
+    stiffness = 1000
 }
 
-new 1 couple crosslinker
+new crosslinker
 {
     position = ( 0 0 0 )
     mark = 1
@@ -72,41 +77,41 @@ set single grafted
 {
     hand = dynein
     activity = fixed
-    stiffness = 500
+    stiffness = 100
 }
 
-new 100 single grafted
+new 100 grafted
 {
     position = ( rectangle 5 0 0 )
 }
 
-run simul *
+run system
 {
     nb_steps = 50
     solve = 0
 }
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 100
 }
 
 % make a red flash!
-change simul:display * { back_color=red }
-run simul *
+change system display { back_color=red }
+run system
 {
     nb_steps = 10
     nb_frames = 1
 }
 
-delete couple *
+delete crosslinker
 {
     mark = 1
 }
-change simul:display * { back_color=black }
+change system display { back_color=black }
 
-run simul *
+run system
 {
     nb_steps = 500
     nb_frames = 10

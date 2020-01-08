@@ -3,77 +3,104 @@
 #ifndef FIBER_H
 #define FIBER_H
 
-#include <vector>
+#include <set>
 #include <stdint.h>
-#include "rigid_fiber.h"
+#include "mecafil.h"
 #include "fiber_prop.h"
 #include "node_list.h"
-#include "field.h"
-#include "array.h"
+#include "lattice.h"
 #include "sim.h"
 
 
+class Hand;
+class Field;
 class Single;
 class FiberSet;
-class FiberLocus;
-class FiberBinder;
+class FiberSegment;
 class LineDisp;
 
 
-/// FiberNaked to which FiberBinder may bind
+/// Flag to associate a Lattice to the Fiber {0, 1}
+#define FIBER_HAS_LATTICE 0
+
+/// Lattice composed of integers, appropriate for discrete occupancy
+typedef Lattice<uint64_t> FiberLattice;
+
+/// a Mecafil to which many Hand may bind
 /**
- A Fiber is a Mecable that can be simulated.
+ The Fiber extends the Mecafil (itself build on Chain), adding in particular
+ methods that are necessary to simulate the attachment/detachment of Hand.
+ It also adds a Lattice object and a FiberProp to hold parameters.
  
- - FiberProp * prop points to the physical properties (ie. parameters) of the Fiber.
- - frBinders keeps track of all attached FiberBinders.
- - frRods provides pointers to the Segments of the Fiber.
- - FiberDisp * disp points to display parameters.
+ - `FiberProp * prop` points to the physical properties (ie. parameters) of the Fiber.
+ - `FiberDisp * disp` points to display parameters (not used in sim).
+ - `handListFront` and `handListBack` keep track of all attached Hands.
  .
+ 
+ if prop->lattice is true, the Fiber will have a Lattice,
+ which can be used by Digit and derived Hands, and other features.
  
  Fibers are stored in a FiberSet.
  */
-class Fiber: public RigidFiber
-{   
+class Fiber: public Mecafil
+{
 private:
     
-    /// list of attached FiberBinders
-    NodeList            frBinders;
+    /// Disabled copy constructor
+    Fiber(Fiber const&);
     
-    /// array of rods, used in Attachments algorithm
-    Array<FiberLocus>   frRods;
+    /// disabled assignment operator
+    Fiber& operator =(const Fiber&);
+
+    /// Stores the information needed to sever a Fiber
+    class SeverPos
+    {
+    public:
+        real    abs;      ///< abscissa of the cut, from the reference
+        state_t stateM;   ///< state of the new MINUS_END
+        state_t stateP;   ///< state of the new PLUS_END
+        
+        /// constructor (abscissa, new_plus_end_state, new_minus_end_state)
+        SeverPos(real a, state_t p, state_t m) { abs=a; stateP=p; stateM=m; }
+        
+        /// sort from PLUS_END to MINUS_END, i.e. with decreasing abscissa
+        real operator < (SeverPos const&b) const { return abs > b.abs; }
+    };
+    
+    /// ordered list of future severing positions
+    std::set<SeverPos>  pendingCuts;
+
+    /// Pointer to hold a list of attached Hands
+    mutable Hand *      handListFront;
+    
+    /// Pointer to hold a list of attached Hands
+    mutable Hand *      handListBack;
+
+#if FIBER_HAS_LATTICE
+    /// Associated Lattice
+    FiberLattice        frLattice;
+#endif
     
     /// a grafted used to immobilize the Fiber
     Single *            frGlue;
     
-    /// stores abscissa for sever() and delayedSevering()
-    std::vector<real>   delayedCuts;
-    
-    /// called if a Fiber tip has elongated or shortened
-    void                updateRange() {}
-    
-public:
-        
-    /// cut fiber at distance \a abs from the MINUS_END; returns section [ abs - PLUS_END ] 
-    virtual Fiber* severM(real abs);
-    
-    /// cut fiber at abscissa \a abs from the ORIGIN; returns section [ abs - PLUS_END ] 
-    Fiber *        severNow(real abs) { return severM(abs-abscissaM()); }
-    
-    /// cut fiber at absicca given to sever()
-    void           delayedSevering();
-    
-    
-    /// cut Fiber at point \a pti, return section [ pti - PLUS_END ]
+protected:
+#if NEW_FIBER_CHEW
+    /// stored chewing at the end
+    real                frChewM, frChewP;
+#endif
+
+    /// cut Fiber at point `pti`, return section `[ pti - PLUS_END ]`
     virtual Fiber* severPoint(unsigned int pti);
     
-    /// cut fiber at points where consecutive segments make a kink
-    void           severKinks();
+    /// return index of point where there is a kink
+    unsigned       hasKink(real) const;
 
     
     /// viscous drag coefficient for a cylinder moving close to a surface
     real           dragCoefficientSurface();
     
-    /// viscous drag coefficient for a cylinder moving close to a surface
+    /// viscous drag coefficient for a cylinder moving in an infinite volume of fluid
     real           dragCoefficientVolume();
     
 public:
@@ -91,11 +118,8 @@ public:
     
     /// destructor
     virtual ~Fiber();
-    
+
     //--------------------------------------------------------------------------
-    
-    /// allocate memory for 'nbp' points
-    virtual unsigned int allocatePoints(unsigned int nbp);
     
     /// calculate viscous drag coefficient
     void           setDragCoefficient();
@@ -105,89 +129,164 @@ public:
     
     /// add interactions to a Meca
     void           setInteractions(Meca &) const;
+    
 
-    /// cut fiber at abscissa \a abs from the ORIGIN, in the next time step 
-    void           sever(real abs) { delayedCuts.push_back(abs); }
+    /// invert polarity and adjust abscissa of Hands to keep them at the same place
+    void           flipPolarity();
     
-    /// Cut all segments intersecting the plane defined by <em> n.x + a = 0 </em>
-    void           cutAlongPlane(FiberSet *, Vector const& n, real a);
+    /// remove the portion of size `len` that includes the MINUS_END
+    void           cutM(real len);
     
-    /// call FiberNaked::join(), and transfer Hands (caller should delete \a fib).
+    /// remove the portion of size `len` that includes the PLUS_END
+    void           cutP(real len);
+    
+    /// Cut all segments intersecting the plane defined by <em> n.pos + a = 0 </em>
+    void           planarCut(Vector const& n, real a, state_t stateP, state_t stateM);
+    
+    /// cut fiber at distance `abs` from the MINUS_END; returns section `[ abs - PLUS_END ]`
+    Fiber *        severP(real abs);
+
+    /// cut fiber at abscissa `abs`; returns section `[ abs - PLUS_END ]`
+    Fiber *        severNow(real abs) { return severP(abs-abscissaM()); }
+
+    /// register a cut at abscissa `a` from the ORIGIN, with `m` and `p` the states of the new ends
+    void           sever(real a, state_t p, state_t m) { pendingCuts.insert(SeverPos(a, p, m)); }
+    
+    /// perform all the cuts registered by sever()
+    void           severNow();
+
+#if NEW_FIBER_CHEW
+    /// register a chewing quantity
+    void           chew(const real x, FiberEnd end) { if ( end == PLUS_END ) frChewP += x; else frChewM += x; }
+#endif
+
+    /// call Chain::join(), and transfer Hands (caller should delete `fib`).
     virtual void   join(Fiber * fib);
     
     /// simulation step
     virtual void   step();
     
+    /// called if a Fiber tip has elongated or shortened
+    void           update();
+    
+    //--------------------------------------------------------------------------
+
+    /// the energy due to bending rigidity: 1/2 * rigidity * sum( curvature(s)^2 ds ),
+    real           bendingEnergy() const { return bendingEnergy0()*prop->rigidity; }
+    
+    /// return the abscissa of the closest position to `w` on this Fiber, and set `dis` to the square of the distance
+    real           projectPoint(Vector const& w, real & dis) const;
+    
     //--------------------------------------------------------------------------
     
-    /// FiberLocus representing the segment [p, p+1]
-    FiberLocus&    segment(unsigned int p) const;
-    
-    /// return the abscissa of the closest position to \c w on this Fiber, and set \a dist to the square of the distance
-    real           projectPoint(Vector const& w, real & dist) const;
-        
-    //--------------------------------------------------------------------------
-    
+    /// return assembly/disassembly state of MINUS_END
+    virtual state_t dynamicStateM() const { return STATE_WHITE; }
+
+    /// return assembly/disassembly state of PLUS_END
+    virtual state_t dynamicStateP() const { return STATE_WHITE; }
+
     /// return assembly/disassembly state of the FiberEnd
-    virtual int    dynamicState(FiberEnd which) const { return 0; }
+    state_t         dynamicState(FiberEnd end) const;
+
     
-    /// change state of FiberEnd \a which to \a new_state
-    virtual void   setDynamicState(FiberEnd which, int new_state) {}
+    /// change state of MINUS_END
+    virtual void   setDynamicStateM(state_t) {}
+
+    /// change state of PLUS_END
+    virtual void   setDynamicStateP(state_t) {}
+
+    /// change state of FiberEnd `end` to `s`
+    void           setDynamicState(FiberEnd end, state_t s);
     
-    /// the amount of freshly assembled polymer during the last time step (this has units of length)
-    virtual real   freshAssembly(FiberEnd which) const { return 0; }
     
-    /// true if the tip \a which has grown in the last time step ( freshAssembly(which) > 0 )
-    bool           isGrowing(FiberEnd which) const { return freshAssembly(which) > 0; }
+    /// the length of freshly assembled polymer at the MINUS_END during the last time step
+    virtual real   freshAssemblyM() const { return 0; }
+
+    /// the length of freshly assembled polymer at the PLUS_END during the last time step
+    virtual real   freshAssemblyP() const { return 0; }
+
+    /// the length of freshly assembled polymer during the last time step
+    real           freshAssembly(FiberEnd end) const;
     
-    /// true if the tip \a which has shrunk in the last time step ( freshAssembly(which) < 0 )
-    bool           isShrinking(FiberEnd which) const { return freshAssembly(which) < 0; }
+    
+    /// true if the tip `end` has grown in the last time step ( freshAssembly(which) > 0 )
+    bool           isGrowing(FiberEnd end) const { return freshAssembly(end) > 0; }
+    
+    /// true if the tip `end` has shrunk in the last time step ( freshAssembly(which) < 0 )
+    bool           isShrinking(FiberEnd end) const { return freshAssembly(end) < 0; }
     
     //--------------------------------------------------------------------------
     
-    /// register a new Binder
-    void           addBinder(FiberBinder*);
+    /// register a new Hands that attached to this Fiber
+    void           addHand(Hand*) const;
     
-    /// unregister bound Binder
-    void           removeBinder(FiberBinder*);
+    /// unregister bound Hands (which has detached)
+    void           removeHand(Hand*) const;
     
-    /// a FiberBinder bound to this fiber (use ->next() to access all other binders)
-    FiberBinder*   firstBinder() const;
+    /// update all Hands bound to this
+    void           updateHands() const;
+
+    /// detach all Hands
+    void           detachHands() const;
     
-    /// update all binders
-    void           updateBinders();
+    /// sort Hands by order of increasing abscissa
+    void           sortHands() const;
     
-    /// detach all binders
-    void           detachBinders();
+    /// return Hand bound to this fiber (use ->next() to access all other Hands)
+    Hand *         firstHand() const { return handListFront; }
+   
+    /// number of attached Hands
+    unsigned       nbHands() const;
     
-    /// number of attached FiberBinders
-    int            nbBinders()    const { return frBinders.size(); }
+    /// a function to count Hands using a custom criteria
+    int            nbHands(int (*count)(Hand const*)) const;
+
+    /// number of Hands attached within a range of abscissa
+    unsigned       nbHandsInRange(real abs_min, real abs_max, FiberEnd ref) const;
     
-    /// number of attached FiberBinders in a range of abscissa
-    int            nbBindersInRange(real aMin, real aMax, FiberEnd from) const;
+    /// number of Hands attached at a distance less than 'len' from the specified FiberEnd
+    unsigned       nbHandsNearEnd(real len, FiberEnd end) const;
     
-    /// number of attached FiberBinders at the specified FiberEnd
-    int            nbBindersNearEnd(real len, FiberEnd which) const;
+    //--------------------------------------------------------------------------
+#if FIBER_HAS_LATTICE
+    /// modifiable reference to Fiber's Lattice
+    FiberLattice&  lattice() { return frLattice; }
     
-    /// a function to count binders using custom criteria
-    int            nbBinders(unsigned int (*count)(FiberBinder const&)) const;
+    /// const reference to Fiber's Lattice
+    FiberLattice const&  lattice() const { return frLattice; }
+
+    /// recalculate occupancy lattice from bound Hands
+    void           resetLattice();
+#else
+    /// does nothing
+    void           resetLattice() {}
+#endif
     
+    /// record minium, maximum and sum of lattice values
+    void           infoLattice(real& len, unsigned&, real& sm, real& mn, real& mx) const;
+
+    /// print Lattice data (for debugging purpose)
+    void           printLattice(std::ostream&, FiberLattice const&) const;
+
     //--------------------------------------------------------------------------
     
     /// set the box glue for pure pushing
-    void           setGlue1(Single* glue, FiberEnd which, const Space * space);
+    void           setGlue1(Single* glue, FiberEnd, Space const* space);
     
     /// set the box glue for pure pulling
-    void           setGlue2(Single* glue, FiberEnd which, const Space * space);
+    void           setGlue2(Single* glue, FiberEnd, Space const* space);
     
     /// set the box glue for pushing and pulling
-    void           setGlue3(Single* glue, const Space * space);
+    void           setGlue3(Single* glue, Space const* space);
     
     /// a setGlue to rule them all
-    void           setGlue(Single*& glue, FiberEnd which, const Space * space, int glue_type);
+    void           setGlue(Single*& glue, FiberEnd, Space const* space);
+    
+    /// create a Single that can be used as glue
+    void           makeGlue(Single*& glue);
     
     //--------------------------------------------------------------------------
-    
+
     /// a static_cast<> of Node::next()
     Fiber *  next()  const  { return static_cast<Fiber*>(nNext); }
     
@@ -197,20 +296,44 @@ public:
     //--------------------------------------------------------------------------
     
     /// a unique character identifying the class
-    static const Tag TAG = 'f';
+    static const ObjectTag TAG = 'f';
+    
+    /// identifies data for dynamic ends of fibers
+    static const ObjectTag TAG_DYNAMIC = 'F';
+    
+    /// identifies FiberLattice data
+    static const ObjectTag TAG_LATTICE = 'l';
     
     /// return unique character identifying the class
-    Tag         tag() const { return TAG; }
+    ObjectTag       tag() const { return TAG; }
     
-    /// return Object Property
-    const Property* property() const { return prop; }
+    /// return associated Property
+    Property const* property() const { return prop; }
     
-    ///write to file
-    void        write(OutputWrapper&) const;
+    /// convert pointer to Fiber* if the conversion seems valid; returns 0 otherwise
+    static Fiber* toFiber(Object * obj)
+    {
+        if ( obj  &&  obj->tag() == TAG )
+            return static_cast<Fiber*>(obj);
+        return nullptr;
+    }
     
-    ///read from file
-    void        read(InputWrapper&, Simul&);
+    /// convert pointer to Fiber* if the conversion seems valid; returns 0 otherwise
+    static Fiber const* toFiber(Object const* obj)
+    {
+        if ( obj  &&  obj->tag() == TAG )
+            return static_cast<Fiber const*>(obj);
+        return nullptr;
+    }
+
+    //--------------------------------------------------------------------------
+
+    /// write to file
+    void        write(Outputter&) const;
     
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+
 };
 
 #endif

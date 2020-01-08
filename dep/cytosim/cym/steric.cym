@@ -2,7 +2,7 @@
 % F. Nedelec, 23 Jan 2010
 
 
-set simul steric 
+set simul system
 {
     steric = 1, 100
     precondition = 0
@@ -15,12 +15,15 @@ set simul steric
 
 set space cell
 {
-    geometry = ( sphere 3 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 3
+}
 
-set fiber tube
+set fiber filament
 {
     rigidity = 1
     confine = inside, 100
@@ -28,21 +31,22 @@ set fiber tube
     steric = 1, 0.05
     
     activity = classic
-    growing_speed = 0.2
-    shrinking_speed = -0.8
-    catastrophe_rate = 0.02
-    rescue_rate = 0
-    fate = rescue
-    growing_force = 1.7
-    min_length = 0.1
-    
-    display = ( line_width=6; coloring=1 )
+    growing_speed     = 0.2,  0.2
+    shrinking_speed   = -0.2, -0.2
+    catastrophe_rate  = 0.02, 0.02
+    rescue_rate       = 0,    0
+    growing_force     = 1.7,  1.7
+    persistent     = 1
+    rebirth_rate   = 10, 10
+    min_length     = 0.1
+    display = ( line_width=6; coloring=1; )
 }
 
 
-new 20 fiber tube
+new 20 filament
 {
-    length = 0.05
+    length = 0.1
+    end_state = grow, grow
 }
 
 set bead ball
@@ -52,12 +56,12 @@ set bead ball
     display = ( style=5; coloring=1; )
 }
 
-new 40 bead ball
+new 40 ball
 {
     radius = 0.25
 }
 
-run 100000 simul *
+run 100000 system
 {
     nb_frames = 100
 }

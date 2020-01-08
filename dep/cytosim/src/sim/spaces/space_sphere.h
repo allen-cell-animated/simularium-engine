@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SPACE_SPHERE_H
 #define SPACE_SPHERE_H
 
@@ -9,57 +8,73 @@
 /**
  Space `sphere` is a sphere centered around the origin
  
- @code 
-    sphere radius
- @endcode
- 
-With:
- - radius = radius of the sphere
- .
+ Parameters:
+    - radius = radius of the sphere
+    .
  
  @ingroup SpaceGroup
  */
 
 class SpaceSphere : public Space
 {
-public:
+protected:
     
     /// the radius of the sphere
-    real        radius() const { return length(0); }
+    real  radius_;
     
-    /// the square of the radius
-    real        radiusSqr() const { return lengthSqr(0); }
+    /// square of the radius
+    real  radiusSqr_;
+    
+    /// calculate radiusSqr
+    void  update() { radiusSqr_ = square(radius_); }
     
 public:
     
     /// constructor
-    SpaceSphere(const SpaceProp*);
-    
-    /// check number and validity of specified lengths
-    void        resize() { Space::checkLengths(1, true); }
+    SpaceSphere(SpaceProp const*);
 
-    /// maximum extension along each axis
-    Vector      extension() const;
+    /// check number and validity of specified lengths
+    void        resize(Glossary& opt);
+
+    /// return bounding box in `inf` and `sup`
+    void        boundaries(Vector& inf, Vector& sup) const;
     
+    /// radius
+    real        thickness() const { return radius_; }
+
     /// the volume inside
     real        volume() const;
     
     /// true if the point is inside the Space
-    bool        inside(const real point[]) const;
+    bool        inside(Vector const&) const;
     
-    /// project point on the closest edge of the Space
-    void        project(const real point[], real proj[]) const;
+    /// a random position inside the volume
+    Vector      randomPlace() const { return Vector::randB(radius_); }
+    
+    /// direct normal direction calculation
+    Vector      normalToEdge(Vector const& pos) const { return normalize(pos); }
+
+    /// set `proj` as the point on the edge that is closest to `point`
+    Vector      project(Vector const& pos) const;
     
     /// apply a force directed towards the edge of the Space
-    void        setInteraction(Vector const& pos, PointExact const&, Meca &, real stiff) const;
+    void        setInteraction(Vector const& pos, Mecapoint const&, Meca &, real stiff) const;
 
     /// apply a force directed towards the edge of the Space
-    void        setInteraction(Vector const& pos, PointExact const&, real rad, Meca &, real stiff) const;
+    void        setInteraction(Vector const& pos, Mecapoint const&, real rad, Meca &, real stiff) const;
+    
+    /// OpenGL display function; returns true if successful
+    bool        draw() const;
+    
+    /// write to file
+    void        write(Outputter&) const;
 
+    /// get dimensions from array `len`
+    void        setLengths(const real len[8]);
     
-    /// OpenGL display function, return true is display was done
-    bool        display() const;
-    
+    /// read from file
+    void        read(Inputter&, Simul&, ObjectTag);
+
 };
 
 #endif

@@ -6,13 +6,13 @@
 #include "exceptions.h"
 #include "iowrapper.h"
 #include "simul.h"
-extern Random RNG;
 
 //------------------------------------------------------------------------------
 
 Actor::Actor(ActorProp const* p, HandMonitor* h)
 : Hand(p,h), prop(p)
 {
+    throw InvalidParameter("the actor class in unfinished");
 }
 
 
@@ -23,20 +23,18 @@ void Actor::stepUnloaded()
     assert_true( attached() );
 
     // test for detachment
-    if ( testDetachment() )
-        return;
+    testDetachment();
 }
 
 
-void Actor::stepLoaded(Vector const& force)
+void Actor::stepLoaded(Vector const& force, real force_norm)
 {
     assert_true( attached() );
+    assert_true( nextDetach >= 0 );
     
-    if ( testKramersDetachment(force.norm()) )
+    if ( testKramersDetachment(force_norm) )
         return;
 
     // do something:
 }
-
-
 

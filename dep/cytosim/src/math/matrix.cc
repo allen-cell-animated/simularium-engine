@@ -1,28 +1,27 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-#include "assert_macro.h"
 #include "matrix.h"
+#include "assert_macro.h"
 #include "cblas.h"
 #include <iomanip>
 
 //------------------------------------------------------------------------------
-real Matrix::value(const index_type x, const index_type y) const
+real Matrix::value(const index_t x, const index_t y) const
 {
     real* v = addr( x, y );
-    if ( v == 0 )
+    if ( v == nullptr )
         return 0;
     else
         return *v;
 }
 
-//------------------------------------------------------------------------------
-real Matrix::maxNorm() const
+real Matrix::norm_inf() const
 {
-    const unsigned int sz = size();
+    const index_t Z = size();
     real result = 0;
-    for ( unsigned int ii = 0; ii < sz; ++ii )
+    for ( index_t ii = 0; ii < Z; ++ii )
     {
-        for ( unsigned int jj = 0; jj < sz; ++jj )
+        for ( index_t jj = 0; jj < Z; ++jj )
         {
             real* v = addr( ii, jj );
             if ( v  &&  ( *v > result ) )
@@ -32,88 +31,103 @@ real Matrix::maxNorm() const
     return result;
 }
 
-//------------------------------------------------------------------------------
 bool Matrix::nonZero() const
 {
-    const unsigned int sz = size();
-    for ( unsigned int ii = 0; ii < sz; ++ii )
-        for ( unsigned int jj = 0; jj < sz; ++jj )
+    const index_t Z = size();
+    for ( index_t ii = 0; ii < Z; ++ii )
+        for ( index_t jj = 0; jj < Z; ++jj )
             if ( 0 != value( ii, jj ) )
                 return true;
     return false;
 }
 
-//------------------------------------------------------------------------------
-unsigned int  Matrix::nbNonZeroElements() const
+size_t Matrix::nbElements(index_t start, index_t stop) const
 {
-    const unsigned int sz = size();
-    unsigned int result = 0;
-    for ( unsigned int ii = 0; ii < sz; ++ii )
-        for ( unsigned int jj = 0; jj < sz; ++jj )
+    assert_true( start <= stop );
+    assert_true( stop <= size_ );
+    
+    size_t result = 0;
+    for ( index_t jj = start; jj < stop; ++jj )
+        for ( index_t ii = 0; ii < size_; ++ii )
             result += ( 0 != value( ii, jj ) );
     return result;
 }
 
 //------------------------------------------------------------------------------
-void Matrix::copyBlock(real* M, const index_type x, const unsigned int sx, const index_type y, const unsigned int sy) const
+void Matrix::copyBlock(real* mat, unsigned ldd, index_t sx, unsigned nx, index_t sy, unsigned ny) const
 {
-    assert_true( x + sx <= size() );
-    assert_true( y + sy <= size() );
-    for ( unsigned int ii = 0; ii < sx; ++ii )
-        for ( unsigned int jj = 0; jj < sy; ++jj )
-            M[ii + sx * jj] = value( x + ii, y + jj );
+    assert_true( sx + nx < size() );
+    assert_true( sy + ny < size() );
+    
+    for ( index_t ii = 0; ii < nx; ++ii )
+    for ( index_t jj = 0; jj < ny; ++jj )
+        mat[ii + ldd * jj] = value( sx + ii, sy + jj );
 }
 
-//------------------------------------------------------------------------------
-void Matrix::addDiagonalBlock(real* M, const index_type x, const unsigned int sx) const
+
+void Matrix::addDiagonalBlock(real* mat, const index_t ldd, const index_t si, const unsigned nb) const
 {
-    for ( unsigned int ii = 0; ii < sx; ++ii )
-        for ( unsigned int jj = 0; jj < sx; ++jj )
-            M[ii + sx * jj] += value( x + ii, x + jj );
+    assert_true( si + nb < size() );
+
+    for ( index_t jj = 0; jj < nb; ++jj )
+    for ( index_t ii = 0; ii < nb; ++ii )
+        mat[ ii + ldd * jj ] += value( si + ii, si + jj );
 }
 
-//------------------------------------------------------------------------------
-void Matrix::addTriangularBlock(real* M, const index_type x, const unsigned int sx) const
+
+void Matrix::addTriangularBlock(real* mat, const index_t ldd, const index_t si, const unsigned nb, const unsigned dim) const
 {
-    for ( unsigned int ii = 0; ii < sx; ++ii )
-        for ( unsigned int jj = ii; jj < sx; ++jj )
-            M[ii + sx * jj] += value( x + ii, x + jj );
+    assert_true( si + nb < size() );
+
+    for ( index_t ii = 0; ii < nb; ++ii )
+    for ( index_t jj = ii; jj < nb; ++jj )
+        mat[ dim*ii + ldd * dim*jj ] += value( si + ii, si + jj );
 }
 
 //------------------------------------------------------------------------------
 void Matrix::vecMul( const real* X, real* Y ) const
 {
-    blas_xzero(size(), Y);
+    zero_real(size(), Y);
     vecMulAdd( X, Y );
 }
 
+
 //------------------------------------------------------------------------------
-void Matrix::printFull(std::ostream & os) const
+void Matrix::printFull(std::ostream& os) const
 {
-    const unsigned int sz = size();
+    char str[32];
+    const index_t Z = size();
     //printf("%i %i\n", size, size);
-    for ( unsigned int ii = 0; ii < sz; ++ii )
+    for ( index_t ii = 0; ii < Z; ++ii )
     {
-        for ( unsigned int jj = 0; jj < sz; ++jj )
+        for ( index_t jj = 0; jj < Z; ++jj )
         {
-            if ( value(ii, jj) == 0 )
-                os << "       . ";
+            real * a = addr(ii,jj);
+            if ( a )
+            {
+                snprintf(str, sizeof(str), " %9.3f", *a);
+                os << str;
+            }
             else
-                os << std::setprecision(2) << std::setw(8) << value(ii, jj) << " ";
+                os << "       .  ";
         }
-        os << std::endl;
+        std::endl(os);
     }
 }
 
-//------------------------------------------------------------------------------
-void Matrix::printSparse(std::ostream & os) const
+void Matrix::printSparse(std::ostream& os) const
 {
-    const unsigned int sz = size();
-    for ( unsigned int ii = 0; ii < sz; ++ii )
-        for ( unsigned int jj = 0; jj < sz; ++jj )
-            if ( addr( ii, jj ) )
-                os << ii << " " << jj << " " << std::scientific << *addr(ii, jj) << std::endl;
+    char str[256];
+    const index_t Z = size();
+    for ( index_t ii = 0; ii < Z; ++ii )
+        for ( index_t jj = 0; jj < Z; ++jj )
+        {
+            real * v = addr(ii, jj);
+            if ( v && *v != 0 )
+            {
+                snprintf(str, sizeof(str), "%6i %6i %16.6f\n", ii, jj, *v);
+                os << str;
+            }
+        }
 }
-
-
 

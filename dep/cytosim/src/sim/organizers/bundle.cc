@@ -4,26 +4,30 @@
 #include "assert_macro.h"
 #include "bundle.h"
 #include "exceptions.h"
-#include "point_exact.h"
-#include "point_interpolated.h"
+#include "mecapoint.h"
+#include "interpolation.h"
 #include "fiber_prop.h"
 #include "glossary.h"
 #include "simul.h"
 #include "meca.h"
 
-//------------------------------------------------------------------------------
+
 void Bundle::step()
 {
-    if ( prop->nucleate )
+    Simul & sim = simul();
+    
+    for ( size_t ii = 0; ii < nbOrganized(); ++ii )
     {
-        for ( unsigned int ii = 0; ii < prop->nb_fibers; ++ii )
+        if ( !organized(ii)  &&  RNG.test(prop->fiber_prob) )
         {
-            if ( 0 == organized(ii) )
+            Glossary opt(prop->fiber_spec);
+            ObjectList objs = sim.fibers.newObjects(prop->fiber_type, opt);
+            if ( objs.size() )
             {
-                Fiber* fib = prop->fiber_prop->newFiber();
-                fib->setLength(prop->overlap, prop->focus);
+                Fiber * fib = Fiber::toFiber(objs[0]);
+                fib->adjustLength(prop->overlap, prop->focus);
                 ///\todo: we should orient the new Fiber in bundle direction
-                objset()->simul.add(fib);
+                sim.add(objs);
                 grasp(fib, ii);
             }
         }
@@ -31,112 +35,145 @@ void Bundle::step()
 }
 
 
-//------------------------------------------------------------------------------
-
 /*
- Parallel connection
+ Parallel connection near the 'prop->focus' end of the fibers
 */
-void Bundle::setParallel(Meca & meca, Fiber * mt1, Fiber * mt2) const
+void Bundle::linkParallel(Meca & meca, Fiber * mt1, Fiber * mt2) const
 {
-    real const& stiff = prop->stiffness;
-    real const& dis = prop->overlap;
+    const real stiff = prop->stiffness;
+    const real dis = prop->overlap;
     
-    meca.interLink(mt1->interpolate(dis, prop->focus), mt2->interpolate(dis, prop->focus), stiff);
-    meca.interLink(mt1->exactEnd(prop->focus), mt2->exactEnd(prop->focus), stiff);
+    meca.addLink(mt1->interpolate(dis, prop->focus), mt2->interpolate(dis, prop->focus), stiff);
+    meca.addLink(mt1->exactEnd(prop->focus), mt2->exactEnd(prop->focus), stiff);
 }
 
 
 /**
- Antiparallel connection 
+ Antiparallel connection near the 'prop->focus' end of the fibers
 */
-void Bundle::setAntiparallel(Meca & meca, Fiber * mt1, Fiber * mt2) const
+void Bundle::linkAntiparallel(Meca & meca, Fiber * mt1, Fiber * mt2) const
 {
-    real const& stiff = prop->stiffness;
-    real const& dis = prop->overlap;
+    const real stiff = prop->stiffness;
+    const real dis = prop->overlap;
 
     if ( dis < REAL_EPSILON )
-        meca.interLink(mt1->exactEnd(prop->focus), mt2->exactEnd(prop->focus), stiff+stiff);
+        meca.addLink(mt1->exactEnd(prop->focus), mt2->exactEnd(prop->focus), stiff+stiff);
     else {
-        meca.interLink(mt1->interpolate(dis, prop->focus), mt2->exactEnd(prop->focus), stiff);
-        meca.interLink(mt2->interpolate(dis, prop->focus), mt1->exactEnd(prop->focus), stiff);
+        meca.addLink(mt2->exactEnd(prop->focus), mt1->interpolate(dis, prop->focus), stiff);
+        meca.addLink(mt1->exactEnd(prop->focus), mt2->interpolate(dis, prop->focus), stiff);
     }
 }
 
 
 /**
- Connect the fibers near their minus-ends, to form a ring:
+ Connect the fibers near their ends, to form a ring:
  1. connect fibers with their neighbors,
- 2. close the ring by connecting the first to the last.
+ 2. close the ring by connecting first and last fibers.
  */
 void Bundle::setInteractions(Meca & meca) const
 {
     assert_true( linked() );
-    assert_true( prop->nb_fibers == nbOrganized() );
     
-    Fiber * mt0 = static_cast<Fiber*>(organized(0));
-    Fiber * mt1 = mt0, * mt2 = 0;
-    
-    for ( unsigned int ii = 1 ; ii < nbOrganized(); ++ii )
+    if ( nbOrganized() > 0 )
     {
-        mt2 = static_cast<Fiber*>(organized(ii));
-        setAntiparallel(meca, mt1, mt2);
-        mt1 = mt2;
-    }
-    
-    // connect first and last fiber:
-    mt1 = mt0;
-    
-    if ( mt1 && mt2 )
-    {    
-        assert_true( mt2 == organized(nbOrganized()-1) );
+        Fiber * mt0 = Fiber::toFiber(organized(0));
+        Fiber * mt1 = mt0, * mt2 = nullptr;
         
-        if ( nbOrganized() % 2 == 0 )
-            setAntiparallel(meca, mt1, mt2);
-        else
-            setParallel(meca, mt1, mt2);
+        for ( unsigned ii = 1 ; ii < nbOrganized(); ++ii )
+        {
+            mt2 = Fiber::toFiber(organized(ii));
+            if ( mt1 && mt2 )
+                linkAntiparallel(meca, mt1, mt2);
+            mt1 = mt2;
+        }
+        
+        // connect first and last fibers:
+        mt1 = mt0;
+        
+        if ( mt1 && mt2 )
+        {
+            if ( nbOrganized() & 1 )
+                linkParallel(meca, mt1, mt2);
+            else
+                linkAntiparallel(meca, mt1, mt2);
+        }
     }
 }
 
 
 //------------------------------------------------------------------------------
+
+Vector Bundle::position() const
+{
+    Vector res(0,0,0);
+    for ( unsigned ii = 1 ; ii < nbOrganized(); ++ii )
+    {
+        Fiber const* fib = Fiber::toFiber(organized(ii));
+        res += fib->posEnd(prop->focus);
+    }
+    return res / nbOrganized();
+}
+
+
 /**
- It is possible to specify multiple lengths for fibers:
- @code
+ It is possible to specify the lengths of individual fibers:
+
  new bundle bundle
  {
     length = 3.0, 4.2
  }
- @endcode
+
  */
-ObjectList Bundle::build(Glossary& opt, Simul&)
+ObjectList Bundle::build(Glossary& opt, Simul& sim)
 {
     assert_true(prop);
-    Vector pos(0,0,0);
-    Vector dir(1,0,0);
+    ObjectList res;
     
-    for ( unsigned int indx = 0; indx < prop->nb_fibers; ++indx )
+    unsigned cnt = 0;
+    std::string type, spec;
+    opt.set(cnt,  "fibers");
+    opt.set(type, "fibers", 1);
+    opt.set(spec, "fibers", 2);
+    
+    if ( cnt <= 0 )
+        throw InvalidParameter("number of fibers (fibers[0]) must be specified and >= 1");
+    
+    nbOrganized(cnt);
+    
+    for ( unsigned inx = 0; inx < cnt; ++inx )
     {
-        int sign = ( indx % 2 ) ? -1 : +1;
-        Vector sdir = sign * dir;
-        Fiber* fib = prop->fiber_prop->newFiber(opt);
-        real len = 1;
-        if ( opt.set(len, "length", indx) )
-            fib->setStraight(pos-sdir*0.5*prop->overlap, sdir, len, prop->focus);
-        else           
-            fib->setStraight(pos-sdir*0.5*prop->overlap, sdir, prop->focus);
-        grasp(fib, indx);
+        Glossary fiber_opt(spec);
+        ObjectList objs = sim.fibers.newObjects(type, fiber_opt);
+        if ( objs.size() > 0 )
+        {
+            Fiber * fib = Fiber::toFiber(objs[0]);
+
+            if ( fib )
+            {
+                // rotate odd fibers by 180 degrees to make an anti-parallel overlap:
+                if ( inx & 1 )
+                    ObjectSet::rotateObjects(objs, Rotation::rotation180());
+                
+                // translate to adjust the overlap:
+                ObjectSet::translateObjects(objs, fib->posMiddle()-fib->pos(0.5*prop->overlap, prop->focus));
+                
+                real len;
+                if ( opt.set(len, "length", inx) )
+                    fib->adjustLength(len, prop->focus== PLUS_END?MINUS_END:PLUS_END);
+                
+                grasp(fib, inx);
+            }
+            res.append(objs);
+        }
     }
     
-    ObjectList res;
-    for ( unsigned int ii = 0; ii < nbOrganized(); ++ii )
-        res.push_back(organized(ii));
     return res;
 }
 
 
 Bundle::~Bundle()
 {
-    prop = 0;
+    prop = nullptr;
 }
 
 

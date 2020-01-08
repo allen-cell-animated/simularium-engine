@@ -1,17 +1,17 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SPACE_PROP_H
 #define SPACE_PROP_H
 
 #include "real.h"
 #include "property.h"
+#include "glossary.h"
+#include "vector.h"
 
 class PointDisp;
-class Glossary;
 class Space;
 class Simul;
 
-#define NEW_DYNAMIC_SPACES 1
+
 
 /// Property for Space
 /**
@@ -29,62 +29,42 @@ public:
      @{
     */
     
-    /// shape followed by parameters (see @ref SpaceGroup)
-    std::string  geometry;
-    
-    /// primitive (rectangle, etc), derived from geometry
+    /// primitive (e.g. `rectangle`)
     std::string  shape;
-    
-    /// sizes of the space, or name of input file or another dependecy as necessary
-    std::string  dimensions;
     
     /// display string (see @ref PointDispPar)
     std::string  display;
     
-#if NEW_DYNAMIC_SPACES
-    
-    /// Surface tension
-    real		 tension;
-    
-    /// Target volume
-    real         volume;
-    
-    /// Viscosity
-    real		 viscosity;
-    
-    /// Viscosity for rotation
-    real		 viscosity_rot;
-
-#endif
-
     /// @}
-    //------------------ derived variables below ----------------
+    
+    /// BACKWARD_COMPATIBILITY
+    std::string  dimensions_;
     
     /// equal to time_step / viscosity
     real         mobility_dt, mobility_rot_dt;
+    
+    /// derived variable: flag to indicate that `display` has a new value
+    bool         display_fresh;
 
-    /// a word present in geometry
-    std::string  spec;
-    
-    /// file name including a full path (derived from \a name)
-    std::string  file;
-    
-    /// for display
+    /// derived variable: parameters extracted from `display`
     PointDisp *  disp;
 
 public:
 
     /// constructor
-    SpaceProp(const std::string& n) : Property(n), disp(0) { clear(); }
+    SpaceProp(const std::string& n) : Property(n), disp(nullptr) { clear(); }
 
     /// destructor
     ~SpaceProp() { }
- 
-    /// create a new Space
+    
+    /// create a new, uninitialized, Space
     Space * newSpace() const;
+
+    /// create a new Space according to specifications
+    Space * newSpace(Glossary&) const;
     
     /// identifies the property
-    std::string kind() const { return "space"; }
+    std::string category() const { return "space"; }
     
     /// set default values
     void clear();
@@ -92,15 +72,18 @@ public:
     /// set from a Glossary
     void read(Glossary&);
     
-    /// check and derive parameters
-    void complete(SimulProp const*, PropertyList*);
+    /// check and derive some parameters
+    void complete();
+ 
+    /// check and derive more parameters
+    void complete(Simul const&);
         
     
     /// return a carbon copy of object
     Property* clone() const { return new SpaceProp(*this); }
     
     /// write all values
-    void write_data(std::ostream &) const;
+    void write_values(std::ostream&) const;
     
 };
 

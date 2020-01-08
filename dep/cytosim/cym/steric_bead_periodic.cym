@@ -1,7 +1,7 @@
 
 
 
-set simul bead 
+set simul system
 {
     steric = 1, 100
     
@@ -12,38 +12,41 @@ set simul bead
 
 set space cell
 {
-    geometry = ( periodic 2 3 4 )
+    shape = periodic
 }
 
-new space cell
-    
+new cell
+{
+    length = 4, 6, 8
+}
+
 set bead balls
 {
     steric = 1
     display = ( coloring=1; style=5 )
 }
 
-new 320 bead balls
+new 320 balls
 {
     radius = 0.05
 }
 
-new 160 bead balls
+new 160 balls
 {
     radius = 0.1
 }
 
-new 40 bead balls
+new 40 balls
 {
     radius = 0.25
 }
 
-new 10 bead balls
+new 10 balls
 {
     radius = 0.5
 }
 
-run simul *
+run system
 {
     nb_steps = 5000
     nb_frames = 10

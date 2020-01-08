@@ -10,8 +10,8 @@ class MightyProp;
 /**
  The Mighty is a Hand, and can thus bind and unbind from fibers.
  
- The Mighty currently is a copy of Motor.
- It can be used when advanced functionalities are needed.
+ Mighty is currently is a copy of Motor.
+ It can be used to implement custom advanced functionalities.
  
  See Examples and the @ref MightyPar.
  @ingroup HandGroup 
@@ -23,13 +23,13 @@ private:
     /// disabled default constructor
     Mighty();
     
-    /// Property
-    MightyProp const* prop;
-    
     /// clamp a in [0,b]
     void limitSpeedRange(real& a, const real b);
 
 public:
+    
+    /// Property
+    MightyProp const* prop;
    
     /// constructor
     Mighty(MightyProp const*, HandMonitor* h);
@@ -37,12 +37,14 @@ public:
     /// destructor
     ~Mighty() {}
     
-    
-    /// simulate when \a this is attached but not under load
+    /// check if attachement is possible according to properties
+    bool   attachmentAllowed(FiberSite&) const;
+
+    /// simulate when `this` is attached but not under load
     void   stepUnloaded();
     
-    /// simulate when \a this is attached and under load
-    void   stepLoaded(Vector const & force);
+    /// simulate when `this` is attached and under load
+    void   stepLoaded(Vector const & force, real force_norm);
     
 };
 

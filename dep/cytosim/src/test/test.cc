@@ -1,50 +1,61 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
 
-#include <stdio.h>
+#include <cstdio>
 #include <sys/types.h>
 
 #include "array.h"
 #include "random.h"
-extern Random RNG;
 
 
-int comp_ints(const void * ap, const void * bp)
+int comp(const void * a, const void * b)
 {
-    int a = *((int*)ap);
-    int b = *((int*)bp);
-    if ( a < b ) return -1;
-    if ( b > a ) return 1;
-    return 0;
+    int av = *(static_cast<const int*>(a));
+    int bv = *(static_cast<const int*>(b));
+    if ( av < bv )
+        return -1;
+    else if ( av > bv )
+        return 1;
+    else
+        return 0;
 }
 
 
 int main(int argc, char* argv[])
 {
-    RNG.seedTimer();
+    RNG.seed();
     Array<int> a;
     
-    for( int cnt = 0; cnt < 10; ++cnt )
+    for( unsigned cnt = 0; cnt < 10; ++cnt )
     {
         a.clear();
-        for( int i=0; i < 10; ++i )
-            if ( RNG.flip() )
-                a.push_back(RNG.flip());
+        unsigned n = RNG.poisson(8);
+        for( int i=0; i < n; ++i )
+            a.push_back(RNG.pint(2));
         
-        printf("size = %i", a.size());
+        printf("\nsize %lu", a.size());
         {
             Array<int> b;
             b = a;
             a.deallocate();
             
-            printf(" = %i", b.size());
-            b.sort(comp_ints);
+            printf("\n   copy %2lu :", b.size());
+            for( unsigned i=0; i < b.size(); ++i )
+                printf(" %i", b[i]);
+
+            b.remove_pack(0);
             
-            printf(" -> %i\n", b.size());
-            for( unsigned int i=0; i < b.size(); ++i )
-                assert_true( b[i] == 1 );
+            printf("\n   pack %2lu :", b.size());
+            for( unsigned i=0; i < b.size(); ++i )
+                printf(" %i", b[i]);
+            
+            b.sort(comp);
+            
+            printf("\n   sort %2lu :", b.size());
+            for( unsigned i=0; i < b.size(); ++i )
+                printf(" %i", b[i]);
         }
     }
     
-    printf("test done\n");
+    printf("\ndone\n");
     return 0;
 }

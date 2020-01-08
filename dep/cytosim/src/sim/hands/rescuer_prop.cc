@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "dim.h"
 #include "exceptions.h"
 #include "glossary.h"
@@ -9,13 +8,13 @@
 #include "rescuer_prop.h"
 #include "rescuer.h"
 
-//------------------------------------------------------------------------------
-Hand * RescuerProp::newHand(HandMonitor* h) const
+
+Hand * RescuerProp::newHand(HandMonitor* m) const
 {
-    return new Rescuer(this, h);
+    return new Rescuer(this, m);
 }
 
-//------------------------------------------------------------------------------
+
 void RescuerProp::clear()
 {
     HandProp::clear();
@@ -23,7 +22,7 @@ void RescuerProp::clear()
     rescue_prob = 0;
 }
 
-//------------------------------------------------------------------------------
+
 void RescuerProp::read(Glossary& glos)
 {
     HandProp::read(glos);
@@ -32,22 +31,19 @@ void RescuerProp::read(Glossary& glos)
     glos.set(rescue_prob,  "rescue_prob");
 }
 
-//------------------------------------------------------------------------------
-void RescuerProp::complete(SimulProp const* sp, PropertyList* plist)
+
+void RescuerProp::complete(Simul const& sim)
 {
-    HandProp::complete(sp, plist);
+    HandProp::complete(sim);
     
     if ( rescue_prob < 0 )
         throw InvalidParameter("rescuer:rescue_prob must be >= 0");
 }
 
 
-
-//------------------------------------------------------------------------------
-
-void RescuerProp::write_data(std::ostream & os) const
+void RescuerProp::write_values(std::ostream& os) const
 {
-    HandProp::write_data(os);
-    write_param(os, "rescue_prob", rescue_prob);
+    HandProp::write_values(os);
+    write_value(os, "rescue_prob", rescue_prob);
 }
 

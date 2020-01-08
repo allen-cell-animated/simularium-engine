@@ -5,7 +5,7 @@
 set simul system
 {
     % The third argument of 'steric' specifies the extra-range of the interaction.
-	% which gives a attractive force, and induces filament bundling
+    % which gives a attractive force, and induces filament bundling
     steric = 1, 500, 100   % enable, stiffness_push, stiffness_pull
     time_step = 0.005
     
@@ -14,10 +14,13 @@ set simul system
 
 set space cell
 {
-    geometry = ( sphere 3 )
+    shape = circle
 }
 
-new space cell
+new cell
+{
+    radius = 3
+}
 
 set fiber microtubule
 {
@@ -25,7 +28,7 @@ set fiber microtubule
     confine = inside, 100
     segmentation = 0.2
     % The third argument of 'steric' specifies the extra-range of the interaction.
-	% which gives a attractive force, and induces filament bundling
+    % which gives a attractive force, and induces filament bundling
     steric = 1, 0.05, 0.025    % enable, radius, extra_radius
 
     activity         = classic
@@ -39,15 +42,15 @@ set fiber microtubule
     display = ( line_width=6; plus_end=12; )
 }
 
-new 5 fiber microtubule
+new 5 microtubule
 {
     length = 0.05
-    plus_end_state = grow
+    plus_end = grow
 }
 
-run 40000 simul *
+run 40000 system
 {
     nb_frames = 100
-    event = 1, ( new fiber microtubule { length=0.012; plus_end_state=grow; } )
+    event = 1, ( new microtubule { length=0.012; plus_end=grow; } )
 }
 

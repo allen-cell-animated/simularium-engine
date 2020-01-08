@@ -1,23 +1,54 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #include "space_dice.h"
 #include "exceptions.h"
+#include "iowrapper.h"
+#include "glossary.h"
 
 
-SpaceDice::SpaceDice(const SpaceProp* p)
+SpaceDice::SpaceDice(SpaceProp const* p)
 : Space(p)
 {
     if ( DIM == 1 )
-        throw InvalidParameter("dice is only valid in DIM=2 or 3");
+        throw InvalidParameter("dice is not usable in 1D");
+
+    for ( int d = 0; d < 3; ++d )
+        length_[d] = 0;
+    radius_ = 0;
 }
 
-/**
- The `dice' is included in the rectangle
- */
-Vector SpaceDice::extension() const
+
+void SpaceDice::resize(Glossary& opt)
 {
-    return Vector( length(0), length(1), length(2) );
+    real rad = radius_;
+    
+    opt.set(rad, "radius");
+    if ( rad < 0 )
+        throw InvalidParameter("dice:radius must be >= 0");
+
+    for ( int d = 0; d < DIM; ++d )
+    {
+        real len = length_[d];
+        if ( opt.set(len, "length", d) )
+            len *= 0.5;
+        if ( len < rad )
+            throw InvalidParameter("dice:length[] must be >= 2 * radius");
+        length_[d] = len;
+    }
+    
+    radius_ = rad;
+    update();
 }
+
+
+/**
+ The `dice` is included in the rectangle
+ */
+void SpaceDice::boundaries(Vector& inf, Vector& sup) const
+{
+    inf.set(-length_[0],-length_[1],-length_[2]);
+    sup.set( length_[0], length_[1], length_[2]);
+}
+
 
 /**
  If `radius==0`, the volume should be the volume of a rectangle
@@ -25,102 +56,121 @@ Vector SpaceDice::extension() const
 real SpaceDice::volume() const
 {
 #if ( DIM == 1 )
-    return 2 * length(0);
+    return 2 * length_[0];
 #elif ( DIM == 2 )
-    return 4 * length(0)*length(1) + (M_PI-4)*radius()*radius();
+    return 4 * length_[0]*length_[1] + (M_PI-4)*radius_*radius_;
 #else
-    return 8 * length(0)*length(1)*length(2)
-    + 2 * (M_PI-4) * ( length(0) + length(1) + length(2) - 3 * radius() ) * radius() * radius()
-    + (4/3.0 * M_PI - 8) * radius()*radius()*radius();
+    return 8 * length_[0]*length_[1]*length_[2]
+    + 2 * (M_PI-4) * ( length_[0] + length_[1] + length_[2] - 3 * radius_ ) * radius_ * radius_
+    + (4*M_PI/3.0 - 8) * radius_ * radius_ * radius_;
 #endif
 }
 
 
 //------------------------------------------------------------------------------
 
-bool  SpaceDice::inside( const real w[] ) const
+bool  SpaceDice::inside(Vector const& w) const
 {
-    int d;
-    real sw[3];
-    
-    for ( d = 0; d < DIM; ++d )
+    real dis = 0;
+    for ( int d = 0; d < DIM; ++d )
     {
-        sw[d] = fabs( w[d] );
-        if ( sw[d] > length(d) )
+        real a = fabs(w[d]) - length_[d];
+        if ( a > 0 )
             return false;
+        dis += square(std::max((real)0, a+radius_));
     }
-    
-    real n = 0;
-    for ( d = 0; d < DIM; ++d )
-    {
-        sw[d] += radius() - length(d);
-        if ( sw[d] > 0 )
-            n += sw[d]*sw[d];
-    }
-    
-    return ( n <= radiusSqr() );
+    return ( dis <= radiusSqr_ );
 }
-
 
 
 //------------------------------------------------------------------------------
 
-void SpaceDice::project( const real w[], real p[] ) const
+#if ( DIM == 1 )
+
+Vector SpaceDice::project(Vector const& w) const
 {
+    return Vector(std::copysign(length_[0], w.XX), 0, 0);
+}
+
+#else
+
+Vector SpaceDice::project(Vector const& w) const
+{
+    Vector p = w;
     bool in = true;
     
-    //calculate the projection on the inner cube disminished from radius()
+    //calculate projection on the inner cube obtained by subtracting radius
     for ( int d = 0; d < DIM; ++d )
     {
-        p[d] = w[d];
-        
-        if ( p[d] >  length(d) - radius() )
+        real test = length_[d] - radius_;
+        if ( fabs(w[d]) > test )
         {
-            p[d] = length(d) - radius();
-            in = false;
-        }
-        
-        if ( p[d] <  radius() - length(d) )
-        {
-            p[d] = radius() - length(d);
+            p[d] = std::copysign(test, w[d]);
             in = false;
         }
     }
-    
-    real dis = 0;
     
     if ( in )
     {
-        int dip = 0;
-        dis = length(0) - fabs(w[0]);
-        
-        for ( int d = 1; d < DIM; ++d )
+        // find the dimensionality corresponding to the closest face
+        real d0 = length_[0] - fabs(w.XX);
+        real d1 = length_[1] - fabs(w.YY);
+#if ( DIM > 2 )
+        real d2 = length_[2] - fabs(w.ZZ);
+        if ( d2 < d1 )
         {
-            real test = length(d) - fabs(w[d]);
-            if ( test < dis )
-            {
-                dip = d;
-                dis = test;
-            }
+            if ( d2 < d0 )
+                p.ZZ = std::copysign(length_[2], w.ZZ);
+            else
+                p.XX = std::copysign(length_[0], w.XX);
         }
-        
-        if ( w[dip] > 0 )
-            p[dip] =  length(dip);
         else
-            p[dip] = -length(dip);
+#endif
+        {
+            if ( d1 < d0 )
+                p.YY = std::copysign(length_[1], w.YY);
+            else
+                p.XX = std::copysign(length_[0], w.XX);
+        }
+        return p;
     }
-    else
-    {
-        //calculate the distance to the projection:
-        for ( int d = 0; d < DIM; ++d )
-            dis += ( w[d] - p[d] ) * ( w[d] - p[d] );
-        
-        //normalize to radius(), and add to p to get the real projection
-        dis = radius() / sqrt(dis);
-        for ( int d = 0; d < DIM; ++d )
-            p[d] += dis * ( w[d] - p[d] );
-        
-    }
+
+    //normalize to radius(), and add to p to get the real projection
+    real dis = radius_ / sqrt((w-p).normSqr());
+    for ( int d = 0; d < DIM; ++d )
+        p[d] += dis * ( w[d] - p[d] );
+    
+    return p;
+}
+#endif
+
+//------------------------------------------------------------------------------
+
+void SpaceDice::write(Outputter& out) const
+{
+    out.put_characters("dice", 16);
+    out.writeUInt16(4);
+    out.writeFloat(length_[0]);
+    out.writeFloat(length_[1]);
+    out.writeFloat(length_[2]);
+    out.writeFloat(radius_);
+}
+
+
+void SpaceDice::setLengths(const real len[])
+{
+    length_[0] = len[0];
+    length_[1] = len[1];
+    length_[2] = len[2];
+    radius_ = len[4];
+    update();
+}
+
+void SpaceDice::read(Inputter& in, Simul&, ObjectTag)
+{
+    real len[8] = { 0 };
+    read_data(in, len, "dice");
+    setLengths(len);
 }
 
 //------------------------------------------------------------------------------
@@ -132,17 +182,17 @@ void SpaceDice::project( const real w[], real p[] ) const
 #include "gle.h"
 using namespace gle;
 
-bool SpaceDice::display() const
+bool SpaceDice::draw() const
 {
-#if ( DIM == 3 )
+#if ( DIM > 2 )
     
-    const real X = length(0) - radius();
-    const real Y = length(1) - radius();
-    const real Z = length(2) - radius();
+    const real X = length_[0] - radius_;
+    const real Y = length_[1] - radius_;
+    const real Z = length_[2] - radius_;
  
-    const real XR = length(0);
-    const real YR = length(1);
-    const real ZR = length(2);
+    const real XR = length_[0];
+    const real YR = length_[1];
+    const real ZR = length_[2];
 
     glBegin(GL_TRIANGLE_STRIP);
     gleVertex(  XR,  Y, -Z );
@@ -189,20 +239,20 @@ bool SpaceDice::display() const
     glPushAttrib(GL_LIGHTING_BIT);
     glDisable(GL_LIGHTING);
     
-    glLineStipple(1, 0x0303);
+    glLineStipple(1, 0x000F);
     glEnable(GL_LINE_STIPPLE);
-    displaySection( 0, -X, 0.01 );
-    displaySection( 0,  X, 0.01 );
-    displaySection( 1, -Y, 0.01 );
-    displaySection( 1,  Y, 0.01 );
-    displaySection( 2, -Z, 0.01 );
-    displaySection( 2,  Z, 0.01 );
+    drawSection( 0, -X, 0.01 );
+    drawSection( 0,  X, 0.01 );
+    drawSection( 1, -Y, 0.01 );
+    drawSection( 1,  Y, 0.01 );
+    drawSection( 2, -Z, 0.01 );
+    drawSection( 2,  Z, 0.01 );
     glDisable(GL_LINE_STIPPLE);
     glPopAttrib();
     
 #else
 
-    displaySection( 2, 0, 0.01 );
+    drawSection( 2, 0, 0.01 );
 
 #endif
     
@@ -211,7 +261,7 @@ bool SpaceDice::display() const
 
 #else
 
-bool SpaceDice::display() const
+bool SpaceDice::draw() const
 {
     return false;
 }

@@ -1,25 +1,21 @@
-# // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
+# Cytosim was created by Francois Nedelec. Copyright 2007-2018 EMBL.
 
 
-#---------------- MACHINE = {mac, linux, cygwin, auto}
+#---------------- MACHINE = {mac, linux, cluster, cygwin, auto}
 MACHINE := auto
 
 #---------------- COMPILER = {gcc, icc, clang}
 COMPILER := gcc
 
-#---------------- MODE = {F, P, D, C}
-# F = Fast
-# P = Profiling
-# D = Debug 
-# C = Coverage
+#---------------- MODE = {F = Fast; D = Debug; P = Profiling; C = Coverage}
 MODE := F
 
 #---------------- INTEL Math Kernel Library
-# If the Intel Math Kernel library is available on your system,
-# you can set:
-#     HAS_MKL = 1 for dynamic linking
-#     HAS_MKL = 2 for static linking
-# otherwise, use HAS_MKL = 0;
+# If the Intel Math Kernel library is a free library providing BLAS+LAPACK,
+# If it is installed on your system, you can set:
+#     HAS_MKL := 1 for dynamic linking
+#     HAS_MKL := 2 for static linking
+# otherwise, set HAS_MKL := 0;
 
 HAS_MKL := 0
 
@@ -35,8 +31,8 @@ HAS_MKL := 0
 #     Ubuntu:  apt-get or synaptic libpng-dev
 # HAS_PNG can be:
 #     0 : no PNG support
-#     1 : macport installation
-#     2 : homebrew installation
+#     1 : macports installation
+#     2 : Homebrew installation
 
 HAS_PNG := 0
 
@@ -48,6 +44,8 @@ ifeq ($(MACHINE), auto)
 
     ifeq ($(shell uname), Darwin)
        MACHINE := mac
+    else ifeq ($(shell uname -n), login.cluster.embl.de)
+       MACHINE := cluster
     else ifeq ($(shell uname), Linux)
        MACHINE := linux
     else ifeq ($(shell uname -o), Cygwin)
@@ -58,60 +56,152 @@ ifeq ($(MACHINE), auto)
 
 endif
 
-#------------------------------------------------------------------------------------
-#---------------------------  Compiler Specifications  ------------------------------
-#------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#------------------------  Compiler Specifications  ----------------------------
+#-------------------------------------------------------------------------------
 
-DONE     = @printf "\x1B[35m >>>>>> made %s\x1B[0m\n" $@
+# common options for all C++ objects:
+CXXFLG := -std=gnu++11 -fno-rtti -Wredeclared-class-member -Wno-deprecated-declarations
+CXXFLG := -std=gnu++11 -fno-rtti -fopenmp #-g -fno-inline
+CXXFLG := -std=gnu++11 -fno-rtti
 
-ALIGN   := -malign-double -falign-loops -falign-jumps -falign-functions
-ALIGN   :=
-WARN    := -Wall -Wno-unknown-pragmas # -Wno-unused
+# option concerning memory alignment:
+ALIGN  := -malign-double -falign-loops -falign-jumps -falign-functions
+ALIGN  :=
 
+# options concerning warnings:
+WARN   := -Wundef -Wall -Wno-unknown-pragmas# -Wno-unused
 
 ifeq ($(MACHINE),mac)
-    LIBTOOL := libtool -static -o
+    LIBTOOL := /usr/bin/libtool -static -o
+    CXXFLG := $(CXXFLG) -fno-pic
 else
-    LIBTOOL := ar rcs
+    LIBTOOL := libtool --mode=link gcc -g -O -o
+    LIBTOOL := ar -rcs
 endif
 
 
 ifeq ($(COMPILER),gcc)
 
-    CXX      := g++ -ffinite-math-only -ftrapping-math -Wfatal-errors
-    FAST     :=-O3 -fno-tree-vectorize -ffast-math -funroll-loops -march=native -Wno-deprecated
-    DEBUG    :=-g3 -ggdb -Wno-deprecated
+# Intel SIMD: -march=core2 (SSE3); -march=sandybridge (AVX); -march=haswell (AVX2)
+# You can use g++-8 to support Intel OMP directives
+    CXX      := g++ -Wfatal-errors -Wno-deprecated-declarations
+    FAST     :=-O3 -fno-trapping-math -ffast-math -funroll-loops #-floop-optimize2 -ftree-vectorize -mavx2 -mfma
+    FAST     :=-O3 -fno-trapping-math -ffast-math -funroll-loops -march=native -ffp-contract=fast
+
+    DEBUG    :=-g3 -ggdb -march=native
     COVERAGE :=-fprofile-arcs -ftest-coverage
     
 else ifeq ($(COMPILER),icc)
 
-    MAKELIB  := xiar -rcs
-     
+    LIBTOOL  := ar -rcs
+
     #CXX     := icpc -fp-trap=common -vec-report0
-    #CXX     := icpc -bind_at_load -fvisibility=hidden -no-parallel -mkl=sequential -wd1224,161
-    CXX      := icpc -vec-report0 -wd1224,161
-    CXX      := icpc -no-parallel -mkl=sequential -wd1224,161
+    #CXX     := icpc -bind_at_load -fvisibility=hidden -wd1224,161
+    CXX      := icpc -fp-trap=none -vec-report0 -wd1224,161,1478
+    CXX      := icpc -fargument-noalias -fp-trap=none -wd1224,161,1478
     # Intel advanced instruction sets:
-    # '-xSSE4.1' for core duo (ca. 2009)
-    # '-mavx' for Intel core i7 (ca. 2012)
-    FAST     := -O3 -xSSE4.1
-    FAST     := -O3 -mdynamic-no-pic -funroll-loops -fno-math-errno -mavx
-    DEBUG    := -g -Wall -no-pie -wd279,383,810,869,981,1418,1419,1572,2259
-    COVERAGE := -ftest-coverage
+    # '-xHost' to optimize for host machine
+    # '-xAVX' for AVX
+    # '-march=corei7-avx' for AVX
+    # '-march=core-avx2' for Intel core i7 (ca. 2015)
+    FAST     := -O3 -march=core-avx2
+    FAST     := -O3 -march=core-avx2 -Wl,-no_pie -funroll-loops -fno-math-errno -fp-model fast=1 -fp-model no-except
+    WARN     := -qopt-report=2 -qopt-report-phase=vec# -opt-report-file=stderr
+    WARN     :=
+
+    DEBUG    := -march=core-avx2 -g -wd279,383,810,869,981,1418,1419,1572,2259
+    COVERAGE :=
 
 else ifeq ($(COMPILER),clang)
 
-    CXX      := c++ -ffinite-math-only -ftrapping-math -Wfatal-errors #-mmacosx-version-min=10.10
-    FAST     := -O3 -ffast-math -funroll-loops #-floop-optimize2 -msse3
+# for the standard library, use: -stdlib=libc++
+# the old library: -stdlib=libstdc++ (deprecated)
+
+    CXX      := c++ -Wfatal-errors
+    FAST     := -O3 -ffast-math -funroll-loops -mavx2 -mfma
     FAST     := -O3 -ffast-math -funroll-loops
     DEBUG    := -g3 -ggdb
     COVERAGE := -fprofile-arcs -ftest-coverage
 
 endif
 
-#------------------------------------------------------------------------------------
-#------------------------------------- Linux ----------------------------------------
-#------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#------------------------------- Mac OSX ---------------------------------------
+#-------------------------------------------------------------------------------
+
+ifeq ($(MACHINE),mac)
+
+    MKLDIR := /opt/intel/mkl/lib
+
+    FlagsC := $(COVERAGE)
+    FlagsD := $(DEBUG) $(WARN)
+    FlagsP := -O2 $(ALIGN) -fno-inline
+    FlagsF := $(FAST) $(ALIGN)
+
+    LINK   := -framework Accelerate
+
+    GRAFIX := -framework GLUT -framework OpenGL -framework AGL
+    # Using brew's freeGLUT:
+    #GRAFIX := -L/usr/local/Cellar/freeglut/3.0.0 -lglut -framework OpenGL
+    
+    ifeq ($(HAS_PNG), 1)
+
+        # macports libraries:
+        LIB_PNG := /opt/local/lib/libpng.a /opt/local/lib/libz.a
+        INC_PNG := -I/opt/local/include
+
+    endif
+	
+    ifeq ($(HAS_PNG), 2)
+
+        # HomeBrew libraries:
+        LIB_PNG := /usr/local/lib/libpng.a /usr/local/opt/zlib/lib/libz.a
+        INC_PNG := -I/usr/local/include
+
+    endif
+
+endif
+
+#-------------------------------------------------------------------------------
+#--------------------------------- Cluster -------------------------------------
+#-------------------------------------------------------------------------------
+
+ifeq ($(MACHINE),cluster)
+
+    # MKLROOT should be defined by 'module load imkl'
+    MKLDIR := $(MKLROOT)/lib/intel64
+
+    # Beware of AVX2 and other advanced features on heterogeneous clusters:
+    FAST   :=-O3 -fno-tree-vectorize -ffast-math -funroll-loops -mavx -ffp-contract=fast
+
+    FlagsD := -O0 $(DEBUG) $(WARN)
+    FlagsP := $(FAST) $(ALIGN) -O0 -fno-inline -pg
+    FlagsC := -O0 -fprofile-arcs -ftest-coverage
+    FlagsF := $(FAST) $(ALIGN) -finline-functions
+    
+    ### self-compiled BLAS/LAPACK fortran library:
+    # this works on the new cluster (64 bit, gcc 4.1 or higher)
+    #LINK  := -static -L/g/nedelec/opt/netlib/linux_em64t -llapack -lblas -lgfortran
+      
+    ### 64bit Linux distribution, 2011 (distribution on LSF EMBL cluster)
+    # ln -sf /usr/lib64/liblapack.so.3 /usr/lib64/liblapack.so
+    # ln -sf /usr/lib64/libblas.so.3 /usr/lib64/libblas.so
+    #LINK  := /usr/lib64/liblapack.so.3 /usr/lib64/libblas.so.3 -L/usr/lib64 -lpthread
+    
+    ### SLURM cluster (EMBL, 2017)
+    LINK   := -llapack -lopenblas -lgfortran -lpthread
+    ### SLURM cluster with self-compiled LAPACK/BLAS (EMBL, 2018)
+    LINK   := /g/nedelec/lapack/liblapack.a /g/nedelec/lapack/librefblas.a -lgfortran -lpthread
+
+    # linkage options for programs using graphics:
+    #GRAFIX := -L/usr/lib -L/usr/lib64 -lglut -lGL -lGLU -lXt -lX11
+
+endif
+
+#-------------------------------------------------------------------------------
+#---------------------------------- Linux --------------------------------------
+#-------------------------------------------------------------------------------
 
 ifeq ($(MACHINE),linux)
 
@@ -121,12 +211,13 @@ ifeq ($(MACHINE),linux)
     FlagsC := -O0 -fprofile-arcs -ftest-coverage
     FlagsF := -O3 -finline-functions $(ALIGN) $(FAST)
 
-    ## select 64 or 32 bit libraries:
-    ifeq ($(shell uname -m),x86_64)
-         USRLIB := /usr/lib64
-    else
-         USRLIB := /usr/lib
-    endif
+    # trying to automatically detect the directory with BLAS & LAPACK:
+    BLASLIB := $(wildcard /usr/lib/libblas.*) $(wildcard /usr/lib/*/libblas.*)
+    BLADIR := $(word 1, $(dir $(BLASLIB)))
+
+    # specify the lib path:
+    LIBDIR := /usr/lib
+    LIBDIR := /usr/lib/x86_64-linux-gnu
 
     ### For 64bit Centos 5.8 March 2012:
     # Centos  blas: yum install blas-devel
@@ -135,10 +226,10 @@ ifeq ($(MACHINE),linux)
     # Ubuntu   blas : apt-get install libblas.dev
     # Ubuntu lapack : apt-get install liblapack.dev
 
-    #### Choose dynamic linking:
-    LINK:= -L$(USRLIB) -llapack -lblas -lpthread
-    #### ...  or static linking:
-    LINK:= -L$(USRLIB) $(USRLIB)/libblas.so $(USRLIB)/liblapack.so -lpthread
+    #### For dynamic linking:
+    LINK := -L$(BLADIR) -llapack -lblas -lpthread
+    #### For static linking specify the objects directly:
+    #LINK := -L$(BLADIR) $(BLADIR)/liblapack.so $(BLADIR)/libblas.so -lpthread
 
     ### Install libraries needed for graphical executables:
     # Centos freglut: yum install freeglut-devel
@@ -151,55 +242,21 @@ ifeq ($(MACHINE),linux)
 
     ### linkage options for programs using graphics:
     #   check for correct library libname.so otherwise give full path
-    LINKGL:= -L$(USRLIB) -lglut -lGL -lGLU -lXt -lX11 -lGLEW
+    GRAFIX := -L$(LIBDIR) -lglut -lGL -lGLU -lXt -lX11 -lGLEW
 
     ifneq ($(HAS_PNG), 0)
 
-        LIB_PNG := $(USRLIB)/libpng.a $(USRLIB)/libz.a
+        LIB_PNG := $(LIBDIR)/libpng.a $(LIBDIR)/libz.a
         ING_PNG :=
 
     endif
 
 endif
 
-#------------------------------------------------------------------------------------
-#-------------------------------- Mac OSX -------------------------------------------
-#------------------------------------------------------------------------------------
 
-ifeq ($(MACHINE),mac)
-
-    MKL_PATH := /opt/intel/mkl/lib
-
-    FlagsC := $(COVERAGE)
-    FlagsD := $(DEBUG) $(WARN)
-    FlagsP := $(DEBUG) $(FAST) $(ALIGN)
-    FlagsF := $(FAST) $(ALIGN)
-    FlagsN := -O2 
-  
-    LINK   := -framework Accelerate
-    LINKGL := -framework GLUT -framework OpenGL -framework AGL
-    #LINKGL = -L/opt/local/lib -lglut -lgl
-    
-    ifeq ($(HAS_PNG), 1)
-        
-        # macport library:
-        LIB_PNG := /opt/local/lib/libpng.a  /opt/local/lib/libz.a
-        INC_PNG :=
-
-    endif
-    ifeq ($(HAS_PNG), 2)
-       
-        # homebrew library:
-        LIB_PNG := /usr/local/lib/libpng.a /usr/local/opt/zlib/lib/libz.a
-        INC_PNG :=
-
-    endif
-
-endif
-
-#------------------------------------------------------------------------------------
-#---------------------------------- Cygwin ------------------------------------------
-#------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#------------------------------- Cygwin ----------------------------------------
+#-------------------------------------------------------------------------------
 
 ifeq ($(MACHINE),cygwin)
 
@@ -212,22 +269,21 @@ ifeq ($(MACHINE),cygwin)
     ### Needs
     # blas:   yum install blas-devel
     # lapack: yum install lapack-devel
-    LINK = -L/usr/lib -L/bin -llapack -lblas -lpthread -lgfortran
-    
+    LINK := -L/usr/lib -L/bin -llapack -lblas -lpthread
+
     ### linkage options for programs using graphics:
     ### Needs
     ### freglut: yum install freeglut-devel
     ### libXi:   yum install libXi-devel
     ### libXmu:  yum install libXmu-devel
-    ###  check for correct library yourlibname.so otherwise give full path 	
-    LINKGL := -L/usr/lib -lglut -lGL -lGLU -lXt -lX11
+    ###  check for correct library yourlibname.so otherwise give full path
+    GRAFIX := -L/usr/lib -lglut -lGL -lGLU -lX11 -lGLEW
 
     ifneq ($(HAS_PNG), 0)
-    
-        LIB_PNG := /lib/libpng.dll.a /lib/libz.a
-        LIB_PNG := /usr/lib/libpng.dll.a /usr/lib/libz.a
-        ING_PNG :=
-    
+
+    LIB_PNG := /lib/libpng.dll.a /lib/libz.a
+    ING_PNG :=
+
     endif
 
     BINEXT :=.exe
@@ -235,38 +291,66 @@ ifeq ($(MACHINE),cygwin)
 endif
 
 
+#-------------------------------------------------------------------------------
+#------------------------------- Native Windows --------------------------------
+#-------------------------------------------------------------------------------
+# THIS IS NOT MAINTAINED: it worked in 2008 but has not been tried since
 
-#------------------------------------------------------------------------------------
-#--------------------- linking with Intel Math Kernel Library -----------------------
-#------------------------------------------------------------------------------------
+ifeq ($(MACHINE),windows)
 
-MKL_EXT := _lp64
+    # Use a windows-native blas/lapack compilation:
+    # copying "libblas.a" and "liblapack.a" in "/usr/lib"
+
+    FlagsD := -g  $(WARN)
+    FlagsP := -pg -O3 -march=i686 -ffast-math $(ALIGN)
+    FlagsF := -O3 -finline-functions -march=i686 -ffast-math $(ALIGN)
+  
+    LINK   := -llapack -lblas
+    GRAFIX  := -lglut32 -lglu32 -lopengl32
+    BINEXT :=.exe
+
+endif
+
+
+
+#-------------------------------------------------------------------------------
+#------------------ linking with Intel Math Kernel Library ---------------------
+#-------------------------------------------------------------------------------
+
+# The Intel MKL provides LAPACK and BLAS implementations optimized for Intel chips
 
 
 ifeq ($(HAS_MKL),1)
 
     # sequential dynamic linking:
-    MKL_LIBS := -lmkl_intel$(MKL_EXT) -lmkl_sequential -lmkl_core
+    MKLLIB := -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
     
     # threaded dynamic linking:
-    #MKL_LIBS := -lmkl_intel$(MKL_EXT) -lmkl_intel_thread -lmkl_core -liomp5
+    #MKLLIB := -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5
 
     # modify the linking command:
-    LINK := -L$(MKL_PATH) $(MKL_LIBS) -lpthread    
+    LINK := -L$(MKLDIR) $(MKLLIB) -lpthread
 
 endif
 
 
 ifeq ($(HAS_MKL),2)
 
-    # sequential static linking:
-    MKL_LIBS := $(MKL_PATH)/libmkl_intel$(MKL_EXT).a $(MKL_PATH)/libmkl_sequential.a $(MKL_PATH)/libmkl_core.a
-    
+    # This are options for the compiler:
+    MKLOPT := -m64 -I${MKLROOT}/include
+
+    # sequential static linking (newer GCC):
+    MKLLIB := -Wl,--start-group $(MKLDIR)/libmkl_intel_lp64.a $(MKLDIR)/libmkl_sequential.a $(MKLDIR)/libmkl_core.a -Wl,--end-group
+
+    # sequential static linking (older GCC):
+    MKLLIB := $(MKLDIR)/libmkl_intel_lp64.a $(MKLDIR)/libmkl_sequential.a $(MKLDIR)/libmkl_core.a
+
     # threaded static linking:
-    #MKL_LIBS := $(MKL_PATH)/libmkl_intel$(MKL_EXT).a $(MKL_PATH)/libmkl_thread.a $(MKL_PATH)/libmkl_core.a /opt/intel/lib/libiomp5.a
+    #MKLLIB := $(MKLDIR)/libmkl_intel_lp64.a $(MKLDIR)/libmkl_thread.a $(MKLDIR)/libmkl_core.a /opt/intel/lib/libiomp5.a
 
     # modify the linking command:
-    LINK := $(MKL_LIBS) -lpthread    
+    LINK := $(MKLLIB) -lpthread -lm -ldl
 
 endif
+
 

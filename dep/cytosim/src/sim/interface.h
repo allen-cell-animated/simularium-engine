@@ -3,10 +3,13 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
-
-#include "simul.h"
 #include <iostream>
+#include "isometry.h"
+#include "object.h"
 
+class Glossary;
+class Property;
+class Simul;
 
 /// Cytosim Application Programming Interface
 /*
@@ -27,69 +30,75 @@ protected:
     
 public:
     
-    /// associates with given Simul
+    /// construct and associates with given Simul
     Interface(Simul& s);
-    
-    /// destructor
-    virtual ~Interface() {}
     
     //-------------------------------------------------------------------------------
     
     /// this is called between commands during the execution process
     /**
-     The overwritten version should call simul.relax() to make sure that
-     the simulation data structures are coherent.
-     It can perform additional things, for example display the simulation world
+     It provides an opportunity to stop or to display the simulation world
      */
     virtual void hold() {}
     
     /// Parse a text containing cytosim commands
     /**
-     This is necessary for the 'event code' in parse_run(),
-     The function must be defined in the derived class Parser
+     This is defined in the derived class Parser
      */
-    virtual void parse(std::istream&, std::string const& msg) = 0;
+    virtual void evaluate(std::string const&) = 0;
     
     //-------------------------------------------------------------------------------
     
-    /// create a new Property of kind \a k from options set in Glossary
-    Property*  execute_set(std::string const& k, std::string const& n, Glossary&);
+    /// create a new Property of category `cat` from values set in Glossary
+    Property*  execute_set(std::string const& cat, std::string const& name, Glossary&);
 
-    /// change values in Property according to Glossary
-    void       execute_change(Property *, Glossary&);
+    /// change values in Property as specified in Glossary
+    void       execute_change(Property*, Glossary&);
 
-    /// change values in Property of kind \a k following options set in Glossary
-    Property*  execute_change(std::string const& k, std::string const& n, Glossary&);
+    /// change values in Property called `name` as specified in Glossary
+    Property*  execute_change(std::string const& name, Glossary&, bool strict=true);
     
-    /// change 'display' (and only this) in corresponding Property
-    void       change_display(std::string const& k, std::string const& n, Glossary&);
+    /// change values of all Property of category `cat`
+    void       execute_change_all(std::string const& cat, Glossary&);
 
-    /// create 1 Object of kind \a k with name \a n, following options in Glossary
-    ObjectList execute_new(std::string const& k, std::string const& n, Glossary&);
+    /// read the specification of position and orientation of an object
+    Isometry   read_placement(Glossary&);
     
-    /// create 'cnt' objects of kind \a k with name \a n, randomly placed in space (no option)
-    int        execute_new(std::string const& k, std::string const& n, unsigned cnt);
+    /// return position and orientation of an object, with verification of 'placement'
+    Isometry   find_placement(Glossary&, int);
     
-    /// delete \c cnt objects of kind \a k with name \a n, following options in Glossary
-    void       execute_delete(std::string const& k, std::string const& n, Glossary&, int cnt);
+    /// create 1 object of type `name`, following options in Glossary
+    ObjectList execute_new(std::string const& name, Glossary&);
     
-    /// mark \c cnt objects of kind \a k with name \a n, following options in Glossary
-    void       execute_mark(std::string const& k, std::string const& n, Glossary&, int cnt);
+    /// create `cnt` objects of type `name`, randomly placed in space (no option)
+    void       execute_new(std::string const& name, unsigned cnt);
+    
+    /// delete `cnt` objects of type `name`, following options in Glossary
+    void       execute_delete(std::string const& name, Glossary&, unsigned cnt);
+    
+    /// mark `cnt`  objects of type `name`, following options in Glossary
+    void       execute_mark(std::string const& name, Glossary&, unsigned cnt);
 
-    /// cut fibers, following different options in Glossary
-    void       execute_cut(std::string const& k, std::string const& n, Glossary&);
+    /// cut fibers of type `name`, following different options in Glossary
+    void       execute_cut(std::string const& name, Glossary&);
     
-    /// import objects from another file
-    void       execute_import(std::string const& file, Glossary&);
-    
-    /// export objects from another file
+    /// import objects (or `what`) from the file with specified name
+    void       execute_import(std::string const& file, std::string const& what, Glossary&);
+
+    /// export objects (or `what`) to a file with specified name
     void       execute_export(std::string& file, std::string const& what, Glossary&);
-    
-    /// write output file with object coordinates or information on objects
+
+    /// write information (specified in `what`) to a file with specified name
     void       execute_report(std::string& file, std::string const& what, Glossary&);
     
-    /// perform simulation steps
-    void       execute_run(Glossary& opt, unsigned cnt, bool do_write);
+    /// perform `cnt` simulation steps
+    void       execute_run(unsigned cnt, Glossary&);
+    
+    /// perform `cnt` simulation steps, with no option
+    void       execute_run(unsigned cnt);
+
+    /// execute miscellaneous functions
+    void       execute_call(std::string& func, Glossary&);
 
 };
 

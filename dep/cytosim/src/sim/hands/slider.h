@@ -1,5 +1,4 @@
 // Cytosim was created by Francois Nedelec. Copyright 2007-2017 EMBL.
-
 #ifndef SLIDER_H
 #define SLIDER_H
 
@@ -15,39 +14,36 @@ class SliderProp;
  
  The @ref SliderPar "mobility" defines the ratio between speed and force
  
- @code
- real load = force * direction_of_fiber;
- real displacement = load * mobility * time_step;
- @endcode
+     real load = force * direction_of_fiber;
+     real displacement = load * mobility * time_step;
  
  See Examples and the @ref SliderPar.
  @ingroup HandGroup 
  */
 class Slider : public Hand
 {
-
 private:
     
     /// disabled default constructor
     Slider();
     
+public:
+    
     /// Property
     SliderProp const* prop;
     
-public:
-    
     /// constructor
-    Slider(SliderProp const* p, HandMonitor* h);
+    Slider(SliderProp const*, HandMonitor*);
 
     /// destructor
     ~Slider() {}
 
     
-    /// simulate when \a this is attached but not under load
+    /// simulate when `this` is attached but not under load
     void   stepUnloaded();
 
-    /// simulate when \a this is attached and under load
-    void   stepLoaded(Vector const & force);
+    /// simulate when `this` is attached and under load
+    void   stepLoaded(Vector const & force, real force_norm);
     
 };
 
