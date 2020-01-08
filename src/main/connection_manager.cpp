@@ -12,6 +12,8 @@ inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
     return !t.owner_before(u) && !u.owner_before(t);
 }
 
+static const std::string LIVE_SIM_IDENTIFIER = "live";
+
 namespace aics {
 namespace agentsim {
 
@@ -41,7 +43,7 @@ namespace agentsim {
     }
 
     void ConnectionManager::LogClientEvent(std::string uid, std::string msg) {
-        LOG_F(INFO, "[%s]%s", uid.c_str(), msg.c_str());
+        LOG_F(INFO, "[%s] %s", uid.c_str(), msg.c_str());
     }
 
     context_ptr ConnectionManager::OnTLSConnect(
@@ -313,9 +315,13 @@ namespace agentsim {
         // Invalid frame, set to last frame
         if(currentFrame >= totalNumberOfFrames)
         {
-            this->LogClientEvent(connectionUID, "Finished Streaming");
-            this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
-            this->SetClientState(connectionUID, ClientPlayState::Finished);
+            if(netState.sim_identifier == LIVE_SIM_IDENTIFIER) {
+                this->SetClientState(connectionUID, ClientPlayState::Waiting);
+            } else {
+                this->LogClientEvent(connectionUID, "Finished Streaming");
+                this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
+                this->SetClientState(connectionUID, ClientPlayState::Finished);
+            }
         }
 
         // Frame is valid but not loaded yet
@@ -330,7 +336,9 @@ namespace agentsim {
         // If the waited for frame has been loaded
         if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
         {
-            this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
+            if(netState.sim_identifier != LIVE_SIM_IDENTIFIER) {
+                this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
+            }
             this->SetClientState(connectionUID, ClientPlayState::Playing);
         }
     }
@@ -623,8 +631,9 @@ namespace agentsim {
                         switch (runMode) {
                         case SimulationMode::id_live_simulation: {
                             this->LogClientEvent(senderUid, "Running Live Simulation");
+                            this->SetClientSimId(senderUid, LIVE_SIM_IDENTIFIER);
                             simulation.SetPlaybackMode(runMode);
-                            simulation.SetSimId("live");
+                            simulation.SetSimId(LIVE_SIM_IDENTIFIER);
                             simulation.Reset();
                         } break;
                         case SimulationMode::id_pre_run_simulation: {
@@ -647,7 +656,7 @@ namespace agentsim {
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
-                            this->LogClientEvent(senderUid, "Playing back trajectory file");
+                            this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
                             this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
                         } break;
                         }
@@ -790,8 +799,13 @@ namespace agentsim {
         std::string fileName
     )
     {
+        this->m_fileMutex.lock();
+        LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
+
         if (fileName.empty()) {
             this->LogClientEvent(connectionUID, "Trajectory file not specified, ignoring request");
+            this->m_fileMutex.unlock();
+            LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
             return;
         }
 
@@ -801,7 +815,8 @@ namespace agentsim {
 
         if(simulation.HasFileInCache(fileName))
         {
-            LOG_F(INFO,"Using previously loaded file");
+            LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
+            this->SendDataToClient(simulation, connectionUID, 0, true);
         }
         else {
             // Attempt to download an already processed runtime cache
@@ -809,13 +824,21 @@ namespace agentsim {
                 && simulation.DownloadRuntimeCache(fileName))
             {
                 simulation.PreprocessRuntimeCache(fileName);
+                this->SendDataToClient(simulation, connectionUID, 0, true);
             }
             else {
                 simulation.SetPlaybackMode(id_traj_file_playback);
                 simulation.Reset();
                 if(simulation.LoadTrajectoryFile(fileName))
                 {
+                    this->m_fileMutex.unlock();
+                    LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
+
                     this->SetupRuntimeCacheAsync(simulation, 500);
+                    this->SendDataToClient(simulation, connectionUID, 0, true);
+
+                    this->m_fileMutex.lock();
+                    LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
                 }
             }
         }
@@ -843,7 +866,8 @@ namespace agentsim {
         fprops["boxSizeZ"] = tfp.boxZ;
 
         this->SendWebsocketMessage(connectionUID, fprops);
-        this->SendDataToClient(simulation, connectionUID, 0, true);
+        this->m_fileMutex.unlock();
+        LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
     }
 
     void ConnectionManager::SetupRuntimeCacheAsync(
@@ -856,13 +880,20 @@ namespace agentsim {
 
         this->m_fileIoThread = std::thread([&simulation, this] {
             loguru::set_thread_name("File IO");
-            LOG_F(INFO,"Loading trajectory file into runtime cache");
+            std::string fileName = simulation.GetSimId();
+
+            this->m_fileMutex.lock();
+            LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
+
+            LOG_F(INFO,"[%s] Loading trajectory file into runtime cache", fileName.c_str());
             std::size_t fn = 0;
 
             while (!simulation.HasLoadedAllFrames()) {
                 simulation.LoadNextFrame();
             }
-            LOG_F(INFO, "Finished loading trajectory into runtime cache");
+            LOG_F(INFO, "[%s] Finished loading trajectory into runtime cache", fileName.c_str());
+            this->m_fileMutex.unlock();
+            LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
 
             // Save the result so it doesn't need to be calculated again
             if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
