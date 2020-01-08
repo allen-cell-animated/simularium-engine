@@ -104,7 +104,12 @@ namespace agentsim {
             }
         }
 
-        this->m_cache.ClearCache(this->m_simIdentifier);
+        // Allow trajectory file cache to persist for efficiency
+        //  Assumption: live and pre-run have no use for outdated cache files
+        if(this->m_playbackMode != SimulationMode::id_traj_file_playback)
+        {
+            this->m_cache.ClearCache(this->m_simIdentifier);
+        }
     }
 
     void Simulation::UpdateParameter(std::string name, float value)
@@ -189,6 +194,7 @@ namespace agentsim {
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)
     {
         this->m_playbackMode = playbackMode;
+        this->m_agents.clear();
     }
 
     void Simulation::UploadRuntimeCache()
@@ -304,6 +310,12 @@ namespace agentsim {
         std::string identifier, std::size_t frameNumber
     )
     {
+        if(this->m_playbackMode == SimulationMode::id_live_simulation) {
+            // @TODO Handle variable frame-rate for 'live' mode
+            //      is this needed functionality?
+            return frameNumber;
+        }
+
         auto tfp = this->GetFileProperties(identifier);
 
         double time = 0.0;
