@@ -1,8 +1,7 @@
-#include "simul_prop.h"
-
 #include "agentsim/simpkg/cytosimpkg.h"
 #include "agentsim/agents/agent.h"
 #include "loguru/loguru.hpp"
+#include "simul_prop.h"
 
 #include "exceptions.h"
 #include "frame_reader.h"
