@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
     float timeStep = 1e-12; // seconds
 
     // @TODO: A more robust way to select simulation packages
-    bool use_readdy = false;
+    bool use_readdy = true;
     bool use_cytosim = !use_readdy;
 
     // Simulation setup
