@@ -3,7 +3,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(AGENTVIZ_FULL_DEBUG_SYMBOLS TRUE)
-set(DIMENSION 2)
+
+if(NOT DEFINED DIMENSION)
+    set(DIMENSION 3) # Used by Cytosim to compile 2D or 3D
+endif()
 
 set(TARGET "agentsim")
 set(SERVER_TARGET "agentsim_server")

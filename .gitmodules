@@ -6,4 +6,4 @@
 	url = https://github.com/aws/aws-sdk-cpp.git
 [submodule "dep/cytosim"]
 	path = dep/cytosim
-	url = https://gitlab.com/f.nedelec/cytosim.git
+	url = https://gitlab.com/EricJIsaac/cytosim.git

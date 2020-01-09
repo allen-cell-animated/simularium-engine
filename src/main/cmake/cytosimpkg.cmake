@@ -28,8 +28,6 @@ target_include_directories("cytosimPKG" PRIVATE
 
 message(WARNING "CYTOSIM PACKAGES: ${CYTOSIM_LIBRARIES}")
 target_link_libraries("cytosimPKG" PRIVATE
-    "cytosimD${DIMENSION}"
-    "cytospaceD${DIMENSION}"
     "${CYTOSIM_LIBRARIES}"
     "loguru"
 )
