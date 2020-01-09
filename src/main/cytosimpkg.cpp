@@ -81,7 +81,7 @@ namespace agentsim {
 
         simul.erase();
         glos.clear();
-        reader.clearPositions();
+        //reader.clear();
     }
 
     void CytosimPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)

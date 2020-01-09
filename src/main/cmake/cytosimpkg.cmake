@@ -26,7 +26,10 @@ target_include_directories("cytosimPKG" PRIVATE
     "${EXTERNAL_DIRECTORY}"
 )
 
+message(WARNING "CYTOSIM PACKAGES: ${CYTOSIM_LIBRARIES}")
 target_link_libraries("cytosimPKG" PRIVATE
+    "cytosimD2"
+    "cytospaceD2"
     "${CYTOSIM_LIBRARIES}"
     "loguru"
 )
