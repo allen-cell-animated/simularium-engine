@@ -59,7 +59,7 @@ RUN echo " "
 COPY --from=build --chown=app:app /usr/. /usr/
 RUN echo " "
 
-RUN mkdir /trajectory && chown -R app /trajectory
+RUN mkdir /trajectory && chown -R app /trajectory && openssl dhparam -out dh.pem 2048
 USER app
 
 #expose port 9002 for server
