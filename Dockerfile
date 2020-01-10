@@ -30,7 +30,7 @@ RUN git submodule update --init --recursive
 RUN cd ../build && \
 	cmake ../agentsim -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release && \
 	make && \
-    openssl dhparam -out ./bin/dh.pem 2048 \
+    openssl dhparam -out ./bin/dh.pem 2048 && \
 	find /agentsim-dev/build | grep -i so$ | xargs -i cp {} /agentsim-dev/lib/
 
 ### Run image ###
