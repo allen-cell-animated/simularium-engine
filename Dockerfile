@@ -17,7 +17,8 @@ RUN mkdir /agentsim-dev && \
 	liblapack-dev \
 	python-dev \
 	libssl-dev libcurl4-openssl-dev \
-	libblosc1
+	libblosc1 \
+    libglew-dev mesa-common-dev freeglut3-dev
 
 # copy agent sim project
 COPY . /agentsim-dev/agentsim
