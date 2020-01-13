@@ -849,7 +849,7 @@ namespace agentsim {
 
         Json::Value fprops;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
-        fprops["totalDuration"] = tfp.numberOfFrames * tfp.timeStepSize;
+        fprops["totalDuration"] = (tfp.numberOfFrames - 1) * tfp.timeStepSize;
         fprops["timeStepSize"] = tfp.timeStepSize;
 
         Json::Value typeMapping;

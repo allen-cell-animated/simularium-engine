@@ -325,7 +325,7 @@ namespace agentsim {
         }
 
         float nearlyZero = 1e-9;
-        if(static_cast<double>(tfp.numberOfFrames * frameNumber) < nearlyZero
+        if(static_cast<double>(tfp.timeStepSize * frameNumber) < nearlyZero
             && time < nearlyZero)
         {
             if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
@@ -339,7 +339,7 @@ namespace agentsim {
         }
 
         return std::max( // one of the below is expected to be 0.0
-            static_cast<double>(tfp.numberOfFrames * frameNumber), // non-zero if cache info was set
+            static_cast<double>(tfp.timeStepSize * frameNumber), // non-zero if cache info was set
             time // non-zero if local processing or a live simulation happened
         ); // if both were zero, a dev error was made
     }
