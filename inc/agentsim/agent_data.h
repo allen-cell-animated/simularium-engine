@@ -1,7 +1,18 @@
 #ifndef AICS_AGENT_DATA_H
 #define AICS_AGENT_DATA_H
 
+#include "json/json-forwards.h"
 #include <vector>
+
+namespace aics {
+namespace agentsim {
+    struct AgentData;
+    
+    typedef std::vector<aics::agentsim::AgentData> AgentDataFrame;
+    typedef std::vector<aics::agentsim::AgentDataFrame> AgentDataFrameBundle;
+} // namespace agentsim
+} // namespace aics
+
 
 namespace aics {
 namespace agentsim {
@@ -14,6 +25,8 @@ namespace agentsim {
         std::vector<float> subpoints;
         float vis_type = 0;
     };
+
+    Json::Value Serialize(AgentDataFrame& adf);
 
 }
 }

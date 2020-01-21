@@ -111,10 +111,17 @@ namespace agentsim {
     private:
         void GenerateLocalUUID(std::string& uuid);
 
+        void SendSingleFrameToClient(
+            Simulation& simulation,
+            std::string connectionUID,
+            std::size_t frameNumber
+        ) { this->SendDataToClient(simulation, connectionUID, frameNumber, 1, true); }
+
         void SendDataToClient(
             Simulation& simulation,
             std::string connectionUID,
-            std::size_t frameNumber,
+            std::size_t startingFrame,
+            std::size_t numberOfFrames,
             bool force = false // ignore play state & all conditions, just send
         );
 
@@ -170,6 +177,7 @@ namespace agentsim {
         const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
         const std::size_t kServerTickIntervalMilliSeconds = 200;
+        const std::size_t kNumberOfFramesToBulkBroadcast = 20;
 
         bool m_argNoTimeout = false;
         bool m_argForceInit = false;
