@@ -441,7 +441,12 @@ namespace agentsim {
             auto& uid = entry.first;
             auto& netState = entry.second;
 
-            this->SendDataToClient(simulation, uid, netState.frame_no);
+            this->SendDataToClient(
+                simulation,
+                uid,
+                netState.frame_no,
+                this->kNumberOfFramesToBulkBroadcast
+            );
         }
     }
 
@@ -518,13 +523,14 @@ namespace agentsim {
     void ConnectionManager::SendDataToClient(
         Simulation& simulation,
         std::string connectionUID,
-        std::size_t frameNumber,
+        std::size_t startingFrame,
+        std::size_t numberOfFrames,
         bool force // set to true for one-off sends
     )
     {
         auto& netState = this->m_netStates.at(connectionUID);
         std::string sid = netState.sim_identifier;
-        auto numberOfFrames = simulation.GetNumFrames(sid);
+        auto totalNumberOfFrames = simulation.GetNumFrames(sid);
 
         if(!force)
         {
@@ -533,43 +539,29 @@ namespace agentsim {
             }
         }
 
-        AgentDataFrame simData;
-        netState.frame_no = std::min(frameNumber, numberOfFrames - 1);
-        simData = simulation.GetDataFrame(sid, netState.frame_no);
+        Json::Value dataFrameMessage;
+        dataFrameMessage["msgType"] = id_vis_data_arrive;
+        dataFrameMessage["bundleSize"] = numberOfFrames;
+        dataFrameMessage["bundleStart"] = startingFrame;
+        Json::Value frameArr = Json::Value(Json::arrayValue);
+        int endFrame = std::min(startingFrame + numberOfFrames, totalNumberOfFrames - 1);
 
-        Json::Value net_agent_data_frame;
-        std::vector<float> vals;
+        for(int currentFrame = startingFrame;
+            currentFrame < endFrame;
+            currentFrame++)
+        {
+            AgentDataFrame adf = simulation.GetDataFrame(sid, currentFrame);
+            Json::Value frameJSON;
+            frameJSON["data"] = Serialize(adf);
+            frameJSON["frameNumber"] = currentFrame;
+            dataFrameMessage["time"] = simulation.GetSimulationTimeAtFrame(sid, currentFrame);
 
-        net_agent_data_frame["msgType"] = id_vis_data_arrive;
-        for (std::size_t i = 0; i < simData.size(); ++i) {
-            auto agentData = simData[i];
-            vals.push_back(agentData.vis_type);
-            vals.push_back(agentData.type);
-            vals.push_back(agentData.x);
-            vals.push_back(agentData.y);
-            vals.push_back(agentData.z);
-            vals.push_back(agentData.xrot);
-            vals.push_back(agentData.yrot);
-            vals.push_back(agentData.zrot);
-            vals.push_back(agentData.collision_radius);
-            vals.push_back(agentData.subpoints.size());
-
-            for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
-                vals.push_back(agentData.subpoints[j]);
-            }
+            frameArr.append(frameJSON);
         }
 
-        // Copy values to json data array
-        auto json_data_arr = Json::Value(Json::arrayValue);
-        for (std::size_t j = 0; j < vals.size(); ++j) {
-            int nd_index = static_cast<int>(j);
-            json_data_arr[nd_index] = vals[nd_index];
-        }
-
-        net_agent_data_frame["data"] = json_data_arr;
-        net_agent_data_frame["frameNumber"] = static_cast<int>(netState.frame_no);
-        net_agent_data_frame["time"] = simulation.GetSimulationTimeAtFrame(sid, netState.frame_no);
-        this->SendWebsocketMessage(connectionUID, net_agent_data_frame);
+        netState.frame_no = endFrame;
+        dataFrameMessage["bundleData"] = frameArr;
+        this->SendWebsocketMessage(connectionUID, dataFrameMessage);
     }
 
     void ConnectionManager::HandleMessage(NetMessage nm)
@@ -673,11 +665,10 @@ namespace agentsim {
                             senderUid,
                             "Data request for frame " + std::to_string(frameNumber)
                         );
-                        this->SendDataToClient(
+                        this->SendSingleFrameToClient(
                             simulation,
                             senderUid,
-                            frameNumber,
-                            true // force
+                            frameNumber
                         );
 
                         this->SetClientState(senderUid, ClientPlayState::Stopped);
@@ -778,7 +769,7 @@ namespace agentsim {
                     this->LogClientEvent(senderUid, "Set to frame " + std::to_string(frameNumber));
                     this->SetClientFrame(senderUid, frameNumber);
                     this->SetClientState(senderUid, ClientPlayState::Paused);
-                    this->SendDataToClient(simulation, senderUid, frameNumber, true);
+                    this->SendSingleFrameToClient(simulation, senderUid, frameNumber);
                 } break;
                 case WebRequestTypes::id_init_trajectory_file: {
                     std::string trajectoryFileName = jsonMsg["fileName"].asString();
@@ -816,7 +807,7 @@ namespace agentsim {
         if(simulation.HasFileInCache(fileName))
         {
             LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
-            this->SendDataToClient(simulation, connectionUID, 0, true);
+            this->SendSingleFrameToClient(simulation, connectionUID, 0);
         }
         else {
             // Attempt to download an already processed runtime cache
@@ -824,7 +815,7 @@ namespace agentsim {
                 && simulation.DownloadRuntimeCache(fileName))
             {
                 simulation.PreprocessRuntimeCache(fileName);
-                this->SendDataToClient(simulation, connectionUID, 0, true);
+                this->SendSingleFrameToClient(simulation, connectionUID, 0);
             }
             else {
                 simulation.SetPlaybackMode(id_traj_file_playback);
@@ -835,7 +826,7 @@ namespace agentsim {
                     LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
 
                     this->SetupRuntimeCacheAsync(simulation, 500);
-                    this->SendDataToClient(simulation, connectionUID, 0, true);
+                    this->SendSingleFrameToClient(simulation, connectionUID, 0);
 
                     this->m_fileMutex.lock();
                     LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());

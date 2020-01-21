@@ -14,9 +14,6 @@
 namespace aics {
 namespace agentsim {
 
-    typedef std::vector<AgentData> AgentDataFrame;
-    typedef std::vector<AgentDataFrame> FrameList;
-
     class SimulationCache {
     public:
         SimulationCache();

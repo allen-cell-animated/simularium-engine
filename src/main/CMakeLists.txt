@@ -7,6 +7,7 @@ set(SOURCES
 "aws_util.cpp"
 "math_util.cpp"
 "agent.cpp"
+"agent_data.cpp"
 "model.cpp"
 "simulation_cache.cpp"
 "simulation.cpp"
