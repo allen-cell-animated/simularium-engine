@@ -554,7 +554,7 @@ namespace agentsim {
             Json::Value frameJSON;
             frameJSON["data"] = Serialize(adf);
             frameJSON["frameNumber"] = currentFrame;
-            dataFrameMessage["time"] = simulation.GetSimulationTimeAtFrame(sid, currentFrame);
+            frameJSON["time"] = simulation.GetSimulationTimeAtFrame(sid, currentFrame);
 
             frameArr.append(frameJSON);
         }
