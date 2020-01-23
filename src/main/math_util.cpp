@@ -76,9 +76,14 @@ namespace mathutil {
 
         auto u = Eigen::Vector3d(-vector[1], vector[0], 0);
         u.normalize();
-        auto r = Eigen::AngleAxisd(rand() % 2*M_PI, vector).toRotationMatrix();
-
-        return r * u;
+        
+//        // TODO
+//        vector.normalize();
+//        auto angle = float(rand() % 360) * float(M_PI) / float(180);
+//        std::cout << "random angle = " << angle << std::endl;
+//        auto r = Eigen::AngleAxisd(angle, vector).toRotationMatrix();
+        
+        return u;// r * u;
     }
 
 } // namespace mathutil

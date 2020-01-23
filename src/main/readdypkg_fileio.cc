@@ -42,15 +42,15 @@ OrientationDataMap initOrientationData() {
                                       0.80641304, -0.41697831,  0.41931742,
                                      -0.55761796, -0.77225604,  0.30443854;
 
-    Eigen::Matrix3d rotation_arp2_from_arp_dimer_axis; //TODO
-    rotation_arp2_from_arp_dimer_axis <<  0.81557928, -0.35510793,  0.45686846,
-                                         -0.57175434, -0.37306342,  0.73069875,
-                                         -0.08903601, -0.85715929, -0.5072973;
+    Eigen::Matrix3d rotation_arp2_from_arp_dimer_axis;
+    rotation_arp2_from_arp_dimer_axis <<  0.493391, -0.862657,   0.111303,
+                                         -0.797446, -0.499725,  -0.338164,
+                                          0.34734,   0.0780887, -0.934482;
 
-    Eigen::Matrix3d rotation_arp3_from_arp_dimer_axis; //TODO
-    rotation_arp3_from_arp_dimer_axis <<  0.19687615, -0.47932213, -0.85527193,
-                                          0.80641304, -0.41697831,  0.41931742,
-                                         -0.55761796, -0.77225604,  0.30443854;
+    Eigen::Matrix3d rotation_arp3_from_arp_dimer_axis;
+    rotation_arp3_from_arp_dimer_axis << -0.599953, 0.795272, 0.0871714,
+                                          0.598794, 0.374107, 0.70816,
+                                          0.530568, 0.47706, -0.70065;
 
     Eigen::Matrix3d rotation_tub_from_tub_dimer_axis;
     rotation_tub_from_tub_dimer_axis <<  1,  0,  0,
@@ -104,7 +104,7 @@ OrientationDataMap initOrientationData() {
             OrientationData (
                 Eigen::Vector3d(2.390059, 1.559484, 3.054445),
                 zero_rotation,
-                zero_rotation  //rotation_arp3_from_arp_dimer_axis
+                rotation_arp3_from_arp_dimer_axis
             )
         }
     };
@@ -114,7 +114,7 @@ OrientationDataMap initOrientationData() {
             OrientationData (
                 Eigen::Vector3d(0,0,0),
                 zero_rotation,
-                zero_rotation  //rotation_arp2_from_arp_dimer_axis
+                rotation_arp2_from_arp_dimer_axis
             )
         }
     };
@@ -1021,6 +1021,7 @@ static Eigen::Matrix3d getCurrentRotation(
     ParticleData neighborParticle1
 )
 {
+    //TODO handle neighbors that cross periodic boundary
     std::vector<Eigen::Vector3d> basisPositions {};
     auto rpos0 = neighborParticle0.position;
     basisPositions.push_back(Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]));
@@ -1055,6 +1056,7 @@ static Eigen::Matrix3d getRotationUsingAxis(
     auto neighborPosition = Eigen::Vector3d(
         neighborParticle.position[0], neighborParticle.position[1], neighborParticle.position[2]);
 
+    //TODO handle neighbors that cross periodic boundary
     Eigen::Vector3d axis = neighborPosition - particlePosition;
     auto normal = aics::agentsim::mathutil::getRandomPerpendicularVector(axis);
     auto normalPos = particlePosition + normal;
