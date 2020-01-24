@@ -4,6 +4,12 @@ add_library("cytosimPKG" STATIC
     "cytosimpkg.cpp"
 )
 
+find_library(LAPACK_LIB lapack REQUIRED)
+find_library(BLAS_LIB blas REQUIRED)
+
+if(NOT BLAS_LIB)
+    message(FATAL_ERROR "BLAS library not found")
+endif()
 set(CYTOSIM_PKG_INCLUDES
   "${DEPENDENCY_DIRECTORY}/cytosim/src"
   "${DEPENDENCY_DIRECTORY}/cytosim/src/sim"
@@ -28,5 +34,7 @@ target_include_directories("cytosimPKG" PRIVATE
 
 target_link_libraries("cytosimPKG" PRIVATE
     "${CYTOSIM_LIBRARIES}"
+    "${LAPACK_LIB}"
+    "${BLAS_LIB}"
     "loguru"
 )

@@ -23,7 +23,6 @@ void killed_handler(int sig)
 }
 
 Simul simul;
-Glossary glos;
 FrameReader reader;
 
 std::string input_file = "./dep/cytosim/cym/aster.cym";
@@ -52,11 +51,7 @@ namespace agentsim {
         if (signal(SIGTERM, killed_handler) == SIG_ERR)
             LOG_F(ERROR,"Could not register SIGTERM handler");
 
-        glos.clear();
-        glos.define("config", input_file);
-
         try {
-            simul.initialize(glos);
             Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
         } catch (Exception& e) {
             LOG_F(FATAL,e.what().c_str());
@@ -65,8 +60,6 @@ namespace agentsim {
             LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
             return;
         }
-
-        glos.warnings(std::cerr);
 
         this->m_hasAlreadySetup = true;
         LOG_F(INFO,"Cytosim PKG Setup ended");
@@ -80,7 +73,6 @@ namespace agentsim {
         this->m_hasLoadedFrameReader = false;
 
         simul.erase();
-        glos.clear();
         //reader.clear();
     }
 
@@ -101,18 +93,7 @@ namespace agentsim {
     void CytosimPkg::RunTimeStep(
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
     {
-        float max_time_step = 0.1f;
-
-        if (timeStep > max_time_step) {
-            unsigned n_iterations = timeStep / max_time_step;
-
-            simul.prop->time_step = max_time_step;
-            Parser(simul, 0, 0, 0, 1, 0).execute_run(n_iterations, glos);
-        } else {
-            simul.prop->time_step = timeStep;
-            Parser(simul, 0, 0, 0, 1, 0).execute_run(1, glos);
-        }
-
+        Parser(simul, 0, 0, 0, 1, 0).execute_run(1);
         GetFiberPositionsFromFrame(agents);
     }
 
@@ -120,14 +101,14 @@ namespace agentsim {
     {
     }
 
-    void CytosimPkg::Run(float timeStep, std::size_t nTimeStep)
+    void CytosimPkg::Run(float timeStep, std::size_t nTimeSteps)
     {
         if (this->m_hasAlreadyRun)
             return;
 
         LOG_F(INFO,"Cytosim PKG Run Started");
         try {
-            Parser(simul, 0, 0, 0, 1, 1).readConfig(input_file);
+            Parser(simul, 0, 0, 0, 1, 1).execute_run(nTimeSteps);
         } catch (Exception& e) {
             LOG_F(FATAL,e.what().c_str());
             return;

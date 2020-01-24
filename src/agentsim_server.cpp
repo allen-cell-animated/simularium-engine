@@ -40,26 +40,11 @@ int main(int argc, char* argv[])
 
     float timeStep = 1e-12; // seconds
 
-    // @TODO: A more robust way to select simulation packages
-    bool use_readdy = true;
-    bool use_cytosim = !use_readdy;
-
     // Simulation setup
     std::vector<std::shared_ptr<SimPkg>> simulators;
 
-    if (use_readdy) {
-        ReaDDyPkg* readdySimPkg = new ReaDDyPkg();
-        std::shared_ptr<SimPkg> readdyPkg;
-        readdyPkg.reset(readdySimPkg);
-        simulators.push_back(readdyPkg);
-    }
-
-    if (use_cytosim) {
-        CytosimPkg* cytosimSimPkg = new CytosimPkg();
-        std::shared_ptr<SimPkg> cytosimPkg;
-        cytosimPkg.reset(cytosimSimPkg);
-        simulators.push_back(cytosimPkg);
-    }
+    //simulators.push_back(std::shared_ptr<SimPkg>(new ReaDDyPkg()));
+    simulators.push_back(std::shared_ptr<SimPkg>(new CytosimPkg()));
 
     std::vector<std::shared_ptr<Agent>> agents;
     Simulation simulation(simulators, agents);
