@@ -16,6 +16,8 @@ link_directories(
   "/usr/local/opt/openssl/lib"
 )
 
+add_compile_options(-Wno-deprecated-declarations)
+
 if(${AGENTVIZ_FULL_DEBUG_SYMBOLS})
   message("Building Agent Viz with full debugging symbols")
   add_definitions("-g3 -ggdb")
