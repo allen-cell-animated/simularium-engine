@@ -83,6 +83,8 @@ namespace agentsim {
 
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) = 0;
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) = 0;
+
+        virtual bool CanLoadFile(std::string filePath) = 0;
     };
 
 } // namespace agentsim

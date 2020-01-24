@@ -1,1 +1,2 @@
-add_subdirectory(${TARGET})
+add_subdirectory("main")
+add_subdirectory("test")

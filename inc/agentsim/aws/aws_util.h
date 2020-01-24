@@ -2,7 +2,6 @@
 #define AICS_AWS_UTIL_H
 
 #include <string>
-#include <aws/core/Aws.h>
 
 namespace aics {
 namespace agentsim {

@@ -131,7 +131,7 @@ namespace agentsim {
 	*
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
 	*/
-        void LoadTrajectoryFile(
+        bool LoadTrajectoryFile(
             std::string fileName
         );
 
@@ -239,6 +239,7 @@ namespace agentsim {
             { return this->m_cache.GetNumFrames(identifier); }
 
         void SetSimId(std::string identifier) { this->m_simIdentifier = identifier; }
+        std::string GetSimId() { return this->m_simIdentifier; }
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;

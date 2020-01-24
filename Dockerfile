@@ -17,7 +17,8 @@ RUN mkdir /agentsim-dev && \
 	liblapack-dev \
 	python-dev \
 	libssl-dev libcurl4-openssl-dev \
-	libblosc1
+	libblosc1 \
+    libglew-dev mesa-common-dev freeglut3-dev
 
 # copy agent sim project
 COPY . /agentsim-dev/agentsim
@@ -30,6 +31,7 @@ RUN git submodule update --init --recursive
 RUN cd ../build && \
 	cmake ../agentsim -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release && \
 	make && \
+    openssl dhparam -out /dh.pem 2048 && \
 	find /agentsim-dev/build | grep -i so$ | xargs -i cp {} /agentsim-dev/lib/
 
 ### Run image ###
@@ -50,6 +52,7 @@ RUN groupadd -r app && useradd -r -g app app
 
 # copy the server to the root dir
 COPY --from=build --chown=app:app /agentsim-dev/build/agentsim_server.exe /usr/bin/agentsim_server.exe
+COPY --from=build --chown=app:app /dh.pem /dh.pem
 COPY --from=build --chown=app:app /agentsim-dev/build/bin/. /bin/
 RUN echo " "
 COPY --from=build --chown=app:app /agentsim-dev/lib/. /usr/lib/

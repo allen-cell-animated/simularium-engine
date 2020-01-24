@@ -8,6 +8,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -110,10 +111,17 @@ namespace agentsim {
     private:
         void GenerateLocalUUID(std::string& uuid);
 
+        void SendSingleFrameToClient(
+            Simulation& simulation,
+            std::string connectionUID,
+            std::size_t frameNumber
+        ) { this->SendDataToClient(simulation, connectionUID, frameNumber, 1, true); }
+
         void SendDataToClient(
             Simulation& simulation,
             std::string connectionUID,
-            std::size_t frameNumber,
+            std::size_t startingFrame,
+            std::size_t numberOfFrames,
             bool force = false // ignore play state & all conditions, just send
         );
 
@@ -156,6 +164,8 @@ namespace agentsim {
             return std::getenv("TLS_KEY_PATH") ? std::getenv("TLS_KEY_PATH") : "";
         }
 
+        void LogClientEvent(std::string uid, std::string msg);
+
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
         std::unordered_map<std::string, std::size_t> m_missedHeartbeats;
@@ -167,6 +177,7 @@ namespace agentsim {
         const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
         const std::size_t kServerTickIntervalMilliSeconds = 200;
+        const std::size_t kNumberOfFramesToBulkBroadcast = 20;
 
         bool m_argNoTimeout = false;
         bool m_argForceInit = false;
@@ -186,6 +197,7 @@ namespace agentsim {
         std::thread m_heartbeatThread;
         std::thread m_simThread;
         std::thread m_fileIoThread;
+        std::mutex m_fileMutex;
     };
 
 } // namespace agentsim
