@@ -22,7 +22,8 @@ OrientationDataMap initOrientationData() {
                                     -0.79675461, -0.55949104, -0.22836785,
                                      0.15113327,  0.18140554, -0.97172566;
 
-    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis; //TODO
+    //TODO test this again once periodic boundary is accounted for in orientation calculation
+    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis; 
     rotation_barbed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
                                              -0.3445482,   0.76082255, -0.54994144,
                                               0.92229704,  0.38359532, -0.0471465;
@@ -32,7 +33,8 @@ OrientationDataMap initOrientationData() {
                                     -0.80873679, -0.55949491, 0.18141181,
                                     -0.05998622, -0.2283657, -0.97172566;
 
-    Eigen::Matrix3d rotation_pointed_from_actin_dimer_axis; //TODO
+    //TODO test this again once periodic boundary is accounted for in orientation calculation
+    Eigen::Matrix3d rotation_pointed_from_actin_dimer_axis;
     rotation_pointed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
                                               -0.3445482,   0.76082255, -0.54994144,
                                                0.92229704,  0.38359532, -0.0471465;
