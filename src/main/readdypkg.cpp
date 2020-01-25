@@ -153,9 +153,4 @@ namespace agentsim {
 } // namespace aics
 
 #include "readdypkg_fileio.cc"
-
-#if USE_HARDCODED == 1
 #include "readdypkg_hardcoded.cc"
-#elif USE_HARDCODED == 0
-#include "readdypkg_generalized.cc"
-#endif
