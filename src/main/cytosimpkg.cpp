@@ -1,8 +1,4 @@
-#include "agentsim/simpkg/cytosimpkg.h"
-#include "agentsim/agents/agent.h"
-#include "loguru/loguru.hpp"
 #include "simul_prop.h"
-
 #include "exceptions.h"
 #include "frame_reader.h"
 #include "glossary.h"
@@ -13,6 +9,10 @@
 #include "tictoc.h"
 #include <csignal>
 #include <stdlib.h>
+
+#include "agentsim/simpkg/cytosimpkg.h"
+#include "agentsim/agents/agent.h"
+#include "loguru/loguru.hpp"
 
 using std::endl;
 
@@ -172,15 +172,12 @@ void GetFiberPositionsFromFrame(
             return;
         }
 
-        std::vector<Eigen::Vector3d> fiber_positions;
+        std::vector<float> fiber_positions;
         for (std::size_t p = 0; p < fib->nbPoints(); ++p) {
             Vector cytosim_pos = fib->posPoint(p);
-            Eigen::Vector3d agentviz_pos(
-                cytosim_pos[0],
-                cytosim_pos[1],
-                cytosim_pos[2]);
-
-            fiber_positions.push_back(agentviz_pos);
+            fiber_positions.push_back(cytosim_pos[0]);
+            fiber_positions.push_back(cytosim_pos[1]);
+            fiber_positions.push_back(cytosim_pos[2]);
         }
 
         agents[agent_index]->SetName("Fiber");
@@ -188,10 +185,14 @@ void GetFiberPositionsFromFrame(
         agents[agent_index]->SetVisType(kVisType::vis_type_fiber);
         agents[agent_index]->SetCollisionRadius(0.3);
         agents[agent_index]->SetVisibility(true);
-        agents[agent_index]->SetLocation(fiber_positions[fiber_positions.size() - 1]);
+        agents[agent_index]->SetLocation(
+            fiber_positions[0],
+            fiber_positions[1],
+            fiber_positions[2]
+        );
 
         for (std::size_t i = 0; i < fiber_positions.size(); ++i) {
-            agents[agent_index]->UpdateSubPoint(i, fiber_positions[i]);
+            agents[agent_index]->UpdateSubPoint(i, &fiber_positions[i*3]);
         }
 
         agent_index++;

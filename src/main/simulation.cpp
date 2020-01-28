@@ -224,10 +224,10 @@ namespace agentsim {
             ad.type = agent->GetTypeID();
             ad.vis_type = static_cast<unsigned int>(agent->GetVisType());
 
-            auto t = agent->GetTransform();
-            ad.x = t(0, 3);
-            ad.y = t(1, 3);
-            ad.z = t(2, 3);
+            auto location = agent->GetLocation();
+            ad.x = location[0];
+            ad.y = location[1];
+            ad.z = location[2];
 
             auto rotation = agent->GetRotation();
             ad.xrot = rotation[0];

@@ -1,8 +1,6 @@
 #include "agentsim/agents/agent.h"
 #include <stdlib.h>
 #include <time.h>
-#include "Eigen/Dense"
-#include "Eigen/Geometry"
 
 namespace aics {
 namespace agentsim {
@@ -24,44 +22,56 @@ namespace agentsim {
         }
     } // namespace agents
 
-    namespace math_util {
-        Eigen::Affine3d CreateRotationMatrix(double ax, double ay, double az)
-        {
-            Eigen::Affine3d rx = Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
-            Eigen::Affine3d ry = Eigen::Affine3d(Eigen::AngleAxisd(ay, Eigen::Vector3d(0, 1, 0)));
-            Eigen::Affine3d rz = Eigen::Affine3d(Eigen::AngleAxisd(az, Eigen::Vector3d(0, 0, 1)));
-            return rz * ry * rx;
-        }
-
-        Eigen::Matrix4d CreateTransform(Eigen::Vector3d loc, Eigen::Vector3d rot)
-        {
-            return (Eigen::Translation3d(loc) * CreateRotationMatrix(rot[0], rot[1], rot[2])).matrix();
-        }
-
-    } // namespace math_util
-
     Agent::Agent()
     {
-        this->m_location << 0, 0, 0;
-        this->m_rotation << 0, 0, 0;
+        this->m_x = 0;
+        this->m_y = 0;
+        this->m_z = 0;
+
+        this->m_xrot = 0;
+        this->m_yrot = 0;
+        this->m_zrot = 0;
 
         agents::GenerateLocalUUID(this->m_agentID);
     }
 
-    void Agent::SetLocation(Eigen::Vector3d newLocation)
+    void Agent::SetLocation(float x, float y, float z)
     {
-        this->m_location = newLocation;
+        this->m_x = x;
+        this->m_y = y;
+        this->m_z = z;
     }
 
-    void Agent::SetRotation(Eigen::Vector3d newRotation)
+    void Agent::SetRotation(float xrot, float yrot, float zrot)
     {
-        this->m_rotation = newRotation;
+        this->m_xrot = xrot;
+        this->m_yrot = yrot;
+        this->m_zrot = zrot;
     }
 
-    const Eigen::Matrix4d Agent::GetTransform()
-    {
-        return math_util::CreateTransform(this->m_location, this->m_rotation);
+    void Agent::AddSubPoint(float point[3]) {
+        this->m_subPoints.push_back(point[0]);
+        this->m_subPoints.push_back(point[1]);
+        this->m_subPoints.push_back(point[2]);
     }
-    
+
+    void Agent::UpdateSubPoint(std::size_t index, float point[3]) {
+        if (index < 0 || index > this->m_subPoints.size() / 3)
+            return;
+        if (index == this->m_subPoints.size()) {
+            AddSubPoint(point);
+        }
+
+        this->m_subPoints[index * 3] = point[0];
+        this->m_subPoints[index * 3 + 1] = point[1];
+        this->m_subPoints[index * 3 + 2] = point[2];
+    }
+
+    std::vector<float> Agent::GetSubPoint(std::size_t index) {
+        auto first = this->m_subPoints.begin() + index * 3;
+        auto last = this->m_subPoints.begin() + index * 3 + 2;
+        return std::vector<float>(first, last);
+    }
+
 } // namespace agentsim
 } // namespace aics

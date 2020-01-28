@@ -7,6 +7,8 @@
 #include <fstream>
 #include <limits>
 #include <readdy/model/topologies/TopologyRecord.h>
+#include "Eigen/Dense"
+#include "Eigen/Geometry"
 
 struct ParticleData {
     ParticleData(std::string type, std::string flavor, const std::array<readdy::scalar, 3>& pos,
