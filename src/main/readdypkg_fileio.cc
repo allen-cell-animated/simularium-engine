@@ -168,7 +168,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& rfi,
+    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
     IdParticleMapping& particleLookup
 );
 
@@ -234,10 +234,17 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
     const std::unordered_map<std::size_t, std::size_t>& idmappingFrame
 );
 
+static Eigen::Vector3d getNeighborNonPeriodicBoundaryPosition(
+    Eigen::Vector3d particlePosition,
+    Eigen::Vector3d neighborParticlePosition,
+    Eigen::Vector3d boxSize
+);
+
 static Eigen::Matrix3d getCurrentRotation(
     ParticleData neighborParticle0,
     ParticleData currentParticle,
-    ParticleData neighborParticle1
+    ParticleData neighborParticle1,
+    Eigen::Vector3d boxSize
 );
 
 static Eigen::Matrix3d getInitialRotation(
@@ -247,13 +254,14 @@ static Eigen::Matrix3d getInitialRotation(
 static Eigen::Matrix3d getRotationUsingAxis(
     ParticleData particle,
     ParticleData neighborParticle,
-    Eigen::Matrix3d axisRotation
+    Eigen::Matrix3d axisRotation,
+    Eigen::Vector3d boxSize
 );
 
 static void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    RotationH5Info& outRotations,
+    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
     const IdParticleMapping& particleLookup,
     const OrientationDataMap& orientationDataLookup
 );
@@ -423,14 +431,13 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& rfi,
+    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
     IdParticleMapping& particleLookup
     )
 {
-    TimeTrajectoryH5Info& trajectoryInfo = rfi->trajectoryInfo;
-    TimeTopologyH5Info& topologyInfo = rfi->topologyInfo;
-    RotationH5Info& rotationInfo = rfi->rotationInfo;
-    std::unordered_map<std::size_t, std::string>& typeMapping = rfi->typeMapping;
+    TimeTrajectoryH5Info& trajectoryInfo = readdyFileInfo->trajectoryInfo;
+    TimeTopologyH5Info& topologyInfo = readdyFileInfo->topologyInfo;
+    std::unordered_map<std::size_t, std::string>& typeMapping = readdyFileInfo->typeMapping;
 
     // open the output file
     auto file = h5rd::File::open(file_name, h5rd::File::Flag::READ_ONLY);
@@ -456,13 +463,13 @@ void read_h5file(
         }
 
         if(boxSizeVec.size() >= 3) {
-            rfi->configInfo.boxX = boxSizeVec[0];
-            rfi->configInfo.boxY = boxSizeVec[1];
-            rfi->configInfo.boxZ = boxSizeVec[2];
+            readdyFileInfo->configInfo.boxX = boxSizeVec[0];
+            readdyFileInfo->configInfo.boxY = boxSizeVec[1];
+            readdyFileInfo->configInfo.boxZ = boxSizeVec[2];
         }
 
-        rfi->configInfo.kbt = jsonMsg["kbt"].asFloat();
-        rfi->configInfo.boxVolume = jsonMsg["box_volume"].asFloat();
+        readdyFileInfo->configInfo.kbt = jsonMsg["kbt"].asFloat();
+        readdyFileInfo->configInfo.boxVolume = jsonMsg["box_volume"].asFloat();
     } catch(...) {
         LOG_F(ERROR,"Config info not found in %s", file_name.c_str());
         return;
@@ -494,7 +501,7 @@ void read_h5file(
       calculateOrientations(
           std::get<1>(topologyInfo),
           std::get<1>(trajectoryInfo),
-          rotationInfo,
+          readdyFileInfo,
           particleLookup,
           orientationData
       );
@@ -1017,20 +1024,54 @@ static std::vector<RelativeOrientationData> getNeighborOrientationData(
     return neighborOrientationData;
 }
 
+static Eigen::Vector3d getNeighborNonPeriodicBoundaryPosition(
+    Eigen::Vector3d particlePosition,
+    Eigen::Vector3d neighborParticlePosition,
+    Eigen::Vector3d boxSize
+)
+{
+    std::vector<float> result {};
+    for (std::size_t dim = 0; dim < 3; ++dim)
+    {
+        if (abs(neighborParticlePosition[dim] - particlePosition[dim]) > boxSize[dim] / 2.) 
+        {
+            if (verboseOrientation)
+            {   
+                LOG_F(INFO,"neighbor crossed periodic boundary in dimension %zu", dim);
+            }
+            result.push_back(neighborParticlePosition[dim] -
+                neighborParticlePosition[dim] / abs(neighborParticlePosition[dim]) * boxSize[dim]);
+        }
+        else
+        {
+            result.push_back(neighborParticlePosition[dim]);
+        }
+    }
+    return Eigen::Vector3d(result[0], result[1], result[2]);
+}
+
 static Eigen::Matrix3d getCurrentRotation(
     ParticleData neighborParticle0,
     ParticleData currentParticle,
-    ParticleData neighborParticle1
+    ParticleData neighborParticle1,
+    Eigen::Vector3d boxSize
 )
 {
-    //TODO handle neighbors that cross periodic boundary
     std::vector<Eigen::Vector3d> basisPositions {};
-    auto rpos0 = neighborParticle0.position;
-    basisPositions.push_back(Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]));
     auto rpos1 = currentParticle.position;
-    basisPositions.push_back(Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]));
+    auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
+    
+    auto rpos0 = neighborParticle0.position;
+    auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
+    auto neighbor0Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos0, boxSize);
+    basisPositions.push_back(neighbor0Position);
+    
+    basisPositions.push_back(pos1);
+    
     auto rpos2 = neighborParticle1.position;
-    basisPositions.push_back(Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]));
+    auto pos2 = Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]);
+    auto neighbor2Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos2, boxSize);
+    basisPositions.push_back(neighbor2Position);
 
     return aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
 }
@@ -1050,23 +1091,25 @@ static Eigen::Matrix3d getInitialRotation(
 static Eigen::Matrix3d getRotationUsingAxis(
     ParticleData particle,
     ParticleData neighborParticle,
-    Eigen::Matrix3d axisRotation
+    Eigen::Matrix3d axisRotation,
+    Eigen::Vector3d boxSize
 )
 {
-    auto particlePosition = Eigen::Vector3d(
-        particle.position[0], particle.position[1], particle.position[2]);
-    auto neighborPosition = Eigen::Vector3d(
-        neighborParticle.position[0], neighborParticle.position[1], neighborParticle.position[2]);
-
-    //TODO handle neighbors that cross periodic boundary
-    Eigen::Vector3d axis = neighborPosition - particlePosition;
+    auto rpos1 = particle.position;
+    auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
+    
+    auto rpos0 = neighborParticle.position;
+    auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
+    auto neighbor0Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos0, boxSize);
+    
+    Eigen::Vector3d axis = neighbor0Position - pos1;
     auto normal = aics::agentsim::mathutil::getRandomPerpendicularVector(axis);
-    auto normalPos = particlePosition + normal;
+    auto pos2 = pos1 + normal;
 
     std::vector<Eigen::Vector3d> basisPositions {};
-    basisPositions.push_back(neighborPosition);
-    basisPositions.push_back(particlePosition);
-    basisPositions.push_back(normalPos);
+    basisPositions.push_back(neighbor0Position);
+    basisPositions.push_back(pos1);
+    basisPositions.push_back(pos2);
 
     Eigen::Matrix3d rotation = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
     return rotation * axisRotation;
@@ -1075,14 +1118,21 @@ static Eigen::Matrix3d getRotationUsingAxis(
 static void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    RotationH5Info& outRotations,
+    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
     const IdParticleMapping& particleLookup,
     const OrientationDataMap& orientationDataLookup
 )
 {
     auto numberOfFrames = trajectoryH5Info.size();
     auto topologyStride = (trajectoryH5Info.size() / topologyH5Info.size()) + 1;
+    RotationH5Info& outRotations = readdyFileInfo->rotationInfo;
     outRotations.resize(numberOfFrames);
+    
+    auto boxSize = Eigen::Vector3d(
+        readdyFileInfo->configInfo.boxX, 
+        readdyFileInfo->configInfo.boxY, 
+        readdyFileInfo->configInfo.boxZ
+    );
 
     for(std::size_t frameIndex = 0; frameIndex < numberOfFrames; ++frameIndex)
     {
@@ -1157,7 +1207,8 @@ static void calculateOrientations(
             Eigen::Matrix3d currentRotation = getCurrentRotation(
                 trajectoryFrame.at(neighborOrientationData.at(0).neighborID),
                 currentParticle,
-                trajectoryFrame.at(neighborOrientationData.at(1).neighborID));
+                trajectoryFrame.at(neighborOrientationData.at(1).neighborID),
+                boxSize);
             Eigen::Matrix3d initialRotation = getInitialRotation(neighborOrientationData);
             orientationFrame.push_back(currentRotation.inverse() * initialRotation);
             if (verboseOrientation)
@@ -1187,7 +1238,8 @@ static void calculateOrientations(
                 orientationFrame.at(particleID) = getRotationUsingAxis(
                     trajectoryFrame.at(particleID),
                     trajectoryFrame.at(neighborID),
-                    it.second.data.axisRotation
+                    it.second.data.axisRotation,
+                    boxSize
                 );
                 if (verboseOrientation)
                 {
