@@ -1,6 +1,7 @@
 #include "agentsim/agents/agent.h"
 #include <stdlib.h>
 #include <time.h>
+#include <iostream>
 
 namespace aics {
 namespace agentsim {
@@ -49,27 +50,36 @@ namespace agentsim {
         this->m_zrot = zrot;
     }
 
-    void Agent::AddSubPoint(float point[3]) {
-        this->m_subPoints.push_back(point[0]);
-        this->m_subPoints.push_back(point[1]);
-        this->m_subPoints.push_back(point[2]);
+
+    std::size_t Agent::GetNumSubPoints()
+    {
+        return this->m_subPoints.size() / 3;
     }
 
-    void Agent::UpdateSubPoint(std::size_t index, float point[3]) {
-        if (index < 0 || index > this->m_subPoints.size() / 3)
-            return;
-        if (index == this->m_subPoints.size()) {
-            AddSubPoint(point);
-        }
+    bool Agent::HasSubPoints() { return this->m_subPoints.size(); }
 
-        this->m_subPoints[index * 3] = point[0];
-        this->m_subPoints[index * 3 + 1] = point[1];
-        this->m_subPoints[index * 3 + 2] = point[2];
+    void Agent::AddSubPoint(float x, float y, float z) {
+        this->m_subPoints.push_back(x);
+        this->m_subPoints.push_back(y);
+        this->m_subPoints.push_back(z);
+    }
+
+    void Agent::UpdateSubPoint(std::size_t index, float x, float y, float z) {
+        std::size_t nbSubPoints = this->GetNumSubPoints();
+        if (index < 0 || index > nbSubPoints) {
+            return;
+        } else if (index < nbSubPoints) {
+            this->m_subPoints[index * 3] = x;
+            this->m_subPoints[index * 3 + 1] = y;
+            this->m_subPoints[index * 3 + 2] = z;
+        } else if (index == nbSubPoints) {
+            AddSubPoint(x,y,z);
+        }
     }
 
     std::vector<float> Agent::GetSubPoint(std::size_t index) {
         auto first = this->m_subPoints.begin() + index * 3;
-        auto last = this->m_subPoints.begin() + index * 3 + 2;
+        auto last = this->m_subPoints.begin() + index * 3 + 3;
         return std::vector<float>(first, last);
     }
 

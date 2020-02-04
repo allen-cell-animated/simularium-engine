@@ -41,11 +41,11 @@ namespace agentsim {
         void SetVisibility(bool visibility) { this->m_visibility = visibility; }
         const bool IsVisible() { return this->m_visibility; }
 
-        void AddSubPoint(float point[3]);
-        void UpdateSubPoint(std::size_t index, float point[3]);
-        bool HasSubPoints() { return this->m_subPoints.size() > 0; }
+        void AddSubPoint(float x, float y, float z);
+        void UpdateSubPoint(std::size_t index, float x, float y, float z);
+        bool HasSubPoints();
 
-        std::size_t GetNumSubPoints() { return this->m_subPoints.size() / 3; }
+        std::size_t GetNumSubPoints();
         std::vector<float> GetSubPoint(std::size_t index);
 
         kVisType GetVisType() { return this->m_visType; }

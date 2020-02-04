@@ -6,6 +6,9 @@
 #include <string>
 #include <vector>
 
+class Simul;
+class FrameReader;
+
 namespace aics {
 namespace agentsim {
 
@@ -40,10 +43,14 @@ namespace agentsim {
             { return filePath.substr(filePath.find_last_of(".") + 1) == "cmo"; }
 
     private:
-        bool m_hasAlreadyRun = false;
-        bool m_hasAlreadySetup = false;
+        void CopyFibers(
+            std::vector<std::shared_ptr<Agent>>& agents,
+            FrameReader* reader,
+            Simul* simul
+        );
+
+        std::shared_ptr<FrameReader> m_reader;
         bool m_hasFinishedStreaming = false;
-        bool m_hasLoadedFrameReader = false;
     };
 
 } // namespace agentsim
