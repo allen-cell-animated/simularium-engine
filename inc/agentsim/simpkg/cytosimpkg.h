@@ -14,8 +14,8 @@ namespace agentsim {
 
     class CytosimPkg : public SimPkg {
     public:
-        CytosimPkg() {}
-        virtual ~CytosimPkg() {}
+        CytosimPkg();
+        virtual ~CytosimPkg();
 
         virtual void Setup() override;
         virtual void Shutdown() override;
@@ -49,8 +49,21 @@ namespace agentsim {
             Simul* simul
         );
 
+        static std::string TrajectoryFilePath()
+        {
+            return CytosimPkg::PKG_DIRECTORY + "/trajectory.cmo";
+        }
+
+        static std::string PropertyFilePath()
+        {
+            return CytosimPkg::PKG_DIRECTORY + "/properties.cmo";
+        }
+
         std::shared_ptr<FrameReader> m_reader;
         bool m_hasFinishedStreaming = false;
+
+        static const std::string PKG_DIRECTORY;
+        std::string m_configFile = "./dep/cytosim/cym/aster.cym";
     };
 
 } // namespace agentsim

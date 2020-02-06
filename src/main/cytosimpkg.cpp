@@ -16,29 +16,31 @@
 
 using std::endl;
 
-void killed_handler(int sig)
-{
-    LOG_F(WARNING, "Cytosim Killed");
-    exit(sig);
-}
-
-std::string input_file = "./dep/cytosim/cym/aster.cym";
-std::string output_file = "./objects.cmo";
-
 /**
 *	Simulation API
 **/
 namespace aics {
 namespace agentsim {
+    const std::string CytosimPkg::PKG_DIRECTORY = "./cytosimpkg";
+
+    CytosimPkg::CytosimPkg()
+    {
+        std::string mkdirCmd = "mkdir -p " + CytosimPkg::PKG_DIRECTORY;
+        system(mkdirCmd.c_str());
+    }
+
+    CytosimPkg::~CytosimPkg()
+    {
+
+    }
 
     void CytosimPkg::Setup()
     {
         if(!this->m_reader.get()) {
             this->m_reader.reset(new FrameReader());
         }
-
-        //Cytosim::all_silent();
     }
+
     void CytosimPkg::Shutdown()
     {
         if(this->m_reader.get() && this->m_reader->good()) {
@@ -69,9 +71,9 @@ namespace agentsim {
     void CytosimPkg::Run(float timeStep, std::size_t nTimeSteps)
     {
         Simul simul;
-        simul.prop->trajectory_file = "./cpkg_objects.cmo";
-        simul.prop->property_file = "./cpkg_properties.cmo";
-        simul.prop->config_file = "./dep/cytosim/cym/aster.cym";
+        simul.prop->trajectory_file = CytosimPkg::TrajectoryFilePath();
+        simul.prop->property_file = CytosimPkg::PropertyFilePath();
+        simul.prop->config_file = this->m_configFile;
         if (Parser(simul, 1, 1, 1, 0, 0).readConfig()) {
                 std::cerr << "You must specify a config file\n";
         }
@@ -120,7 +122,6 @@ namespace agentsim {
                 check = ( ++frame * delta );
             }
 
-            //hold();
             fprintf(stderr, "> step %6i\n", sss);
             (simul.*solveFunc)();
             simul.step();
@@ -139,12 +140,12 @@ namespace agentsim {
             return;
 
         Simul simul;
-        simul.prop->property_file = "./cpkg_properties.cmo";
+        simul.prop->property_file = CytosimPkg::PropertyFilePath();
         simul.loadProperties();
 
         if(!this->m_reader->hasFile()) {
             try {
-                this->m_reader->openFile("./cpkg_objects.cmo");
+                this->m_reader->openFile(CytosimPkg::TrajectoryFilePath());
             } catch (Exception& e) {
                 std::cerr << "Aborted: " << e.what() << std::endl;
                 simul.erase();
@@ -193,9 +194,6 @@ namespace agentsim {
         Simul* simul
     )
     {
-        //LOG_F(INFO, "Cytosim Inventory Report below...");
-        //simul->reportInventory(std::cout);
-
         int fiberIndex = 0;
         for (Fiber * fib = simul->fibers.first(); fib; fib = fib->next(), fiberIndex++)
         {
