@@ -36,7 +36,7 @@ namespace agentsim {
         virtual void LoadTrajectoryFile(
             std::string file_path,
             TrajectoryFileProperties& fileProps
-        ) override {};
+        ) override;
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override { return 0.0; };
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override { return 0; };
         virtual bool CanLoadFile(std::string filePath) override
@@ -60,10 +60,20 @@ namespace agentsim {
         }
 
         std::shared_ptr<FrameReader> m_reader;
+        std::shared_ptr<Simul> m_simul;
         bool m_hasFinishedStreaming = false;
+        bool m_hasLoadedFile = false;
 
         static const std::string PKG_DIRECTORY;
         std::string m_configFile = "./dep/cytosim/cym/aster.cym";
+
+        enum TypeId {
+            FiberId = 0
+        };
+
+        std::unordered_map<std::size_t, std::string> m_typeMapping {
+            {TypeId::FiberId, "Fiber"}
+        };
     };
 
 } // namespace agentsim

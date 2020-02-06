@@ -36,18 +36,30 @@ namespace agentsim {
 
     void CytosimPkg::Setup()
     {
+        LOG_F(INFO, "Cytosim PKG Setup called");
         if(!this->m_reader.get()) {
             this->m_reader.reset(new FrameReader());
+        }
+
+        if(!this->m_simul.get()) {
+            this->m_simul.reset(new Simul());
         }
     }
 
     void CytosimPkg::Shutdown()
     {
+        LOG_F(INFO, "Cytosim PKG Shutdown called");
         if(this->m_reader.get() && this->m_reader->good()) {
             this->m_reader->clear();
         }
 
+        if(this->m_simul.get()) {
+            this->m_simul->erase();
+            this->m_simul->prop->clear();
+        }
+
         this->m_hasFinishedStreaming = false;
+        this->m_hasLoadedFile = false;
     }
 
     void CytosimPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)
@@ -64,7 +76,8 @@ namespace agentsim {
     void CytosimPkg::RunTimeStep(
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
     {
-
+        LOG_F(ERROR, "Run-Time-Step is currently unimplemented in Cytosim PKG.");
+        // @TODO: option to return error code from this function
     }
 
     void CytosimPkg::UpdateParameter(std::string paramName, float paramValue) { }
@@ -139,19 +152,13 @@ namespace agentsim {
         if(this->m_hasFinishedStreaming)
             return;
 
-        Simul simul;
-        simul.prop->property_file = CytosimPkg::PropertyFilePath();
-        simul.loadProperties();
-
-        if(!this->m_reader->hasFile()) {
-            try {
-                this->m_reader->openFile(CytosimPkg::TrajectoryFilePath());
-            } catch (Exception& e) {
-                std::cerr << "Aborted: " << e.what() << std::endl;
-                simul.erase();
-                simul.prop->clear();
-                return;
-            }
+        if(!this->m_hasLoadedFile) {
+            TrajectoryFileProperties ignore;
+            this->LoadTrajectoryFile(
+                this->m_configFile,
+                ignore
+            );
+            this->m_hasLoadedFile = true;
         }
 
         if(this->m_reader->eof()) {
@@ -160,32 +167,51 @@ namespace agentsim {
         }
 
         if(this->m_reader->good()) {
-            int errCode = this->m_reader->loadNextFrame(simul);
+            int errCode = this->m_reader->loadNextFrame(*(this->m_simul));
             std::size_t currentFrame = this->m_reader->currentFrame();
             if(errCode != 0) {
                 LOG_F(ERROR, "Error loading Cytosim Reader: err-no %i", errCode);
                 this->m_hasFinishedStreaming = true;
-                simul.erase();
-                simul.prop->clear();
                 return;
             } else {
                 LOG_F(INFO, "Copying fibers from frame %i", static_cast<int>(currentFrame));
                 this->CopyFibers(
                     agents,
                     this->m_reader.get(),
-                    &simul
+                    this->m_simul.get()
                 );
             }
         } else {
             LOG_F(ERROR, "File could not be opened");
             this->m_hasFinishedStreaming = true;
-            simul.erase();
-            simul.prop->clear();
             return;
         }
+    }
 
-        simul.erase();
-        simul.prop->clear();
+    void CytosimPkg::LoadTrajectoryFile(
+        std::string filePath,
+        TrajectoryFileProperties& fileProps
+    ) {
+        this->m_configFile = filePath;
+
+        LOG_F(INFO, "Loading Cytosim Trajectory: %s", filePath.c_str());
+        this->m_simul->prop->property_file = CytosimPkg::PropertyFilePath();
+        this->m_simul->loadProperties();
+
+        if(!this->m_reader->hasFile()) {
+            try {
+                this->m_reader->openFile(CytosimPkg::TrajectoryFilePath());
+            } catch (Exception& e) {
+                std::cerr << "Aborted: " << e.what() << std::endl;
+                return;
+            }
+        }
+
+        // @TODO: how to find time-step from a cytosim trajectory file
+        //fileProps.fileName = filePath;
+        //fileProps.numberOfFrames = static_cast<std::size_t>(this->m_reader->lastKnownFrame());
+        //fileProps.timeStepSize = real(this->m_simul->prop->time_step);
+        fileProps.typeMapping = this->m_typeMapping;
     }
 
     void CytosimPkg::CopyFibers(
@@ -208,6 +234,7 @@ namespace agentsim {
             agents[fiberIndex]->SetVisType(vis_type_fiber);
             agents[fiberIndex]->SetVisibility(true);
             agents[fiberIndex]->SetCollisionRadius(0.5);
+            agents[fiberIndex]->SetTypeID(CytosimPkg::TypeId::FiberId);
             for(std::size_t p=0; p < fib->nbPoints(); ++p) {
                 Vector cytosimPos = fib->posPoint(p);
                 float x = cytosimPos[0];
