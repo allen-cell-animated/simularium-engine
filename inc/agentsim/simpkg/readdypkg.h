@@ -50,6 +50,9 @@ namespace agentsim {
         virtual bool CanLoadFile(std::string filePath) override
             { return filePath.substr(filePath.find_last_of(".") + 1) == "h5"; }
 
+        virtual std::vector<std::string> GetFileNames(std::string filePath) override
+            { return { filePath }; }
+
     private:
         readdy::Simulation* m_simulation;
         bool m_agents_initialized = false;

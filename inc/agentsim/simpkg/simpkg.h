@@ -85,6 +85,15 @@ namespace agentsim {
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) = 0;
 
         virtual bool CanLoadFile(std::string filePath) = 0;
+
+        /**
+        *   GetFileNames
+        *
+        *   Returns the a list of the files needed to load a simulation
+        *   e.g. some simulation packages require additional property/config files
+        *   to read a simulation
+        */
+        virtual std::vector<std::string> GetFileNames(std::string filePath) = 0;
     };
 
 } // namespace agentsim

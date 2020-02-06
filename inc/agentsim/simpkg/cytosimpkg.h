@@ -42,6 +42,14 @@ namespace agentsim {
         virtual bool CanLoadFile(std::string filePath) override
             { return filePath.substr(filePath.find_last_of(".") + 1) == "cmo"; }
 
+        virtual std::vector<std::string> GetFileNames(std::string filePath) override
+        {
+            return {
+                filePath,
+                GetPropertyFileName(filePath)
+            };
+        }
+
     private:
         void CopyFibers(
             std::vector<std::shared_ptr<Agent>>& agents,
@@ -59,6 +67,10 @@ namespace agentsim {
             return CytosimPkg::PKG_DIRECTORY + "/properties.cmo";
         }
 
+        std::string GetPropertyFileName(std::string filePath) {
+            return filePath.substr(0, filePath.find_last_of(".")) + "_properties.cmo";
+        }
+
         std::shared_ptr<FrameReader> m_reader;
         std::shared_ptr<Simul> m_simul;
         bool m_hasFinishedStreaming = false;
@@ -66,6 +78,8 @@ namespace agentsim {
 
         static const std::string PKG_DIRECTORY;
         std::string m_configFile = "./dep/cytosim/cym/aster.cym";
+        std::string m_trajectoryFile = "";
+        std::string m_propertyFile = "";
 
         enum TypeId {
             FiberId = 0

@@ -40,6 +40,14 @@ bool FindFile(std::string& filePath)
     return true;
 }
 
+bool FindFiles(std::vector<std::string>& files) {
+    for(std::string& file : files) {
+        if(!FindFile(file)) return false;
+    }
+
+    return true;
+}
+
 namespace aics {
 namespace agentsim {
 
@@ -136,21 +144,17 @@ namespace agentsim {
 
     bool Simulation::HasLoadedAllFrames()
     {
-        for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            if (!this->m_SimPkgs[i]->IsFinished()) {
-                return false;
-            }
-        }
-
-        return true;
+        return this->m_SimPkgs[this->m_activeSimPkg]->IsFinished();
     }
 
     void Simulation::LoadNextFrame()
     {
-        for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            if (!this->m_SimPkgs[i]->IsFinished()) {
-                this->m_SimPkgs[i]->GetNextFrame(this->m_agents);
-            }
+        // This function is only called in the context of trajectory
+        //  file loading
+        //  Assumption: Only 1 SimPKG is needed in the use case
+        auto simPkg = this->m_SimPkgs[this->m_activeSimPkg];
+        if (!simPkg->IsFinished()) {
+            simPkg->GetNextFrame(this->m_agents);
         }
 
         this->CacheCurrentAgents();
@@ -175,6 +179,13 @@ namespace agentsim {
             auto simPkg = this->m_SimPkgs[i];
 
             if(simPkg->CanLoadFile(fileName)) {
+                this->m_activeSimPkg = i;
+
+                std::vector<std::string> files = simPkg->GetFileNames(filePath);
+                for(auto file : files) {
+                    LOG_F(INFO, "File to load: %s", file.c_str());
+                }
+
                 if(!FindFile(filePath)) {
                     LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;

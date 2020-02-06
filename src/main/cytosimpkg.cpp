@@ -83,9 +83,12 @@ namespace agentsim {
     void CytosimPkg::UpdateParameter(std::string paramName, float paramValue) { }
     void CytosimPkg::Run(float timeStep, std::size_t nTimeSteps)
     {
+        this->m_trajectoryFile = CytosimPkg::TrajectoryFilePath();
+        this->m_propertyFile = CytosimPkg::PropertyFilePath();
+
         Simul simul;
-        simul.prop->trajectory_file = CytosimPkg::TrajectoryFilePath();
-        simul.prop->property_file = CytosimPkg::PropertyFilePath();
+        simul.prop->trajectory_file = this->m_trajectoryFile;
+        simul.prop->property_file = this->m_propertyFile;
         simul.prop->config_file = this->m_configFile;
         if (Parser(simul, 1, 1, 1, 0, 0).readConfig()) {
                 std::cerr << "You must specify a config file\n";
@@ -155,7 +158,7 @@ namespace agentsim {
         if(!this->m_hasLoadedFile) {
             TrajectoryFileProperties ignore;
             this->LoadTrajectoryFile(
-                this->m_configFile,
+                this->m_trajectoryFile,
                 ignore
             );
             this->m_hasLoadedFile = true;
@@ -192,15 +195,17 @@ namespace agentsim {
         std::string filePath,
         TrajectoryFileProperties& fileProps
     ) {
-        this->m_configFile = filePath;
+        this->m_trajectoryFile = filePath;
+        this->m_propertyFile = this->GetPropertyFileName(this->m_trajectoryFile);
 
-        LOG_F(INFO, "Loading Cytosim Trajectory: %s", filePath.c_str());
-        this->m_simul->prop->property_file = CytosimPkg::PropertyFilePath();
+        LOG_F(INFO, "Loading Cytosim Trajectory: %s", this->m_trajectoryFile.c_str());
+        LOG_F(INFO, "Loading Cytosim Trajectory: %s", this->m_propertyFile.c_str());
+        this->m_simul->prop->property_file = this->m_propertyFile;
         this->m_simul->loadProperties();
 
         if(!this->m_reader->hasFile()) {
             try {
-                this->m_reader->openFile(CytosimPkg::TrajectoryFilePath());
+                this->m_reader->openFile(this->m_trajectoryFile);
             } catch (Exception& e) {
                 std::cerr << "Aborted: " << e.what() << std::endl;
                 return;

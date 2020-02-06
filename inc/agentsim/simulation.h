@@ -247,6 +247,8 @@ namespace agentsim {
         SimulationCache m_cache;
         std::size_t m_playbackMode = SimulationMode::id_live_simulation;
         std::string m_simIdentifier = "runtime"; // identifier for currently running simulation
+
+        std::size_t m_activeSimPkg = 0;
     };
 
 }
