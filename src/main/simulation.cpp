@@ -137,9 +137,8 @@ namespace agentsim {
         float timeStep,
         std::size_t n_time_steps)
     {
-        for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->Run(timeStep, n_time_steps);
-        }
+        this->m_activeSimPkg = 0; // @TODO, selecting active sim-pkg for pre-run and live mode
+        this->m_SimPkgs[this->m_activeSimPkg]->Run(timeStep, n_time_steps);
     }
 
     bool Simulation::HasLoadedAllFrames()
@@ -186,7 +185,7 @@ namespace agentsim {
                     LOG_F(INFO, "File to load: %s", file.c_str());
                 }
 
-                if(!FindFile(filePath)) {
+                if(!FindFiles(files)) {
                     LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;
                 }

@@ -64,6 +64,7 @@ namespace agentsim {
 
     void CytosimPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)
     {
+        LOG_F(INFO, "Cytosim PKG Creating 1000 agents");
         for (std::size_t i = 0; i < 1000; ++i) {
             std::shared_ptr<Agent> agent;
             agent.reset(new Agent());
@@ -84,7 +85,7 @@ namespace agentsim {
     void CytosimPkg::Run(float timeStep, std::size_t nTimeSteps)
     {
         this->m_trajectoryFile = CytosimPkg::TrajectoryFilePath();
-        this->m_propertyFile = CytosimPkg::PropertyFilePath();
+        this->m_propertyFile = GetPropertyFileName(this->m_trajectoryFile);
 
         Simul simul;
         simul.prop->trajectory_file = this->m_trajectoryFile;
@@ -155,13 +156,26 @@ namespace agentsim {
         if(this->m_hasFinishedStreaming)
             return;
 
+        if(agents.size() == 0) {
+            LOG_F(INFO, "Cytosim PKG Creating 1000 agents");
+            for (std::size_t i = 0; i < 1000; ++i) {
+                std::shared_ptr<Agent> agent;
+                agent.reset(new Agent());
+                agent->SetVisibility(false);
+                agents.push_back(agent);
+            }
+        }
+
         if(!this->m_hasLoadedFile) {
             TrajectoryFileProperties ignore;
+            std::string currentFile = this->m_trajectoryFile;
+
+            LOG_F(INFO, "Loading current trajectory file %s", currentFile.c_str());
+
             this->LoadTrajectoryFile(
-                this->m_trajectoryFile,
+                currentFile,
                 ignore
             );
-            this->m_hasLoadedFile = true;
         }
 
         if(this->m_reader->eof()) {
@@ -199,9 +213,9 @@ namespace agentsim {
         this->m_propertyFile = this->GetPropertyFileName(this->m_trajectoryFile);
 
         LOG_F(INFO, "Loading Cytosim Trajectory: %s", this->m_trajectoryFile.c_str());
-        LOG_F(INFO, "Loading Cytosim Trajectory: %s", this->m_propertyFile.c_str());
+        LOG_F(INFO, "Loading Cytosim Properties File: %s", this->m_propertyFile.c_str());
         this->m_simul->prop->property_file = this->m_propertyFile;
-        this->m_simul->loadProperties();
+        this->m_simul->loadProperties(); // @BREAK HERE AFTER LUNCH
 
         if(!this->m_reader->hasFile()) {
             try {
@@ -212,11 +226,14 @@ namespace agentsim {
             }
         }
 
-        // @TODO: how to find time-step from a cytosim trajectory file
-        //fileProps.fileName = filePath;
-        //fileProps.numberOfFrames = static_cast<std::size_t>(this->m_reader->lastKnownFrame());
-        //fileProps.timeStepSize = real(this->m_simul->prop->time_step);
+        fileProps.fileName = filePath;
+        fileProps.numberOfFrames = 1000; //@TODO: How to get # frames from Cytosim File
+        fileProps.timeStepSize = real(this->m_simul->prop->time_step);
         fileProps.typeMapping = this->m_typeMapping;
+        fileProps.boxX = 100;
+        fileProps.boxY = 100;
+        fileProps.boxZ = 100;
+        this->m_hasLoadedFile = true;
     }
 
     void CytosimPkg::CopyFibers(
