@@ -4,6 +4,10 @@ add_library("cytosimPKG" STATIC
     "cytosimpkg.cpp"
 )
 
+target_compile_definitions("cytosimPKG" PRIVATE 
+-DDIM=${DIMENSION}
+)
+
 find_library(LAPACK_LIB lapack REQUIRED)
 find_library(BLAS_LIB blas REQUIRED)
 
