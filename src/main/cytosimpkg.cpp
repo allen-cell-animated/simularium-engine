@@ -184,7 +184,7 @@ namespace agentsim {
         }
 
         if(this->m_reader->good()) {
-            int errCode = this->m_reader->loadNextFrame(*(this->m_simul));
+            int errCode = this->m_reader->loadNextFrame(*(this->m_simul.get()));
             std::size_t currentFrame = this->m_reader->currentFrame();
             if(errCode != 0) {
                 LOG_F(ERROR, "Error loading Cytosim Reader: err-no %i", errCode);
@@ -226,8 +226,18 @@ namespace agentsim {
             }
         }
 
+        std::size_t numTimeSteps = 0;
+        while(!this->m_reader->eof()) {
+            if(this->m_reader->loadNextFrame(*(this->m_simul.get())) == 0) {
+                numTimeSteps++;
+            };
+        }
+
+        // Assuming this should put the reader back to frame '0'
+        this->m_reader->rewind();
+
         fileProps.fileName = filePath;
-        fileProps.numberOfFrames = 1000; //@TODO: How to get # frames from Cytosim File
+        fileProps.numberOfFrames = numTimeSteps;
         fileProps.timeStepSize = real(this->m_simul->prop->time_step);
         fileProps.typeMapping = this->m_typeMapping;
         fileProps.boxX = 100;
