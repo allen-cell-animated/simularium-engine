@@ -5,7 +5,6 @@ use warnings;
 use strict;
 use List::Util qw(first);
 use File::Path;
-use Scalar::Util qw(looks_like_number);
 
 my $num_args = $#ARGV + 1;
 if ($num_args != 1) {
