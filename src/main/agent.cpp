@@ -1,6 +1,7 @@
 #include "agentsim/agents/agent.h"
 #include <stdlib.h>
 #include <time.h>
+#include <iostream>
 
 namespace aics {
 namespace agentsim {
@@ -22,148 +23,64 @@ namespace agentsim {
         }
     } // namespace agents
 
-    namespace math_util {
-        Eigen::Affine3d CreateRotationMatrix(double ax, double ay, double az)
-        {
-            Eigen::Affine3d rx = Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
-            Eigen::Affine3d ry = Eigen::Affine3d(Eigen::AngleAxisd(ay, Eigen::Vector3d(0, 1, 0)));
-            Eigen::Affine3d rz = Eigen::Affine3d(Eigen::AngleAxisd(az, Eigen::Vector3d(0, 0, 1)));
-            return rz * ry * rx;
-        }
-
-        Eigen::Matrix4d CreateTransform(Eigen::Vector3d loc, Eigen::Vector3d rot)
-        {
-            return (Eigen::Translation3d(loc) * CreateRotationMatrix(rot[0], rot[1], rot[2])).matrix();
-        }
-
-    } // namespace math_util
-
     Agent::Agent()
     {
-        this->m_location << 0, 0, 0;
-        this->m_rotation << 0, 0, 0;
-        this->m_parentTransform.setIdentity();
+        this->m_x = 0;
+        this->m_y = 0;
+        this->m_z = 0;
+
+        this->m_xrot = 0;
+        this->m_yrot = 0;
+        this->m_zrot = 0;
 
         agents::GenerateLocalUUID(this->m_agentID);
     }
 
-    void Agent::SetLocation(Eigen::Vector3d newLocation)
+    void Agent::SetLocation(float x, float y, float z)
     {
-        this->m_location = newLocation;
-        this->UpdateParentTransform(this->m_parentTransform); // triggers transform updates in children
+        this->m_x = x;
+        this->m_y = y;
+        this->m_z = z;
     }
 
-    void Agent::SetRotation(Eigen::Vector3d newRotation)
+    void Agent::SetRotation(float xrot, float yrot, float zrot)
     {
-        this->m_rotation = newRotation;
-        this->UpdateParentTransform(this->m_parentTransform); // triggers transform updates in children
+        this->m_xrot = xrot;
+        this->m_yrot = yrot;
+        this->m_zrot = zrot;
     }
 
-    const Eigen::Matrix4d Agent::GetTransform()
+
+    std::size_t Agent::GetNumSubPoints()
     {
-        return math_util::CreateTransform(this->m_location, this->m_rotation);
+        return this->m_subPoints.size() / 3;
     }
 
-    const Eigen::Matrix4d Agent::GetGlobalTransform()
-    {
-        return this->m_parentTransform * this->GetTransform();
+    bool Agent::HasSubPoints() { return this->m_subPoints.size(); }
+
+    void Agent::AddSubPoint(float x, float y, float z) {
+        this->m_subPoints.push_back(x);
+        this->m_subPoints.push_back(y);
+        this->m_subPoints.push_back(z);
     }
 
-    bool Agent::AddBoundPartner(std::shared_ptr<Agent> other)
-    {
-        if (other->m_agentID == this->m_agentID) {
-            printf("Agent.cpp: An Agent cannot be bound to itself.\n");
-            return false;
-        }
-
-        this->m_boundPartners.push_back(other);
-        return true;
-    }
-
-    bool Agent::AddChildAgent(std::shared_ptr<Agent> other)
-    {
-        if (other->m_agentID == this->m_agentID) {
-            printf("Agent.cpp: An Agent cannot be parented to itself.\n");
-            return false;
-        }
-
-        this->m_childAgents.push_back(other);
-        other->UpdateParentTransform(this->GetGlobalTransform());
-        return true;
-    }
-
-    std::shared_ptr<Agent> Agent::GetChildAgent(std::size_t index)
-    {
-        if (index < 0 || index > this->m_childAgents.size()) {
-            return nullptr;
-        }
-
-        return this->m_childAgents[index];
-    }
-
-    std::shared_ptr<Agent> Agent::GetBoundPartner(std::size_t index)
-    {
-        if (index < 0 || index > this->m_boundPartners.size()) {
-            return nullptr;
-        }
-
-        return this->m_boundPartners[index];
-    }
-
-    bool Agent::CanInteractWith(const Agent& other)
-    {
-        if (this->m_agentID == other.m_agentID) {
-            return false;
-        }
-
-        float interaction_dist_squared = (this->m_interaction_distance + other.m_interaction_distance) * (this->m_interaction_distance + other.m_interaction_distance);
-
-        float dist_squared = (this->m_location - other.m_location).squaredNorm();
-
-        return dist_squared <= interaction_dist_squared;
-    }
-
-    bool Agent::IsCollidingWith(const Agent& other)
-    {
-        float dist_squared = (this->m_location - other.m_location).squaredNorm();
-        float coll_dist_squared = (this->m_collision_radius + other.m_collision_radius) * (this->m_collision_radius + other.m_collision_radius);
-
-        return dist_squared <= coll_dist_squared;
-    }
-
-    void Agent::AddTag(std::string tag)
-    {
-        if (std::find(this->m_tags.begin(), this->m_tags.end(), tag) != this->m_tags.end()) {
+    void Agent::UpdateSubPoint(std::size_t index, float x, float y, float z) {
+        std::size_t nbSubPoints = this->GetNumSubPoints();
+        if (index < 0 || index > nbSubPoints) {
             return;
-        }
-
-        this->m_tags.push_back(tag);
-    }
-
-    const bool Agent::HasTag(std::string tag)
-    {
-        return std::find(this->m_tags.begin(), this->m_tags.end(), tag) != this->m_tags.end();
-    }
-
-    const void Agent::PrintDbg() const
-    {
-        printf("[Agent] %s\n", this->m_agentName.c_str());
-
-        for (std::size_t i = 0; i < this->m_boundPartners.size(); ++i) {
-            printf("[bound] %s\n", this->m_boundPartners[i]->GetName().c_str());
-        }
-
-        for (std::size_t i = 0; i < this->m_childAgents.size(); ++i) {
-            printf("[child] %s\n", this->m_childAgents[i]->GetName().c_str());
+        } else if (index < nbSubPoints) {
+            this->m_subPoints[index * 3] = x;
+            this->m_subPoints[index * 3 + 1] = y;
+            this->m_subPoints[index * 3 + 2] = z;
+        } else if (index == nbSubPoints) {
+            AddSubPoint(x,y,z);
         }
     }
 
-    void Agent::UpdateParentTransform(Eigen::Matrix4d parentTransform)
-    {
-        this->m_parentTransform = parentTransform;
-        for (std::size_t i = 0; i < this->m_childAgents.size(); ++i) {
-            this->m_childAgents[i]->UpdateParentTransform(this->GetGlobalTransform());
-        }
+    std::vector<float> Agent::GetSubPoint(std::size_t index) {
+        auto first = this->m_subPoints.begin() + index * 3;
+        auto last = this->m_subPoints.begin() + index * 3 + 3;
+        return std::vector<float>(first, last);
     }
 
 } // namespace agentsim

@@ -5,7 +5,6 @@ set(EXECUTABLE_OUTPUT_PATH
 )
 
 set(TEST_LIST
-"test_agent"
 "test_aws_util"
 "test_client_server"
 "test_net_commands"

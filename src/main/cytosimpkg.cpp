@@ -1,8 +1,4 @@
-#include "agentsim/simpkg/cytosimpkg.h"
-#include "agentsim/agents/agent.h"
-#include "loguru/loguru.hpp"
 #include "simul_prop.h"
-
 #include "exceptions.h"
 #include "frame_reader.h"
 #include "glossary.h"
@@ -14,78 +10,61 @@
 #include <csignal>
 #include <stdlib.h>
 
+#include "agentsim/simpkg/cytosimpkg.h"
+#include "agentsim/agents/agent.h"
+#include "loguru/loguru.hpp"
+
 using std::endl;
-
-void killed_handler(int sig)
-{
-    LOG_F(WARNING, "Cytosim Killed");
-    exit(sig);
-}
-
-Simul simul;
-Glossary glos;
-FrameReader reader;
-
-std::string input_file = "./dep/cytosim/cym/aster.cym";
-std::string output_file = "./objects.cmo";
-
-void GetFiberPositionsFromFrame(
-    std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
 
 /**
 *	Simulation API
 **/
 namespace aics {
 namespace agentsim {
+    const std::string CytosimPkg::PKG_DIRECTORY = "./cytosimpkg";
+
+    CytosimPkg::CytosimPkg()
+    {
+        std::string mkdirCmd = "mkdir -p " + CytosimPkg::PKG_DIRECTORY;
+        system(mkdirCmd.c_str());
+    }
+
+    CytosimPkg::~CytosimPkg()
+    {
+
+    }
 
     void CytosimPkg::Setup()
     {
-        if (this->m_hasAlreadySetup)
-            return;
-
-        LOG_F(INFO,"Cytosim PKG Setup started");
-
-        // Register a function to be called for Floating point exceptions:
-        if (signal(SIGINT, killed_handler) == SIG_ERR)
-            LOG_F(ERROR,"Could not register SIGINT handler");
-
-        if (signal(SIGTERM, killed_handler) == SIG_ERR)
-            LOG_F(ERROR,"Could not register SIGTERM handler");
-
-        glos.clear();
-        glos.define("config", input_file);
-
-        try {
-            simul.initialize(glos);
-            Parser(simul, 1, 1, 1, 0, 0).readConfig(input_file);
-        } catch (Exception& e) {
-            LOG_F(FATAL,e.what().c_str());
-            return;
-        } catch (...) {
-            LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
-            return;
+        LOG_F(INFO, "Cytosim PKG Setup called");
+        if(!this->m_reader.get()) {
+            this->m_reader.reset(new FrameReader());
         }
 
-        glos.warnings(std::cerr);
-
-        this->m_hasAlreadySetup = true;
-        LOG_F(INFO,"Cytosim PKG Setup ended");
+        if(!this->m_simul.get()) {
+            this->m_simul.reset(new Simul());
+        }
     }
 
     void CytosimPkg::Shutdown()
     {
-        this->m_hasAlreadyRun = false;
-        this->m_hasAlreadySetup = false;
-        this->m_hasFinishedStreaming = false;
-        this->m_hasLoadedFrameReader = false;
+        LOG_F(INFO, "Cytosim PKG Shutdown called");
+        if(this->m_reader.get() && this->m_reader->good()) {
+            this->m_reader->clear();
+        }
 
-        simul.erase();
-        glos.clear();
-        //reader.clear();
+        if(this->m_simul.get()) {
+            this->m_simul->erase();
+            this->m_simul->prop->clear();
+        }
+
+        this->m_hasFinishedStreaming = false;
+        this->m_hasLoadedFile = false;
     }
 
     void CytosimPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)
     {
+        LOG_F(INFO, "Cytosim PKG Creating 1000 agents");
         for (std::size_t i = 0; i < 1000; ++i) {
             std::shared_ptr<Agent> agent;
             agent.reset(new Agent());
@@ -94,127 +73,209 @@ namespace agentsim {
         }
     }
 
-    void CytosimPkg::InitReactions(Model& model)
-    {
-    }
-
+    void CytosimPkg::InitReactions(Model& model) { }
     void CytosimPkg::RunTimeStep(
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
     {
-        float max_time_step = 0.1f;
+        LOG_F(ERROR, "Run-Time-Step is currently unimplemented in Cytosim PKG.");
+        // @TODO: option to return error code from this function
+    }
 
-        if (timeStep > max_time_step) {
-            unsigned n_iterations = timeStep / max_time_step;
+    void CytosimPkg::UpdateParameter(std::string paramName, float paramValue) { }
+    void CytosimPkg::Run(float timeStep, std::size_t nTimeSteps)
+    {
+        this->m_trajectoryFile = CytosimPkg::TrajectoryFilePath();
+        this->m_propertyFile = GetPropertyFileName(this->m_trajectoryFile);
 
-            simul.prop->time_step = max_time_step;
-            Parser(simul, 0, 0, 0, 1, 0).execute_run(n_iterations, glos);
-        } else {
-            simul.prop->time_step = timeStep;
-            Parser(simul, 0, 0, 0, 1, 0).execute_run(1, glos);
+        Simul simul;
+        simul.prop->trajectory_file = this->m_trajectoryFile;
+        simul.prop->property_file = this->m_propertyFile;
+        simul.prop->config_file = this->m_configFile;
+        if (Parser(simul, 1, 1, 1, 0, 0).readConfig()) {
+                std::cerr << "You must specify a config file\n";
         }
 
-        GetFiberPositionsFromFrame(agents);
-    }
+        simul.prepare();
 
-    void CytosimPkg::UpdateParameter(std::string paramName, float paramValue)
-    {
-    }
+        unsigned     nb_steps = nTimeSteps;
+        unsigned     nb_frames  = 0;
+        int          solve      = 1;
+        bool         prune      = true;
+        bool         binary     = true;
 
-    void CytosimPkg::Run(float timeStep, std::size_t nTimeStep)
-    {
-        if (this->m_hasAlreadyRun)
-            return;
+        unsigned sss = 0;
 
-        LOG_F(INFO,"Cytosim PKG Run Started");
-        try {
-            Parser(simul, 0, 0, 0, 1, 1).readConfig(input_file);
-        } catch (Exception& e) {
-            LOG_F(FATAL,e.what().c_str());
-            return;
-        } catch (...) {
-            LOG_F(FATAL,"Unkown exception occured during Cytosim PKG Initialization");
-            return;
+        unsigned int  frame = 1;
+        real          delta = nb_steps;
+        unsigned long check = nb_steps;
+
+        void (Simul::* solveFunc)() = &Simul::solve_not;
+        switch ( solve )
+        {
+            case 1: solveFunc = &Simul::solve;      break;
+            case 2: solveFunc = &Simul::solve_auto; break;
+            case 3: solveFunc = &Simul::solveX;     break;
         }
 
-        LOG_F(INFO,"Cytosim PKG Run ended");
-        this->m_hasAlreadyRun = true;
+        simul.writeProperties(nullptr, prune);
+        if ( simul.prop->clear_trajectory )
+        {
+            simul.writeObjects(simul.prop->trajectory_file, false, binary);
+            simul.prop->clear_trajectory = false;
+        }
+        delta = real(nb_steps) / real(nb_frames);
+        check = delta;
+
+        simul.prop->time_step = real(timeStep);
+        while ( 1 )
+        {
+            if ( sss >= check )
+            {
+                simul.relax();
+                simul.writeObjects(simul.prop->trajectory_file, true, binary);
+                simul.unrelax();
+                if ( sss >= nb_steps )
+                    break;
+                check = ( ++frame * delta );
+            }
+
+            fprintf(stderr, "> step %6i\n", sss);
+            (simul.*solveFunc)();
+            simul.step();
+            ++sss;
+        }
+
+        simul.erase();
+        simul.prop->clear();
     }
 
-    bool CytosimPkg::IsFinished()
-    {
-        return this->m_hasAlreadyRun && this->m_hasFinishedStreaming;
-    }
+    bool CytosimPkg::IsFinished() { return this->m_hasFinishedStreaming; }
 
     void CytosimPkg::GetNextFrame(std::vector<std::shared_ptr<Agent>>& agents)
     {
-        if (this->m_hasFinishedStreaming)
+        if(this->m_hasFinishedStreaming)
             return;
 
-        if (!this->m_hasLoadedFrameReader) {
+        if(agents.size() == 0) {
+            LOG_F(INFO, "Cytosim PKG Creating 1000 agents");
+            for (std::size_t i = 0; i < 1000; ++i) {
+                std::shared_ptr<Agent> agent;
+                agent.reset(new Agent());
+                agent->SetVisibility(false);
+                agents.push_back(agent);
+            }
+        }
+
+        if(!this->m_hasLoadedFile) {
+            TrajectoryFileProperties ignore;
+            std::string currentFile = this->m_trajectoryFile;
+
+            LOG_F(INFO, "Loading current trajectory file %s", currentFile.c_str());
+
+            this->LoadTrajectoryFile(
+                currentFile,
+                ignore
+            );
+        }
+
+        if(this->m_reader->eof()) {
+            LOG_F(INFO, "Finished processing Cytosim Trajectory");
+            this->m_hasFinishedStreaming = true;
+        }
+
+        if(this->m_reader->good()) {
+            int errCode = this->m_reader->loadNextFrame(*(this->m_simul.get()));
+            std::size_t currentFrame = this->m_reader->currentFrame();
+            if(errCode != 0) {
+                LOG_F(ERROR, "Error loading Cytosim Reader: err-no %i", errCode);
+                this->m_hasFinishedStreaming = true;
+                return;
+            } else {
+                LOG_F(INFO, "Copying fibers from frame %i", static_cast<int>(currentFrame));
+                this->CopyFibers(
+                    agents,
+                    this->m_reader.get(),
+                    this->m_simul.get()
+                );
+            }
+        } else {
+            LOG_F(ERROR, "File could not be opened");
+            this->m_hasFinishedStreaming = true;
+            return;
+        }
+    }
+
+    void CytosimPkg::LoadTrajectoryFile(
+        std::string filePath,
+        TrajectoryFileProperties& fileProps
+    ) {
+        this->m_trajectoryFile = filePath;
+        this->m_propertyFile = this->GetPropertyFileName(this->m_trajectoryFile);
+
+        LOG_F(INFO, "Loading Cytosim Trajectory: %s", this->m_trajectoryFile.c_str());
+        LOG_F(INFO, "Loading Cytosim Properties File: %s", this->m_propertyFile.c_str());
+        this->m_simul->prop->property_file = this->m_propertyFile;
+        this->m_simul->loadProperties(); // @BREAK HERE AFTER LUNCH
+
+        if(!this->m_reader->hasFile()) {
             try {
-                reader.openFile(output_file);
+                this->m_reader->openFile(this->m_trajectoryFile);
             } catch (Exception& e) {
                 std::cerr << "Aborted: " << e.what() << std::endl;
                 return;
             }
-
-            if (reader.good()) {
-                this->m_hasLoadedFrameReader = true;
-            } else {
-                printf("File could not be opened\n");
-                return;
-            }
         }
 
-        if (0 == reader.loadNextFrame(simul)) {
-            GetFiberPositionsFromFrame(agents);
-        } else {
-            LOG_F(INFO,"Finished Streaming Cytosim Run from File");
-            this->m_hasFinishedStreaming = true;
+        std::size_t numTimeSteps = 0;
+        while(!this->m_reader->eof()) {
+            if(this->m_reader->loadNextFrame(*(this->m_simul.get())) == 0) {
+                numTimeSteps++;
+            };
+        }
+
+        // Assuming this should put the reader back to frame '0'
+        this->m_reader->rewind();
+
+        fileProps.fileName = filePath;
+        fileProps.numberOfFrames = numTimeSteps;
+        fileProps.timeStepSize = real(this->m_simul->prop->time_step);
+        fileProps.typeMapping = this->m_typeMapping;
+        fileProps.boxX = 100;
+        fileProps.boxY = 100;
+        fileProps.boxZ = 100;
+        this->m_hasLoadedFile = true;
+    }
+
+    void CytosimPkg::CopyFibers(
+        std::vector<std::shared_ptr<Agent>>& agents,
+        FrameReader* reader,
+        Simul* simul
+    )
+    {
+        int fiberIndex = 0;
+        for (Fiber * fib = simul->fibers.first(); fib; fib = fib->next(), fiberIndex++)
+        {
+            if (fiberIndex >= agents.size()) {
+                LOG_F(ERROR, "Not enough agents to represent fibers");
+                return;
+            }
+
+            auto agent = agents[fiberIndex];
+            agents[fiberIndex]->SetLocation(0,0,0);
+
+            agents[fiberIndex]->SetVisType(vis_type_fiber);
+            agents[fiberIndex]->SetVisibility(true);
+            agents[fiberIndex]->SetCollisionRadius(0.5);
+            agents[fiberIndex]->SetTypeID(CytosimPkg::TypeId::FiberId);
+            for(std::size_t p=0; p < fib->nbPoints(); ++p) {
+                Vector cytosimPos = fib->posPoint(p);
+                float x = cytosimPos[0];
+                float y = cytosimPos[1];
+                float z = cytosimPos[2];
+                agents[fiberIndex]->UpdateSubPoint(p,x,y,z);
+            }
         }
     }
 
 } // namespace agentsim
 } // namespace aics
-
-void GetFiberPositionsFromFrame(
-    std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents)
-{
-    Fiber* fib = static_cast<Fiber*>(simul.fibers.inventory.first());
-
-    std::size_t agent_index = 0;
-    std::size_t fib_index = 0;
-    while (fib) {
-        if (agent_index >= agents.size()) {
-            std::cerr << std::endl
-                      << "Error: Not enough agents to represent fibers" << std::endl;
-            return;
-        }
-
-        std::vector<Eigen::Vector3d> fiber_positions;
-        for (std::size_t p = 0; p < fib->nbPoints(); ++p) {
-            Vector cytosim_pos = fib->posPoint(p);
-            Eigen::Vector3d agentviz_pos(
-                cytosim_pos[0],
-                cytosim_pos[1],
-                cytosim_pos[2]);
-
-            fiber_positions.push_back(agentviz_pos);
-        }
-
-        agents[agent_index]->SetName("Fiber");
-        agents[agent_index]->SetTypeID(0);
-        agents[agent_index]->SetVisType(kVisType::vis_type_fiber);
-        agents[agent_index]->SetCollisionRadius(0.3);
-        agents[agent_index]->SetVisibility(true);
-        agents[agent_index]->SetLocation(fiber_positions[fiber_positions.size() - 1]);
-
-        for (std::size_t i = 0; i < fiber_positions.size(); ++i) {
-            agents[agent_index]->UpdateSubPoint(i, fiber_positions[i]);
-        }
-
-        agent_index++;
-        fib_index++;
-        fib = static_cast<Fiber*>(simul.fibers.inventory.next(fib));
-    }
-}

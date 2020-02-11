@@ -103,6 +103,9 @@ namespace agentsim {
 
         this->m_ofstreams.erase(identifier);
         this->m_ifstreams.erase(identifier);
+
+        this->m_numFrames.erase(identifier);
+        this->m_fileProps.erase(identifier);
     }
 
     void SimulationCache::Preprocess(std::string identifier)

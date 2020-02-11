@@ -289,7 +289,7 @@ namespace agentsim {
                 newAgent.reset(new Agent());
                 newAgent->SetName(pTypes[i]);
                 newAgent->SetTypeID(i);
-                newAgent->SetLocation(Eigen::Vector3d(v[0], v[1], v[2]));
+                newAgent->SetLocation(v[0], v[1], v[2]);
                 newAgent->SetCollisionRadius(0.5f);
 
                 if (has_orientation) {
@@ -298,13 +298,13 @@ namespace agentsim {
                     readdy::Vec3 z = zpositions[j];
 
                     std::vector<Eigen::Vector3d> basis;
-                    basis.push_back(newAgent->GetLocation());
+                    basis.push_back(Eigen::Vector3d(v[0], v[1], v[2]));
                     basis.push_back(Eigen::Vector3d(x[0], x[1], x[2]));
                     basis.push_back(Eigen::Vector3d(y[0], y[1], y[2]));
                     basis.push_back(Eigen::Vector3d(z[0], z[1], z[2]));
                     Eigen::Matrix3d rm = get_rotation_matrix(basis);
                     Eigen::Vector3d rea = rm.eulerAngles(0, 1, 2);
-                    newAgent->SetRotation(rea);
+                    newAgent->SetRotation(rea[0], rea[1], rea[2]);
                 }
 
                 agents.push_back(newAgent);

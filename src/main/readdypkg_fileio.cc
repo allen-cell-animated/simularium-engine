@@ -567,9 +567,13 @@ void copy_frame(
 
         // copy the position of the particle to an AgentViz agent
         auto currentAgent = agents[agentIndex].get();
-        currentAgent->SetLocation(Eigen::Vector3d(pos[0], pos[1], pos[2]));
+        currentAgent->SetLocation(pos[0], pos[1], pos[2]);
         if(useRotation) {
-            currentAgent->SetRotation(rotationInfo[particleIndex]);
+            currentAgent->SetRotation(
+                rotationInfo[particleIndex][0],
+                rotationInfo[particleIndex][1],
+                rotationInfo[particleIndex][2]
+            );
         }
         currentAgent->SetTypeID(p.type_id);
         currentAgent->SetName(p.type);
