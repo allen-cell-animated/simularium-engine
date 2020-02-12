@@ -120,19 +120,25 @@ namespace agentsim {
 
     bool SimulationCache::DownloadRuntimeCache(std::string awsFilePath, std::string identifier)
     {
-        LOG_F(INFO, "Downloading cache for %s from S3", awsFilePath.c_str());
-        std::string destination = this->GetFilePath(identifier);
-        std::string cacheFilePath = awsFilePath + "_cache";
-        if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
-            LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
-            return false;
-        }
-
         std::string fpropsFilePath = awsFilePath + "_info";
         std::string fpropsDestination = this->GetInfoFilePath(identifier);
         if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
         {
             LOG_F(WARNING, "Info file for %s not found on AWS S3", + awsFilePath.c_str());
+            return false;
+        }
+
+        if(!this->IsFilePropertiesValid(identifier))
+        {
+            LOG_F(WARNING, "Info file for %s is missing required fields", + awsFilePath.c_str());
+            return false;
+        }
+
+        LOG_F(INFO, "Downloading cache for %s from S3", awsFilePath.c_str());
+        std::string destination = this->GetFilePath(identifier);
+        std::string cacheFilePath = awsFilePath + "_cache";
+        if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
+            LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
             return false;
         }
 
@@ -158,6 +164,9 @@ namespace agentsim {
         fprops["fileName"] = tfp.fileName;
         fprops["numberOfFrames"] = static_cast<int>(tfp.numberOfFrames);
         fprops["timeStepSize"] = tfp.timeStepSize;
+        fprops["boxSizeX"] = static_cast<int>(tfp.boxX);
+        fprops["boxSizeY"] = static_cast<int>(tfp.boxY);
+        fprops["boxSizeZ"] = static_cast<int>(tfp.boxZ);
 
         Json::Value typeMapping;
         for(auto& entry : tfp.typeMapping)
@@ -201,6 +210,33 @@ namespace agentsim {
         trajFileProps.numberOfFrames = fprops["numberOfFrames"].asInt();
         trajFileProps.timeStepSize = fprops["timeStepSize"].asFloat();
         this->m_fileProps[identifier] = trajFileProps;
+    }
+
+    bool SimulationCache::IsFilePropertiesValid(std::string identifier)
+    {
+        std::string filePath = this->GetInfoFilePath(identifier);
+        std::ifstream is(filePath);
+        Json::Value fprops;
+        is >> fprops;
+
+        std::vector<std::string> keys({
+            "boxX",
+            "boxY",
+            "boxZ",
+            "typeMapping",
+            "fileName",
+            "numberOfFrames",
+            "timeStepSize"
+        });
+
+        for(auto key : keys) {
+            if(!fprops.isMember(key)) {
+                LOG_F(WARNING, "File properties for identifier %s is missing key %s", identifier.c_str(), key.c_str());
+                return false;
+            }
+        }
+
+        return true;
     }
 
     std::string SimulationCache::GetFilePath(std::string identifier)

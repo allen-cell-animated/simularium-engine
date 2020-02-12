@@ -174,6 +174,7 @@ namespace agentsim {
     {
         std::string filePath = "trajectory/" + fileName;
         TrajectoryFileProperties tfp;
+        tfp.fileName = fileName;
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
             auto simPkg = this->m_SimPkgs[i];
 

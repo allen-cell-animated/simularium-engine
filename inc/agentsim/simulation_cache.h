@@ -80,6 +80,7 @@ namespace agentsim {
         void CloseFileStreams();
 
         void ParseFileProperties(std::string identifier);
+        bool IsFilePropertiesValid(std::string identifier);
 
         std::string m_cacheFolder = "/tmp/aics/simularium/";
         std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
