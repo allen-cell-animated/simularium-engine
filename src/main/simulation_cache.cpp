@@ -164,9 +164,9 @@ namespace agentsim {
         fprops["fileName"] = tfp.fileName;
         fprops["numberOfFrames"] = static_cast<int>(tfp.numberOfFrames);
         fprops["timeStepSize"] = tfp.timeStepSize;
-        fprops["boxSizeX"] = static_cast<int>(tfp.boxX);
-        fprops["boxSizeY"] = static_cast<int>(tfp.boxY);
-        fprops["boxSizeZ"] = static_cast<int>(tfp.boxZ);
+        fprops["boxSizeX"] = static_cast<float>(tfp.boxX);
+        fprops["boxSizeY"] = static_cast<float>(tfp.boxY);
+        fprops["boxSizeZ"] = static_cast<float>(tfp.boxZ);
 
         Json::Value typeMapping;
         for(auto& entry : tfp.typeMapping)
@@ -206,6 +206,9 @@ namespace agentsim {
                 typeMapping[id].asString();
         }
 
+        trajFileProps.boxX = fprops["boxSizeX"].asFloat();
+        trajFileProps.boxY = fprops["boxSizeY"].asFloat();
+        trajFileProps.boxZ = fprops["boxSizeZ"].asFloat();
         trajFileProps.fileName = fprops["fileName"].asString();
         trajFileProps.numberOfFrames = fprops["numberOfFrames"].asInt();
         trajFileProps.timeStepSize = fprops["timeStepSize"].asFloat();
@@ -220,9 +223,9 @@ namespace agentsim {
         is >> fprops;
 
         std::vector<std::string> keys({
-            "boxX",
-            "boxY",
-            "boxZ",
+            "boxSizeX",
+            "boxSizeY",
+            "boxSizeZ",
             "typeMapping",
             "fileName",
             "numberOfFrames",
