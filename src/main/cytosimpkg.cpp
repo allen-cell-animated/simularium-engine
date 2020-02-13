@@ -21,7 +21,7 @@ using std::endl;
 **/
 namespace aics {
 namespace agentsim {
-    const std::string CytosimPkg::PKG_DIRECTORY = "./cytosimpkg";
+    const std::string CytosimPkg::PKG_DIRECTORY = "/tmp/aics/simularium/pkg/cytosimpkg";
 
     CytosimPkg::CytosimPkg()
     {
