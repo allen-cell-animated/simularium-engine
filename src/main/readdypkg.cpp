@@ -7,6 +7,8 @@
 #include <fstream>
 #include <limits>
 #include <readdy/model/topologies/TopologyRecord.h>
+#include "Eigen/Dense"
+#include "Eigen/Geometry"
 
 struct ParticleData {
     ParticleData(std::string type, std::string flavor, const std::array<readdy::scalar, 3>& pos,
@@ -153,9 +155,4 @@ namespace agentsim {
 } // namespace aics
 
 #include "readdypkg_fileio.cc"
-
-#if USE_HARDCODED == 1
 #include "readdypkg_hardcoded.cc"
-#elif USE_HARDCODED == 0
-#include "readdypkg_generalized.cc"
-#endif

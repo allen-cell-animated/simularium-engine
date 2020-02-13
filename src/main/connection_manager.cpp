@@ -642,8 +642,8 @@ namespace agentsim {
                             tfp.timeStepSize = timeStep;
                             simulation.SetFileProperties("prerun", tfp);
                             this->SetClientSimId(senderUid, "prerun");
-                            this->SetupRuntimeCacheAsync(simulation, 500);
                             simulation.SetSimId("prerun");
+                            this->SetupRuntimeCacheAsync(simulation, 500);
                         } break;
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);

@@ -40,6 +40,14 @@ bool FindFile(std::string& filePath)
     return true;
 }
 
+bool FindFiles(std::vector<std::string>& files) {
+    for(std::string& file : files) {
+        if(!FindFile(file)) return false;
+    }
+
+    return true;
+}
+
 namespace aics {
 namespace agentsim {
 
@@ -129,28 +137,23 @@ namespace agentsim {
         float timeStep,
         std::size_t n_time_steps)
     {
-        for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            this->m_SimPkgs[i]->Run(timeStep, n_time_steps);
-        }
+        this->m_activeSimPkg = 0; // @TODO, selecting active sim-pkg for pre-run and live mode
+        this->m_SimPkgs[this->m_activeSimPkg]->Run(timeStep, n_time_steps);
     }
 
     bool Simulation::HasLoadedAllFrames()
     {
-        for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            if (!this->m_SimPkgs[i]->IsFinished()) {
-                return false;
-            }
-        }
-
-        return true;
+        return this->m_SimPkgs[this->m_activeSimPkg]->IsFinished();
     }
 
     void Simulation::LoadNextFrame()
     {
-        for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
-            if (!this->m_SimPkgs[i]->IsFinished()) {
-                this->m_SimPkgs[i]->GetNextFrame(this->m_agents);
-            }
+        // This function is only called in the context of trajectory
+        //  file loading
+        //  Assumption: Only 1 SimPKG is needed in the use case
+        auto simPkg = this->m_SimPkgs[this->m_activeSimPkg];
+        if (!simPkg->IsFinished()) {
+            simPkg->GetNextFrame(this->m_agents);
         }
 
         this->CacheCurrentAgents();
@@ -171,11 +174,19 @@ namespace agentsim {
     {
         std::string filePath = "trajectory/" + fileName;
         TrajectoryFileProperties tfp;
+        tfp.fileName = fileName;
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
             auto simPkg = this->m_SimPkgs[i];
 
             if(simPkg->CanLoadFile(fileName)) {
-                if(!FindFile(filePath)) {
+                this->m_activeSimPkg = i;
+
+                std::vector<std::string> files = simPkg->GetFileNames(filePath);
+                for(auto file : files) {
+                    LOG_F(INFO, "File to load: %s", file.c_str());
+                }
+
+                if(!FindFiles(files)) {
                     LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;
                 }
@@ -224,10 +235,10 @@ namespace agentsim {
             ad.type = agent->GetTypeID();
             ad.vis_type = static_cast<unsigned int>(agent->GetVisType());
 
-            auto t = agent->GetGlobalTransform();
-            ad.x = t(0, 3);
-            ad.y = t(1, 3);
-            ad.z = t(2, 3);
+            auto location = agent->GetLocation();
+            ad.x = location[0];
+            ad.y = location[1];
+            ad.z = location[2];
 
             auto rotation = agent->GetRotation();
             ad.xrot = rotation[0];
@@ -245,65 +256,12 @@ namespace agentsim {
 
             out.push_back(ad);
         }
-
-        for (std::size_t i = 0; i < agent->GetNumChildAgents(); ++i) {
-            auto child = agent->GetChildAgent(i);
-            AppendAgentData(out, child);
-        }
     }
 
     void InitAgents(std::vector<std::shared_ptr<Agent>>& out, Model& model)
     {
-        out.clear();
-
-        int boxSize = pow(model.volume, 1.0 / 3.0);
-        for (auto entry : model.agents) {
-            std::string key = entry.first;
-            std::size_t agent_count = 0;
-
-            if (model.concentrations.count(key) != 0) {
-                agent_count += model.concentrations[key] * model.volume;
-            } else if (model.seed_counts.count(key) != 0) {
-                agent_count += model.seed_counts[key];
-            } else {
-                continue;
-            }
-
-            auto agent_model_data = entry.second;
-            for (std::size_t i = 0; i < agent_count; ++i) {
-                std::shared_ptr<Agent> parent;
-                parent.reset(new Agent());
-                parent->SetName(agent_model_data.name);
-
-                float x, y, z;
-                x = rand() % boxSize - boxSize / 2;
-                y = rand() % boxSize - boxSize / 2;
-                z = rand() % boxSize - boxSize / 2;
-                parent->SetLocation(Eigen::Vector3d(x, y, z));
-
-                parent->SetDiffusionCoefficient(agent_model_data.diffusion_coefficient);
-                parent->SetCollisionRadius(agent_model_data.collision_radius);
-                parent->SetTypeID(agent_model_data.type_id);
-
-                for (auto subagent : agent_model_data.children) {
-                    std::shared_ptr<Agent> child;
-                    child.reset(new Agent());
-                    child->SetName(subagent.name);
-                    child->SetLocation(
-                        Eigen::Vector3d(
-                            subagent.x_offset, subagent.y_offset, subagent.z_offset));
-
-                    auto subagent_model_data = model.agents[subagent.name];
-                    child->SetTypeID(subagent_model_data.type_id);
-                    child->SetCollisionRadius(subagent_model_data.collision_radius);
-                    child->SetDiffusionCoefficient(subagent_model_data.diffusion_coefficient);
-                    child->SetVisibility(subagent.visible);
-
-                    parent->AddChildAgent(child);
-                }
-                out.push_back(parent);
-            }
-        }
+        //@TODO Implement when model definition better specified
+        LOG_F(ERROR, "Model parsing is not currently implemented.");
     }
 
     double Simulation::GetSimulationTimeAtFrame(

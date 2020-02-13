@@ -6,13 +6,16 @@
 #include <string>
 #include <vector>
 
+class Simul;
+class FrameReader;
+
 namespace aics {
 namespace agentsim {
 
     class CytosimPkg : public SimPkg {
     public:
-        CytosimPkg() {}
-        virtual ~CytosimPkg() {}
+        CytosimPkg();
+        virtual ~CytosimPkg();
 
         virtual void Setup() override;
         virtual void Shutdown() override;
@@ -33,17 +36,58 @@ namespace agentsim {
         virtual void LoadTrajectoryFile(
             std::string file_path,
             TrajectoryFileProperties& fileProps
-        ) override {};
+        ) override;
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override { return 0.0; };
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override { return 0; };
         virtual bool CanLoadFile(std::string filePath) override
             { return filePath.substr(filePath.find_last_of(".") + 1) == "cmo"; }
 
+        virtual std::vector<std::string> GetFileNames(std::string filePath) override
+        {
+            return {
+                filePath,
+                GetPropertyFileName(filePath)
+            };
+        }
+
     private:
-        bool m_hasAlreadyRun = false;
-        bool m_hasAlreadySetup = false;
+        void CopyFibers(
+            std::vector<std::shared_ptr<Agent>>& agents,
+            FrameReader* reader,
+            Simul* simul
+        );
+
+        static std::string TrajectoryFilePath()
+        {
+            return CytosimPkg::PKG_DIRECTORY + "/trajectory.cmo";
+        }
+
+        static std::string PropertyFilePath()
+        {
+            return CytosimPkg::PKG_DIRECTORY + "/properties.cmo";
+        }
+
+        std::string GetPropertyFileName(std::string filePath) {
+            return filePath.substr(0, filePath.find_last_of(".")) + "_properties.cmo";
+        }
+
+        std::shared_ptr<FrameReader> m_reader;
+        std::shared_ptr<Simul> m_simul;
         bool m_hasFinishedStreaming = false;
-        bool m_hasLoadedFrameReader = false;
+        bool m_hasLoadedFile = false;
+
+        static const std::string PKG_DIRECTORY;
+        std::string m_configFile = "./dep/cytosim/cym/aster.cym";
+        std::string m_trajectoryFile = "";
+        std::string m_propertyFile = "";
+
+        enum TypeId {
+            FiberId = 0
+        };
+
+        std::unordered_map<std::size_t, std::string> m_typeMapping {
+            {TypeId::FiberId, "Fiber"}
+        };
     };
 
 } // namespace agentsim

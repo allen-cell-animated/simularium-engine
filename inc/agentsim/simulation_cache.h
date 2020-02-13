@@ -71,8 +71,8 @@ namespace agentsim {
         std::string GetFilePath(std::string identifier);
         std::string GetInfoFilePath(std::string identifier);
 
-        inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium/"); }
-        inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/"); }
+        inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium/cache"); }
+        inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium/cache"); }
 
         std::ofstream& GetOfstream(std::string& identifier);
         std::ifstream& GetIfstream(std::string& identifier);
@@ -80,6 +80,7 @@ namespace agentsim {
         void CloseFileStreams();
 
         void ParseFileProperties(std::string identifier);
+        bool IsFilePropertiesValid(std::string identifier);
 
         std::string m_cacheFolder = "/tmp/aics/simularium/";
         std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
