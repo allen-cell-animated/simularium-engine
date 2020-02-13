@@ -541,8 +541,8 @@ namespace agentsim {
 
         Json::Value dataFrameMessage;
         dataFrameMessage["msgType"] = id_vis_data_arrive;
-        dataFrameMessage["bundleSize"] = numberOfFrames;
-        dataFrameMessage["bundleStart"] = startingFrame;
+        dataFrameMessage["bundleSize"] = (int)numberOfFrames;
+        dataFrameMessage["bundleStart"] = (int)startingFrame;
         Json::Value frameArr = Json::Value(Json::arrayValue);
         int endFrame = std::min(startingFrame + numberOfFrames, totalNumberOfFrames - 1);
 
