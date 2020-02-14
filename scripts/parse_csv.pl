@@ -107,6 +107,7 @@ while(my $line = <$data>){
     }
 }
 close($data);
+my $numFrames = $currentFrame + 1;
 
 my $bundle_file="$file_name.simularium";
 open(my $fh, '>', "$bundle_file");
@@ -116,7 +117,7 @@ print $fh "{\n
 \"bundleData\": [
     $bundle_data_json
 ],
-\"bundleSize\":$currentFrame,
+\"bundleSize\":$numFrames,
 \"bundleStart\":0
 }";
 
