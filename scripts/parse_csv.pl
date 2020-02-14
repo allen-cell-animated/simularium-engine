@@ -36,7 +36,8 @@ sub get_val {
 sub alphanumeric_to_int {
     my ($string) = @_;
     if (exists($str_ids{$string})) { return $str_ids{$string}; }
-    $str_ids{$string} = keys %str_ids
+    $str_ids{$string} = keys %str_ids;
+    return $str_ids{$string};
 }
 
 sub frame_to_json {
