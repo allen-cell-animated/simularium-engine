@@ -545,10 +545,9 @@ namespace agentsim {
         dataFrameMessage["bundleStart"] = startingFrame;
         Json::Value frameArr = Json::Value(Json::arrayValue);
         int endFrame = std::min(startingFrame + numberOfFrames, totalNumberOfFrames - 1);
+        int currentFrame = startingFrame;
 
-        for(int currentFrame = startingFrame;
-            currentFrame < endFrame;
-            currentFrame++)
+        for(; currentFrame < endFrame; currentFrame++)
         {
             AgentDataFrame adf = simulation.GetDataFrame(sid, currentFrame);
             Json::Value frameJSON;
@@ -559,7 +558,7 @@ namespace agentsim {
             frameArr.append(frameJSON);
         }
 
-        netState.frame_no = endFrame;
+        netState.frame_no = currentFrame - 1;
         dataFrameMessage["bundleData"] = frameArr;
         this->SendWebsocketMessage(connectionUID, dataFrameMessage);
     }
