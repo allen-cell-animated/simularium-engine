@@ -767,7 +767,6 @@ namespace agentsim {
 
                     this->LogClientEvent(senderUid, "Set to frame " + std::to_string(frameNumber));
                     this->SetClientFrame(senderUid, frameNumber);
-                    this->SetClientState(senderUid, ClientPlayState::Paused);
                     this->SendSingleFrameToClient(simulation, senderUid, frameNumber);
                 } break;
                 case WebRequestTypes::id_init_trajectory_file: {
