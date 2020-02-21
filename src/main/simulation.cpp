@@ -277,29 +277,24 @@ namespace agentsim {
         auto tfp = this->GetFileProperties(identifier);
 
         double time = 0.0;
-        if(this->m_SimPkgs.size() > 0)
-        {
-            time = this->m_SimPkgs[0]->GetSimulationTimeAtFrame(frameNumber);
+        float nearlyZero = 1e-9;
+
+        time = static_cast<double>(tfp.timeStepSize * frameNumber);
+        if(time > nearlyZero) {
+            return time;
         }
 
-        float nearlyZero = 1e-9;
-        if(static_cast<double>(tfp.timeStepSize * frameNumber) < nearlyZero
-            && time < nearlyZero)
+        if(this->m_SimPkgs.size() > 0 &&
+            this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier))
         {
-            if(frameNumber != 0) // presumably, only the first frame may have a time of '0' ns
-            {
-                LOG_F(ERROR,
-                    "Both the cached time and the live-calculated time are zero, a dev error may have been made"
-                );
-                return frameNumber; // this will allow client to function properly
-                // a client may reasonably assume that frames are sequential
+            time = this->m_SimPkgs[this->m_activeSimPkg]->GetSimulationTimeAtFrame(frameNumber);
+            if(time > nearlyZero) {
+                return time;
             }
         }
 
-        return std::max( // one of the below is expected to be 0.0
-            static_cast<double>(tfp.timeStepSize * frameNumber), // non-zero if cache info was set
-            time // non-zero if local processing or a live simulation happened
-        ); // if both were zero, a dev error was made
+        LOG_F(ERROR, "Both the cached time and the live-calculated time are zero, a dev error may have been made");
+        return frameNumber;
     }
 
     std::size_t Simulation::GetClosestFrameNumberForTime(
@@ -314,12 +309,13 @@ namespace agentsim {
         {
             // Integer division performed to get nearest frames
             // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
-            return static_cast<int>(simulationTimeNs) / static_cast<int>(tfp.numberOfFrames);
+            return static_cast<int>(simulationTimeNs) / static_cast<int>(tfp.timeStepSize);
         }
 
-        if(this->m_SimPkgs.size() > 0)
+        if(this->m_SimPkgs.size() > 0 &&
+            this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier))
         {
-            return this->m_SimPkgs[0]->GetClosestFrameNumberForTime(simulationTimeNs);
+            return this->m_SimPkgs[this->m_activeSimPkg]->GetClosestFrameNumberForTime(simulationTimeNs);
         }
 
         return 0;
