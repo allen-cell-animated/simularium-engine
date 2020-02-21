@@ -757,7 +757,7 @@ namespace agentsim {
                 } break;
                 case WebRequestTypes::id_goto_simulation_time: {
                     auto& netState = this->m_netStates[senderUid];
-                    double timeNs = jsonMsg["time"].asDouble();
+                    double timeNs = std::stod(jsonMsg["time"].asString());
                     std::size_t frameNumber = simulation.GetClosestFrameNumberForTime(
                         netState.sim_identifier, timeNs
                     );
@@ -765,12 +765,16 @@ namespace agentsim {
                         netState.sim_identifier, frameNumber
                     );
 
-                    this->LogClientEvent(senderUid, "Set to frame " + std::to_string(frameNumber));
+                    this->LogClientEvent(senderUid,
+                        "Request for time " + std::to_string(timeNs) + " -> selected frame " +
+                        std::to_string(frameNumber) + " with time " + std::to_string(closestTime)
+                    );
                     this->SetClientFrame(senderUid, frameNumber);
                     this->SendSingleFrameToClient(simulation, senderUid, frameNumber);
                 } break;
                 case WebRequestTypes::id_init_trajectory_file: {
                     std::string trajectoryFileName = jsonMsg["fileName"].asString();
+                    simulation.SetPlaybackMode(SimulationMode::id_traj_file_playback);
                     this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
                 } break;
                 default: {
