@@ -631,7 +631,7 @@ TimeTrajectoryH5Info readTrajectory(
     group.read("limits", limits);
 
     // time of length T containing the time steps of recording the trajectory
-    std::vector<readdy::time_step_type> time;
+    std::vector<readdy::TimeStep> time;
     group.read("time", time);
 
     // records containing all particles for all times, slicing according to limits
@@ -725,7 +725,7 @@ TimeTopologyH5Info readTopologies(
     to = std::min(nFrames, to);
 
     // time
-    std::vector<readdy::time_step_type> time;
+    std::vector<readdy::TimeStep> time;
     if (stride > 1) {
         group.readSelection("time", time, { from }, { stride }, { to - from });
     } else {
