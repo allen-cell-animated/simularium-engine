@@ -1,9 +1,42 @@
-# DATA FORMAT
+# VISUALIZATION DATA FORMAT
 Trajectory frames are sent from the Agent-Viz back-end in a JSON format documented below.
 
-## Example
-The below example is for frame 1, at time 200 nano-seconds, with a single agent:
+## Frame Bundle Encoding
+Trajectory frames are broadcast in bundles; each frame has a format that it is encoded into, and each bundle has an array of these objects, and some information about the bundle.
 
+### Example
+A bundle with 5 frames starting at frame number 0:
+```
+{
+    msgType:1,
+    bundleStart: 0,
+    bundleSize: 5,
+    bundleData: [
+        { frameNumber: 0, time: 0, data: [...] },
+        { frameNumber: 1, time: 5, data: [...] },
+        { frameNumber: 2, time: 10, data: [...] },
+        { frameNumber: 3, time: 15, data: [...] },
+        { frameNumber: 4, time: 20, data: [...] }
+    ]
+}
+```
+
+### Fields
+#### bundleStart
+The first frame contained in the bundle. Above, this is frame number 0.
+
+#### bundleSize
+How many individual frames are contained in the data bundle. Above, 5 frames are included (frames 0 - 4).
+
+#### bundleData
+An array containing the individual data frames encoded in the format described below.
+
+## Individual Frame Encoding
+Individual frames are encoded into a more compact format before being packed into the
+bundleData field mentioned above.
+
+### Example
+A single frame at time 200 with a single agent:
 ```
 {  
     "data" : [  
@@ -38,11 +71,12 @@ ad.z = 15.7;
 ad.xrot = 45.25;
 ad.yrot = 45.26;
 ad.zrot = 45.27;
+ad.cr = 1.0
 ad.subpoints = std::vector<float>(); // empty, included for clarity
 ```
 
 ## Agent Data
-Data on the back-end is represented using the AgentData structure. This structure contains basic spatial  information about the agent as well as information on how to visualize the agent.
+Data on the back-end is represented using the AgentData structure. This structure contains basic spatial information about the agent as well as information on how to visualize the agent.
 
 ### Fields
 The fields of the AgentData structure are streamed in the following order:
