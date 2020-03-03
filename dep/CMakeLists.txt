@@ -1,9 +1,12 @@
 add_subdirectory(gtest)
+
+set(READDY_BUILD_PYTHON_WRAPPER OFF CACHE BOOL "don't build ReaDDy's python wrapper")
+set(READDY_CREATE_TEST_TARGET OFF CACHE BOOL "don't build Readdy test target")
 add_subdirectory(readdy)
 add_subdirectory(aws-sdk-cpp)
 
-set(BUILD_SIM_EXECUTABLE OFF CACHE BOOL "don't build Cytosim Sim EXE" FORCE)
-set(BUILD_PLAY_EXECUTABLE OFF CACHE BOOL "don't build Cytosim Play EXE" FORCE)
+set(BUILD_SIM_EXECUTABLE OFF CACHE BOOL "don't build Cytosim Sim executable" FORCE)
+set(BUILD_PLAY_EXECUTABLE OFF CACHE BOOL "don't build Cytosim Play executable" FORCE)
 set(BUILD_CYTOSIM_TESTS OFF CACHE BOOL "don't build Cytosim Tests" FORCE)
 set(BUILD_CYTOSIM_TOOLS OFF CACHE BOOL "don't build Cytosim Tools" FORCE)
 

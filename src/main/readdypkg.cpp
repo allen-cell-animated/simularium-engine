@@ -12,7 +12,7 @@
 
 struct ParticleData {
     ParticleData(std::string type, std::string flavor, const std::array<readdy::scalar, 3>& pos,
-        readdy::model::Particle::id_type id, std::size_t type_id, readdy::time_step_type t)
+        readdy::ParticleId id, std::size_t type_id, readdy::TimeStep t)
         : type(std::move(type))
         , flavor(std::move(flavor))
         , position(pos)
@@ -25,9 +25,9 @@ struct ParticleData {
     std::string type;
     std::string flavor;
     std::array<readdy::scalar, 3> position;
-    readdy::model::Particle::id_type id;
+    readdy::ParticleId id;
     std::size_t type_id;
-    readdy::time_step_type t;
+    readdy::TimeStep t;
 };
 
 struct OrientationData {
@@ -102,7 +102,7 @@ struct TopologyRecord {
 };
 */
 
-using TimestepH5List = std::vector<readdy::time_step_type>;
+using TimestepH5List = std::vector<readdy::TimeStep>;
 
 using ParticleH5List = std::vector<ParticleData>;
 using TrajectoryH5Info = std::vector<ParticleH5List>;
@@ -138,7 +138,7 @@ namespace agentsim {
     };
 
     ReaDDyPkg::ReaDDyPkg() {
-        this->m_simulation = new readdy::Simulation("SingleCPU");
+        this->m_simulation = new readdy::Simulation("SingleCPU", readdy::model::Context());
 
         this->m_fileInfo = std::make_shared<ReaDDyFileInfo>();
         this->m_bloscFilter = std::make_shared<readdy::io::BloscFilter>();

@@ -144,99 +144,101 @@ namespace agentsim {
 
     void ReaDDyPkg::Setup()
     {
-        if (!this->m_agents_initialized) {
-            this->m_simulation->context().boxSize()[0] = boxSize;
-            this->m_simulation->context().boxSize()[1] = boxSize;
-            this->m_simulation->context().boxSize()[2] = boxSize;
-
-            //define particles
-            auto& particles = this->m_simulation->context().particleTypes();
-
-            add_oriented_species(this->m_simulation, mol_name + "0", diffusion_constant_monomer, particle_types, particle_radii);
-
-            for (std::size_t i = 1; i <= n_helix_types; ++i) {
-                if (i == 1) {
-                    add_oriented_species(this->m_simulation, mol_name + std::to_string(i), 0, particle_types, particle_radii);
-                } else {
-                    // add particles for other filament monomers
-                    particles.addTopologyType(mol_name + std::to_string(i), diffusion_constant);
-                    particle_types.push_back(mol_name + std::to_string(i));
-                    particle_radii.push_back(mol_radius);
-                }
-
-                if (i > 0) {
-                    // add 'end' particles for monomers at reactive end of filament
-                    particles.addTopologyType(mol_name + std::to_string(i) + "_end", diffusion_constant);
-                    particle_types.push_back(mol_name + std::to_string(i) + "_end");
-                    particle_radii.push_back(mol_radius);
-                }
-            }
-
-            //for decay of basis particles when a monomer joins a filament
-            particles.add("basis", diffusion_constant);
-            this->m_simulation->context().reactions().addDecay("Basis_decay", "basis", 1e30);
-
-            //define topologies
-            auto& topologies = this->m_simulation->context().topologyRegistry();
-            topologies.addType("Monomer");
-            topologies.addType("Dimer_binding");
-            topologies.addType("Dimer");
-            topologies.addType("Polymer_nucleating");
-            topologies.addType("Polymer_growing");
-            topologies.addType("Polymer");
-
-            add_filament_constraints(this->m_simulation, mol_name);
-
-            //define reactions
-            topologies.addSpatialReaction(
-                "Dimerize: Monomer(A0) + Monomer(A0) -> Dimer_binding(A1--A0) [self=true]", dimerize_rate, 100);
-            topologies.addSpatialReaction(
-                "Nucleate: Monomer(A0) + Dimer(A3_end) -> Polymer_nucleating(A0--A3)", nucleate_rate, reaction_distance);
-            int i_plus_2;
-            for (std::size_t i = 1; i <= n_helix_types; ++i) {
-                i_plus_2 = i < n_helix_types - 1 ? i + 2 : i + 2 - n_helix_types;
-                topologies.addSpatialReaction(
-                    "Polymerize" + std::to_string(i) + ": Monomer(A0) + Polymer(A" + std::to_string(i)
-                        + "_end) -> Polymer_growing(A0--A" + std::to_string(i) + ")",
-                    polymerize_rate, reaction_distance);
-            }
-            create_dimerize_rxn(this->m_simulation);
-            create_nucleate_rxn(this->m_simulation);
-            create_polymerize_rxn(this->m_simulation);
-
-            //define repulsions
-            auto& potentials = this->m_simulation->context().potentials();
-            this->m_agents_initialized = true;
-            for (std::size_t i = 0; i <= n_helix_types; ++i) {
-                potentials.addHarmonicRepulsion(mol_name + "0", mol_name + std::to_string(i), force_constant, 2 * mol_radius);
-                if (i > 0) {
-                    potentials.addHarmonicRepulsion(mol_name + "0", mol_name + std::to_string(i) + "_end", force_constant, 2 * mol_radius);
-                }
-                potentials.addBox(mol_name + std::to_string(i), force_constant,
-                    readdy::Vec3(-boxSize / 2, -boxSize / 2, -boxSize / 2), readdy::Vec3(boxSize, boxSize, boxSize));
-            }
-        }
-
-        //add initial monomers
-        for (std::size_t i = 0; i < n_monomers; ++i) {
-            float x, y, z;
-            x = rand() % boxSize - boxSize / 2;
-            y = rand() % boxSize - boxSize / 2;
-            z = rand() % boxSize - boxSize / 2;
-
-            add_oriented_particle(this->m_simulation, mol_name + "0", "Monomer", Eigen::Vector3d(x, y, z));
-        }
-
-        auto loop = this->m_simulation->createLoop(1);
-        loop.runInitialize();
-        loop.runInitializeNeighborList();
+        printf("setup\n");
+        
+        
+//        if (!this->m_agents_initialized) {
+//            
+////            this->m_simulation->context().boxSize() = {{(double)boxSize, (double)boxSize, (double)boxSize}};
+//
+//            //define particles
+//            auto& particles = this->m_simulation->context().particleTypes();
+//
+//            add_oriented_species(this->m_simulation, mol_name + "0", diffusion_constant_monomer, particle_types, particle_radii);
+//
+//            for (std::size_t i = 1; i <= n_helix_types; ++i) {
+//                if (i == 1) {
+//                    add_oriented_species(this->m_simulation, mol_name + std::to_string(i), 0, particle_types, particle_radii);
+//                } else {
+//                    // add particles for other filament monomers
+////                    particles.addTopologyType(mol_name + std::to_string(i), diffusion_constant);
+//                    particle_types.push_back(mol_name + std::to_string(i));
+//                    particle_radii.push_back(mol_radius);
+//                }
+//
+//                if (i > 0) {
+//                    // add 'end' particles for monomers at reactive end of filament
+////                    particles.addTopologyType(mol_name + std::to_string(i) + "_end", diffusion_constant);
+//                    particle_types.push_back(mol_name + std::to_string(i) + "_end");
+//                    particle_radii.push_back(mol_radius);
+//                }
+//            }
+//
+//            //for decay of basis particles when a monomer joins a filament
+////            particles.add("basis", diffusion_constant);
+////            this->m_simulation->context().reactions().addDecay("Basis_decay", "basis", 1e30);
+//
+//            //define topologies
+//            auto& topologies = this->m_simulation->context().topologyRegistry();
+////            topologies.addType("Monomer");
+////            topologies.addType("Dimer_binding");
+////            topologies.addType("Dimer");
+////            topologies.addType("Polymer_nucleating");
+////            topologies.addType("Polymer_growing");
+////            topologies.addType("Polymer");
+//
+//            add_filament_constraints(this->m_simulation, mol_name);
+//
+//            //define reactions
+////            topologies.addSpatialReaction(
+////                "Dimerize: Monomer(A0) + Monomer(A0) -> Dimer_binding(A1--A0) [self=true]", dimerize_rate, 100);
+////            topologies.addSpatialReaction(
+////                "Nucleate: Monomer(A0) + Dimer(A3_end) -> Polymer_nucleating(A0--A3)", nucleate_rate, reaction_distance);
+//            int i_plus_2;
+//            for (std::size_t i = 1; i <= n_helix_types; ++i) {
+//                i_plus_2 = i < n_helix_types - 1 ? i + 2 : i + 2 - n_helix_types;
+////                topologies.addSpatialReaction(
+////                    "Polymerize" + std::to_string(i) + ": Monomer(A0) + Polymer(A" + std::to_string(i)
+////                        + "_end) -> Polymer_growing(A0--A" + std::to_string(i) + ")",
+////                    polymerize_rate, reaction_distance);
+//            }
+//            create_dimerize_rxn(this->m_simulation);
+//            create_nucleate_rxn(this->m_simulation);
+//            create_polymerize_rxn(this->m_simulation);
+//
+//            //define repulsions
+//            auto& potentials = this->m_simulation->context().potentials();
+//            this->m_agents_initialized = true;
+//            for (std::size_t i = 0; i <= n_helix_types; ++i) {
+////                potentials.addHarmonicRepulsion(mol_name + "0", mol_name + std::to_string(i), force_constant, 2 * mol_radius);
+//                if (i > 0) {
+////                    potentials.addHarmonicRepulsion(mol_name + "0", mol_name + std::to_string(i) + "_end", force_constant, 2 * mol_radius);
+//                }
+////                potentials.addBox(mol_name + std::to_string(i), force_constant,
+////                    readdy::Vec3(-boxSize / 2, -boxSize / 2, -boxSize / 2), readdy::Vec3(boxSize, boxSize, boxSize));
+//            }
+//        }
+//
+//        //add initial monomers
+//        for (std::size_t i = 0; i < n_monomers; ++i) {
+//            float x, y, z;
+//            x = rand() % boxSize - boxSize / 2;
+//            y = rand() % boxSize - boxSize / 2;
+//            z = rand() % boxSize - boxSize / 2;
+//
+//            add_oriented_particle(this->m_simulation, mol_name + "0", "Monomer", Eigen::Vector3d(x, y, z));
+//        }
+//
+//        auto loop = this->m_simulation->createLoop(1);
+//        loop.runInitialize();
+//        loop.runInitializeNeighborList();
     }
 
     void ReaDDyPkg::Shutdown()
     {
         delete this->m_simulation;
         this->m_simulation = nullptr;
-        this->m_simulation = new readdy::Simulation("SingleCPU");
+//        this->m_simulation = new readdy::Simulation("SingleCPU");
 
         this->m_timeStepCount = 0;
         this->m_agents_initialized = false;
@@ -249,67 +251,68 @@ namespace agentsim {
     void ReaDDyPkg::RunTimeStep(
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
     {
-        auto loop = this->m_simulation->createLoop(timeStep);
-
-        this->m_timeStepCount++;
-        loop.runIntegrator(); // propagate particles
-        loop.runUpdateNeighborList(); // neighbor list update
-        loop.runReactions(); // evaluate reactions
-        loop.runTopologyReactions(); // and topology reactions
-        loop.runUpdateNeighborList(); // neighbor list update
-        loop.runForces(); // evaluate forces based on current particle configuration
-        loop.runEvaluateObservables(this->m_timeStepCount); // evaluate observables
-
-        agents.clear();
-        std::vector<std::string> pTypes = particle_types;
-        for (std::size_t i = 0; i < pTypes.size(); ++i) {
-            std::string pt = pTypes[i];
-            if (pt.find("_x") != std::string::npos
-                || pt.find("_y") != std::string::npos
-                || pt.find("_z") != std::string::npos) {
-                continue;
-            }
-
-            std::vector<readdy::Vec3> positions = this->m_simulation->getParticlePositions(pTypes[i]);
-            std::vector<readdy::Vec3> xpositions;
-            std::vector<readdy::Vec3> ypositions;
-            std::vector<readdy::Vec3> zpositions;
-
-            bool has_orientation = false;
-            if (std::find(pTypes.begin(), pTypes.end(), pTypes[i] + "_x") != pTypes.end()) {
-                has_orientation = true;
-                xpositions = this->m_simulation->getParticlePositions(pTypes[i] + "_x");
-                ypositions = this->m_simulation->getParticlePositions(pTypes[i] + "_y");
-                zpositions = this->m_simulation->getParticlePositions(pTypes[i] + "_z");
-            }
-
-            for (std::size_t j = 0; j < positions.size(); ++j) {
-                readdy::Vec3 v = positions[j];
-                std::shared_ptr<Agent> newAgent;
-                newAgent.reset(new Agent());
-                newAgent->SetName(pTypes[i]);
-                newAgent->SetTypeID(i);
-                newAgent->SetLocation(v[0], v[1], v[2]);
-                newAgent->SetCollisionRadius(0.5f);
-
-                if (has_orientation) {
-                    readdy::Vec3 x = xpositions[j];
-                    readdy::Vec3 y = ypositions[j];
-                    readdy::Vec3 z = zpositions[j];
-
-                    std::vector<Eigen::Vector3d> basis;
-                    basis.push_back(Eigen::Vector3d(v[0], v[1], v[2]));
-                    basis.push_back(Eigen::Vector3d(x[0], x[1], x[2]));
-                    basis.push_back(Eigen::Vector3d(y[0], y[1], y[2]));
-                    basis.push_back(Eigen::Vector3d(z[0], z[1], z[2]));
-                    Eigen::Matrix3d rm = get_rotation_matrix(basis);
-                    Eigen::Vector3d rea = rm.eulerAngles(0, 1, 2);
-                    newAgent->SetRotation(rea[0], rea[1], rea[2]);
-                }
-
-                agents.push_back(newAgent);
-            }
-        }
+        printf("timestep\n");
+//        auto loop = this->m_simulation->createLoop(timeStep);
+//
+//        this->m_timeStepCount++;
+//        loop.runIntegrator(); // propagate particles
+//        loop.runUpdateNeighborList(); // neighbor list update
+//        loop.runReactions(); // evaluate reactions
+//        loop.runTopologyReactions(); // and topology reactions
+//        loop.runUpdateNeighborList(); // neighbor list update
+//        loop.runForces(); // evaluate forces based on current particle configuration
+//        loop.runEvaluateObservables(this->m_timeStepCount); // evaluate observables
+//
+//        agents.clear();
+//        std::vector<std::string> pTypes = particle_types;
+//        for (std::size_t i = 0; i < pTypes.size(); ++i) {
+//            std::string pt = pTypes[i];
+//            if (pt.find("_x") != std::string::npos
+//                || pt.find("_y") != std::string::npos
+//                || pt.find("_z") != std::string::npos) {
+//                continue;
+//            }
+//
+//            std::vector<readdy::Vec3> positions = this->m_simulation->getParticlePositions(pTypes[i]);
+//            std::vector<readdy::Vec3> xpositions;
+//            std::vector<readdy::Vec3> ypositions;
+//            std::vector<readdy::Vec3> zpositions;
+//
+//            bool has_orientation = false;
+//            if (std::find(pTypes.begin(), pTypes.end(), pTypes[i] + "_x") != pTypes.end()) {
+//                has_orientation = true;
+//                xpositions = this->m_simulation->getParticlePositions(pTypes[i] + "_x");
+//                ypositions = this->m_simulation->getParticlePositions(pTypes[i] + "_y");
+//                zpositions = this->m_simulation->getParticlePositions(pTypes[i] + "_z");
+//            }
+//
+//            for (std::size_t j = 0; j < positions.size(); ++j) {
+//                readdy::Vec3 v = positions[j];
+//                std::shared_ptr<Agent> newAgent;
+//                newAgent.reset(new Agent());
+//                newAgent->SetName(pTypes[i]);
+//                newAgent->SetTypeID(i);
+//                newAgent->SetLocation(v[0], v[1], v[2]);
+//                newAgent->SetCollisionRadius(0.5f);
+//
+//                if (has_orientation) {
+//                    readdy::Vec3 x = xpositions[j];
+//                    readdy::Vec3 y = ypositions[j];
+//                    readdy::Vec3 z = zpositions[j];
+//
+//                    std::vector<Eigen::Vector3d> basis;
+//                    basis.push_back(Eigen::Vector3d(v[0], v[1], v[2]));
+//                    basis.push_back(Eigen::Vector3d(x[0], x[1], x[2]));
+//                    basis.push_back(Eigen::Vector3d(y[0], y[1], y[2]));
+//                    basis.push_back(Eigen::Vector3d(z[0], z[1], z[2]));
+//                    Eigen::Matrix3d rm = get_rotation_matrix(basis);
+//                    Eigen::Vector3d rea = rm.eulerAngles(0, 1, 2);
+//                    newAgent->SetRotation(rea[0], rea[1], rea[2]);
+//                }
+//
+//                agents.push_back(newAgent);
+//            }
+//        }
     }
 
     void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue)
@@ -376,22 +379,22 @@ void add_oriented_species(
     auto& particles = sim->context().particleTypes();
     float component_radii = 0.1f;
 
-    particles.addTopologyType(name, diff_coeff);
+//    particles.addTopologyType(name, diff_coeff);
     out_types.push_back(name);
     out_radii.push_back(mol_radius);
 
     cxn = name + "_x";
-    particles.addTopologyType(cxn, diff_coeff);
+//    particles.addTopologyType(cxn, diff_coeff);
     out_types.push_back(cxn);
     out_radii.push_back(component_radii);
 
     cyn = name + "_y";
-    particles.addTopologyType(cyn, diff_coeff);
+//    particles.addTopologyType(cyn, diff_coeff);
     out_types.push_back(cyn);
     out_radii.push_back(component_radii);
 
     czn = name + "_z";
-    particles.addTopologyType(czn, diff_coeff);
+//    particles.addTopologyType(czn, diff_coeff);
     out_types.push_back(czn);
     out_radii.push_back(component_radii);
 
@@ -401,26 +404,26 @@ void add_oriented_species(
     auto& topologies = sim->context().topologyRegistry();
 
     bond.length = 1;
-    topologies.configureBondPotential(name, cxn, bond);
-    topologies.configureBondPotential(name, cyn, bond);
-    topologies.configureBondPotential(name, czn, bond);
+//    topologies.configureBondPotential(name, cxn, bond);
+//    topologies.configureBondPotential(name, cyn, bond);
+//    topologies.configureBondPotential(name, czn, bond);
     bond.length = M_SQRT2;
-    topologies.configureBondPotential(cxn, cyn, bond);
-    topologies.configureBondPotential(cyn, czn, bond);
-    topologies.configureBondPotential(czn, cxn, bond);
+//    topologies.configureBondPotential(cxn, cyn, bond);
+//    topologies.configureBondPotential(cyn, czn, bond);
+//    topologies.configureBondPotential(czn, cxn, bond);
 
     //angle constraints
     readdy::api::Angle angle;
     angle.forceConstant = force_constant;
 
     angle.equilibriumAngle = M_PI_2;
-    topologies.configureAnglePotential(cxn, name, cyn, angle);
-    topologies.configureAnglePotential(cxn, name, czn, angle);
-    topologies.configureAnglePotential(cyn, name, czn, angle);
+//    topologies.configureAnglePotential(cxn, name, cyn, angle);
+//    topologies.configureAnglePotential(cxn, name, czn, angle);
+//    topologies.configureAnglePotential(cyn, name, czn, angle);
     angle.equilibriumAngle = M_PI / 3;
-    topologies.configureAnglePotential(cxn, cyn, czn, angle);
-    topologies.configureAnglePotential(cyn, czn, cxn, angle);
-    topologies.configureAnglePotential(czn, cxn, cyn, angle);
+//    topologies.configureAnglePotential(cxn, cyn, czn, angle);
+//    topologies.configureAnglePotential(cyn, czn, cxn, angle);
+//    topologies.configureAnglePotential(czn, cxn, cyn, angle);
 }
 
 void add_oriented_particle(
@@ -492,60 +495,60 @@ void add_filament_constraints(
         i_plus_2_str = std::to_string(i_plus_2);
 
         //during transitions, newly added particle is still A0
-        topologies.configureBondPotential(base_name + "0",
-            base_name + i_str, bond2);
+//        topologies.configureBondPotential(base_name + "0",
+//            base_name + i_str, bond2);
 
-        topologies.configureBondPotential(base_name + i_str,
-            base_name + i_plus_1_str, bond1);
-        topologies.configureBondPotential(base_name + i_str + "_end",
-            base_name + i_plus_1_str, bond1);
-        topologies.configureBondPotential(base_name + i_str,
-            base_name + i_plus_1_str + "_end", bond1);
-        topologies.configureBondPotential(base_name + i_str,
-            base_name + i_plus_2_str, bond2);
-        topologies.configureBondPotential(base_name + i_str,
-            base_name + i_plus_2_str + "_end", bond2);
-        topologies.configureBondPotential(base_name + i_str,
-            base_name + i_str, bond3);
-        topologies.configureBondPotential(base_name + i_str,
-            base_name + i_str + "_end", bond3);
-
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_plus_1_str,
-            base_name + i_plus_2_str, angle1);
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_plus_1_str + "_end",
-            base_name + i_plus_2_str, angle1);
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_plus_1_str,
-            base_name + i_plus_2_str + "_end", angle1);
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_plus_2_str,
-            base_name + i_plus_1_str, angle2);
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_plus_2_str,
-            base_name + i_plus_1_str + "_end", angle2);
-        topologies.configureAnglePotential(base_name + i_plus_1_str,
-            base_name + i_str,
-            base_name + i_plus_2_str, angle2);
-        topologies.configureAnglePotential(base_name + i_plus_1_str + "_end",
-            base_name + i_str,
-            base_name + i_plus_2_str, angle2);
-        topologies.configureAnglePotential(base_name + i_plus_1_str,
-            base_name + i_str,
-            base_name + i_plus_2_str + "_end", angle2);
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_str,
-            base_name + i_str, angle3);
-        topologies.configureAnglePotential(base_name + i_str,
-            base_name + i_str,
-            base_name + i_str + "_end", angle3);
+//        topologies.configureBondPotential(base_name + i_str,
+//            base_name + i_plus_1_str, bond1);
+//        topologies.configureBondPotential(base_name + i_str + "_end",
+//            base_name + i_plus_1_str, bond1);
+//        topologies.configureBondPotential(base_name + i_str,
+//            base_name + i_plus_1_str + "_end", bond1);
+//        topologies.configureBondPotential(base_name + i_str,
+//            base_name + i_plus_2_str, bond2);
+//        topologies.configureBondPotential(base_name + i_str,
+//            base_name + i_plus_2_str + "_end", bond2);
+//        topologies.configureBondPotential(base_name + i_str,
+//            base_name + i_str, bond3);
+//        topologies.configureBondPotential(base_name + i_str,
+//            base_name + i_str + "_end", bond3);
+//
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_plus_1_str,
+//            base_name + i_plus_2_str, angle1);
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_plus_1_str + "_end",
+//            base_name + i_plus_2_str, angle1);
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_plus_1_str,
+//            base_name + i_plus_2_str + "_end", angle1);
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_plus_2_str,
+//            base_name + i_plus_1_str, angle2);
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_plus_2_str,
+//            base_name + i_plus_1_str + "_end", angle2);
+//        topologies.configureAnglePotential(base_name + i_plus_1_str,
+//            base_name + i_str,
+//            base_name + i_plus_2_str, angle2);
+//        topologies.configureAnglePotential(base_name + i_plus_1_str + "_end",
+//            base_name + i_str,
+//            base_name + i_plus_2_str, angle2);
+//        topologies.configureAnglePotential(base_name + i_plus_1_str,
+//            base_name + i_str,
+//            base_name + i_plus_2_str + "_end", angle2);
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_str,
+//            base_name + i_str, angle3);
+//        topologies.configureAnglePotential(base_name + i_str,
+//            base_name + i_str,
+//            base_name + i_str + "_end", angle3);
     }
     //during dimer transition, A0 becomes A1 before bases can be renamed
     bond1.length = 1;
-    topologies.configureBondPotential("A1", "A0_x", bond1);
-    topologies.configureBondPotential("A1", "A0_y", bond1);
-    topologies.configureBondPotential("A1", "A0_z", bond1);
+//    topologies.configureBondPotential("A1", "A0_x", bond1);
+//    topologies.configureBondPotential("A1", "A0_y", bond1);
+//    topologies.configureBondPotential("A1", "A0_z", bond1);
 }
 
 void create_dimerize_rxn(
@@ -571,10 +574,10 @@ void create_dimerize_rxn(
 
         return recipe;
     };
-    readdy::model::top::reactions::StructuralTopologyReaction dimerize_rxn(
-        dimerize, 1e30);
-    sim->context().topologyRegistry().addStructuralReaction(
-        "Dimer_binding", dimerize_rxn);
+//    readdy::model::top::reactions::StructuralTopologyReaction dimerize_rxn(
+//        dimerize, 1e30);
+//    sim->context().topologyRegistry().addStructuralReaction(
+//        "Dimer_binding", dimerize_rxn);
 }
 
 void create_nucleate_rxn(
@@ -599,10 +602,10 @@ void create_nucleate_rxn(
 
         return recipe;
     };
-    readdy::model::top::reactions::StructuralTopologyReaction nucleate_rxn(
-        nucleate, 1e30);
-    sim->context().topologyRegistry().addStructuralReaction(
-        "Polymer_nucleating", nucleate_rxn);
+//    readdy::model::top::reactions::StructuralTopologyReaction nucleate_rxn(
+//        nucleate, 1e30);
+//    sim->context().topologyRegistry().addStructuralReaction(
+//        "Polymer_nucleating", nucleate_rxn);
 }
 
 void create_polymerize_rxn(
@@ -636,10 +639,10 @@ void create_polymerize_rxn(
 
         return recipe;
     };
-    readdy::model::top::reactions::StructuralTopologyReaction polymerize_rxn(
-        polymerize, 1e30);
-    sim->context().topologyRegistry().addStructuralReaction(
-        "Polymer_growing", polymerize_rxn);
+//    readdy::model::top::reactions::StructuralTopologyReaction polymerize_rxn(
+//        polymerize, 1e30);
+//    sim->context().topologyRegistry().addStructuralReaction(
+//        "Polymer_growing", polymerize_rxn);
 }
 
 readdy::model::top::graph::Vertex* get_orientation_vertex(
