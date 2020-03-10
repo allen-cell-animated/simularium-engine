@@ -274,13 +274,12 @@ namespace agentsim {
             return frameNumber;
         }
 
+        if(frameNumber == 0) { return 0; } // Assumption: the first frame is at 0
+
         auto tfp = this->GetFileProperties(identifier);
-
         double time = 0.0;
-        float nearlyZero = 1e-9;
-
         time = static_cast<double>(tfp.timeStepSize * frameNumber);
-        if(time > nearlyZero) {
+        if(time > 0.0) {
             return time;
         }
 
@@ -288,7 +287,7 @@ namespace agentsim {
             this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier))
         {
             time = this->m_SimPkgs[this->m_activeSimPkg]->GetSimulationTimeAtFrame(frameNumber);
-            if(time > nearlyZero) {
+            if(time > 0.0) {
                 return time;
             }
         }
@@ -303,13 +302,14 @@ namespace agentsim {
     {
         auto tfp = this->GetFileProperties(identifier);
 
-        // If theres is cached meta-data for the simulation,
+        // If there is cached meta-data for the simulation,
         //  assume we are running using a cache pulled down from the network
         if(tfp.numberOfFrames != 0)
         {
             // Integer division performed to get nearest frames
             // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
-            return static_cast<int>(simulationTimeNs) / static_cast<int>(tfp.timeStepSize);
+            int time = simulationTimeNs / tfp.timeStepSize;
+            return time;
         }
 
         if(this->m_SimPkgs.size() > 0 &&
