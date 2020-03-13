@@ -8,6 +8,7 @@ set(TEST_LIST
 "test_aws_util"
 "test_client_server"
 "test_net_commands"
+"test_sim_time"
 )
 
 set(TEST_INCLUDES
