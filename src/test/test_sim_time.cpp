@@ -10,9 +10,6 @@ namespace test {
 
     TEST_F(SimulationTimeTests, FrameTimeCalculation)
     {
-        std::atomic<bool> isRunning = true;
-        float timeStep = 1e-12;
-        std::string uri = "wss://localhost:9002";
         std::string simFileName = "testSim"; // not a real simulation
         std::string simFilePath = "trajectory/" + simFileName;
 
