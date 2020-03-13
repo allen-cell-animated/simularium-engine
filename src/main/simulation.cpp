@@ -300,12 +300,23 @@ namespace agentsim {
         std::string identifier, double simulationTimeNs
     )
     {
+        // Return the first frame for a negative time
+        //  the assumption is that simulation time starts at a non-negative value
+        if(simulationTimeNs < 0) { return 0; }
+
         auto tfp = this->GetFileProperties(identifier);
 
         // If there is cached meta-data for the simulation,
         //  assume we are running using a cache pulled down from the network
         if(tfp.numberOfFrames != 0)
         {
+            // If the requested time is past the end,
+            //  return the last frame avaliable
+            auto totalDuration = tfp.numberOfFrames * tfp.timeStepSize;
+            if(simulationTimeNs >= totalDuration) {
+              return tfp.numberOfFrames - 1;
+            }
+
             // Integer division performed to get nearest frames
             // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
             int time = simulationTimeNs / tfp.timeStepSize;
