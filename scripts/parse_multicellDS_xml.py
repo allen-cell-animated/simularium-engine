@@ -55,9 +55,12 @@ def get_visualization_data_one_frame(index, sim_data_one_frame):
     data = {}
     data['data'] = []
     data['frameNumber'] = index
-    data['time'] = index 
-        
+    data['time'] = sim_data_one_frame.data['metadata']['current_time']
+    
     for i in range(len(discrete_cells['position_x'])):
+        
+        if i >= 500:
+            return data
         
         data['data'].append(1000.0)                                                               # viz type = sphere
         data['data'].append(float(get_agent_type(int(discrete_cells['cell_type'][i]),             # agent type 
