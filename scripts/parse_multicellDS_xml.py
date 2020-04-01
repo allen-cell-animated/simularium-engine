@@ -69,8 +69,8 @@ def get_visualization_data_one_frame(index, sim_data_one_frame):
         data['data'].append(round(discrete_cells['position_y'][i], 1))                            # Y position
         data['data'].append(round(discrete_cells['position_z'][i], 1))                            # Z position
         data['data'].append(round(discrete_cells['orientation_x'][i], 1))                         # X orientation 
-        data['data'].append(round(discrete_cells['orientation_x'][i], 1))                         # Y orientation
-        data['data'].append(round(discrete_cells['orientation_x'][i], 1))                         # Z orientation
+        data['data'].append(round(discrete_cells['orientation_y'][i], 1))                         # Y orientation
+        data['data'].append(round(discrete_cells['orientation_z'][i], 1))                         # Z orientation
         data['data'].append(round(np.cbrt(3./4. * discrete_cells['total_volume'][i] / np.pi), 1)) # scale 
         data['data'].append(0.0)                                                                  # ?
     
