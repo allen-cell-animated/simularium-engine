@@ -1,15 +1,21 @@
-# Agent Viz
+# Simularium
+
+Simularium is a spatial simulation framework and visualization environment for biological simulations.
+
+---
 
 ## Description
-Agent-Viz is a spatial simulation framework and visualization environment for biological simulations.
 
-### Packages
+Simularium is a spatial simulation framework and visualization environment for biological simulations.
+
+## Installation
+
 Agent-Viz integrates existing spatial simulation software:
 
 * [ReaDDy](https://readdy.github.io/) : Molecular Dynamics
 * [Cytosim](https://gitlab.com/f.nedelec/cytosim): Cytoskeletal Dynamics
 
-## Dependencies
+### Dependencies
 * blosc
 * hdf5
 * blas
@@ -27,8 +33,7 @@ On **Ubuntu 19.04**, install [mkcert](https://github.com/FiloSottile/mkcert) and
 build-essential cmake curl git libblas-dev libhdf5-dev liblapack-dev
 python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 
-## Building
-### Docker
+#### Docker
 1. Install [docker](https://docs.docker.com/v17.09/engine/installation/)
 2. Clone the repository locally: `git clone --recursive *repository-address*`
 3. To build the container, run: `sudo docker build -t agentsim-dev .`
@@ -36,7 +41,7 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 5. Mount the tls certificate to /etc/ssl/tls.crt
 6. Mount the tls key to /etc/ssl/tls.key
 
-### Native
+#### Native
 1. Clone the repository locally: `git clone --recursive *repository-address*`
 2. Create a new directory for the build: e.g. '~/Documents/build/agentviz'
 3. Navigate to the new directory in a terminal and run:
@@ -46,11 +51,11 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 6. To run the server, run: `./agentsim_server.exe --no-exit`
 7. To rebuild/update after source changes, run `make` from the build directory
 
-## Tests
+### Tests
 This project uses the [google test framework](https://github.com/google/googletest)
 To run the tests, navigate to the build directory and run: `./agentsim_tests`
 
-## AWS Authentication
+### AWS Authentication
 Agent-Viz stores various runtime files on Amazon Web Services (AWS) S3. The following steps are necessary to allow a local build to
 upload to S3.
 
@@ -58,3 +63,16 @@ upload to S3.
 2. [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) the aws-cli using your [private key](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_CreateAccessKey_CLIAPI); the region is **us-east-2**
 
 Agent-Viz will use the credentials configured above to upload, download, and otherwise interact with other components of the application setup on AWS. The application should function normally without these credentials, but will be unable to upload files to the AWS S3 repository.
+## Documentation
+
+If you have more extensive technical documentation (whether generated or not), ensure they are published to the following address:
+For full package documentation please visit
+[organization.github.io/projectname](https://organization.github.io/projectname/index.html).
+
+## Quick Start
+
+Describe the most common operations, step by step, that a first time user would want to know, here.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for information related to developing the code.
