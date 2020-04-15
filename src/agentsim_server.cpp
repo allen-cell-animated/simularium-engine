@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     // Simulation setup
     std::vector<std::shared_ptr<SimPkg>> simulators;
 
-    simulators.push_back(std::shared_ptr<SimPkg>(new CytosimPkg()));
+    // simulators.push_back(std::shared_ptr<SimPkg>(new CytosimPkg()));
     simulators.push_back(std::shared_ptr<SimPkg>(new ReaDDyPkg()));
 
     std::vector<std::shared_ptr<Agent>> agents;
