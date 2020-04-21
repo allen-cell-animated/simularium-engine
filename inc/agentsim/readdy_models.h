@@ -194,7 +194,8 @@ namespace models {
      * @param context ReaDDy Context
      */
     void addReaDDyMicrotubuleToSystem(
-        readdy::model::Context &context
+        readdy::model::Context &context,
+        std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping
     );
 
     /**
@@ -245,7 +246,8 @@ namespace models {
      * @param context ReaDDy Context
      */
     void addReaDDyKinesinToSystem(
-        readdy::model::Context &context
+        readdy::model::Context &context,
+        std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping
     );
 
     /**

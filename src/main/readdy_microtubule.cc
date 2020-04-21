@@ -59,12 +59,16 @@ std::vector<std::string> getAllPolymerParticleTypes(
 void addPolymerTopologySpecies(
     readdy::model::ParticleTypeRegistry &typeRegistry,
     const std::string particleType,
-    float diffusionCoefficient)
+    float radius,
+    float diffusionCoefficient,
+    std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping)
 {
     auto types = getAllPolymerParticleTypes(particleType);
 
     for (const auto &t : types) {
         typeRegistry.add(t, diffusionCoefficient);
+        particleTypeRadiusMapping->insert(
+            std::pair<std::string,float>(t, radius));
     }
 }
 
@@ -355,7 +359,8 @@ void addPolymerRepulsion(
  * @param context ReaDDy Context
  */
 void addReaDDyMicrotubuleToSystem(
-    readdy::model::Context &context)
+    readdy::model::Context &context,
+    std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping)
 {
     float forceConstant = 90.;
     float eta = 8.1;
@@ -368,17 +373,19 @@ void addReaDDyMicrotubuleToSystem(
     auto &typeRegistry = context.particleTypes();
     std::vector<std::string> tubulinTypes = {
         "tubulinA#", "tubulinB#"};
-    float diffCoeff = calculateDiffusionCoefficient(4., eta, temperature);
+    float diffCoeff = calculateDiffusionCoefficient(2., eta, temperature);
     for (const auto &t : tubulinTypes)
     {
-        addPolymerTopologySpecies(typeRegistry, t, diffCoeff);
+        addPolymerTopologySpecies(
+            typeRegistry, t, 2., diffCoeff, particleTypeRadiusMapping);
     }
 
     std::vector<std::string> tubulinTypesFixed = {
         "tubulinA#fixed_", "tubulinB#fixed_"};
     for (const auto &t : tubulinTypesFixed)
     {
-        addPolymerTopologySpecies(typeRegistry, t, 0.0);
+        addPolymerTopologySpecies(
+            typeRegistry, t, 2., 0., particleTypeRadiusMapping);
     }
 
     // bonds between protofilaments
@@ -482,8 +489,6 @@ std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
             std::string type = "tubulin" + a + fixed + number1 + "_" + number2;
 
             particles.push_back({pos[0], pos[1], pos[2], typeRegistry.idOf(type)});
-
-            std::cout << "(" << pos[0] << ", " << pos[1] << ", " << pos[2] << ")" << std::endl;
 
             pos = pos + 4. * tangent;
         }

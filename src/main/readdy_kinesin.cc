@@ -27,65 +27,67 @@ std::vector<std::string> getAllReactiveTubulinTypes()
  * @param context ReaDDy Context
  */
 void addReaDDyKinesinToSystem(
-    readdy::model::Context &context)
+    readdy::model::Context &context,
+    std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping)
 {
     float forceConstant = 90.;
     float eta = 8.1;
     float temperature = 37. + 273.15;
 
-    float motor_radius = 2.;
-    float hips_radius = 1.;
-    float cargo_radius = 15.;
-    float tubulin_radius = 2.;
-    float necklinker_length = 7.;
-
-    // types
     auto &topologyRegistry = context.topologyRegistry();
     topologyRegistry.addType("Kinesin");
 
     auto &typeRegistry = context.particleTypes();
-    float motor_diffCoeff = calculateDiffusionCoefficient(
-        motor_radius, eta, temperature);
-    float hips_diffCoeff = calculateDiffusionCoefficient(
-        hips_radius, eta, temperature);
-    float cargo_diffCoeff = calculateDiffusionCoefficient(
-        cargo_radius, eta, temperature);
-    typeRegistry.add("motor", motor_diffCoeff);
-    typeRegistry.add("motor#bound", motor_diffCoeff);
-    typeRegistry.add("hips", hips_diffCoeff);
-    typeRegistry.add("cargo", cargo_diffCoeff);
+    std::unordered_map<std::string,float> particles = {
+        {"motor", 2.},
+        {"motor#bound", 2.},
+        {"cargo", 15.},
+        {"hips", 1.}
+    };
+    typeRegistry.add("hips", calculateDiffusionCoefficient(
+        particles.at("hips"), eta, temperature));
+    for (auto it : particles)
+    {
+        std::cout << it.first << std::endl;
 
-    // bonds and repulsions within kinesin
-    readdy::api::Bond bond1{
-        forceConstant, necklinker_length, readdy::api::BondType::HARMONIC};
-    topologyRegistry.configureBondPotential("motor", "hips", bond1);
-    topologyRegistry.configureBondPotential("motor#bound", "hips", bond1);
+        if (it.first != "hips")
+        {
+            // add type
+            typeRegistry.add(it.first, calculateDiffusionCoefficient(
+                it.second, eta, temperature));
+
+            // bonds to hips
+            readdy::api::Bond bond{
+                forceConstant, 2. * it.second, readdy::api::BondType::HARMONIC};
+            topologyRegistry.configureBondPotential("hips", it.first, bond);
+        }
+    }
+
+    // repulsions
     context.potentials().addHarmonicRepulsion(
-        "motor", "motor", forceConstant, 2 * motor_radius);
+        "motor", "motor", forceConstant, 2. * particles.at("motor"));
     context.potentials().addHarmonicRepulsion(
-        "motor", "motor#bound", forceConstant, 2 * motor_radius);
+        "motor", "motor#bound", forceConstant, 2. * particles.at("motor"));
     context.potentials().addHarmonicRepulsion(
-        "motor#bound", "motor#bound", forceConstant, 2 * motor_radius);
-    readdy::api::Bond bond2{
-        forceConstant, 2 * cargo_radius, readdy::api::BondType::HARMONIC};
-    topologyRegistry.configureBondPotential("hips", "cargo", bond2);
+        "motor#bound", "motor#bound", forceConstant, 2. * particles.at("motor"));
     context.potentials().addHarmonicRepulsion(
-        "hips", "cargo", forceConstant, 2 * cargo_radius);
+        "hips", "cargo", forceConstant, 2. * particles.at("cargo"));
 
     // bonds and repulsions with tubulins
     std::vector<std::string> tubulinTypes = getAllReactiveTubulinTypes();
-    float distance = motor_radius + tubulin_radius;
-    readdy::api::Bond bond3{
-        forceConstant, distance, readdy::api::BondType::HARMONIC};
-    for (const auto &t : tubulinTypes)
+    readdy::api::Bond bond{
+        forceConstant, 4., readdy::api::BondType::HARMONIC};
+    for (const auto &tubulin : tubulinTypes)
     {
-        topologyRegistry.configureBondPotential("motor", t, bond3);
-        topologyRegistry.configureBondPotential("motor#bound", t, bond3);
+        topologyRegistry.configureBondPotential("motor", tubulin, bond);
+        topologyRegistry.configureBondPotential("motor#bound", tubulin, bond);
         context.potentials().addHarmonicRepulsion(
-            "motor", t, forceConstant, distance);
+            "motor", tubulin, forceConstant, 3.);
         context.potentials().addHarmonicRepulsion(
-            "motor#bound", t, forceConstant, distance);
+            "motor#bound", tubulin, forceConstant, 3.);
     }
+
+    particleTypeRadiusMapping->insert(particles.begin(), particles.end());
 }
 
 /**
@@ -98,8 +100,8 @@ std::vector<readdy::model::TopologyParticle> getKinesinParticles(
 {
     std::vector<readdy::model::TopologyParticle> particles {};
 
-    Eigen::Vector3d motor1_pos = position + Eigen::Vector3d(0., 0., -2.);
-    Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 0., 2.);
+    Eigen::Vector3d motor1_pos = position + Eigen::Vector3d(0., 0., -4.);
+    Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 0., 4.);
     Eigen::Vector3d cargo_pos = position + Eigen::Vector3d(0., 30., 0.);
 
     particles.push_back({

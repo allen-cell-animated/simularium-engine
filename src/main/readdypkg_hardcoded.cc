@@ -32,6 +32,9 @@ std::unique_ptr<readdy::model::actions::reactions::UncontrolledApproximation> re
 std::unique_ptr<readdy::model::actions::top::EvaluateTopologyReactions> topologyReactions = NULL;
 std::unique_ptr<readdy::model::actions::top::BreakBonds> breakingBonds = NULL;
 
+std::shared_ptr<std::unordered_map<std::string,float>> particleTypeRadiusMapping( 
+    new std::unordered_map<std::string,float>() );
+
 bool initialized = false; // temporarily using this to track init
 
 /**
@@ -67,13 +70,13 @@ namespace agentsim {
                 return;
             }
             kernel->context().boxSize() = {150., 150., 150.};
-            models::addReaDDyMicrotubuleToSystem(kernel->context());
-            models::addReaDDyKinesinToSystem(kernel->context());
+            models::addReaDDyMicrotubuleToSystem(kernel->context(), particleTypeRadiusMapping);
+            models::addReaDDyKinesinToSystem(kernel->context(), particleTypeRadiusMapping);
 
             // stateModel
             models::addReaDDyMicrotubuleToSimulation(&kernel, 16);
             models::addReaDDyKinesinToSimulation(
-                &kernel, Eigen::Vector3d(0., 14., 0.));
+                &kernel, Eigen::Vector3d(0., 16., 0.));
 
             readdy::scalar timeStep = 0.1;
 
@@ -137,11 +140,17 @@ namespace agentsim {
             {
                 readdy::Vec3 v = positions[j];
                 std::shared_ptr<Agent> newAgent;
+                std::string type = particleTypeRegistry.nameOf(particle_types[i]);
+                float radius = 10.;
+                if (particleTypeRadiusMapping->find(type) != particleTypeRadiusMapping->end())
+                {
+                    radius *= particleTypeRadiusMapping->at(type);
+                }
                 newAgent.reset(new Agent());
-                newAgent->SetName(particleTypeRegistry.nameOf(particle_types[i]));
+                newAgent->SetName(type);
                 newAgent->SetTypeID(i);
                 newAgent->SetLocation(v[0], v[1], v[2]);
-                newAgent->SetCollisionRadius(30.0f);
+                newAgent->SetCollisionRadius(radius);
 
                 agents.push_back(newAgent);
             }
