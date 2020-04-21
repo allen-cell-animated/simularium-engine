@@ -57,8 +57,6 @@ namespace agentsim {
     {
         printf("setup\n");
 
-        std::cout << "initted? " << initialized << std::endl;
-
         if (!initialized) { // (!this->m_agents_initialized)
 
             printf("init\n");
@@ -73,9 +71,10 @@ namespace agentsim {
 
             // stateModel
             models::addReaDDyMicrotubuleToSimulation(&kernel, 16);
-            // models::addReaDDyKinesinToSimulation(kernel->stateModel());
+            // models::addReaDDyKinesinToSimulation(
+            //     &kernel, Eigen::Vector3d(0., 12., 0.));
 
-            readdy::scalar timeStep = 0.05;
+            readdy::scalar timeStep = 0.1;
 
             integrator = kernel->actions().eulerBDIntegrator(timeStep);
             forces = kernel->actions().calculateForces();
@@ -84,7 +83,7 @@ namespace agentsim {
             reactions = kernel->actions().uncontrolledApproximation(timeStep);
             topologyReactions = kernel->actions().evaluateTopologyReactions(timeStep);
 
-            // models::addBreakableKinesinBond(kernel->actions(), (float)timeStep);
+            // breakingBonds = models::addBreakableKinesinBond(&kernel, (float)timeStep);
 
             initialized = true;
         }
@@ -93,6 +92,7 @@ namespace agentsim {
         neighborList->perform();
         forces->perform();
         kernel->evaluateObservables(0);
+        kernel->initialize();
     }
 
     void ReaDDyPkg::Shutdown()
@@ -145,10 +145,10 @@ namespace agentsim {
                 agents.push_back(newAgent);
             }
         }
-        // if (models::kinesinBondHasBroken())
-        // {
-        //     std::cout << "bond broken!!!" << std::endl;
-        // }
+        if (models::kinesinBondHasBroken())
+        {
+            std::cout << "bond broken!!!" << std::endl;
+        }
     }
 
     void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue)

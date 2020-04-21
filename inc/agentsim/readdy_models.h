@@ -9,6 +9,19 @@ namespace agentsim {
 namespace models {
 
     /**
+     * A method to calculate the theoretical diffusion constant of a spherical particle
+     * @param radius [nm]
+     * @param eta viscosity [cP]
+     * @param temperature [Kelvin]
+     * @return diffusion coefficient [nm^2/s]
+     */
+    float calculateDiffusionCoefficient(
+        float radius,
+        float eta,
+        float temperature
+    );
+
+    /**
      * A method to get a list of all polymer numbers
      * ("type1_1", "type1_2", "type1_3", "type2_1", ... "type3_3")
      * @param particleType base particle type
@@ -29,22 +42,6 @@ namespace models {
         readdy::model::ParticleTypeRegistry &typeRegistry,
         const std::string particleType,
         float diffusionCoefficient
-    );
-
-    /**
-    * A method to add a bond (if it hasn't been added already)
-    * @param topologyRegistry ReaDDy TopologyRegistry
-    * @param particleTypes1 from particle types
-    * @param particleTypes2 to particle types
-    * @param forceConstant force constant
-    * @param bondLength equilibrium distance [nm]
-    */
-    void addBond(
-        readdy::model::top::TopologyRegistry &topologyRegistry,
-        std::vector<std::string> particleTypes1,
-        std::vector<std::string> particleTypes2,
-        float forceConstant,
-        float bondLength
     );
 
     /**
@@ -82,6 +79,22 @@ namespace models {
         int x,
         int y,
         std::vector<int> polymerOffsets
+    );
+
+    /**
+    * A method to add a bond (if it hasn't been added already)
+    * @param topologyRegistry ReaDDy TopologyRegistry
+    * @param particleTypes1 from particle types
+    * @param particleTypes2 to particle types
+    * @param forceConstant force constant
+    * @param bondLength equilibrium distance [nm]
+    */
+    void addBond(
+        readdy::model::top::TopologyRegistry &topologyRegistry,
+        std::vector<std::string> particleTypes1,
+        std::vector<std::string> particleTypes2,
+        float forceConstant,
+        float bondLength
     );
 
     /**
@@ -185,7 +198,8 @@ namespace models {
     );
 
     /**
-     * A method to get lists of positions and types for particles in a microtubule
+     * A method to get a list of topology particles in a microtubule
+     * @param typeRegistry ReaDDY type registry
      * @param nFilaments protofilaments
      * @param nRings rings
      * @param radius of the microtubule [nm]
@@ -198,7 +212,8 @@ namespace models {
     );
 
     /**
-     * A method to add dges to a microtubule topology
+     * A method to add edges to a microtubule topology
+     * @param graph ReaDDy topology graph
      * @param nFilaments protofilaments
      * @param nRings rings
      */
@@ -220,6 +235,12 @@ namespace models {
     );
 
     /**
+    * A method to get all tubulin types (for binding to motors)
+    * @param context ReaDDy Context
+    */
+    std::vector<std::string> getAllReactiveTubulinTypes();
+
+    /**
      * A method to add particle types and constraints to the ReaDDy context
      * @param context ReaDDy Context
      */
@@ -228,19 +249,27 @@ namespace models {
     );
 
     /**
-     * A method to
+     * A method to get lists of positions and types for particles in a kinesin
+     * @param typeRegistry ReaDDY type registry
+     */
+    std::vector<readdy::model::TopologyParticle> getKinesinParticles(
+        readdy::model::ParticleTypeRegistry &typeRegistry
+    );
+
+    /**
+     * A method to add a kinesin to the simulation
      * @param stateModel ReaDDy StateModel
      */
     void addReaDDyKinesinToSimulation(
-        readdy::model::StateModel &stateModel
+        std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel
     );
 
     /**
      * A method to add a breakable kinesin bond
      * @param actions ReaDDy ActionFactory
      */
-    void addBreakableKinesinBond(
-        readdy::model::actions::ActionFactory &actions,
+    std::unique_ptr<readdy::model::actions::top::BreakBonds> addBreakableKinesinBond(
+        std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel,
         float timeStep
     );
 

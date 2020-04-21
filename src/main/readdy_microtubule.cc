@@ -12,6 +12,23 @@ std::set<std::tuple<std::string, std::string, std::string>> angleTriples;
 std::set<std::tuple<std::string, std::string>> repulsePairs;
 
 /**
+* A method to calculate the theoretical diffusion constant of a spherical particle
+* @param radius [nm]
+* @param eta viscosity [cP]
+* @param temperature [Kelvin]
+* @return diffusion coefficient [nm^2/s]
+*/
+float calculateDiffusionCoefficient(
+    float radius,
+    float eta,
+    float temperature)
+{
+    return ((1.38065 * pow(10.,-23.) * temperature)
+            / (6 * M_PI * eta * pow(10.,-3.) * radius * pow(10.,-9.))
+            * pow(10.,18.)/pow(10.,9.));
+}
+
+/**
  * A method to get a list of all polymer numbers
  * ("type1_1", "type1_2", "type1_3", "type2_1", ... "type3_3")
  * @param particleType base particle type
@@ -340,18 +357,28 @@ void addPolymerRepulsion(
 void addReaDDyMicrotubuleToSystem(
     readdy::model::Context &context)
 {
-    context.boxSize() = {150., 150., 150.};
-    float forceConstant = 150.;
+    float forceConstant = 90.;
+    float eta = 8.1;
+    float temperature = 37. + 273.15;
 
     // types
     auto &topologyRegistry = context.topologyRegistry();
     topologyRegistry.addType("Microtubule");
 
     auto &typeRegistry = context.particleTypes();
-    std::vector<std::string> tubulinTypes = {"tubulinA#", "tubulinB#"};
+    std::vector<std::string> tubulinTypes = {
+        "tubulinA#", "tubulinB#"};
+    float diffCoeff = 0.0;//calculateDiffusionCoefficient(4., eta, temperature);
     for (const auto &t : tubulinTypes)
     {
-        addPolymerTopologySpecies(typeRegistry, t, 0.01);
+        addPolymerTopologySpecies(typeRegistry, t, diffCoeff);
+    }
+
+    std::vector<std::string> tubulinTypesFixed = {
+        "tubulinA#fixed_", "tubulinB#fixed_"};
+    for (const auto &t : tubulinTypesFixed)
+    {
+        addPolymerTopologySpecies(typeRegistry, t, 0.0);
     }
 
     // bonds between protofilaments
@@ -359,10 +386,30 @@ void addReaDDyMicrotubuleToSystem(
         tubulinTypes, {0, 0},
         tubulinTypes, {0, -1},
         forceConstant, 5.2);
+    addPolymerBond(topologyRegistry,
+        tubulinTypes, {0, 0},
+        tubulinTypesFixed, {0, -1},
+        forceConstant, 5.2);
+    addPolymerBond(topologyRegistry,
+        tubulinTypesFixed, {0, 0},
+        tubulinTypes, {0, -1},
+        forceConstant, 5.2);
+    addPolymerBond(topologyRegistry,
+        tubulinTypesFixed, {0, 0},
+        tubulinTypesFixed, {0, -1},
+        forceConstant, 5.2);
 
     // bonds between rings
     addPolymerBond(topologyRegistry,
         tubulinTypes, {0, 0},
+        tubulinTypes, {-1, 0},
+        forceConstant, 4.);
+    addPolymerBond(topologyRegistry,
+        tubulinTypes, {0, 0},
+        tubulinTypesFixed, {-1, 0},
+        forceConstant, 4.);
+    addPolymerBond(topologyRegistry,
+        tubulinTypesFixed, {0, 0},
         tubulinTypes, {-1, 0},
         forceConstant, 4.);
 
@@ -400,11 +447,12 @@ void addReaDDyMicrotubuleToSystem(
 
     // repulsions
     addPolymerRepulsion(context, tubulinTypes,
-        forceConstant, 4.2);
+        75., 4.2);
 }
 
 /**
- * A method to get lists of positions and types for particles in a microtubule
+ * A method to get a list of topology particles in a microtubule
+ * @param typeRegistry ReaDDY type registry
  * @param nFilaments protofilaments
  * @param nRings rings
  * @param radius of the microtubule [nm]
@@ -430,9 +478,12 @@ std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
             std::string number1 = std::to_string(ring % 3 + 1);
             std::string number2 = std::to_string(int(filament + floor(ring / 3.)) % 3 + 1);
             std::string a = ring % 2 == 0 ? "A#" : "B#";
-            std::string type = "tubulin" + a + number1 + "_" + number2;
+            std::string fixed = ring == 0 || ring == nRings-1 ? "fixed_" : "";
+            std::string type = "tubulin" + a + fixed + number1 + "_" + number2;
 
             particles.push_back({pos[0], pos[1], pos[2], typeRegistry.idOf(type)});
+
+            std::cout << "(" << pos[0] << ", " << pos[1] << ", " << pos[2] << ")" << std::endl;
 
             pos = pos + 4. * tangent;
         }
@@ -442,7 +493,8 @@ std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
 }
 
 /**
- * A method to add dges to a microtubule topology
+ * A method to add edges to a microtubule topology
+ * @param graph ReaDDy topology graph
  * @param nFilaments protofilaments
  * @param nRings rings
  */
