@@ -32,7 +32,7 @@ std::unique_ptr<readdy::model::actions::reactions::UncontrolledApproximation> re
 std::unique_ptr<readdy::model::actions::top::EvaluateTopologyReactions> topologyReactions = NULL;
 std::unique_ptr<readdy::model::actions::top::BreakBonds> breakingBonds = NULL;
 
-std::shared_ptr<std::unordered_map<std::string,float>> particleTypeRadiusMapping( 
+std::shared_ptr<std::unordered_map<std::string,float>> particleTypeRadiusMapping(
     new std::unordered_map<std::string,float>() );
 
 bool initialized = false; // temporarily using this to track init
@@ -69,14 +69,14 @@ namespace agentsim {
                 printf("kernel is null\n");
                 return;
             }
-            kernel->context().boxSize() = {150., 150., 150.};
+            kernel->context().boxSize() = {300., 300., 300.};
             models::addReaDDyMicrotubuleToSystem(kernel->context(), particleTypeRadiusMapping);
             models::addReaDDyKinesinToSystem(kernel->context(), particleTypeRadiusMapping);
 
             // stateModel
-            models::addReaDDyMicrotubuleToSimulation(&kernel, 16);
+            models::addReaDDyMicrotubuleToSimulation(&kernel, 50);
             models::addReaDDyKinesinToSimulation(
-                &kernel, Eigen::Vector3d(0., 16., 0.));
+                &kernel, Eigen::Vector3d(0., 14., 0.));
 
             readdy::scalar timeStep = 0.1;
 
@@ -149,7 +149,7 @@ namespace agentsim {
                 newAgent.reset(new Agent());
                 newAgent->SetName(type);
                 newAgent->SetTypeID(i);
-                newAgent->SetLocation(v[0], v[1], v[2]);
+                newAgent->SetLocation(-v[0], v[1], v[2]);
                 newAgent->SetCollisionRadius(radius);
 
                 agents.push_back(newAgent);

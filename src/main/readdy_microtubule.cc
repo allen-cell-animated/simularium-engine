@@ -392,26 +392,27 @@ void addReaDDyMicrotubuleToSystem(
         forceConstant, 4.);
 
     // angles
+    forceConstant *= 2.;
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {0, 1},
         tubulinTypes, {0, 0},
         tubulinTypes, {-1, 0},
-        forceConstant, 1.40);
+        forceConstant, 1.75);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {0, 1},
         tubulinTypes, {0, 0},
         tubulinTypes, {1, 0},
-        forceConstant, 1.75);
-    addPolymerAngle(topologyRegistry,
-        tubulinTypes, {0, -1},
-        tubulinTypes, {0, 0},
-        tubulinTypes, {-1, 0},
         forceConstant, 1.40);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {0, -1},
         tubulinTypes, {0, 0},
-        tubulinTypes, {1, 0},
+        tubulinTypes, {-1, 0},
         forceConstant, 1.75);
+    addPolymerAngle(topologyRegistry,
+        tubulinTypes, {0, -1},
+        tubulinTypes, {0, 0},
+        tubulinTypes, {1, 0},
+        forceConstant, 1.40);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {-1, 0},
         tubulinTypes, {0, 0},
@@ -458,7 +459,7 @@ std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
             std::string a = ring % 2 == 0 ? "A#" : "B#";
             std::string type = "tubulin" + a + number1 + "_" + number2;
 
-            particles.push_back({pos[0], pos[1], pos[2], typeRegistry.idOf(type)});
+            particles.push_back({-pos[0], pos[1], pos[2], typeRegistry.idOf(type)});
 
             pos = pos + 4. * tangent;
         }
