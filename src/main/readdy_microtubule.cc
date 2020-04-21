@@ -368,7 +368,7 @@ void addReaDDyMicrotubuleToSystem(
     auto &typeRegistry = context.particleTypes();
     std::vector<std::string> tubulinTypes = {
         "tubulinA#", "tubulinB#"};
-    float diffCoeff = 0.0;//calculateDiffusionCoefficient(4., eta, temperature);
+    float diffCoeff = calculateDiffusionCoefficient(4., eta, temperature);
     for (const auto &t : tubulinTypes)
     {
         addPolymerTopologySpecies(typeRegistry, t, diffCoeff);

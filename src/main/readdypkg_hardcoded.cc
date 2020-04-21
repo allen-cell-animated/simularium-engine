@@ -66,13 +66,14 @@ namespace agentsim {
                 printf("kernel is null\n");
                 return;
             }
+            kernel->context().boxSize() = {150., 150., 150.};
             models::addReaDDyMicrotubuleToSystem(kernel->context());
-            // models::addReaDDyKinesinToSystem(kernel->context());
+            models::addReaDDyKinesinToSystem(kernel->context());
 
             // stateModel
             models::addReaDDyMicrotubuleToSimulation(&kernel, 16);
-            // models::addReaDDyKinesinToSimulation(
-            //     &kernel, Eigen::Vector3d(0., 12., 0.));
+            models::addReaDDyKinesinToSimulation(
+                &kernel, Eigen::Vector3d(0., 14., 0.));
 
             readdy::scalar timeStep = 0.1;
 
@@ -140,7 +141,7 @@ namespace agentsim {
                 newAgent->SetName(particleTypeRegistry.nameOf(particle_types[i]));
                 newAgent->SetTypeID(i);
                 newAgent->SetLocation(v[0], v[1], v[2]);
-                newAgent->SetCollisionRadius(3.0f);
+                newAgent->SetCollisionRadius(30.0f);
 
                 agents.push_back(newAgent);
             }
