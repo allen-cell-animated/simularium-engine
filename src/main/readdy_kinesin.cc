@@ -48,8 +48,6 @@ void addReaDDyKinesinToSystem(
         particles.at("hips"), eta, temperature));
     for (auto it : particles)
     {
-        std::cout << it.first << std::endl;
-
         if (it.first != "hips")
         {
             // add type

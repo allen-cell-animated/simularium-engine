@@ -371,8 +371,7 @@ void addReaDDyMicrotubuleToSystem(
     topologyRegistry.addType("Microtubule");
 
     auto &typeRegistry = context.particleTypes();
-    std::vector<std::string> tubulinTypes = {
-        "tubulinA#", "tubulinB#"};
+    std::vector<std::string> tubulinTypes = {"tubulinA#", "tubulinB#"};
     float diffCoeff = calculateDiffusionCoefficient(2., eta, temperature);
     for (const auto &t : tubulinTypes)
     {
@@ -380,43 +379,15 @@ void addReaDDyMicrotubuleToSystem(
             typeRegistry, t, 2., diffCoeff, particleTypeRadiusMapping);
     }
 
-    std::vector<std::string> tubulinTypesFixed = {
-        "tubulinA#fixed_", "tubulinB#fixed_"};
-    for (const auto &t : tubulinTypesFixed)
-    {
-        addPolymerTopologySpecies(
-            typeRegistry, t, 2., 0., particleTypeRadiusMapping);
-    }
-
     // bonds between protofilaments
     addPolymerBond(topologyRegistry,
         tubulinTypes, {0, 0},
         tubulinTypes, {0, -1},
         forceConstant, 5.2);
-    addPolymerBond(topologyRegistry,
-        tubulinTypes, {0, 0},
-        tubulinTypesFixed, {0, -1},
-        forceConstant, 5.2);
-    addPolymerBond(topologyRegistry,
-        tubulinTypesFixed, {0, 0},
-        tubulinTypes, {0, -1},
-        forceConstant, 5.2);
-    addPolymerBond(topologyRegistry,
-        tubulinTypesFixed, {0, 0},
-        tubulinTypesFixed, {0, -1},
-        forceConstant, 5.2);
 
     // bonds between rings
     addPolymerBond(topologyRegistry,
         tubulinTypes, {0, 0},
-        tubulinTypes, {-1, 0},
-        forceConstant, 4.);
-    addPolymerBond(topologyRegistry,
-        tubulinTypes, {0, 0},
-        tubulinTypesFixed, {-1, 0},
-        forceConstant, 4.);
-    addPolymerBond(topologyRegistry,
-        tubulinTypesFixed, {0, 0},
         tubulinTypes, {-1, 0},
         forceConstant, 4.);
 
@@ -425,22 +396,22 @@ void addReaDDyMicrotubuleToSystem(
         tubulinTypes, {0, 1},
         tubulinTypes, {0, 0},
         tubulinTypes, {-1, 0},
-        forceConstant, 1.75);
+        forceConstant, 1.40);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {0, 1},
         tubulinTypes, {0, 0},
         tubulinTypes, {1, 0},
-        forceConstant, 1.40);
-    addPolymerAngle(topologyRegistry,
-        tubulinTypes, {0, -1},
-        tubulinTypes, {0, 0},
-        tubulinTypes, {-1, 0},
         forceConstant, 1.75);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {0, -1},
         tubulinTypes, {0, 0},
-        tubulinTypes, {1, 0},
+        tubulinTypes, {-1, 0},
         forceConstant, 1.40);
+    addPolymerAngle(topologyRegistry,
+        tubulinTypes, {0, -1},
+        tubulinTypes, {0, 0},
+        tubulinTypes, {1, 0},
+        forceConstant, 1.75);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {-1, 0},
         tubulinTypes, {0, 0},
@@ -485,8 +456,7 @@ std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
             std::string number1 = std::to_string(ring % 3 + 1);
             std::string number2 = std::to_string(int(filament + floor(ring / 3.)) % 3 + 1);
             std::string a = ring % 2 == 0 ? "A#" : "B#";
-            std::string fixed = ring == 0 || ring == nRings-1 ? "fixed_" : "";
-            std::string type = "tubulin" + a + fixed + number1 + "_" + number2;
+            std::string type = "tubulin" + a + number1 + "_" + number2;
 
             particles.push_back({pos[0], pos[1], pos[2], typeRegistry.idOf(type)});
 
