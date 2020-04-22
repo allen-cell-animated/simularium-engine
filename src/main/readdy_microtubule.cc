@@ -407,12 +407,12 @@ void addReaDDyMicrotubuleToSystem(
         tubulinTypes, {0, -1},
         tubulinTypes, {0, 0},
         tubulinTypes, {-1, 0},
-        forceConstant, 1.75);
+        forceConstant, 1.40);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {0, -1},
         tubulinTypes, {0, 0},
         tubulinTypes, {1, 0},
-        forceConstant, 1.40);
+        forceConstant, 1.75);
     addPolymerAngle(topologyRegistry,
         tubulinTypes, {-1, 0},
         tubulinTypes, {0, 0},
