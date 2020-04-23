@@ -66,7 +66,7 @@ void addPolymerTopologySpecies(
     auto types = getAllPolymerParticleTypes(particleType);
 
     for (const auto &t : types) {
-        typeRegistry.add(t, diffusionCoefficient);
+        typeRegistry.add(t, diffusionCoefficient, readdy::model::particleflavor::TOPOLOGY);
         particleTypeRadiusMapping->insert(
             std::pair<std::string,float>(t, radius));
     }

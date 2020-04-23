@@ -154,10 +154,7 @@ namespace agentsim {
                 agents.push_back(newAgent);
             }
         }
-        if (models::kinesinBondHasBroken())
-        {
-            std::cout << "bond broken!!!" << std::endl;
-        }
+        models::checkKinesin(&kernel);
     }
 
     void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue)
