@@ -85,7 +85,7 @@ void addReaDDyKinesinToSystem(
             // add type
             typeRegistry.add(
                 it.first,
-                calculateDiffusionCoefficient(it.second, eta, temperature),
+                (it.first == "cargo" ? 35. : 1.) * calculateDiffusionCoefficient(it.second, eta, temperature),
                 readdy::model::particleflavor::TOPOLOGY
             );
 
@@ -202,15 +202,25 @@ std::unique_ptr<readdy::model::actions::top::BreakBonds> addBreakableKinesinBond
 void checkKinesin(
     std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel)
 {
-    const auto particles = (*_kernel)->stateModel().getParticles();
-    const auto particleTypes = (*_kernel)->context().particleTypes();
-    int count = 0;
-    for (const auto &p : particles) {
-        if (p.type() == particleTypes.idOf("motor#bound")) {
-            count++;
+    auto &model = (*_kernel)->getSCPUKernelStateModel();
+    auto &topologies = model.topologies();
+    for (auto &&top : topologies)
+    {
+        auto boundMotor = getVertexOfType((*_kernel)->context(), &top, "motor#bound", true);
+        if (boundMotor == NULL)
+        {
+            std::cout << "no motors bound" << std::endl;
+            return;
         }
+
+        auto tubulin = getNeighborVertexOfType((*_kernel)->context(), boundMotor, "tubulinB", false);
+        auto motorPos = getParticleForIndex(boundMotor->particleIndex).pos();
+        auto tubulinPos = getParticleForIndex(tubulin->particleIndex).pos();
+        float distance = (motorPos - tubulinPos).norm();
+        float energy = 45. * distance * distance;
+
+        std::cout << "energy = " << std::to_string(energy) <<  std::endl;
     }
-    std::cout << std::to_string(count) << " motors bound" << std::endl;
 }
 
 } // namespace models
