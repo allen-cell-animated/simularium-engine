@@ -7,11 +7,11 @@ namespace models {
 
 /**
 * A method to get all tubulin types (for binding to motors)
-* @param context ReaDDy Context
+* @return vector of strings for each reactive type
 */
 std::vector<std::string> getAllReactiveTubulinTypes()
 {
-    std::vector<std::string> tubulinTypes = {"tubulinA#", "tubulinB#"};
+    std::vector<std::string> tubulinTypes = {"tubulinB#"};
     std::vector<std::string> result;
     result.reserve(9 * tubulinTypes.size());
     for (const auto &t : tubulinTypes)
@@ -20,6 +20,28 @@ std::vector<std::string> getAllReactiveTubulinTypes()
         result.insert( result.end(), types.begin(), types.end() );
     }
     return result;
+}
+
+/**
+ * A method to add a spatial reaction to bind a kinesin motor to a tubulinB
+ * @param context ReaDDy Context
+ */
+void addKinesinTubulinBindReaction(
+    readdy::model::Context &context)
+{
+    auto &topologyRegistry = context.topologyRegistry();
+    topologyRegistry.addType("Microtubule-Kinesin");
+
+    //spatial reaction
+    auto polymerNumbers = getAllPolymerParticleTypes("");
+    int i = 1;
+    for (const auto &numbers : polymerNumbers)
+    {
+        topologyRegistry.addSpatialReaction(
+            "Motor-Bind" + i + ": Microtubule(tubulinB#" + numbers + ") + Kinesin(motor) -> " +
+            "Microtubule-Kinesin(tubulinB#bound_" + numbers + "--motor#bound)", 1e10, 5.);
+        i++;
+    }
 }
 
 /**
@@ -44,6 +66,7 @@ void addReaDDyKinesinToSystem(
         {"cargo", 15.},
         {"hips", 1.}
     };
+    particleTypeRadiusMapping->insert(particles.begin(), particles.end());
     typeRegistry.add("hips", calculateDiffusionCoefficient(
         particles.at("hips"), eta, temperature));
     for (auto it : particles)
@@ -85,7 +108,7 @@ void addReaDDyKinesinToSystem(
             "motor#bound", tubulin, forceConstant, 3.);
     }
 
-    particleTypeRadiusMapping->insert(particles.begin(), particles.end());
+    addKinesinTubulinBindReaction(context);
 }
 
 /**

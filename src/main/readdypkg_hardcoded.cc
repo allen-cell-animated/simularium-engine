@@ -104,8 +104,7 @@ namespace agentsim {
         printf("shutdown\n");
 
        //  // TODO properly reset kernel state
-       // delete kernel.get();
-       // kernel = new readdy::kernel::scpu::SCPUKernel();
+       // kernel.reset( new readdy::kernel::scpu::SCPUKernel() )
 
         this->m_timeStepCount = 0;
         this->m_agents_initialized = false;
