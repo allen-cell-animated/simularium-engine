@@ -1,8 +1,9 @@
 #include "agentsim/agents/agent.h"
 #include "agentsim/simpkg/readdypkg.h"
 #include "agentsim/readdy_models.h"
-#include "readdy_microtubule.cc"
-#include "readdy_kinesin.cc"
+#include "readdypkg_microtubule.cc"
+#include "readdypkg_kinesin.cc"
+#include "readdypkg_model_utils.cc"
 #include <algorithm>
 #include <csignal>
 #include <math.h>

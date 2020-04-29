@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include "readdy/kernel/singlecpu/SCPUKernel.h"
-#include "../../dep/readdy/libraries/graph/graphs/Graph.h"
+// #include <graphs/graphs.h>
 
 namespace aics {
 namespace agentsim {
@@ -28,11 +28,11 @@ namespace models {
     * @param top ReaDDy GraphTopology
     * @param type string to find
     * @param bool should particle's type contain the type or match it exactly?
-    * @return the vertex's persistent index
+    * @return the Vertex
     */
-    graphs::Graph::PersistentVertexIndex getVertexOfType(
+    const readdy::model::top::Vertex* getVertexOfType(
         readdy::model::Context &context,
-        model::top::GraphTopology &top,
+        readdy::model::top::GraphTopology &top,
         std::string type,
         bool exactMatch
     );
@@ -40,14 +40,16 @@ namespace models {
     /**
     * A method to get the first neighbor of the given vertex with the given type
     * @param context ReaDDy Context
-    * @param vertex persistent index of vertex
+    * @param graph ReaDDy topology graph
+    * @param vertex ReaDDy Vertex
     * @param type string to find
     * @param bool should particle's type contain the type or match it exactly?
-    * @return the vertex's persistent index
+    * @return the Vertex
     */
-    graphs::Graph::PersistentVertexIndex getNeighborVertexOfType(
+    const readdy::model::top::Vertex* getNeighborVertexOfType(
         readdy::model::Context &context,
-        graphs::Graph::PersistentVertexIndex vertex,
+        readdy::model::top::GraphTopology &top,
+        const readdy::model::top::Vertex* vertex,
         std::string type,
         bool exactMatch
     );
@@ -249,7 +251,7 @@ namespace models {
      * @param nRings rings
      * @param radius of the microtubule [nm]
      */
-    std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
+    std::vector<readdy::model::Particle> getMicrotubuleParticles(
         readdy::model::ParticleTypeRegistry &typeRegistry,
         int nFilaments,
         int nRings,
@@ -263,7 +265,7 @@ namespace models {
      * @param nRings rings
      */
     void addMicrotubuleEdges(
-        readdy::model::top::graph::Graph &graph,
+        readdy::model::top::GraphTopology &top,
         int nFilaments,
         int nRings
     );
@@ -298,7 +300,7 @@ namespace models {
      * A method to get lists of positions and types for particles in a kinesin
      * @param typeRegistry ReaDDY type registry
      */
-    std::vector<readdy::model::TopologyParticle> getKinesinParticles(
+    std::vector<readdy::model::Particle> getKinesinParticles(
         readdy::model::ParticleTypeRegistry &typeRegistry
     );
 

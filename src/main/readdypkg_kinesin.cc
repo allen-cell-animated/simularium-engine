@@ -1,5 +1,6 @@
 #include "agentsim/readdy_models.h"
 #include <math.h>
+#include "readdy/model/topologies/common.h"
 
 namespace aics {
 namespace agentsim {
@@ -128,28 +129,20 @@ void addReaDDyKinesinToSystem(
  * A method to get lists of positions and types for particles in a kinesin
  * @param typeRegistry ReaDDY type registry
  */
-std::vector<readdy::model::TopologyParticle> getKinesinParticles(
+std::vector<readdy::model::Particle> getKinesinParticles(
     readdy::model::ParticleTypeRegistry &typeRegistry,
     Eigen::Vector3d position)
 {
-    std::vector<readdy::model::TopologyParticle> particles {};
-
     Eigen::Vector3d motor1_pos = position + Eigen::Vector3d(0., 0., -4.);
     Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 0., 4.);
     Eigen::Vector3d cargo_pos = position + Eigen::Vector3d(0., 30., 0.);
 
-    particles.push_back({
-        position[0], position[1], position[2],
-        typeRegistry.idOf("hips")});
-    particles.push_back({
-        motor1_pos[0], motor1_pos[1], motor1_pos[2],
-        typeRegistry.idOf("motor")});
-    particles.push_back({
-        motor2_pos[0], motor2_pos[1], motor2_pos[2],
-        typeRegistry.idOf("motor")});
-    particles.push_back({
-        cargo_pos[0], cargo_pos[1], cargo_pos[2],
-        typeRegistry.idOf("cargo")});
+    std::vector<readdy::model::Particle> particles {
+        {position[0], position[1], position[2], typeRegistry.idOf("hips")},
+        {motor1_pos[0], motor1_pos[1], motor1_pos[2], typeRegistry.idOf("motor")},
+        {motor2_pos[0], motor2_pos[1], motor2_pos[2], typeRegistry.idOf("motor")},
+        {cargo_pos[0], cargo_pos[1], cargo_pos[2], typeRegistry.idOf("cargo")},
+    };
 
     return particles;
 }
@@ -162,15 +155,15 @@ void addReaDDyKinesinToSimulation(
     std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel,
     Eigen::Vector3d position)
 {
-    std::vector<readdy::model::TopologyParticle> particles = getKinesinParticles(
+    std::vector<readdy::model::Particle> particles = getKinesinParticles(
         (*_kernel)->context().particleTypes(), position);
 
-    auto topology = (*_kernel)->stateModel().addTopology(
+    auto top = (*_kernel)->stateModel().addTopology(
         (*_kernel)->context().topologyRegistry().idOf("Kinesin"), particles);
 
-    topology->graph().addEdgeBetweenParticles(0, 1);
-    topology->graph().addEdgeBetweenParticles(0, 2);
-    topology->graph().addEdgeBetweenParticles(0, 3);
+    for (std::size_t i = 1; i < 4; ++i) {
+        top->addEdge({0}, {i});
+    }
 }
 
 /**
@@ -202,24 +195,42 @@ std::unique_ptr<readdy::model::actions::top::BreakBonds> addBreakableKinesinBond
 void checkKinesin(
     std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel)
 {
-    auto &model = (*_kernel)->getSCPUKernelStateModel();
-    auto &topologies = model.topologies();
-    for (auto &&top : topologies)
+    std::cout << "---------------------------------------------" <<  std::endl;
+
+    for (auto top : (*_kernel)->stateModel().getTopologies())
     {
-        auto boundMotor = getVertexOfType((*_kernel)->context(), &top, "motor#bound", true);
-        if (boundMotor == NULL)
+        std::cout << "topology " << (*_kernel)->context().topologyRegistry().nameOf(top->type()) << " ----------" <<  std::endl;
+
+        for (auto particle : (*_kernel)->stateModel().getParticlesForTopology(*top))
         {
-            std::cout << "no motors bound" << std::endl;
-            return;
+            auto t = (*_kernel)->context().particleTypes().infoOf(particle.type()).name;
+            if (t.find("bound") != std::string::npos)
+            {
+                std::cout << t << std::endl;
+            }
         }
 
-        auto tubulin = getNeighborVertexOfType((*_kernel)->context(), boundMotor, "tubulinB", false);
-        auto motorPos = getParticleForIndex(boundMotor->particleIndex).pos();
-        auto tubulinPos = getParticleForIndex(tubulin->particleIndex).pos();
-        float distance = (motorPos - tubulinPos).norm();
-        float energy = 45. * distance * distance;
-
-        std::cout << "energy = " << std::to_string(energy) <<  std::endl;
+        // auto boundMotor = getVertexOfType((*_kernel)->context(), *top, "motor#bound", true);
+        // if (!boundMotor)
+        // {
+        //     std::cout << "no motors bound" << std::endl;
+        //     continue;
+        // }
+        //
+        // auto tubulin = getNeighborVertexOfType((*_kernel)->context(), *top, boundMotor, "tubulinB", false);
+        // if (!tubulin)
+        // {
+        //     std::cout << "bound motor has no tubulin neighbor!" << std::endl;
+        //     continue;
+        // }
+        //
+        // std::cout << "found motor & tubulin" << std::endl;
+        // auto motorPos = top->particleForVertex(*boundMotor).pos();
+        // auto tubulinPos = top->particleForVertex(*tubulin).pos();
+        // float distance = (motorPos - tubulinPos).norm();
+        // float energy = 45. * distance * distance;
+        //
+        // std::cout << "bond energy = " << std::to_string(energy) <<  std::endl;
     }
 }
 

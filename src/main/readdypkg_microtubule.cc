@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include "readdy/kernel/singlecpu/SCPUKernel.h"
+#include "readdy/model/topologies/common.h"
+// #include <graphs/graphs.h>
 
 namespace aics {
 namespace agentsim {
@@ -437,13 +439,13 @@ void addReaDDyMicrotubuleToSystem(
  * @param nRings rings
  * @param radius of the microtubule [nm]
  */
-std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
+std::vector<readdy::model::Particle> getMicrotubuleParticles(
     readdy::model::ParticleTypeRegistry &typeRegistry,
     int nFilaments,
     int nRings,
     float radius)
 {
-    std::vector<readdy::model::TopologyParticle> particles {};
+    std::vector<readdy::model::Particle> particles {};
 
     for(int filament = 0; filament < nFilaments; ++filament)
     {
@@ -476,7 +478,7 @@ std::vector<readdy::model::TopologyParticle> getMicrotubuleParticles(
  * @param nRings rings
  */
 void addMicrotubuleEdges(
-    readdy::model::top::graph::Graph &graph,
+    readdy::model::top::GraphTopology &top,
     int nFilaments,
     int nRings)
 {
@@ -484,18 +486,19 @@ void addMicrotubuleEdges(
     {
         for(int ring = 0; ring < nRings; ++ring)
         {
-            int i = filament * nRings + ring;
+            std::size_t i = filament * nRings + ring;
 
             //bond along filament
             if (ring < nRings-1)
             {
-                graph.addEdgeBetweenParticles(i, i+1);
+                top.addEdge({i}, {i+1});
             }
 
             if (ring < nRings-3 || filament < nFilaments-1)
             {
-                graph.addEdgeBetweenParticles(i, filament < nFilaments-1 ? i + nRings :
-                    i - ((nFilaments-1) * nRings) + 3);
+                std::size_t i_filament = (filament < nFilaments-1 ?
+                    i + nRings : i - ((nFilaments-1) * nRings) + 3);
+                top.addEdge({i}, {i_filament});
             }
         }
     }
@@ -511,13 +514,13 @@ void addReaDDyMicrotubuleToSimulation(
     std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel,
     int nRings)
 {
-    std::vector<readdy::model::TopologyParticle> particles = getMicrotubuleParticles(
+    std::vector<readdy::model::Particle> particles = getMicrotubuleParticles(
         (*_kernel)->context().particleTypes(), 13, nRings, 10.86);
 
     auto topology = (*_kernel)->stateModel().addTopology(
         (*_kernel)->context().topologyRegistry().idOf("Microtubule"), particles);
 
-    addMicrotubuleEdges(topology->graph(), 13, nRings);
+    addMicrotubuleEdges(*topology, 13, nRings);
 }
 
 } // namespace models
