@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include "readdy/kernel/singlecpu/SCPUKernel.h"
-// #include <graphs/graphs.h>
+#include <graphs/graphs.h>
 
 namespace aics {
 namespace agentsim {
@@ -30,11 +30,12 @@ namespace models {
     * @param bool should particle's type contain the type or match it exactly?
     * @return the Vertex
     */
-    const readdy::model::top::Vertex* getVertexOfType(
+    std::size_t getIndexOfVertexOfType(
         readdy::model::Context &context,
         readdy::model::top::GraphTopology &top,
         std::string type,
-        bool exactMatch
+        bool exactMatch,
+        bool &vertexExists
     );
 
     /**
@@ -46,12 +47,13 @@ namespace models {
     * @param bool should particle's type contain the type or match it exactly?
     * @return the Vertex
     */
-    const readdy::model::top::Vertex* getNeighborVertexOfType(
+    std::size_t getIndexOfNeighborOfType(
         readdy::model::Context &context,
         readdy::model::top::GraphTopology &top,
-        const readdy::model::top::Vertex* vertex,
+        std::size_t vertexIndex,
         std::string type,
-        bool exactMatch
+        bool exactMatch,
+        bool &vertexExists
     );
 
     /**

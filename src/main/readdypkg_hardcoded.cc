@@ -77,7 +77,7 @@ namespace agentsim {
             // stateModel
             models::addReaDDyMicrotubuleToSimulation(&kernel, 50);
             models::addReaDDyKinesinToSimulation(
-                &kernel, Eigen::Vector3d(0., 14., 0.));
+                &kernel, Eigen::Vector3d(0., 14., 4.));
 
             readdy::scalar timeStep = 0.1;
 
@@ -88,7 +88,7 @@ namespace agentsim {
             reactions = kernel->actions().uncontrolledApproximation(timeStep);
             topologyReactions = kernel->actions().evaluateTopologyReactions(timeStep);
 
-            breakingBonds = models::addBreakableKinesinBond(&kernel, (float)timeStep);
+            // breakingBonds = models::addBreakableKinesinBond(&kernel, (float)timeStep);
 
             initialized = true;
         }
@@ -124,7 +124,10 @@ namespace agentsim {
         forces->perform(); // evaluate forces based on current particle configuration
         reactions->perform();  // evaluate reactions
         topologyReactions->perform(); // and topology reactions
-        breakingBonds->perform(); // check bonds for breaks
+
+        models::checkKinesin(&kernel);
+
+        // breakingBonds->perform(); // check bonds for breaks
         neighborList->perform(); // neighbor list update
         forces->perform(); // evaluate forces based on current particle configuration
         kernel->evaluateObservables(this->m_timeStepCount); // evaluate observables
@@ -155,7 +158,6 @@ namespace agentsim {
                 agents.push_back(newAgent);
             }
         }
-        models::checkKinesin(&kernel);
     }
 
     void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue)

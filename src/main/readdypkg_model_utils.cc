@@ -35,11 +35,12 @@ bool typesMatch(
 * @param bool should particle's type contain the type or match it exactly?
 * @return the vertex's persistent index
 */
-const readdy::model::top::Vertex* getVertexOfType(
+std::size_t getIndexOfVertexOfType(
     readdy::model::Context &context,
     readdy::model::top::GraphTopology &top,
     std::string type,
-    bool exactMatch)
+    bool exactMatch,
+    bool &vertexExists)
 {
     const auto &types = context.particleTypes();
     auto vertex = top.graph().vertices().begin();
@@ -47,11 +48,13 @@ const readdy::model::top::Vertex* getVertexOfType(
         auto t = types.infoOf(top.particleForVertex(*vertex).type()).name;
         if (typesMatch(t, type, exactMatch))
         {
-            return &(*vertex);
+            vertexExists = true;
+            return vertex.persistent_index().value;
         }
         std::advance(vertex, 1);
     }
-    return NULL;
+    vertexExists = false;
+    return 0;
 }
 
 /**
@@ -63,23 +66,28 @@ const readdy::model::top::Vertex* getVertexOfType(
 * @param bool should particle's type contain the type or match it exactly?
 * @return the Vertex
 */
-const readdy::model::top::Vertex* getNeighborVertexOfType(
+std::size_t getIndexOfNeighborOfType(
     readdy::model::Context &context,
     readdy::model::top::GraphTopology &top,
-    const readdy::model::top::Vertex* vertex,
+    std::size_t vertexIndex,
     std::string type,
-    bool exactMatch)
+    bool exactMatch,
+    bool &vertexExists)
 {
     const auto &types = context.particleTypes();
-    for (const auto &neighbor : vertex->neighbors())
+    const auto &vertex = top.graph().vertices().at(vertexIndex);
+    for (const auto &neighbor : vertex.neighbors())
     {
         auto t = types.infoOf(top.particleForVertex(neighbor).type()).name;
+        std::cout << t << std::endl;
         if (typesMatch(t, type, exactMatch))
         {
-            return &(top.graph().vertices().at(neighbor));
+            vertexExists = true;
+            return neighbor.value;
         }
     }
-    return NULL;
+    vertexExists = false;
+    return 0;
 }
 
 } // namespace models
