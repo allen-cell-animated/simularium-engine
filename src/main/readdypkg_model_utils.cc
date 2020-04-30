@@ -1,5 +1,5 @@
 #include "agentsim/readdy_models.h"
-// #include <graphs/graphs.h>
+#include <graphs/graphs.h>
 
 namespace aics {
 namespace agentsim {
@@ -35,7 +35,7 @@ bool typesMatch(
 * @param bool should particle's type contain the type or match it exactly?
 * @return the vertex's persistent index
 */
-std::size_t getIndexOfVertexOfType(
+graphs::PersistentIndex getIndexOfVertexOfType(
     readdy::model::Context &context,
     readdy::model::top::GraphTopology &top,
     std::string type,
@@ -49,12 +49,12 @@ std::size_t getIndexOfVertexOfType(
         if (typesMatch(t, type, exactMatch))
         {
             vertexExists = true;
-            return vertex.persistent_index().value;
+            return vertex.persistent_index();
         }
         std::advance(vertex, 1);
     }
     vertexExists = false;
-    return 0;
+    return graphs::PersistentIndex{0};
 }
 
 /**
@@ -66,10 +66,10 @@ std::size_t getIndexOfVertexOfType(
 * @param bool should particle's type contain the type or match it exactly?
 * @return the Vertex
 */
-std::size_t getIndexOfNeighborOfType(
+graphs::PersistentIndex getIndexOfNeighborOfType(
     readdy::model::Context &context,
     readdy::model::top::GraphTopology &top,
-    std::size_t vertexIndex,
+    graphs::PersistentIndex vertexIndex,
     std::string type,
     bool exactMatch,
     bool &vertexExists)
@@ -79,15 +79,14 @@ std::size_t getIndexOfNeighborOfType(
     for (const auto &neighbor : vertex.neighbors())
     {
         auto t = types.infoOf(top.particleForVertex(neighbor).type()).name;
-        std::cout << t << std::endl;
         if (typesMatch(t, type, exactMatch))
         {
             vertexExists = true;
-            return neighbor.value;
+            return neighbor;
         }
     }
     vertexExists = false;
-    return 0;
+    return graphs::PersistentIndex{0};
 }
 
 } // namespace models

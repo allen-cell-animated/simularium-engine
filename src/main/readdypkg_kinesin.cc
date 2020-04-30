@@ -43,48 +43,48 @@ void addKinesinTubulinBindReaction(
     for (const auto &numbers : polymerNumbers)
     {
         topologyRegistry.addSpatialReaction(
-            "Motor-Bind" + std::to_string(i) + ": Microtubule(tubulinB#" +
-            numbers + ") + Kinesin(motor) -> " +
-            "Microtubule-Kinesin#Binding(tubulinB#bound_" + numbers + "--motor)",
+            "Motor-Bind" + std::to_string(i) + ": Kinesin(motor) + Microtubule(tubulinB#" +
+            numbers + ") -> Microtubule-Kinesin#Binding(motor#new--tubulinB#bound_" + numbers + ")",
             1e10, 5.);
         i++;
     }
 
     // structural reaction
-    // auto &typeRegistry = context.particleTypes();
-    // auto reactionFunction = [&](readdy::model::top::GraphTopology &top)
-    // {
-    //     readdy::model::top::reactions::Recipe recipe(top);
-    //
-    //     bool boundMotorExists = false;
-    //     auto boundMotorIndex = getIndexOfVertexOfType(context, top, "motor", true, boundMotorExists);
-    //     if (!boundMotorExists)
-    //     {
-    //         std::cout << "failed to find new motor" << std::endl;
-    //         return recipe;
-    //     }
-    //
-    //     bool tubulinExists = false;
-    //     auto tubulinIndex = getIndexOfNeighborOfType(context, top, boundMotorIndex, "tubulinB", false, tubulinExists);
-    //     if (!tubulinExists)
-    //     {
-    //         std::cout << "failed to find bound tubulin" << std::endl;
-    //         return recipe;
-    //     }
-    //
-    //     auto boundMotor = top.vertexIndexForParticle(boundMotorIndex);
-    //     recipe.changeParticleType(boundMotor, typeRegistry.idOf("motor#bound"));
-    //     auto tubulinPos = top.particleForVertex(top.vertexIndexForParticle(tubulinIndex)).pos();
-    //     readdy::Vec3 offset{0., 4., 0.};
-    //     recipe.changeParticlePosition(boundMotor, tubulinPos + offset);
-    //     recipe.changeTopologyType("Microtubule-Kinesin");
-    //
-    //     std::cout << "successfully set up new motor" << std::endl;
-    //
-    //     return recipe;
-    // };
-    // readdy::model::top::reactions::StructuralTopologyReaction reaction{"Finish-Motor-Bind", reactionFunction, 1e30};
-    // topologyRegistry.addStructuralReaction(topologyRegistry.idOf("Microtubule-Kinesin#Binding"), reaction);
+    auto &typeRegistry = context.particleTypes();
+    auto reactionFunction = [&](readdy::model::top::GraphTopology &top)
+    {
+        readdy::model::top::reactions::Recipe recipe(top);
+
+        const auto &types = context.particleTypes();
+
+        bool boundMotorExists = false;
+        auto boundMotorIndex = getIndexOfVertexOfType(context, top, "motor#new", true, boundMotorExists);
+        if (!boundMotorExists)
+        {
+            std::cout << "*** failed to find new motor" << std::endl;
+            return recipe;
+        }
+
+        bool tubulinExists = false;
+        auto tubulinIndex = getIndexOfNeighborOfType(context, top, boundMotorIndex, "tubulinB#bound", false, tubulinExists);
+        if (!tubulinExists)
+        {
+            std::cout << "*** failed to find bound tubulin" << std::endl;
+            return recipe;
+        }
+
+        auto tubulinPos = top.particleForVertex(tubulinIndex).pos();
+        readdy::Vec3 offset{0., 4., 0.};
+        recipe.changeParticlePosition(boundMotorIndex, tubulinPos + offset);
+        recipe.changeParticleType(boundMotorIndex, typeRegistry.idOf("motor#bound"));
+        recipe.changeTopologyType("Microtubule-Kinesin");
+
+        std::cout << "*** successfully set up new motor" << std::endl;
+
+        return recipe;
+    };
+    readdy::model::top::reactions::StructuralTopologyReaction reaction{"Finish-Motor-Bind", reactionFunction, 1e30};
+    topologyRegistry.addStructuralReaction(topologyRegistry.idOf("Microtubule-Kinesin#Binding"), reaction);
 }
 
 /**
@@ -105,6 +105,7 @@ void addReaDDyKinesinToSystem(
     auto &typeRegistry = context.particleTypes();
     std::unordered_map<std::string,float> particles = {
         {"motor", 2.},
+        {"motor#new", 2.},
         {"motor#bound", 2.},
         {"cargo", 15.},
         {"hips", 1.}
@@ -152,7 +153,7 @@ void addReaDDyKinesinToSystem(
         forceConstant, 4., readdy::api::BondType::HARMONIC};
     for (const auto &tubulin : tubulinTypes)
     {
-        topologyRegistry.configureBondPotential("motor", tubulin, bond);
+        topologyRegistry.configureBondPotential("motor#new", tubulin, bond);
         topologyRegistry.configureBondPotential("motor#bound", tubulin, bond);
         context.potentials().addHarmonicRepulsion(
             "motor", tubulin, forceConstant, 3.);
@@ -212,7 +213,7 @@ std::unique_ptr<readdy::model::actions::top::BreakBonds> addBreakableKinesinBond
     std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel,
     float timeStep)
 {
-    const float break_threshold = 1.0;
+    const float break_threshold = 1000.0;
     readdy::model::actions::top::BreakConfig breakConfig;
     std::vector<std::string> tubulinTypes = getAllPolymerTypes({"tubulinB#bound_"});
     const auto particleTypes = (*_kernel)->context().particleTypes();
@@ -233,44 +234,28 @@ std::unique_ptr<readdy::model::actions::top::BreakBonds> addBreakableKinesinBond
 void checkKinesin(
     std::unique_ptr<readdy::kernel::scpu::SCPUKernel>* _kernel)
 {
-    std::cout << "---------------------------------------------" <<  std::endl;
-
     for (auto top : (*_kernel)->stateModel().getTopologies())
     {
-        std::cout << "topology " << (*_kernel)->context().topologyRegistry().nameOf(top->type()) << " ----------" <<  std::endl;
-
-        for (auto particle : (*_kernel)->stateModel().getParticlesForTopology(*top))
-        {
-            auto t = (*_kernel)->context().particleTypes().infoOf(particle.type()).name;
-            if (t.find("bound") != std::string::npos)
-            {
-                std::cout << "  " << t << std::endl;
-            }
-        }
-
-        std::cout << "---" <<  std::endl;
-
         bool boundMotorExists = false;
         auto boundMotorIndex = getIndexOfVertexOfType(
-            (*_kernel)->context(), *top, "motor", true, boundMotorExists);
+            (*_kernel)->context(), *top, "motor#bound", true, boundMotorExists);
         if (!boundMotorExists)
         {
             std::cout << "no motors bound" << std::endl;
-            continue;
+            return;
         }
 
         bool tubulinExists = false;
         auto tubulinIndex = getIndexOfNeighborOfType(
-            (*_kernel)->context(), *top, boundMotorIndex, "tubulinB", false, tubulinExists);
+            (*_kernel)->context(), *top, boundMotorIndex, "tubulinB#bound", false, tubulinExists);
         if (!tubulinExists)
         {
-            std::cout << "bound motor has no tubulin neighbor!" << std::endl;
-            continue;
+            std::cout << "motor has no tubulin neighbor!" << std::endl;
+            return;
         }
 
-        std::cout << "found bound motor & tubulin" << std::endl;
-        auto motorPos = top->particleForVertex(top->vertexIndexForParticle(boundMotorIndex)).pos();
-        auto tubulinPos = top->particleForVertex(top->vertexIndexForParticle(tubulinIndex)).pos();
+        auto motorPos = top->particleForVertex(boundMotorIndex).pos();
+        auto tubulinPos = top->particleForVertex(tubulinIndex).pos();
         float distance = (motorPos - tubulinPos).norm();
         float energy = 45. * distance * distance;
 

@@ -30,7 +30,7 @@ namespace models {
     * @param bool should particle's type contain the type or match it exactly?
     * @return the Vertex
     */
-    std::size_t getIndexOfVertexOfType(
+    graphs::PersistentIndex getIndexOfVertexOfType(
         readdy::model::Context &context,
         readdy::model::top::GraphTopology &top,
         std::string type,
@@ -47,10 +47,10 @@ namespace models {
     * @param bool should particle's type contain the type or match it exactly?
     * @return the Vertex
     */
-    std::size_t getIndexOfNeighborOfType(
+    graphs::PersistentIndex getIndexOfNeighborOfType(
         readdy::model::Context &context,
         readdy::model::top::GraphTopology &top,
-        std::size_t vertexIndex,
+        graphs::PersistentIndex vertexIndex,
         std::string type,
         bool exactMatch,
         bool &vertexExists
