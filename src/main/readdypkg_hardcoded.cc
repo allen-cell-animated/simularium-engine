@@ -88,7 +88,7 @@ namespace agentsim {
             reactions = kernel->actions().uncontrolledApproximation(timeStep);
             topologyReactions = kernel->actions().evaluateTopologyReactions(timeStep);
 
-            breakingBonds = models::addBreakableKinesinBond(&kernel, (float)timeStep);
+            // breakingBonds = models::addBreakableKinesinBond(&kernel, (float)timeStep);
 
             initialized = true;
         }
@@ -127,7 +127,7 @@ namespace agentsim {
 
         models::checkKinesin(&kernel);
 
-        breakingBonds->perform(); // check bonds for breaks
+        // breakingBonds->perform(); // check bonds for breaks
         neighborList->perform(); // neighbor list update
         forces->perform(); // evaluate forces based on current particle configuration
         kernel->evaluateObservables(this->m_timeStepCount); // evaluate observables

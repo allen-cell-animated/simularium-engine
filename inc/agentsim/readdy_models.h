@@ -10,50 +10,23 @@ namespace agentsim {
 namespace models {
 
     /**
-    * A method to check if the first type contains or equals the second
-    * @param type1 string
-    * @param type2 string
-    * @param exactMatch bool
-    * @return true if matches
-    */
-    bool typesMatch(
-        std::string type1,
-        std::string type2,
-        bool exactMatch
+     * A method to get a list of all polymer numbers
+     * ("type1_1", "type1_2", "type1_3", "type2_1", ... "type3_3")
+     * @param particleType base particle type
+     * @return vector of types
+     */
+    std::vector<std::string> getPolymerParticleTypes(
+        const std::string particleType
     );
 
     /**
-    * A method to get the first vertex in the topology with the given type
-    * @param context ReaDDy Context
-    * @param top ReaDDy GraphTopology
-    * @param type string to find
-    * @param bool should particle's type contain the type or match it exactly?
-    * @return the Vertex
-    */
-    graphs::PersistentIndex getIndexOfVertexOfType(
-        readdy::model::Context &context,
-        readdy::model::top::GraphTopology &top,
-        std::string type,
-        bool exactMatch,
-        bool &vertexExists
-    );
-
-    /**
-    * A method to get the first neighbor of the given vertex with the given type
-    * @param context ReaDDy Context
-    * @param graph ReaDDy topology graph
-    * @param vertex ReaDDy Vertex
-    * @param type string to find
-    * @param bool should particle's type contain the type or match it exactly?
-    * @return the Vertex
-    */
-    graphs::PersistentIndex getIndexOfNeighborOfType(
-        readdy::model::Context &context,
-        readdy::model::top::GraphTopology &top,
-        graphs::PersistentIndex vertexIndex,
-        std::string type,
-        bool exactMatch,
-        bool &vertexExists
+     * A method to get a list of all polymer numbers
+     * ("type1_1", "type1_2", "type1_3", "type2_1", ... "type3_3")
+     * @param particleType base particle types
+     * @return vector of types
+     */
+    std::vector<std::string> getAllPolymerParticleTypes(
+        std::vector<std::string> types
     );
 
     /**
@@ -70,16 +43,6 @@ namespace models {
     );
 
     /**
-     * A method to get a list of all polymer numbers
-     * ("type1_1", "type1_2", "type1_3", "type2_1", ... "type3_3")
-     * @param particleType base particle type
-     * @return vector of types
-     */
-    std::vector<std::string> getAllPolymerParticleTypes(
-        const std::string particleType
-    );
-
-    /**
      * A method to add ReaDDy topology species for all polymer numbers
      * ("type1_1", "type1_2", "type1_3", "type2_1", ... "type3_3")
      * @param typeRegistry ReaDDy ParticleTypeRegistry
@@ -89,7 +52,9 @@ namespace models {
     void addPolymerTopologySpecies(
         readdy::model::ParticleTypeRegistry &typeRegistry,
         const std::string particleType,
-        float diffusionCoefficient
+        float radius,
+        float diffusionCoefficient,
+        std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping
     );
 
     /**
@@ -238,6 +203,69 @@ namespace models {
     );
 
     /**
+    * A method to check if the first type contains or equals the second
+    * @param type1 string
+    * @param type2 string
+    * @param exactMatch bool
+    * @return true if matches
+    */
+    bool typesMatch(
+        std::string type1,
+        std::string type2,
+        bool exactMatch
+    );
+
+    /**
+    * A method to get the type of the vertex at the given index
+    * @param context ReaDDy Context
+    * @param top ReaDDy GraphTopology
+    * @param vertexIndex ReaDDy PersistentIndex the vertex
+    * @return string type of vertex
+    */
+    std::string getVertexType(
+        readdy::model::Context &context,
+        readdy::model::top::GraphTopology &top,
+        graphs::PersistentIndex vertexIndex
+    );
+
+    /**
+    * A method to get the first vertex in the topology with the given type
+    * @param context ReaDDy Context
+    * @param top ReaDDy GraphTopology
+    * @param type string to find
+    * @param bool should particle's type contain the type or match it exactly?
+    * @param vertexIndex ReaDDy PersistentIndex a reference to be set to the neighbor
+    * @return success
+    */
+    bool setIndexOfVertexOfType(
+        readdy::model::Context &context,
+        readdy::model::top::GraphTopology &top,
+        std::string type,
+        bool exactMatch,
+        graphs::PersistentIndex &vertexIndex
+    );
+
+    /**
+    * A method to set the vertexIndex reference to the first neighbor
+    * of the given vertex with the given type
+    * @param context ReaDDy Context
+    * @param graph ReaDDy topology graph
+    * @param vertex ReaDDy Vertex
+    * @param type string to find
+    * @param bool should particle's type contain the type or match it exactly?
+    * @param neighborIndex ReaDDy PersistentIndex a reference to be set to the neighbor
+    * @return success
+    */
+    bool setIndexOfNeighborOfType(
+        readdy::model::Context &context,
+        readdy::model::top::GraphTopology &top,
+        graphs::PersistentIndex vertexIndex,
+        std::string type,
+        bool exactMatch,
+        graphs::PersistentIndex &neighborIndex
+    );
+
+    /**
      * A method to add particle types and constraints to the ReaDDy context
      * @param context ReaDDy Context
      */
@@ -284,10 +312,77 @@ namespace models {
     );
 
     /**
-    * A method to get all tubulin types (for binding to motors)
+    * A method to get persistent indices for the motors in a topologyRegistry
+    * as well as their types (i.e. states) as strings
     * @param context ReaDDy Context
+    * @param top ReaDDy GraphTopology
+    * @return the persistent index and type for each motor
     */
-    std::vector<std::string> getAllReactiveTubulinTypes();
+    std::unordered_map<std::string,graphs::PersistentIndex> getMotorsAndTheirStates(
+        readdy::model::Context &context,
+        readdy::model::top::GraphTopology &top
+    );
+
+    /**
+    * A method to get the overall state of a kinesin given both of its motors' states
+    * @param motorStates the state for each of the two motors
+    * @return string representing kinesin's overall state
+    */
+    std::string getBoundKinesinState(
+        std::vector<std::string> motorStates
+    );
+
+    /**
+    * A method to change the state of a motor
+    * and update the kinesin state to match
+    * @param context ReaDDy Context
+    * @param top ReaDDy GraphTopology
+    * @param recipe ReaDDy recipe
+    * @param the starting state of the motor to change
+    * @param the state to change the motor to
+    * @param a reference to the changed motor's index
+    * @return success
+    */
+    bool setKinesinState(
+        readdy::model::Context &context,
+        readdy::model::top::GraphTopology &top,
+        readdy::model::top::reactions::Recipe &recipe,
+        std::string fromMotorState,
+        std::string toMotorState,
+        graphs::PersistentIndex &changedMotor
+    );
+
+    /**
+     * A method to add spatial and structural reactions
+     * to bind a kinesin motor in ADP state to a free tubulinB
+     * @param context ReaDDy Context
+     * @param rate ReaDDy scalar reaction rate
+     */
+    void addMotorBindTubulinReaction(
+        readdy::model::Context &context,
+        readdy::scalar rate
+    );
+
+    /**
+     * A method to add structural reactions to set bound motor's state to ATP
+     * (and implicitly simulate ATP binding)
+     * @param context ReaDDy Context
+     * @param rate ReaDDy scalar reaction rate
+     */
+    void addMotorBindATPReaction(
+        readdy::model::Context &context,
+        readdy::scalar rate
+    );
+
+    /**
+     * A method to add structural reactions to release a bound motor from tubulin
+     * @param context ReaDDy Context
+     * @param rate ReaDDy scalar reaction rate
+     */
+    void addMotorReleaseTubulinReaction(
+        readdy::model::Context &context,
+        readdy::scalar rate
+    );
 
     /**
      * A method to add particle types and constraints to the ReaDDy context
