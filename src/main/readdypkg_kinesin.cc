@@ -14,18 +14,18 @@ namespace models {
 * @param top ReaDDy GraphTopology
 * @return the persistent index and type for each motor
 */
-std::unordered_map<std::string,graphs::PersistentIndex> getMotorsAndTheirStates(
+std::vector<std::pair<std::string,graphs::PersistentIndex>> getMotorsAndTheirStates(
     readdy::model::Context &context,
     readdy::model::top::GraphTopology &top)
 {
-    std::unordered_map<std::string,graphs::PersistentIndex> motors;
+    std::vector<std::pair<std::string,graphs::PersistentIndex>> motors;
     const auto &types = context.particleTypes();
     auto vertex = top.graph().vertices().begin();
     while (vertex != top.graph().vertices().end()) {
         auto t = types.infoOf(top.particleForVertex(*vertex).type()).name;
         if (typesMatch(t, "motor", false))
         {
-            motors.insert(std::pair<std::string,graphs::PersistentIndex>(
+            motors.push_back(std::pair<std::string,graphs::PersistentIndex>(
                 t, vertex.persistent_index()));
         }
         std::advance(vertex, 1);
@@ -81,25 +81,25 @@ bool setKinesinState(
     std::string toMotorState,
     graphs::PersistentIndex &changedMotor)
 {
-    std::unordered_map<std::string,graphs::PersistentIndex> motors =
+    std::vector<std::pair<std::string,graphs::PersistentIndex>> motors =
         getMotorsAndTheirStates(context, top);
     if (motors.size() < 2)
     {
-        std::cout << "*** failed to find motors" << std::endl;
+        std::cout << "*** failed to find 2 motors, found " << motors.size() << std::endl;
         return false;
     }
 
     std::string otherState = "";
     std::vector<graphs::PersistentIndex> motorsInState;
-    for (auto it : motors)
+    for (std::size_t i = 0; i < motors.size(); ++i)
     {
-        if (it.first.find(fromMotorState) != std::string::npos)
+        if (motors[i].first.find(fromMotorState) != std::string::npos)
         {
-            motorsInState.push_back(it.second);
+            motorsInState.push_back(motors[i].second);
         }
         else
         {
-            otherState = it.first;
+            otherState = motors[i].first;
         }
     }
 
@@ -164,7 +164,7 @@ void addMotorBindTubulinReaction(
         topologyRegistry.addSpatialReaction(
             "Bind-Tubulin" + std::to_string(i) + ": Kinesin(motor#ADP) + Microtubule(tubulinB#" +
             numbers + ") -> Microtubule-Kinesin#Binding(motor#new--tubulinB#bound_" + numbers + ")",
-            rate, 5.);
+            rate, 4.);
         i++;
     }
     std::vector<std::string> kinesinStates = {"ADP-apo", "ADP-ATP"};
@@ -177,7 +177,7 @@ void addMotorBindTubulinReaction(
                 state + "(motor#ADP) + Microtubule-Kinesin#" + state + "(tubulinB#" +
                 numbers + ") -> Microtubule-Kinesin#Binding(motor#new--tubulinB#bound_" +
                 numbers + ") [self=true]",
-                1e10, 5.);
+                1e10, 4.);
             i++;
         }
     }
@@ -317,7 +317,7 @@ void addMotorReleaseTubulinReaction(
         readdy::model::top::reactions::Recipe recipe(top);
 
         std::string newType = "Microtubule";
-        std::unordered_map<std::string,graphs::PersistentIndex> motors =
+        std::vector<std::pair<std::string,graphs::PersistentIndex>> motors =
         getMotorsAndTheirStates(context, top);
         if (motors.size() > 0)
         {
@@ -343,6 +343,11 @@ void addReaDDyKinesinToSystem(
     readdy::model::Context &context,
     std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping)
 {
+    float motorDiffusionMultiplier = 2.;
+    float hipsDiffusionMultiplier = 2.;
+    float cargoDiffusionMultiplier = 1.; //35.
+    float rateMultiplier = pow(10, 7);
+
     float forceConstant = 90.;
     float eta = 8.1;
     float temperature = 37. + 273.15;
@@ -368,7 +373,7 @@ void addReaDDyKinesinToSystem(
 
     typeRegistry.add(
         "hips",
-        calculateDiffusionCoefficient(particles.at("hips"), eta, temperature),
+        hipsDiffusionMultiplier * calculateDiffusionCoefficient(particles.at("hips"), eta, temperature),
         readdy::model::particleflavor::TOPOLOGY
     );
 
@@ -379,13 +384,15 @@ void addReaDDyKinesinToSystem(
             // add type
             typeRegistry.add(
                 it.first,
-                calculateDiffusionCoefficient(it.second, eta, temperature),// * (it.first == "cargo" ? 35. : 1.),
+                (it.first.find("motor") != std::string::npos ? motorDiffusionMultiplier : cargoDiffusionMultiplier) *
+                calculateDiffusionCoefficient(it.second, eta, temperature),
                 readdy::model::particleflavor::TOPOLOGY
             );
 
             // bond to hips
             readdy::api::Bond bond{
-                forceConstant, 2. * it.second, readdy::api::BondType::HARMONIC};
+                (it.first == "cargo" ? 0.1 : 1.) * forceConstant,
+                2. * it.second, readdy::api::BondType::HARMONIC};
             topologyRegistry.configureBondPotential("hips", it.first, bond);
         }
     }
@@ -402,9 +409,9 @@ void addReaDDyKinesinToSystem(
     addBond(topologyRegistry, motorTypes, tubulinTypes, forceConstant, 4.);
     addRepulsion(context, motorTypes, tubulinTypes, forceConstant, 3.);
 
-    addMotorBindTubulinReaction(context, 1e30);
-    addMotorBindATPReaction(context, 1e30);
-    addMotorReleaseTubulinReaction(context, 1e30);
+    addMotorBindTubulinReaction(context, rateMultiplier * 4.3 * pow(10, -7));
+    addMotorBindATPReaction(context, rateMultiplier * 6. * pow(10, -9));
+    addMotorReleaseTubulinReaction(context, rateMultiplier * 1.8 * pow(10, -7));
 }
 
 /**
@@ -416,7 +423,7 @@ std::vector<readdy::model::Particle> getKinesinParticles(
     Eigen::Vector3d position)
 {
     Eigen::Vector3d motor1_pos = position + Eigen::Vector3d(0., 0., -4.);
-    Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 0., 4.);
+    Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 3., 4.);
     Eigen::Vector3d cargo_pos = position + Eigen::Vector3d(0., 30., 0.);
 
     std::vector<readdy::model::Particle> particles {
@@ -480,7 +487,7 @@ void checkKinesin(
     std::cout << "check --------------------------" <<  std::endl;
     for (auto top : (*_kernel)->stateModel().getTopologies())
     {
-        std::unordered_map<std::string,graphs::PersistentIndex> motors =
+        std::vector<std::pair<std::string,graphs::PersistentIndex>> motors =
             getMotorsAndTheirStates((*_kernel)->context(), *top);
         if (motors.size() < 2)
         {
@@ -488,24 +495,24 @@ void checkKinesin(
             continue;
         }
         std::string motorStates = "";
-        for (auto it : motors)
+        for (std::size_t i = 0; i < motors.size(); ++i)
         {
-            motorStates += it.first + " ";
+            motorStates += motors[i].first + " ";
         }
         std::cout << "motor states = " << motorStates << std::endl;
 
         graphs::PersistentIndex tubulinIndex;
-        for (auto it : motors)
+        for (std::size_t i = 0; i < motors.size(); ++i)
         {
-            if (setIndexOfNeighborOfType((*_kernel)->context(), *top, it.second,
+            if (setIndexOfNeighborOfType((*_kernel)->context(), *top, motors[i].second,
                 "tubulinB#bound", false, tubulinIndex))
             {
-                auto motorPos = top->particleForVertex(it.second).pos();
+                auto motorPos = top->particleForVertex(motors[i].second).pos();
                 auto tubulinPos = top->particleForVertex(tubulinIndex).pos();
                 float distance = (motorPos - tubulinPos).norm();
                 float energy = 45. * distance * distance;
 
-                std::cout << it.first << " bond energy = " << std::to_string(energy) <<  std::endl;
+                std::cout << motors[i].first << " bond energy = " << std::to_string(energy) <<  std::endl;
             }
         }
     }

@@ -71,7 +71,7 @@ namespace agentsim {
                 return;
             }
             kernel->context().boxSize() = {300., 300., 300.};
-            models::addReaDDyMicrotubuleToSystem(kernel->context(), particleTypeRadiusMapping);
+            models::addReaDDyMicrotubuleToSystem(kernel->context(), false, particleTypeRadiusMapping);
             models::addReaDDyKinesinToSystem(kernel->context(), particleTypeRadiusMapping);
 
             // stateModel

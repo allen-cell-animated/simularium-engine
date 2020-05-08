@@ -14,6 +14,7 @@ namespace models {
  */
 void addReaDDyMicrotubuleToSystem(
     readdy::model::Context &context,
+    bool diffuse,
     std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping)
 {
     float forceConstant = 90.;
@@ -27,7 +28,7 @@ void addReaDDyMicrotubuleToSystem(
     auto &typeRegistry = context.particleTypes();
     std::vector<std::string> tubulinTypes = {
         "tubulinA#", "tubulinB#", "tubulinA#bound_", "tubulinB#bound_"};
-    float diffCoeff = calculateDiffusionCoefficient(2., eta, temperature);
+    float diffCoeff = diffuse ? calculateDiffusionCoefficient(2., eta, temperature) : 0.;
     for (const auto &t : tubulinTypes)
     {
         addPolymerTopologySpecies(

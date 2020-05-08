@@ -271,6 +271,7 @@ namespace models {
      */
     void addReaDDyMicrotubuleToSystem(
         readdy::model::Context &context,
+        bool diffuse,
         std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping
     );
 
@@ -318,7 +319,7 @@ namespace models {
     * @param top ReaDDy GraphTopology
     * @return the persistent index and type for each motor
     */
-    std::unordered_map<std::string,graphs::PersistentIndex> getMotorsAndTheirStates(
+    std::vector<std::pair<std::string,graphs::PersistentIndex>> getMotorsAndTheirStates(
         readdy::model::Context &context,
         readdy::model::top::GraphTopology &top
     );
