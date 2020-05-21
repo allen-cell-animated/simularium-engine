@@ -47,6 +47,7 @@ std::vector<std::string> getAllPolymerParticleTypes(
 
 std::set<std::tuple<std::string, std::string>> bondPairs;
 std::set<std::tuple<std::string, std::string, std::string>> angleTriples;
+std::set<std::tuple<std::string, std::string, std::string, std::string>> torsionQuads;
 std::set<std::tuple<std::string, std::string>> repulsePairs;
 
 /**
@@ -311,6 +312,88 @@ void addPolymerAngle(
                 getTypesWithPolymerNumbers(particleTypes1, x, y, offsets1),
                 getTypesWithPolymerNumbers(particleTypes2, x, y, offsets2),
                 getTypesWithPolymerNumbers(particleTypes3, x, y, offsets3),
+                forceConstant, angleRadians
+            );
+        }
+    }
+}
+
+/**
+* A method to add an angle (if it hasn't been added already)
+* @param topologyRegistry ReaDDy TopologyRegistry
+* @param particleTypes1 from particle types
+* @param particleTypes2 through particle types
+* @param particleTypes3 to particle types
+* @param forceConstant force constant
+* @param angleRadians equilibrium angle [radians]
+*/
+void addCosineDihedral(
+    readdy::model::top::TopologyRegistry &topologyRegistry,
+    std::vector<std::string> particleTypes1,
+    std::vector<std::string> particleTypes2,
+    std::vector<std::string> particleTypes3,
+    std::vector<std::string> particleTypes4,
+    float forceConstant,
+    float angleRadians)
+{
+    readdy::api::TorsionAngle angle{
+        forceConstant, 1., angleRadians, readdy::api::TorsionType::COS_DIHEDRAL};
+    for (const auto &t1 : particleTypes1)
+    {
+        for (const auto &t2 : particleTypes2)
+        {
+            for (const auto &t3 : particleTypes3)
+            {
+                for (const auto &t4 : particleTypes4)
+                {
+                    if (!torsionQuads.insert({t1, t2, t3, t4}).second)
+                    {
+                        continue;
+                    }
+                    topologyRegistry.configureTorsionPotential(t1, t2, t3, t4, angle);
+                    torsionQuads.insert({t4, t3, t2, t1});
+                }
+            }
+        }
+    }
+}
+
+/**
+* A method to add an angle between all polymer numbers
+* @param topologyRegistry ReaDDy TopologyRegistry
+* @param particleTypes1 from particle types
+* @param polymerOffsets1 offsets for from particle types (likely [0,0])
+* @param particleTypes2 through particle types
+* @param polymerOffsets2 offsets for through particle types
+* @param particleTypes3 to particle types
+* @param polymerOffsets3 offsets for to particle types
+* @param forceConstant force constant
+* @param bondLength equilibrium angle [radians]
+*/
+void addPolymerCosineDihedral(
+    readdy::model::top::TopologyRegistry &topologyRegistry,
+    std::vector<std::string> particleTypes1,
+    std::vector<int> polymerOffsets1,
+    std::vector<std::string> particleTypes2,
+    std::vector<int> polymerOffsets2,
+    std::vector<std::string> particleTypes3,
+    std::vector<std::string> particleTypes4,
+    float forceConstant,
+    float angleRadians)
+{
+    for(int x = 1; x < 4; ++x)
+    {
+        for(int y = 1; y < 4; ++y)
+        {
+            auto offsets1 = clampPolymerOffsets(x, polymerOffsets1);
+            auto offsets2 = clampPolymerOffsets(x, polymerOffsets2);
+
+            addCosineDihedral(
+                topologyRegistry,
+                getTypesWithPolymerNumbers(particleTypes1, x, y, offsets1),
+                getTypesWithPolymerNumbers(particleTypes2, x, y, offsets2),
+                particleTypes3,
+                particleTypes4,
                 forceConstant, angleRadians
             );
         }

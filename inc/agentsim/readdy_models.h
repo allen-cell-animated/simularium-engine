@@ -173,6 +173,49 @@ namespace models {
     );
 
     /**
+    * A method to add an angle (if it hasn't been added already)
+    * @param topologyRegistry ReaDDy TopologyRegistry
+    * @param particleTypes1 from particle types
+    * @param particleTypes2 through particle types
+    * @param particleTypes3 to particle types
+    * @param forceConstant force constant
+    * @param angleRadians equilibrium angle [radians]
+    */
+    void addCosineDihedral(
+        readdy::model::top::TopologyRegistry &topologyRegistry,
+        std::vector<std::string> particleTypes1,
+        std::vector<std::string> particleTypes2,
+        std::vector<std::string> particleTypes3,
+        std::vector<std::string> particleTypes4,
+        float forceConstant,
+        float angleRadians
+    );
+
+    /**
+    * A method to add an angle between all polymer numbers
+    * @param topologyRegistry ReaDDy TopologyRegistry
+    * @param particleTypes1 from particle types
+    * @param polymerOffsets1 offsets for from particle types (likely [0,0])
+    * @param particleTypes2 through particle types
+    * @param polymerOffsets2 offsets for through particle types
+    * @param particleTypes3 to particle types
+    * @param polymerOffsets3 offsets for to particle types
+    * @param forceConstant force constant
+    * @param bondLength equilibrium angle [radians]
+    */
+    void addPolymerCosineDihedral(
+        readdy::model::top::TopologyRegistry &topologyRegistry,
+        std::vector<std::string> particleTypes1,
+        std::vector<int> polymerOffsets1,
+        std::vector<std::string> particleTypes2,
+        std::vector<int> polymerOffsets2,
+        std::vector<std::string> particleTypes3,
+        std::vector<std::string> particleTypes4,
+        float forceConstant,
+        float angleRadians
+    );
+
+    /**
     * A method to add a pairwise repulsion (if it hasn't been added already)
     * @param context ReaDDy context
     * @param particleTypes1 from particle types

@@ -390,18 +390,15 @@ void addReaDDyKinesinToSystem(
             );
 
             // bond to hips
-            readdy::api::Bond bond{
-                (it.first == "cargo" ? 0.1 : 1.) * forceConstant,
-                2. * it.second, readdy::api::BondType::HARMONIC};
-            topologyRegistry.configureBondPotential("hips", it.first, bond);
+            addBond(topologyRegistry, {"hips"}, {it.first},
+                    (it.first == "cargo" ? 0.1 : 1.) * forceConstant, 2. * it.second);
         }
     }
 
     // intramolecular repulsions
     std::vector<std::string> motorTypes = {"motor#ADP", "motor#ATP", "motor#apo", "motor#new"};
     addRepulsion(context, motorTypes, motorTypes, forceConstant, 4.);
-    context.potentials().addHarmonicRepulsion(
-        "hips", "cargo", forceConstant, 2. * particles.at("cargo"));
+    addRepulsion(context, {"hips"}, {"cargo"}, forceConstant, 2. * particles.at("cargo"));
 
     // bonds and repulsions with tubulins
     std::vector<std::string> tubulinTypes = getAllPolymerParticleTypes(
@@ -409,6 +406,67 @@ void addReaDDyKinesinToSystem(
     addBond(topologyRegistry, motorTypes, tubulinTypes, forceConstant, 4.);
     addRepulsion(context, motorTypes, tubulinTypes, forceConstant, 3.);
 
+    // angles from tubulins to bound motor
+    addPolymerAngle(topologyRegistry,
+        tubulinTypes, {-1, 0},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#apo", "motor#ATP"}, {},
+        forceConstant, M_PI / 2.
+    );
+    addPolymerAngle(topologyRegistry,
+        tubulinTypes, {1, 0},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#apo", "motor#ATP"}, {},
+        forceConstant, M_PI / 2.
+    );
+    addPolymerAngle(topologyRegistry,
+        tubulinTypes, {0, -1},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#apo", "motor#ATP"}, {},
+        forceConstant, 1.81
+    );
+    addPolymerAngle(topologyRegistry,
+        tubulinTypes, {0, 1},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#apo", "motor#ATP"}, {},
+        forceConstant, 1.81
+    );
+
+    // dihedrals from tubulins to hips
+    addPolymerCosineDihedral(
+        topologyRegistry,
+        tubulinTypes, {-1, 0},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#ATP"},
+        {"hips"},
+        forceConstant, M_PI
+    );
+    addPolymerCosineDihedral(
+        topologyRegistry,
+        tubulinTypes, {1, 0},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#ATP"},
+        {"hips"},
+        forceConstant, 0.
+    );
+    addPolymerCosineDihedral(
+        topologyRegistry,
+        tubulinTypes, {0, -1},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#ATP"},
+        {"hips"},
+        forceConstant, 1.75
+    );
+    addPolymerCosineDihedral(
+        topologyRegistry,
+        tubulinTypes, {0, 1},
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#ATP"},
+        {"hips"},
+        forceConstant, 1.4
+    );
+
+    // reactions
     addMotorBindTubulinReaction(context, rateMultiplier * 4.3 * pow(10, -7));
     addMotorBindATPReaction(context, rateMultiplier * 6. * pow(10, -9));
     addMotorReleaseTubulinReaction(context, rateMultiplier * 1.8 * pow(10, -7));
