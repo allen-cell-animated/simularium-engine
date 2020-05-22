@@ -77,7 +77,7 @@ namespace agentsim {
             // stateModel
             models::addReaDDyMicrotubuleToSimulation(&kernel, 50);
             models::addReaDDyKinesinToSimulation(
-                &kernel, Eigen::Vector3d(0., 14., 4.));
+                &kernel, Eigen::Vector3d(0., 14., -60.));
 
             readdy::scalar timeStep = 0.1;
 
@@ -148,6 +148,10 @@ namespace agentsim {
                 if (particleTypeRadiusMapping->find(type) != particleTypeRadiusMapping->end())
                 {
                     radius *= particleTypeRadiusMapping->at(type);
+                    // if (type.find("tubulinA#1_") != std::string::npos)
+                    // {
+                    //     radius *= 2.;
+                    // }
                 }
                 newAgent.reset(new Agent());
                 newAgent->SetName(type);

@@ -343,8 +343,8 @@ void addReaDDyKinesinToSystem(
     readdy::model::Context &context,
     std::shared_ptr<std::unordered_map<std::string,float>>& particleTypeRadiusMapping)
 {
-    float motorDiffusionMultiplier = 2.;
-    float hipsDiffusionMultiplier = 2.;
+    float motorDiffusionMultiplier = 3.;
+    float hipsDiffusionMultiplier = 2.5;
     float cargoDiffusionMultiplier = 1.; //35.
     float rateMultiplier = pow(10, 7);
 
@@ -391,7 +391,8 @@ void addReaDDyKinesinToSystem(
 
             // bond to hips
             addBond(topologyRegistry, {"hips"}, {it.first},
-                    (it.first == "cargo" ? 0.1 : 1.) * forceConstant, 2. * it.second);
+                    (it.first == "cargo" ? 0.1 : 0.1) * forceConstant,
+                    (it.first == "cargo" ? 2. : 1.5) * it.second);
         }
     }
 
@@ -407,69 +408,93 @@ void addReaDDyKinesinToSystem(
     addRepulsion(context, motorTypes, tubulinTypes, forceConstant, 3.);
 
     // angles from tubulins to bound motor
+    std::vector<std::string> allTubulinTypes = {
+        "tubulinA#", "tubulinB#", "tubulinB#bound_"};
     addPolymerAngle(topologyRegistry,
-        tubulinTypes, {-1, 0},
+        allTubulinTypes, {-1, 0},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#apo", "motor#ATP"}, {},
-        forceConstant, M_PI / 2.
+        1.5 * forceConstant, M_PI / 2.
     );
     addPolymerAngle(topologyRegistry,
-        tubulinTypes, {1, 0},
+        allTubulinTypes, {1, 0},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#apo", "motor#ATP"}, {},
-        forceConstant, M_PI / 2.
+        1.5 * forceConstant, M_PI / 2.
     );
     addPolymerAngle(topologyRegistry,
-        tubulinTypes, {0, -1},
+        allTubulinTypes, {0, -1},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#apo", "motor#ATP"}, {},
-        forceConstant, 1.81
+        1.5 * forceConstant, 1.84
     );
     addPolymerAngle(topologyRegistry,
-        tubulinTypes, {0, 1},
+        allTubulinTypes, {0, 1},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#apo", "motor#ATP"}, {},
-        forceConstant, 1.81
+        1.5 * forceConstant, 1.54
+    );
+
+    // angle from bound tubulin to hips
+    addPolymerAngle(topologyRegistry,
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#ATP"}, {},
+        {"hips"}, {},
+        0.5 * forceConstant, M_PI * 5. / 9.
+    );
+
+    // angle from bound motor to free motor through hips
+    auto pi = M_PI - std::numeric_limits<float>::epsilon();
+    addAngle(topologyRegistry,
+        {"motor#ATP"},
+        {"hips"},
+        {"motor#ADP"},
+        0.1 * forceConstant, M_PI * 8. / 9.
     );
 
     // dihedrals from tubulins to hips
-    addPolymerCosineDihedral(
-        topologyRegistry,
-        tubulinTypes, {-1, 0},
+    addPolymerCosineDihedral(topologyRegistry,
+        allTubulinTypes, {-1, 0},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#ATP"},
         {"hips"},
-        forceConstant, M_PI
+        1.5 * forceConstant, M_PI * 17. / 18.
     );
-    addPolymerCosineDihedral(
-        topologyRegistry,
-        tubulinTypes, {1, 0},
+    addPolymerCosineDihedral(topologyRegistry,
+        allTubulinTypes, {1, 0},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#ATP"},
         {"hips"},
-        forceConstant, 0.
+        1.5 * forceConstant, M_PI / 18.
     );
-    addPolymerCosineDihedral(
-        topologyRegistry,
-        tubulinTypes, {0, -1},
+    addPolymerCosineDihedral(topologyRegistry,
+        allTubulinTypes, {0, -1},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#ATP"},
         {"hips"},
-        forceConstant, 1.75
+        1.5 * forceConstant, 1.79
     );
-    addPolymerCosineDihedral(
-        topologyRegistry,
-        tubulinTypes, {0, 1},
+    addPolymerCosineDihedral(topologyRegistry,
+        allTubulinTypes, {0, 1},
         {"tubulinB#bound_"}, {0, 0},
         {"motor#ATP"},
         {"hips"},
-        forceConstant, 1.4
+        1.5 * forceConstant, 1.44
+    );
+
+    // dihedral from bound tubulin to free motor
+    addPolymerCosineDihedral(topologyRegistry,
+        {"tubulinB#bound_"}, {0, 0},
+        {"motor#ATP"}, {},
+        {"hips"},
+        {"motor#ADP"},
+        0.5 * forceConstant, M_PI * 4. / 9.
     );
 
     // reactions
-    addMotorBindTubulinReaction(context, rateMultiplier * 4.3 * pow(10, -7));
-    addMotorBindATPReaction(context, rateMultiplier * 6. * pow(10, -9));
-    addMotorReleaseTubulinReaction(context, rateMultiplier * 1.8 * pow(10, -7));
+    addMotorBindTubulinReaction(context, rateMultiplier * 5. * pow(10, -7));
+    addMotorBindATPReaction(context, rateMultiplier * 5. * pow(10, -7));
+    // addMotorReleaseTubulinReaction(context, rateMultiplier * 1.8 * pow(10, -12));
 }
 
 /**
@@ -480,12 +505,13 @@ std::vector<readdy::model::Particle> getKinesinParticles(
     readdy::model::ParticleTypeRegistry &typeRegistry,
     Eigen::Vector3d position)
 {
-    Eigen::Vector3d motor1_pos = position + Eigen::Vector3d(0., 0., -4.);
-    Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 3., 4.);
+    Eigen::Vector3d hips_pos = position + Eigen::Vector3d(0., 4., 0.);
+    Eigen::Vector3d motor1_pos = position + Eigen::Vector3d(0., 3., -4.);
+    Eigen::Vector3d motor2_pos = position + Eigen::Vector3d(0., 0., 4.);
     Eigen::Vector3d cargo_pos = position + Eigen::Vector3d(0., 30., 0.);
 
     std::vector<readdy::model::Particle> particles {
-        {position[0], position[1], position[2], typeRegistry.idOf("hips")},
+        {hips_pos[0], hips_pos[1], hips_pos[2], typeRegistry.idOf("hips")},
         {motor1_pos[0], motor1_pos[1], motor1_pos[2], typeRegistry.idOf("motor#ADP")},
         {motor2_pos[0], motor2_pos[1], motor2_pos[2], typeRegistry.idOf("motor#ADP")},
         {cargo_pos[0], cargo_pos[1], cargo_pos[2], typeRegistry.idOf("cargo")},

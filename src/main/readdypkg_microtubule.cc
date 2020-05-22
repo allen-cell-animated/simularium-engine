@@ -27,7 +27,7 @@ void addReaDDyMicrotubuleToSystem(
 
     auto &typeRegistry = context.particleTypes();
     std::vector<std::string> tubulinTypes = {
-        "tubulinA#", "tubulinB#", "tubulinA#bound_", "tubulinB#bound_"};
+        "tubulinA#", "tubulinB#", "tubulinB#bound_"};
     float diffCoeff = diffuse ? calculateDiffusionCoefficient(2., eta, temperature) : 0.;
     for (const auto &t : tubulinTypes)
     {
@@ -112,8 +112,8 @@ std::vector<readdy::model::Particle> getMicrotubuleParticles(
         {
             std::string number1 = std::to_string(ring % 3 + 1);
             std::string number2 = std::to_string(int(filament + floor(ring / 3.)) % 3 + 1);
-            std::string a = ring % 2 == 0 ? "A#" : "B#";
-            std::string type = "tubulin" + a + number1 + "_" + number2;
+            std::string t = ring % 2 == 0 ? "A#" : "B#";
+            std::string type = "tubulin" + t + number1 + "_" + number2;
 
             particles.push_back({-pos[0], pos[1], pos[2], typeRegistry.idOf(type)});
 
