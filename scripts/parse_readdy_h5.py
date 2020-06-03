@@ -3,6 +3,22 @@ import sys
 import json
 import h5py as _h5py
 
+# Parses an hdf5 (*.h5) trajectory file produced
+# by the ReaDDy software and converts it into the Simularium
+# visualization-data-format
+#
+# The file produced can be drug-and-dropped in the Simularium
+# WebGL viewer for visualization
+#
+# Requires ReaDDy to be installed through Conda in the calling
+# python environment
+#
+# Requires 2 command line arguments:
+#   file_path - where to find the *.h5 file to parse
+#   output_file - where to write out the JSON file produced
+#
+# e.g. python parse_readdy_h5.py ./trajectory.h5 output.json
+
 if not len(sys.argv) == 3:
     print("Usage: parse_readdy_h5.py [file_path] [output_file]")
     quit()
