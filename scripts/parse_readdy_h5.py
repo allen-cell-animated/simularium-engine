@@ -1,7 +1,7 @@
 import readdy
+import numpy as np
 import argparse
 import json
-import h5py as _h5py
 
 def main():
     parser = argparse.ArgumentParser(
@@ -16,60 +16,50 @@ def main():
     file_path = args.file_path
     output_path = args.output_path
 
-    with _h5py.File(file_path, "r") as f:
-        limits = f['readdy']['trajectory']['limits']
-        records = f['readdy']['trajectory']['records']
-        time = f['readdy']['trajectory']['time']
+    traj = readdy.Trajectory(file_path)
+    n_particles_per_frame, positions, types, ids = traj.to_numpy(start=0, stop=None)
 
-        data = {}
-        data['msgType'] = 1
-        data['bundleStart'] = 0
-        data['bundleSize'] = len(limits)
-        data['bundleData'] = []
+    # load flavors
+    flavors = np.zeros_like(types)
+    for typeid in range(np.max(types)):
+        if traj.is_topology_particle_type(typeid):
+            flavors[types == typeid] = 1
+        else:
+            flavors[types == typeid] = 0
 
-        nframes = len(limits)
+    # types.shape[1] is the max. number of particles in the simulation
+    # for each particle:
+    # - vis type 1000 (1)
+    # - type id (1)
+    # - loc (3)
+    # - rot (3)
+    # - radius/flavor (1)
+    # - n subpoints (1)
+    max_n_particles = types.shape[1]
+    frame_buf = np.zeros((max_n_particles * 10, ))
+    frame_buf[::10] = 1000  # vis type
+    data = {}
+    data['msgType'] = 1
+    data['bundleStart'] = 0
+    data['bundleSize'] = len(n_particles_per_frame)
+    data['bundleData'] = []
+    ix = np.arange(frame_buf.shape[0])
+    ix_particles = np.empty((3*max_n_particles,), dtype=int)
 
-        for fi in range(0, nframes):
-            l = limits[fi]
-            t = time[fi]
+    for i in range(max_n_particles):
+        ix_particles[3*i:3*i+3] = np.arange(i*10 + 2, i*10 + 2+3)
 
-            frame_data = {}
-            frame_data['data'] = []
-            frame_data['frameNumber'] = fi
-            frame_data['time'] = float(t)
-
-            l_start = int(l[0])
-            l_end = int(l[1])
-
-            for ri in range(l_start, l_end):
-                if ri >= len(records):
-                    break
-
-                r = records[ri] # type, guid, radius, [x,y,z]
-
-                # vis type
-                frame_data['data'].append(1000)
-
-                # type
-                frame_data['data'].append(int(r[0]))
-
-                # location
-                frame_data['data'].append(float(r[3][0]))
-                frame_data['data'].append(float(r[3][1]))
-                frame_data['data'].append(float(r[3][2]))
-
-                # rotation
-                frame_data['data'].append(0)
-                frame_data['data'].append(0)
-                frame_data['data'].append(0)
-
-                # radius
-                frame_data['data'].append(float(r[2]))
-
-                # number of sub-points
-                frame_data['data'].append(0)
-
-            data['bundleData'].append(frame_data)
+    for t in range(len(n_particles_per_frame)):
+        frame_data = {}
+        frame_data['frameNumber'] = t
+        frame_data['time'] = float(t)
+        n_particles = int(n_particles_per_frame[t])
+        local_buf = frame_buf[:10*n_particles]
+        local_buf[1::10] = types[t, :n_particles]
+        local_buf[ix_particles[:3*n_particles]] = positions[t, :n_particles].flatten()
+        local_buf[8::10] = flavors[t, :n_particles]
+        frame_data['data'] = local_buf.tolist()
+        data['bundleData'].append(frame_data)
 
     with open(output_path, 'w+') as outfile:
         json.dump(data, outfile)
