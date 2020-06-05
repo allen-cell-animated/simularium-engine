@@ -43,7 +43,6 @@ def main():
     data['bundleStart'] = 0
     data['bundleSize'] = len(n_particles_per_frame)
     data['bundleData'] = []
-    ix = np.arange(frame_buf.shape[0])
     ix_particles = np.empty((3*max_n_particles,), dtype=int)
 
     for i in range(max_n_particles):
