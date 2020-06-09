@@ -304,6 +304,17 @@ namespace agentsim {
         //  the assumption is that simulation time starts at a non-negative value
         if(simulationTimeNs < 0) { return 0; }
 
+        if(this->m_playbackMode == SimulationMode::id_live_simulation) {
+            // @TODO Handle variable frame-rate for 'live' mode
+            //      is this needed functionality?
+            std::size_t numFrames = this->m_cache.GetNumFrames(identifier);
+            return std::min(
+              static_cast<std::size_t>(simulationTimeNs),
+              numFrames
+            );
+        }
+
+
         auto tfp = this->GetFileProperties(identifier);
 
         // If there is cached meta-data for the simulation,
