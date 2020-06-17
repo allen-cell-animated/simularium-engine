@@ -107,10 +107,16 @@ The three components of the agent's spatial position.
 The three components of the agent's spatial rotation.
 
 #### collision_radius
-If the agent is visualized as a `vis_type_fiber`, this is used to determine the thickness of the fiber visualized.
+* If the agent is visualized as a `vis_type_default`, this is used to determine the radius of the geometry used.
+* If the agent is visualized as a `vis_type_fiber`, this is used to determine the thickness of the fiber visualized.
 
 #### subpoints
-If the agent is visualized as a `vis_type_fiber`, these are used to render a fiber. This array is variable length, with the expectation that future visualization options may use the contained information differently.
+This array is variable length, with the expectation that future visualization options may use the contained information differently.
+
+* If the agent is visualized as a `vis_type_default`, these are ignored.
+* If the agent is visualized as a `vis_type_fiber`, these are used to render a fiber. The data in subpoints
+is treated as a sequence of 3D position vectors. Each position is connected to the next by a line-segment
+to visualize a fiber.
 
 ## Outgoing Data
 The outgoing JSON has the following fields:
@@ -122,4 +128,4 @@ The outgoing JSON has the following fields:
 
 Values are written to the data field in the following order: **vis_type | type | x | y | z | xrot | yrot | zrot | collision_radius | size of subpoints | N subpoint-values**
 
-If there are the following **six** subpoints (0,0,0,1,1,1), then the following will be written after the non-variable-length values: (**6**,0,0,0,1,1,1); the front-end will render a fiber going through the points (0,0,0) and (1,1,1).
+If there are the following **six** subpoints (0,0,0,1,1,1), then the following will be written after the non-variable-length values: (**6**,0,0,0,1,1,1); if `vis_type_fiber` is sent as the vis_type, then the front-end will render a fiber going through the points (0,0,0) and (1,1,1).

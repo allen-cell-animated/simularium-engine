@@ -10,7 +10,7 @@ Simularium is a spatial simulation framework and visualization environment for b
 
 ## Installation
 
-Agent-Viz integrates existing spatial simulation software:
+Simularium integrates existing spatial simulation software:
 
 * [ReaDDy](https://readdy.github.io/) : Molecular Dynamics
 * [Cytosim](https://gitlab.com/f.nedelec/cytosim): Cytoskeletal Dynamics
@@ -43,7 +43,7 @@ python-dev libssl-dev libcurl4-openssl-dev libblosc1`
 
 #### Native
 1. Clone the repository locally: `git clone --recursive *repository-address*`
-2. Create a new directory for the build: e.g. '~/Documents/build/agentviz'
+2. Create a new directory for the build: e.g. '~/Documents/build/simularium'
 3. Navigate to the new directory in a terminal and run:
 	`sudo [path to repository]/local_build.sh`
 4. From the same terminal window, run: `sudo chown -R $USER *`
@@ -56,13 +56,13 @@ This project uses the [google test framework](https://github.com/google/googlete
 To run the tests, navigate to the build directory and run: `./agentsim_tests`
 
 ### AWS Authentication
-Agent-Viz stores various runtime files on Amazon Web Services (AWS) S3. The following steps are necessary to allow a local build to
-upload to S3.
+Simularium stores various runtime files on Amazon Web Services (AWS) S3.
+The following steps are necessary to allow a local build to upload to S3.
 
 1. Install the [aws-cli](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
 2. [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) the aws-cli using your [private key](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_CreateAccessKey_CLIAPI); the region is **us-east-2**
 
-Agent-Viz will use the credentials configured above to upload, download, and otherwise interact with other components of the application setup on AWS. The application should function normally without these credentials, but will be unable to upload files to the AWS S3 repository.
+Simularium will use the credentials configured above to upload, download, and otherwise interact with other components of the application setup on AWS. The application should function normally without these credentials, but will be unable to upload files to the AWS S3 repository.
 ## Documentation
 
 If you have more extensive technical documentation (whether generated or not), ensure they are published to the following address:
