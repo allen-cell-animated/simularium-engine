@@ -9,6 +9,7 @@ Json::Value Serialize(AgentDataFrame& adf) {
     for (std::size_t i = 0; i < adf.size(); ++i) {
         auto agentData = adf[i];
         vals.push_back(agentData.vis_type);
+        vals.push_back(agentData.id);
         vals.push_back(agentData.type);
         vals.push_back(agentData.x);
         vals.push_back(agentData.y);

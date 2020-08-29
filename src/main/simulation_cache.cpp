@@ -359,16 +359,17 @@ bool deserialize(
 
 void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
 {
-    os << ad.x << delimiter
-       << ad.y << delimiter
-       << ad.z << delimiter
-       << ad.xrot << delimiter
-       << ad.yrot << delimiter
-       << ad.zrot << delimiter
-       << ad.collision_radius << delimiter
-       << ad.vis_type << delimiter
-       << ad.type << delimiter
-       << ad.subpoints.size() << delimiter;
+    os << ad.vis_type << delimiter
+      << ad.id << delimiter
+      << ad.type << delimiter
+      << ad.x << delimiter
+      << ad.y << delimiter
+      << ad.z << delimiter
+      << ad.xrot << delimiter
+      << ad.yrot << delimiter
+      << ad.zrot << delimiter
+      << ad.collision_radius << delimiter
+      << ad.subpoints.size() << delimiter;
 
     for (auto val : ad.subpoints) {
         os << val << delimiter;
@@ -379,7 +380,7 @@ bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
 {
     std::string line;
     std::vector<float> vals;
-    for (std::size_t i = 0; i < 10; ++i) {
+    for (std::size_t i = 0; i < 11; ++i) {
         if (std::getline(is, line, delimiter[0])) {
             vals.push_back(std::atof(line.c_str()));
         } else {
@@ -387,17 +388,18 @@ bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
         }
     }
 
-    ad.x = vals[0];
-    ad.y = vals[1];
-    ad.z = vals[2];
-    ad.xrot = vals[3];
-    ad.yrot = vals[4];
-    ad.zrot = vals[5];
-    ad.collision_radius = vals[6];
-    ad.vis_type = vals[7];
-    ad.type = vals[8];
+    ad.vis_type = vals[0];
+    ad.id = vals[1];
+    ad.type = vals[2];
+    ad.y = vals[3];
+    ad.x = vals[4];
+    ad.z = vals[5];
+    ad.xrot = vals[6];
+    ad.yrot = vals[7];
+    ad.zrot = vals[8];
+    ad.collision_radius = vals[9];
 
-    std::size_t num_sp = vals[9];
+    std::size_t num_sp = vals[10];
     for (std::size_t i = 0; i < num_sp; ++i) {
         if (std::getline(is, line, delimiter[0])) {
             ad.subpoints.push_back(std::atof(line.c_str()));
