@@ -1,5 +1,5 @@
 ### Build image ###
-FROM ubuntu:19.04 as build
+FROM ubuntu:19.10 as build
 
 # install dependencies
 RUN mkdir /agentsim-dev && \
@@ -18,7 +18,13 @@ RUN mkdir /agentsim-dev && \
 	python-dev \
 	libssl-dev libcurl4-openssl-dev \
 	libblosc1 \
-    libglew-dev mesa-common-dev freeglut3-dev
+    libglew-dev mesa-common-dev freeglut3-dev \
+		golang-go
+
+# install mkcert
+RUN git clone https://github.com/FiloSottile/mkcert && cd mkcert && \
+go build -ldflags "-X main.Version=$(git describe --tags)" && \
+mv ./* /bin
 
 # copy agent sim project
 COPY . /agentsim-dev/agentsim
@@ -29,13 +35,13 @@ RUN git submodule update --init --recursive
 
 # build agentsim project
 RUN cd ../build && \
-	cmake ../agentsim -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release && \
+	../agentsim/local_build.sh && \
 	make && \
     openssl dhparam -out /dh.pem 2048 && \
 	find /agentsim-dev/build | grep -i so$ | xargs -i cp {} /agentsim-dev/lib/
 
 ### Run image ###
-FROM ubuntu:19.04
+FROM ubuntu:19.10
 WORKDIR /
 
 # install dependencies
@@ -52,6 +58,8 @@ RUN groupadd -r app && useradd -r -g app app
 
 # copy the server to the root dir
 COPY --from=build --chown=app:app /agentsim-dev/build/agentsim_server.exe /usr/bin/agentsim_server.exe
+COPY --from=build --chown=app:app /agentsim-dev/build/localhost.pem /localhost.pem
+COPY --from=build --chown=app:app /agentsim-dev/build/localhost-key.pem /localhost-key.pem
 COPY --from=build --chown=app:app /dh.pem /dh.pem
 COPY --from=build --chown=app:app /agentsim-dev/build/bin/. /bin/
 RUN echo " "
