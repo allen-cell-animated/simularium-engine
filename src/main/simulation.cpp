@@ -232,6 +232,7 @@ namespace agentsim {
         if (agent->IsVisible()) {
             AgentData ad;
 
+            ad.id = agent->GetUid();
             ad.type = agent->GetTypeID();
             ad.vis_type = static_cast<unsigned int>(agent->GetVisType());
 

@@ -7,7 +7,7 @@
 namespace aics {
 namespace agentsim {
     struct AgentData;
-    
+
     typedef std::vector<aics::agentsim::AgentData> AgentDataFrame;
     typedef std::vector<aics::agentsim::AgentDataFrame> AgentDataFrameBundle;
 } // namespace agentsim
@@ -18,16 +18,21 @@ namespace aics {
 namespace agentsim {
 
     struct AgentData {
+        float vis_type = 0;
+        float id = 0;
         float type = 0;
-        float x = 0, y = 0, z = 0;
-        float xrot = 0, yrot = 0, zrot = 0;
+        float x = 0;
+        float y = 0;
+        float z = 0;
+        float xrot = 0;
+        float yrot = 0;
+        float zrot = 0;
         float collision_radius = 0;
         std::vector<float> subpoints;
-        float vis_type = 0;
     };
 
     Json::Value Serialize(AgentDataFrame& adf);
-
+    std::vector<float> Serialize(AgentData& ad);
 }
 }
 

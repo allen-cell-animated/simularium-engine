@@ -51,9 +51,13 @@ namespace agentsim {
         kVisType GetVisType() { return this->m_visType; }
         void SetVisType(kVisType newType) { this->m_visType = newType; }
 
+        void SetUid(float uid) { this->m_uid = uid; }
+        const float GetUid() const { return this->m_uid; }
+
     private:
         float m_x, m_y, m_z;
         float m_xrot, m_yrot, m_zrot;
+        float m_uid;
 
         float m_collision_radius = 50.f;
         unsigned int m_typeId = 0;
