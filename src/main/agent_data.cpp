@@ -6,22 +6,14 @@ namespace agentsim {
 
 Json::Value Serialize(AgentDataFrame& adf) {
     std::vector<float> vals;
+    
+    // Serialize agents to float sequence
     for (std::size_t i = 0; i < adf.size(); ++i) {
         auto agentData = adf[i];
-        vals.push_back(agentData.vis_type);
-        vals.push_back(agentData.id);
-        vals.push_back(agentData.type);
-        vals.push_back(agentData.x);
-        vals.push_back(agentData.y);
-        vals.push_back(agentData.z);
-        vals.push_back(agentData.xrot);
-        vals.push_back(agentData.yrot);
-        vals.push_back(agentData.zrot);
-        vals.push_back(agentData.collision_radius);
-        vals.push_back(agentData.subpoints.size());
+        std::vector<float> agentValArr = Serialize(agentData);
 
-        for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
-            vals.push_back(agentData.subpoints[j]);
+        for (auto v : agentValArr) {
+            vals.push_back(v);
         }
     }
 
@@ -32,6 +24,28 @@ Json::Value Serialize(AgentDataFrame& adf) {
     }
 
     return dataArr;
+}
+
+
+std::vector<float> Serialize(AgentData& agentData) {
+    std::vector<float> vals;
+    vals.push_back(agentData.vis_type);
+    vals.push_back(agentData.id);
+    vals.push_back(agentData.type);
+    vals.push_back(agentData.x);
+    vals.push_back(agentData.y);
+    vals.push_back(agentData.z);
+    vals.push_back(agentData.xrot);
+    vals.push_back(agentData.yrot);
+    vals.push_back(agentData.zrot);
+    vals.push_back(agentData.collision_radius);
+    vals.push_back(agentData.subpoints.size());
+
+    for (std::size_t j = 0; j < agentData.subpoints.size(); ++j) {
+        vals.push_back(agentData.subpoints[j]);
+    }
+
+    return vals;
 }
 
 } // namespace agentsim

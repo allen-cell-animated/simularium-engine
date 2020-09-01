@@ -1,5 +1,5 @@
 ### Build image ###
-FROM ubuntu:19.04 as build
+FROM ubuntu:19.10 as build
 
 # install dependencies
 RUN mkdir /agentsim-dev && \
@@ -35,7 +35,7 @@ RUN cd ../build && \
 	find /agentsim-dev/build | grep -i so$ | xargs -i cp {} /agentsim-dev/lib/
 
 ### Run image ###
-FROM ubuntu:19.04
+FROM ubuntu:19.10
 WORKDIR /
 
 # install dependencies

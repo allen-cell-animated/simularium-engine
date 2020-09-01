@@ -1,4 +1,3 @@
-#define USE_HARDCODED 1
 #include "readdy/readdy.h"
 #include "agentsim/agents/agent.h"
 #include "agentsim/simpkg/readdypkg.h"
@@ -151,8 +150,26 @@ namespace agentsim {
         this->m_simulation = nullptr;
     }
 
+    void ReaDDyPkg::InitAgents(std::vector<std::shared_ptr<Agent>>& agents, Model& model)
+    {
+        for (std::size_t i = 0; i < 1000; ++i) {
+            std::shared_ptr<Agent> agent;
+            agent.reset(new Agent());
+            agent->SetVisibility(false);
+            agent->SetCollisionRadius(1.0);
+            agents.push_back(agent);
+        }
+    }
+
+    // Live Simulation API
+    void ReaDDyPkg::InitReactions(Model& model) {}
+    void ReaDDyPkg::Setup() {}
+    void ReaDDyPkg::Shutdown() {}
+    void ReaDDyPkg::RunTimeStep(
+        float timeStep, std::vector<std::shared_ptr<Agent>>& agents) {}
+    void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue) {}
+
 } // namespace agentsim
 } // namespace aics
 
 #include "readdypkg_fileio.cc"
-#include "readdypkg_hardcoded.cc"

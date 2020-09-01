@@ -359,19 +359,8 @@ bool deserialize(
 
 void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
 {
-    os << ad.vis_type << delimiter
-      << ad.id << delimiter
-      << ad.type << delimiter
-      << ad.x << delimiter
-      << ad.y << delimiter
-      << ad.z << delimiter
-      << ad.xrot << delimiter
-      << ad.yrot << delimiter
-      << ad.zrot << delimiter
-      << ad.collision_radius << delimiter
-      << ad.subpoints.size() << delimiter;
-
-    for (auto val : ad.subpoints) {
+    auto vals = aics::agentsim::Serialize(ad);
+    for (auto val : vals) {
         os << val << delimiter;
     }
 }
@@ -391,8 +380,8 @@ bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
     ad.vis_type = vals[0];
     ad.id = vals[1];
     ad.type = vals[2];
-    ad.y = vals[3];
-    ad.x = vals[4];
+    ad.x = vals[3];
+    ad.y = vals[4];
     ad.z = vals[5];
     ad.xrot = vals[6];
     ad.yrot = vals[7];

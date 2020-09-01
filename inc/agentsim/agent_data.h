@@ -32,7 +32,7 @@ namespace agentsim {
     };
 
     Json::Value Serialize(AgentDataFrame& adf);
-
+    std::vector<float> Serialize(AgentData& ad);
 }
 }
 

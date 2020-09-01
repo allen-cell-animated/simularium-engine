@@ -23,7 +23,7 @@ OrientationDataMap initOrientationData() {
                                      0.15113327,  0.18140554, -0.97172566;
 
     //TODO test this again once periodic boundary is accounted for in orientation calculation
-    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis; 
+    Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis;
     rotation_barbed_from_actin_dimer_axis <<  0.17508484, -0.52345361, -0.83387146,
                                              -0.3445482,   0.76082255, -0.54994144,
                                               0.92229704,  0.38359532, -0.0471465;
@@ -585,6 +585,7 @@ void copy_frame(
         currentAgent->SetTypeID(p.type_id);
         currentAgent->SetName(p.type);
         currentAgent->SetVisibility(true);
+        currentAgent->SetUid(p.id);
         agentIndex++;
     }
 
@@ -1037,10 +1038,10 @@ static Eigen::Vector3d getNeighborNonPeriodicBoundaryPosition(
     std::vector<float> result {};
     for (std::size_t dim = 0; dim < 3; ++dim)
     {
-        if (abs(neighborParticlePosition[dim] - particlePosition[dim]) > boxSize[dim] / 2.) 
+        if (abs(neighborParticlePosition[dim] - particlePosition[dim]) > boxSize[dim] / 2.)
         {
             if (verboseOrientation)
-            {   
+            {
                 LOG_F(INFO,"neighbor crossed periodic boundary in dimension %zu", dim);
             }
             result.push_back(neighborParticlePosition[dim] -
@@ -1064,14 +1065,14 @@ static Eigen::Matrix3d getCurrentRotation(
     std::vector<Eigen::Vector3d> basisPositions {};
     auto rpos1 = currentParticle.position;
     auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
-    
+
     auto rpos0 = neighborParticle0.position;
     auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
     auto neighbor0Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos0, boxSize);
     basisPositions.push_back(neighbor0Position);
-    
+
     basisPositions.push_back(pos1);
-    
+
     auto rpos2 = neighborParticle1.position;
     auto pos2 = Eigen::Vector3d(rpos2[0], rpos2[1], rpos2[2]);
     auto neighbor2Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos2, boxSize);
@@ -1101,11 +1102,11 @@ static Eigen::Matrix3d getRotationUsingAxis(
 {
     auto rpos1 = particle.position;
     auto pos1 = Eigen::Vector3d(rpos1[0], rpos1[1], rpos1[2]);
-    
+
     auto rpos0 = neighborParticle.position;
     auto pos0 = Eigen::Vector3d(rpos0[0], rpos0[1], rpos0[2]);
     auto neighbor0Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos0, boxSize);
-    
+
     Eigen::Vector3d axis = neighbor0Position - pos1;
     auto normal = aics::agentsim::mathutil::getRandomPerpendicularVector(axis);
     auto pos2 = pos1 + normal;
@@ -1131,10 +1132,10 @@ static void calculateOrientations(
     auto topologyStride = (trajectoryH5Info.size() / topologyH5Info.size()) + 1;
     RotationH5Info& outRotations = readdyFileInfo->rotationInfo;
     outRotations.resize(numberOfFrames);
-    
+
     auto boxSize = Eigen::Vector3d(
-        readdyFileInfo->configInfo.boxX, 
-        readdyFileInfo->configInfo.boxY, 
+        readdyFileInfo->configInfo.boxX,
+        readdyFileInfo->configInfo.boxY,
         readdyFileInfo->configInfo.boxZ
     );
 
