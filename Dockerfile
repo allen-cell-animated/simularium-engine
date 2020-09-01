@@ -1,5 +1,6 @@
 ### Build image ###
-FROM ubuntu:19.10 as build
+FROM ubuntu:20.04 as build
+ARG DEBIAN_FRONTEND=noninteractive
 
 # install dependencies
 RUN mkdir /agentsim-dev && \
@@ -35,7 +36,7 @@ RUN cd ../build && \
 	find /agentsim-dev/build | grep -i so$ | xargs -i cp {} /agentsim-dev/lib/
 
 ### Run image ###
-FROM ubuntu:19.10
+FROM ubuntu:20.04
 WORKDIR /
 
 # install dependencies
