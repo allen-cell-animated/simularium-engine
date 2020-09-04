@@ -841,8 +841,9 @@ namespace agentsim {
         LOG_F(INFO, "%s", tfp.Str().c_str());
 
         Json::Value fprops;
+        fprops["version"] = 1;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
-        fprops["totalDuration"] = (tfp.numberOfFrames - 1) * tfp.timeStepSize;
+        fprops["totalSteps"] = tfp.numberOfFrames;
         fprops["timeStepSize"] = tfp.timeStepSize;
 
         Json::Value typeMapping;
@@ -851,12 +852,19 @@ namespace agentsim {
             std::string id = std::to_string(entry.first);
             std::string name = entry.second;
 
-            typeMapping[id] = name;
+            Json::Value typeEntry;
+            typeEntry["name"] = name;
+
+            typeMapping[id] = typeEntry;
         }
+
+        Json::Value size;
+        size["x"] = tfp.boxX;
+        size["y"] = tfp.boxY;
+        size["z"] = tfp.boxZ;
+
         fprops["typeMapping"] = typeMapping;
-        fprops["boxSizeX"] = tfp.boxX;
-        fprops["boxSizeY"] = tfp.boxY;
-        fprops["boxSizeZ"] = tfp.boxZ;
+        fprops["size"] = size;
 
         this->SendWebsocketMessage(connectionUID, fprops);
         this->m_fileMutex.unlock();
