@@ -71,8 +71,8 @@ namespace agentsim {
         std::string GetFilePath(std::string identifier);
         std::string GetInfoFilePath(std::string identifier);
 
-        inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium/cache"); }
-        inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium/cache"); }
+        inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium"); }
+        inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium"); }
 
         std::ofstream& GetOfstream(std::string& identifier);
         std::ifstream& GetIfstream(std::string& identifier);
