@@ -211,6 +211,7 @@ namespace agentsim {
         this->m_latestConnectionUid = newUid;
         this->m_hasNewConnection = true;
         this->LogClientEvent(newUid, "Incoming connection accepted");
+        LOG_F(INFO, "%zu active websocket connections", this->m_netConnections.size());
     }
 
     void ConnectionManager::RemoveConnection(std::string connectionUID)

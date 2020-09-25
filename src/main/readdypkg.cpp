@@ -163,7 +163,15 @@ namespace agentsim {
 
     // Live Simulation API
     void ReaDDyPkg::InitReactions(Model& model) {}
-    void ReaDDyPkg::Setup() {}
+    void ReaDDyPkg::Setup() {
+      this->m_agents_initialized = false;
+      this->m_reactions_initialized = false;
+      this->m_timeStepCount = 0;
+
+      this->m_hasAlreadyRun = false;
+      this->m_hasLoadedRunFile = false;
+      this->m_hasFinishedStreaming = false;
+    }
     void ReaDDyPkg::Shutdown() {}
     void ReaDDyPkg::RunTimeStep(
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents) {}
