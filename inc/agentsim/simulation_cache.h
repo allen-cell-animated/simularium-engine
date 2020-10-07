@@ -3,6 +3,8 @@
 
 #include "agentsim/agent_data.h"
 #include "agentsim/network/trajectory_properties.h"
+#include "agentsim/fileio/binary_cache_reader.h"
+#include "agentsim/fileio/binary_cache_writer.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -89,6 +91,9 @@ namespace agentsim {
         std::unordered_map<std::string, std::ifstream> m_ifstreams;
         std::unordered_map<std::string, std::size_t> m_numFrames;
         std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
+
+        fileio::BinaryCacheWriter m_binaryCacheWriter;
+        fileio::BinaryCacheReader m_binaryCacheReader;
     };
 
 }

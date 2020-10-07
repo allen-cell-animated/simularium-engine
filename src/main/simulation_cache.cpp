@@ -13,26 +13,6 @@
 #include <iterator>
 
 /**
-*	File Serialization Functions
-*/
-bool goto_frameno(std::ifstream& is, std::size_t fno, std::string& line);
-
-void serialize(
-    std::ofstream& os,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf);
-bool deserialize(
-    std::ifstream& is,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf);
-
-void serialize(std::ofstream& os, aics::agentsim::AgentData& ad);
-bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad);
-
-std::ofstream tmp_cache_file;
-std::string delimiter = "/";
-
-/**
 *	Simulation API
 */
 namespace aics {
@@ -59,7 +39,11 @@ namespace agentsim {
         }
 
         auto& fstream = this->GetOfstream(identifier);
-        serialize(fstream, this->m_numFrames[identifier], data);
+        this->m_binaryCacheWriter.SerializeFrame(
+          fstream,
+          this->m_numFrames[identifier],
+          data
+        );
     }
 
     AgentDataFrame SimulationCache::GetFrame(std::string identifier, std::size_t frameNumber)
@@ -76,7 +60,11 @@ namespace agentsim {
         std::ifstream& is = this->GetIfstream(identifier);
         if (is) {
             AgentDataFrame adf;
-            deserialize(is, frameNumber, adf);
+            this->m_binaryCacheReader.DeserializeFrame(
+              is,
+              frameNumber,
+              adf
+            );
             return adf;
         }
 
@@ -298,104 +286,3 @@ namespace agentsim {
 
 } // namespace agentsim
 } // namespace aics
-
-/**
-*	File Serialization Functions
-*/
-bool goto_frameno(
-    std::ifstream& is,
-    std::size_t fno,
-    std::string& line)
-{
-    is.seekg(0, is.beg); // go to beginning
-    for (std::size_t i = 0; i < fno; ++i) {
-        if (std::getline(is, line)) {
-            line = "";
-        } else {
-            return false;
-        }
-    }
-
-    std::getline(is, line, delimiter[0]);
-    return true;
-}
-
-void serialize(
-    std::ofstream& os,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf)
-{
-    os << "F" << frame_number << delimiter
-       << adf.size() << delimiter;
-    for (aics::agentsim::AgentData ad : adf) {
-        serialize(os, ad);
-    }
-    os << std::endl;
-}
-
-bool deserialize(
-    std::ifstream& is,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf)
-{
-    std::string line;
-    if (!goto_frameno(is, frame_number, line)) {
-        return false;
-    }
-
-    // Get the number of agents in this data frame
-    std::getline(is, line, delimiter[0]);
-    std::size_t num_agents = std::stoi(line);
-
-    for (std::size_t i = 0; i < num_agents; ++i) {
-        aics::agentsim::AgentData ad;
-        if (deserialize(is, ad)) {
-            adf.push_back(ad);
-        }
-    }
-
-    return true;
-}
-
-void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
-{
-    auto vals = aics::agentsim::Serialize(ad);
-    for (auto val : vals) {
-        os << val << delimiter;
-    }
-}
-
-bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
-{
-    std::string line;
-    std::vector<float> vals;
-    for (std::size_t i = 0; i < 11; ++i) {
-        if (std::getline(is, line, delimiter[0])) {
-            vals.push_back(std::atof(line.c_str()));
-        } else {
-            return false;
-        }
-    }
-
-    ad.vis_type = vals[0];
-    ad.id = vals[1];
-    ad.type = vals[2];
-    ad.x = vals[3];
-    ad.y = vals[4];
-    ad.z = vals[5];
-    ad.xrot = vals[6];
-    ad.yrot = vals[7];
-    ad.zrot = vals[8];
-    ad.collision_radius = vals[9];
-
-    std::size_t num_sp = vals[10];
-    for (std::size_t i = 0; i < num_sp; ++i) {
-        if (std::getline(is, line, delimiter[0])) {
-            ad.subpoints.push_back(std::atof(line.c_str()));
-        } else {
-            return false;
-        }
-    }
-
-    return true;
-}

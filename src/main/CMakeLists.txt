@@ -13,6 +13,8 @@ set(SOURCES
 "simulation.cpp"
 "connection_manager.cpp"
 "cli_client.cpp"
+"binary_cache_reader.cpp"
+"binary_cache_writer.cpp"
 )
 
 add_library(${TARGET} STATIC ${SOURCES})
