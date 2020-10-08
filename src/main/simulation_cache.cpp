@@ -148,48 +148,68 @@ namespace agentsim {
             filesFound = false;
         }
 
-        if(filesFound) {
-          return true;
-        } else if (isSimulariumFile) {
-            LOG_F(INFO, "%s is an unprocessed simularium JSON file", identifier.c_str());
-            std::string simulariumFilePath = this->kCacheFolder + identifier;
-            if(!aics::agentsim::aws_util::Download(awsFilePath, simulariumFilePath)) {
-              LOG_F(WARNING, "Simularium file %s not found on AWS S3", awsFilePath.c_str());
-              return false;
+        return filesFound;
+    }
+
+    bool SimulationCache::FindSimulariumFile(std::string fileName) {
+        std::string tmpkey = "tmp";
+        std::string tmpFile = this->GetLocalFilePath(tmpkey);
+        bool fileFound = false;
+
+        // try replacing the file extension with .simularium (e.g. test.h5 -> test.simularium)
+        //  then try appending .simularium (e.g. test.h5 -> test.h5.simularium)
+        std::vector<std::string> pathsToTry = {
+          fileName.substr(0, fileName.find_last_of(".")) + ".simularium",
+          fileName + ".simularium"
+        };
+
+        for(auto path: pathsToTry) {
+          if(!fileFound) {
+            std::string awsPath = this->GetAwsFilePath(path);
+
+            if(!aics::agentsim::aws_util::Download(awsPath, tmpFile)) {
+              LOG_F(WARNING, "Simularium file %s not found on AWS S3", awsPath.c_str());
+            } else {
+                LOG_F(INFO, "Simularium file %s found on AWS S3", awsPath.c_str());
+                fileFound = true;
             }
+          }
+        }
 
-            LOG_F(INFO, "Simularium file %s found on AWS S3", awsFilePath.c_str());
-
-            // Parse the file to JSON
-            std::ifstream is(simulariumFilePath);
-            Json::Value simJson;
-            is >> simJson;
-
-            // Create trajectory file properties
-            Json::Value& trajectoryInfo = simJson["trajectoryInfo"];
-            this->ParseFileProperties(trajectoryInfo, identifier);
-            this->WriteFilePropertiesToDisk(awsFilePath, identifier);
-
-            // Convert the simularium file to a binary cache file
-            fileio::SimulariumFileReader simulariumFileReader;
-            std::ofstream& os = this->GetOfstream(identifier);
-
-            Json::Value& spatialData = simJson["spatialData"];
-            int nFrames = spatialData["bundleSize"].asInt();
-            LOG_F(INFO, "%i frames found in simularium json file", nFrames);
-            for(int i = 0; i < nFrames; i++) {
-              AgentDataFrame adf;
-              if(simulariumFileReader.DeserializeFrame(simJson, i, adf)) {
-                this->m_binaryCacheWriter.SerializeFrame(os, i, adf);
-              } else {
-                //@TODO: Delete invalid file
-              }
-            }
-
-            return true;
-        } else {
+        if(!fileFound) {
+          LOG_F(ERROR, "Simularium file %s not found on AWS S3", fileName.c_str());
           return false;
         }
+
+        // Parse the file to JSON
+        std::ifstream is(tmpFile);
+        Json::Value simJson;
+        is >> simJson;
+        is.close();
+
+        // Create trajectory file properties
+        LOG_F(INFO, "Processed simularium file will be assigned to identifier %s", fileName.c_str());
+        Json::Value& trajectoryInfo = simJson["trajectoryInfo"];
+        this->ParseFileProperties(trajectoryInfo, fileName);
+        this->WriteFilePropertiesToDisk(fileName);
+
+        // Convert the simularium file to a binary cache file
+        fileio::SimulariumFileReader simulariumFileReader;
+        std::ofstream& os = this->GetOfstream(fileName);
+
+        Json::Value& spatialData = simJson["spatialData"];
+        int nFrames = spatialData["bundleSize"].asInt();
+        LOG_F(INFO, "%i frames found in simularium json file", nFrames);
+        for(int i = 0; i < nFrames; i++) {
+          AgentDataFrame adf;
+          if(simulariumFileReader.DeserializeFrame(simJson, i, adf)) {
+            this->m_binaryCacheWriter.SerializeFrame(os, i, adf);
+          } else {
+            LOG_F(ERROR, "Failed to deserialize frame from simularium JSON");
+          }
+        }
+
+        return true;
     }
 
     bool SimulationCache::FindFile(std::string fileName) {
@@ -216,7 +236,7 @@ namespace agentsim {
         return true;
     }
 
-    void SimulationCache::WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier) {
+    void SimulationCache::WriteFilePropertiesToDisk(std::string identifier) {
         std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
         std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
         std::ofstream propsFile;
@@ -254,7 +274,7 @@ namespace agentsim {
     bool SimulationCache::UploadRuntimeCache(std::string identifier)
     {
         std::string awsFilePath = this->GetAwsFilePath(identifier);
-        this->WriteFilePropertiesToDisk(awsFilePath, identifier);
+        this->WriteFilePropertiesToDisk(identifier);
 
         std::string destination = awsFilePath + "_cache";
         std::string source = this->GetLocalFilePath(identifier);

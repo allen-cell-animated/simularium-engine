@@ -74,10 +74,25 @@ namespace agentsim {
 
         bool FindFiles(std::vector<std::string> files);
 
+        /**
+        *   FindSimulariumFile
+        *
+        *   @param  fileName    the name of the file to find on S3,
+        *                       the file extension will be replaced with ".simularium"
+        *                       for the search
+        *
+        *   This function will download, convert, and upload a cache for a
+        *   .simularium file to S3, identifiable by the fileName passed in
+        */
+        bool FindSimulariumFile(std::string fileName);
+
     private:
         bool FindFile(std::string file);
-        void WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier);
+        void WriteFilePropertiesToDisk(std::string identifier);
 
+        // Given how files are searched for in this app, changing any of the
+        //  below functions will cause file processing to re-occur
+        //  outdated cache-files will need to be manually removed from S3
         std::string GetLocalFilePath(std::string identifier);
         std::string GetLocalInfoFilePath(std::string identifier);
         std::string GetAwsFilePath(std::string identifier);

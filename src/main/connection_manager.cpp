@@ -803,7 +803,6 @@ namespace agentsim {
             return;
         }
 
-        simulation.SetSimId(fileName);
         this->LogClientEvent(connectionUID, "Set to file " + fileName);
         this->SetClientSimId(connectionUID, fileName);
         this->SetClientFrame(connectionUID, 0);
@@ -814,23 +813,26 @@ namespace agentsim {
             this->SendSingleFrameToClient(simulation, connectionUID, 0);
         }
         else {
+            bool isSimulariumFile = fileName.substr(fileName.find_last_of(".") + 1) == "simularium";
+            if(isSimulariumFile) {
+              LOG_F(INFO, "File %s has a simularium file extension", fileName.c_str());
+            }
+
             // Attempt to download an already processed runtime cache
             if(!this->m_argForceInit // this will force the server to re-download/process a trajectory
-                && simulation.DownloadRuntimeCache(fileName))
+                && simulation.DownloadRuntimeCache(fileName)
+                && !isSimulariumFile)
             {
                 simulation.PreprocessRuntimeCache(fileName);
                 this->SendSingleFrameToClient(simulation, connectionUID, 0);
-
-                // If the file is a simularium JSON, upload the processed trajectory
-                // Every other file type needs to be converted by a sim pkg
-                //  but the simularium json will be processed directly in the
-                //  runtime cache
-                std::string ext = fileName.substr(fileName.find_last_of(".") + 1);
-                if(ext == "simularium" && !this->m_argNoUpload) {
-                    simulation.UploadRuntimeCache(fileName);
+            } else if(simulation.FindSimulariumFile(fileName)) { // find .simularium file instead
+                simulation.PreprocessRuntimeCache(fileName);
+                this->SendSingleFrameToClient(simulation, connectionUID, 0);
+                if(!this->m_argNoUpload) {
+                  simulation.UploadRuntimeCache(fileName);
                 }
-            }
-            else {
+            } else {
+                // Reprocess a raw trajectory (if found)
                 simulation.SetPlaybackMode(id_traj_file_playback);
                 simulation.Reset();
                 if(simulation.LoadTrajectoryFile(fileName))

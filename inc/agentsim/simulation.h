@@ -191,6 +191,9 @@ namespace agentsim {
         */
         void PreprocessRuntimeCache(std::string identifier);
 
+        bool FindSimulariumFile(std::string identifier)
+          { return this->m_cache.FindSimulariumFile(identifier); }
+
         /**
         *   IsPlayingTrajectory
         *
