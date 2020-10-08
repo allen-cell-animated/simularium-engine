@@ -70,7 +70,12 @@ namespace agentsim {
             this->m_fileProps[identifier] = tfp;
         }
 
+        std::string GetLocalRawTrajectoryFilePath(std::string identifier);
+
+        bool FindFiles(std::vector<std::string> files);
+
     private:
+        bool FindFile(std::string file);
         void WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier);
 
         std::string GetLocalFilePath(std::string identifier);

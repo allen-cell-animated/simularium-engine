@@ -12,6 +12,13 @@
 #include <string>
 #include <vector>
 #include <iterator>
+#include <sys/stat.h>
+
+inline bool FileExists(const std::string& name)
+{
+    struct stat buffer;
+    return (stat(name.c_str(), &buffer) == 0);
+}
 
 /**
 *	Simulation API
@@ -185,6 +192,30 @@ namespace agentsim {
         }
     }
 
+    bool SimulationCache::FindFile(std::string fileName) {
+        std::string rawPath = this->GetLocalRawTrajectoryFilePath(fileName);
+        std::string awsPath = this->GetAwsFilePath(fileName);
+
+        // Download the file from AWS if it is not present locally
+        if (!FileExists(rawPath)) {
+            LOG_F(INFO, "%s doesn't exist locally, checking S3...", fileName.c_str());
+            if (!aics::agentsim::aws_util::Download(awsPath, rawPath)) {
+                LOG_F(WARNING, "%s not found on AWS S3", fileName.c_str());
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool SimulationCache::FindFiles(std::vector<std::string> files) {
+        for(std::string& file : files) {
+            if(!FindFile(file)) return false;
+        }
+
+        return true;
+    }
+
     void SimulationCache::WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier) {
         std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
         std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
@@ -311,6 +342,10 @@ namespace agentsim {
         }
 
         return true;
+    }
+
+    std::string SimulationCache::GetLocalRawTrajectoryFilePath(std::string identifier) {
+      return this->kCacheFolder + identifier;
     }
 
     std::string SimulationCache::GetAwsFilePath(std::string identifier)
