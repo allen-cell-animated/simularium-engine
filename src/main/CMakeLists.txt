@@ -15,6 +15,7 @@ set(SOURCES
 "cli_client.cpp"
 "binary_cache_reader.cpp"
 "binary_cache_writer.cpp"
+"simularium_file_reader.cpp"
 )
 
 add_library(${TARGET} STATIC ${SOURCES})

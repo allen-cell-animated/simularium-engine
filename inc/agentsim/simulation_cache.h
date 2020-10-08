@@ -5,6 +5,7 @@
 #include "agentsim/network/trajectory_properties.h"
 #include "agentsim/fileio/binary_cache_reader.h"
 #include "agentsim/fileio/binary_cache_writer.h"
+#include <json/json.h>
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -70,6 +71,8 @@ namespace agentsim {
         }
 
     private:
+        void WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier);
+
         std::string GetFilePath(std::string identifier);
         std::string GetInfoFilePath(std::string identifier);
 
@@ -82,6 +85,7 @@ namespace agentsim {
         void CloseFileStreams();
 
         void ParseFileProperties(std::string identifier);
+        void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
         bool IsFilePropertiesValid(std::string identifier);
 
         std::string m_cacheFolder = "/tmp/aics/simularium/";

@@ -819,6 +819,15 @@ namespace agentsim {
             {
                 simulation.PreprocessRuntimeCache(fileName);
                 this->SendSingleFrameToClient(simulation, connectionUID, 0);
+
+                // If the file is a simularium JSON, upload the processed trajectory
+                // Every other file type needs to be converted by a sim pkg
+                //  but the simularium json will be processed directly in the
+                //  runtime cache
+                std::string ext = fileName.substr(fileName.find_last_of(".") + 1);
+                if(ext == "simularium" && !this->m_argNoUpload) {
+                    simulation.UploadRuntimeCache();
+                }
             }
             else {
                 simulation.SetPlaybackMode(id_traj_file_playback);
