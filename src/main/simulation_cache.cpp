@@ -81,7 +81,7 @@ namespace agentsim {
 
     void SimulationCache::ClearCache(std::string identifier)
     {
-        std::string filePath = this->GetFilePath(identifier);
+        std::string filePath = this->GetLocalFilePath(identifier);
         std::remove(filePath.c_str());
 
         std::ifstream& is = this->GetIfstream(identifier);
@@ -107,8 +107,9 @@ namespace agentsim {
         );
     }
 
-    bool SimulationCache::DownloadRuntimeCache(std::string awsFilePath, std::string identifier)
+    bool SimulationCache::DownloadRuntimeCache(std::string identifier)
     {
+        std::string awsFilePath = this->GetAwsFilePath(identifier);
         bool isSimulariumFile = false;
         bool filesFound = true;
 
@@ -119,8 +120,8 @@ namespace agentsim {
         }
 
         // Otherwise, look for the binary cache file
-        std::string fpropsFilePath = awsFilePath + "_info";
-        std::string fpropsDestination = this->GetInfoFilePath(identifier);
+        std::string fpropsFilePath = this->GetAwsInfoFilePath(identifier);
+        std::string fpropsDestination = this->GetLocalInfoFilePath(identifier);
         if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
         {
             LOG_F(WARNING, "Info file for %s not found on AWS S3", awsFilePath.c_str());
@@ -133,7 +134,7 @@ namespace agentsim {
         }
 
         LOG_F(INFO, "Downloading cache for %s from S3", awsFilePath.c_str());
-        std::string destination = this->GetFilePath(identifier);
+        std::string destination = this->GetLocalFilePath(identifier);
         std::string cacheFilePath = awsFilePath + "_cache";
         if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
             LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
@@ -144,7 +145,7 @@ namespace agentsim {
           return true;
         } else if (isSimulariumFile) {
             LOG_F(INFO, "%s is an unprocessed simularium JSON file", identifier.c_str());
-            std::string simulariumFilePath = this->m_cacheFolder + identifier;
+            std::string simulariumFilePath = this->kCacheFolder + identifier;
             if(!aics::agentsim::aws_util::Download(awsFilePath, simulariumFilePath)) {
               LOG_F(WARNING, "Simularium file %s not found on AWS S3", awsFilePath.c_str());
               return false;
@@ -185,8 +186,8 @@ namespace agentsim {
     }
 
     void SimulationCache::WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier) {
-        std::string filePropsPath = this->GetInfoFilePath(identifier);
-        std::string filePropsDest = awsFilePath + "_info";
+        std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
+        std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
         std::ofstream propsFile;
         propsFile.open(filePropsPath);
 
@@ -219,19 +220,21 @@ namespace agentsim {
         propsFile.close();
     }
 
-    bool SimulationCache::UploadRuntimeCache(std::string awsFilePath, std::string identifier)
+    bool SimulationCache::UploadRuntimeCache(std::string identifier)
     {
+        std::string awsFilePath = this->GetAwsFilePath(identifier);
         this->WriteFilePropertiesToDisk(awsFilePath, identifier);
 
         std::string destination = awsFilePath + "_cache";
-        std::string source = this->GetFilePath(identifier);
+        std::string source = this->GetLocalFilePath(identifier);
         LOG_F(INFO, "Uploading cache file for %s to S3", identifier.c_str());
         if(!aics::agentsim::aws_util::Upload(source, destination)) {
             return false;
         }
 
-        std::string filePropsPath = this->GetInfoFilePath(identifier);
-        std::string filePropsDest = awsFilePath + "_info";
+        std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
+        std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
+
         LOG_F(INFO, "Uploading info file for %s to S3", identifier.c_str());
         if(!aics::agentsim::aws_util::Upload(filePropsPath, filePropsDest))
         {
@@ -245,7 +248,7 @@ namespace agentsim {
 
     void SimulationCache::ParseFileProperties(std::string identifier)
     {
-        std::string filePath = this->GetInfoFilePath(identifier);
+        std::string filePath = this->GetLocalInfoFilePath(identifier);
         LOG_F(INFO, "Loading file %s from filepath %s", identifier.c_str(), filePath.c_str());
 
         std::ifstream is(filePath);
@@ -286,7 +289,7 @@ namespace agentsim {
 
     bool SimulationCache::IsFilePropertiesValid(std::string identifier)
     {
-        std::string filePath = this->GetInfoFilePath(identifier);
+        std::string filePath = this->GetLocalInfoFilePath(identifier);
         std::ifstream is(filePath);
         Json::Value fprops;
         is >> fprops;
@@ -310,25 +313,35 @@ namespace agentsim {
         return true;
     }
 
-    std::string SimulationCache::GetFilePath(std::string identifier)
+    std::string SimulationCache::GetAwsFilePath(std::string identifier)
     {
-        return this->m_cacheFolder + identifier + ".bin";
+      return this->kAwsPrefix + identifier;
     }
 
-    std::string SimulationCache::GetInfoFilePath(std::string identifier)
+    std::string SimulationCache::GetAwsInfoFilePath(std::string identifier)
     {
-        return this->m_cacheFolder + identifier + ".json";
+      return this->kAwsPrefix + identifier + "_info";
+    }
+
+    std::string SimulationCache::GetLocalFilePath(std::string identifier)
+    {
+        return this->kCacheFolder + identifier + ".bin";
+    }
+
+    std::string SimulationCache::GetLocalInfoFilePath(std::string identifier)
+    {
+        return this->kCacheFolder + identifier + ".json";
     }
 
     std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {
         if(!this->m_ofstreams.count(identifier)) {
             std::ofstream& newStream = this->m_ofstreams[identifier];
-            newStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            newStream.open(this->GetLocalFilePath(identifier), this->m_ofstreamFlags);
             return newStream;
         } else if (!this->m_ofstreams[identifier]) {
             std::ofstream& badStream = this->m_ofstreams[identifier];
             badStream.close();
-            badStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            badStream.open(this->GetLocalFilePath(identifier), this->m_ofstreamFlags);
             return badStream;
         } else {
             std::ofstream& currentStream = this->m_ofstreams[identifier];
@@ -339,12 +352,12 @@ namespace agentsim {
     std::ifstream& SimulationCache::GetIfstream(std::string& identifier) {
         if(!this->m_ifstreams.count(identifier)) {
             std::ifstream& newStream = this->m_ifstreams[identifier];
-            newStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            newStream.open(this->GetLocalFilePath(identifier), this->m_ifstreamFlags);
             return newStream;
         } else if(!this->m_ifstreams[identifier]) {
             std::ifstream& badStream = this->m_ifstreams[identifier];
             badStream.close();
-            badStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            badStream.open(this->GetLocalFilePath(identifier), this->m_ifstreamFlags);
             return badStream;
         } else {
             std::ifstream& currentStream = this->m_ifstreams[identifier];

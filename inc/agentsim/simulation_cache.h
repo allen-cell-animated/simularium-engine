@@ -56,8 +56,8 @@ namespace agentsim {
 
         void Preprocess(std::string identifier);
 
-        bool DownloadRuntimeCache(std::string awsFilePath, std::string identifier);
-        bool UploadRuntimeCache(std::string awsFilePath, std::string identifier);
+        bool DownloadRuntimeCache(std::string identifier);
+        bool UploadRuntimeCache(std::string identifier);
 
         bool HasIdentifier(std::string identifier) { return this->m_fileProps.count(identifier); }
 
@@ -73,8 +73,10 @@ namespace agentsim {
     private:
         void WriteFilePropertiesToDisk(std::string awsFilePath, std::string identifier);
 
-        std::string GetFilePath(std::string identifier);
-        std::string GetInfoFilePath(std::string identifier);
+        std::string GetLocalFilePath(std::string identifier);
+        std::string GetLocalInfoFilePath(std::string identifier);
+        std::string GetAwsFilePath(std::string identifier);
+        std::string GetAwsInfoFilePath(std::string identifier);
 
         inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium"); }
         inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium"); }
@@ -88,7 +90,9 @@ namespace agentsim {
         void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
         bool IsFilePropertiesValid(std::string identifier);
 
-        std::string m_cacheFolder = "/tmp/aics/simularium/";
+        const std::string kCacheFolder = "/tmp/aics/simularium/";
+        const std::string kAwsPrefix = "trajectory/";
+
         std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
         std::ios_base::openmode m_ifstreamFlags = std::ios::in | std::ios::binary;
         std::unordered_map<std::string, std::ofstream> m_ofstreams;

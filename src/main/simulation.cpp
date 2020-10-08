@@ -208,16 +208,14 @@ namespace agentsim {
         this->m_agents.clear();
     }
 
-    void Simulation::UploadRuntimeCache()
+    void Simulation::UploadRuntimeCache(std::string fileName)
     {
-        std::string awsFilePath = "trajectory/" + this->m_simIdentifier;
-        this->m_cache.UploadRuntimeCache(awsFilePath, this->m_simIdentifier);
+        this->m_cache.UploadRuntimeCache(fileName);
     }
 
     bool Simulation::DownloadRuntimeCache(std::string fileName)
     {
-        std::string awsFilePath = "trajectory/" + fileName;
-        return this->m_cache.DownloadRuntimeCache(awsFilePath, fileName);
+        return this->m_cache.DownloadRuntimeCache(fileName);
     }
 
     void Simulation::PreprocessRuntimeCache(std::string identifier)

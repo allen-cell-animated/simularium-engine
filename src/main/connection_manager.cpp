@@ -827,7 +827,7 @@ namespace agentsim {
                 //  runtime cache
                 std::string ext = fileName.substr(fileName.find_last_of(".") + 1);
                 if(ext == "simularium" && !this->m_argNoUpload) {
-                    simulation.UploadRuntimeCache();
+                    simulation.UploadRuntimeCache(fileName);
                 }
             }
             else {
@@ -910,7 +910,7 @@ namespace agentsim {
             // Save the result so it doesn't need to be calculated again
             if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
             {
-                simulation.UploadRuntimeCache();
+                simulation.UploadRuntimeCache(fileName);
             }
         });
 
