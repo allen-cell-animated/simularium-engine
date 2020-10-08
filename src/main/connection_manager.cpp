@@ -803,6 +803,7 @@ namespace agentsim {
             return;
         }
 
+        simulation.SetSimId(fileName);
         this->LogClientEvent(connectionUID, "Set to file " + fileName);
         this->SetClientSimId(connectionUID, fileName);
         this->SetClientFrame(connectionUID, 0);

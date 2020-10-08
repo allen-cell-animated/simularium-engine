@@ -193,6 +193,7 @@ namespace agentsim {
         TrajectoryFileProperties tfp = this->GetFileProperties(identifier);
         Json::Value fprops;
         fprops["fileName"] = tfp.fileName;
+        fprops["version"] = 1;
         fprops["totalSteps"] = static_cast<int>(tfp.numberOfFrames);
         fprops["timeStepSize"] = tfp.timeStepSize;
 
@@ -291,12 +292,11 @@ namespace agentsim {
         is >> fprops;
 
         std::vector<std::string> keys({
-            "boxSizeX",
-            "boxSizeY",
-            "boxSizeZ",
+            "version",
+            "size",
             "typeMapping",
             "fileName",
-            "numberOfFrames",
+            "totalSteps",
             "timeStepSize"
         });
 
