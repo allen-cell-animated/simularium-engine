@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include <mutex>
+#include <queue>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -45,6 +46,12 @@ namespace agentsim {
         Json::Value jsonMessage;
     };
 
+    struct FileRequest {
+        std::string fileName;
+        std::string senderUid;
+        int frameNumber = -1;
+    };
+
     class ConnectionManager {
     public:
         ConnectionManager();
@@ -54,6 +61,9 @@ namespace agentsim {
             std::atomic<bool>& isRunning,
             Simulation& simulation,
             float& timeStep);
+        void StartFileIOAsync(
+            std::atomic<bool>& isRunning,
+            Simulation& simulation);
 
         void AddConnection(websocketpp::connection_hdl hd1);
         void RemoveConnection(std::string connectionUID);
@@ -142,13 +152,9 @@ namespace agentsim {
         *   @param simulation: the simulation object used by the other functions
         *   in this class; responsible for loading trajectories, running simulations
         *   and keeping the run-time cache updated
-        *
-        *   @param  waitTimeMs: specifies an amount of time to wait
-        *   this gives the trajectory loading thread a head-start before reading
         */
-        void SetupRuntimeCacheAsync(
-            Simulation& simulation,
-            std::size_t waitTimeMs
+        void SetupRuntimeCache(
+            Simulation& simulation
         );
 
         /**
@@ -178,6 +184,7 @@ namespace agentsim {
         const std::size_t kNoClientTimeoutSeconds = 30;
         const std::size_t kServerTickIntervalMilliSeconds = 200;
         const std::size_t kNumberOfFramesToBulkBroadcast = 100;
+        const std::size_t kFileIoCheckIntervalMilliSeconds = 100;
 
         bool m_argNoTimeout = false;
         bool m_argForceInit = false;
@@ -193,6 +200,7 @@ namespace agentsim {
         bool m_hasModel = false;
 
         std::vector<NetMessage> m_simThreadMessages;
+        std::queue<FileRequest> m_fileRequests;
         std::thread m_listeningThread;
         std::thread m_heartbeatThread;
         std::thread m_simThread;

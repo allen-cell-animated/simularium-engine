@@ -26,6 +26,7 @@ namespace test {
         ConnectionManager connectionManager;
         connectionManager.ListenAsync();
         connectionManager.StartSimAsync(isRunning, simulation, timeStep);
+        connectionManager.StartFileIOAsync(isRunning, simulation);
 
         CliClient controller(uri);
         std::this_thread::sleep_for(std::chrono::seconds(1));

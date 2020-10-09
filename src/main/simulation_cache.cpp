@@ -1,5 +1,6 @@
 #include "agentsim/simulation_cache.h"
 #include "agentsim/aws/aws_util.h"
+#include "agentsim/fileio/simularium_file_reader.h"
 #include "loguru/loguru.hpp"
 #include <json/json.h>
 #include <algorithm>
@@ -11,26 +12,13 @@
 #include <string>
 #include <vector>
 #include <iterator>
+#include <sys/stat.h>
 
-/**
-*	File Serialization Functions
-*/
-bool goto_frameno(std::ifstream& is, std::size_t fno, std::string& line);
-
-void serialize(
-    std::ofstream& os,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf);
-bool deserialize(
-    std::ifstream& is,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf);
-
-void serialize(std::ofstream& os, aics::agentsim::AgentData& ad);
-bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad);
-
-std::ofstream tmp_cache_file;
-std::string delimiter = "/";
+inline bool FileExists(const std::string& name)
+{
+    struct stat buffer;
+    return (stat(name.c_str(), &buffer) == 0);
+}
 
 /**
 *	Simulation API
@@ -59,7 +47,11 @@ namespace agentsim {
         }
 
         auto& fstream = this->GetOfstream(identifier);
-        serialize(fstream, this->m_numFrames[identifier], data);
+        this->m_binaryCacheWriter.SerializeFrame(
+          fstream,
+          this->m_numFrames[identifier],
+          data
+        );
     }
 
     AgentDataFrame SimulationCache::GetFrame(std::string identifier, std::size_t frameNumber)
@@ -76,7 +68,11 @@ namespace agentsim {
         std::ifstream& is = this->GetIfstream(identifier);
         if (is) {
             AgentDataFrame adf;
-            deserialize(is, frameNumber, adf);
+            this->m_binaryCacheReader.DeserializeFrame(
+              is,
+              frameNumber,
+              adf
+            );
             return adf;
         }
 
@@ -92,7 +88,7 @@ namespace agentsim {
 
     void SimulationCache::ClearCache(std::string identifier)
     {
-        std::string filePath = this->GetFilePath(identifier);
+        std::string filePath = this->GetLocalFilePath(identifier);
         std::remove(filePath.c_str());
 
         std::ifstream& is = this->GetIfstream(identifier);
@@ -118,55 +114,146 @@ namespace agentsim {
         );
     }
 
-    bool SimulationCache::DownloadRuntimeCache(std::string awsFilePath, std::string identifier)
+    bool SimulationCache::DownloadRuntimeCache(std::string identifier)
     {
-        std::string fpropsFilePath = awsFilePath + "_info";
-        std::string fpropsDestination = this->GetInfoFilePath(identifier);
-        if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
-        {
-            LOG_F(WARNING, "Info file for %s not found on AWS S3", + awsFilePath.c_str());
-            return false;
+        std::string awsFilePath = this->GetAwsFilePath(identifier);
+        bool isSimulariumFile = false;
+        bool filesFound = true;
+
+        LOG_F(INFO, "Downloading runtime cache for file %s", awsFilePath.c_str());
+        std::string ext = identifier.substr(identifier.find_last_of(".") + 1);
+        if(ext == "simularium") {
+          isSimulariumFile = true;
         }
 
-        if(!this->IsFilePropertiesValid(identifier))
+        // Otherwise, look for the binary cache file
+        std::string fpropsFilePath = this->GetAwsInfoFilePath(identifier);
+        std::string fpropsDestination = this->GetLocalInfoFilePath(identifier);
+        if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
         {
-            LOG_F(WARNING, "Info file for %s is missing required fields", + awsFilePath.c_str());
-            return false;
+            LOG_F(WARNING, "Info file for %s not found on AWS S3", awsFilePath.c_str());
+            filesFound = false;
+        }
+        else if(!this->IsFilePropertiesValid(identifier))
+        {
+            LOG_F(WARNING, "Info file for %s is missing required fields", awsFilePath.c_str());
+            filesFound = false;
         }
 
         LOG_F(INFO, "Downloading cache for %s from S3", awsFilePath.c_str());
-        std::string destination = this->GetFilePath(identifier);
+        std::string destination = this->GetLocalFilePath(identifier);
         std::string cacheFilePath = awsFilePath + "_cache";
         if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
             LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
-            return false;
+            filesFound = false;
+        }
+
+        return filesFound;
+    }
+
+    bool SimulationCache::FindSimulariumFile(std::string fileName) {
+        std::string tmpkey = "tmp";
+        std::string tmpFile = this->GetLocalFilePath(tmpkey);
+        bool fileFound = false;
+
+        // try replacing the file extension with .simularium (e.g. test.h5 -> test.simularium)
+        //  then try appending .simularium (e.g. test.h5 -> test.h5.simularium)
+        std::vector<std::string> pathsToTry = {
+          fileName.substr(0, fileName.find_last_of(".")) + ".simularium",
+          fileName + ".simularium"
+        };
+
+        for(auto path: pathsToTry) {
+          if(!fileFound) {
+            std::string awsPath = this->GetAwsFilePath(path);
+
+            if(!aics::agentsim::aws_util::Download(awsPath, tmpFile)) {
+              LOG_F(WARNING, "Simularium file %s not found on AWS S3", awsPath.c_str());
+            } else {
+                LOG_F(INFO, "Simularium file %s found on AWS S3", awsPath.c_str());
+                fileFound = true;
+            }
+          }
+        }
+
+        if(!fileFound) {
+          LOG_F(ERROR, "Simularium file %s not found on AWS S3", fileName.c_str());
+          return false;
+        }
+
+        // Parse the file to JSON
+        std::ifstream is(tmpFile);
+        Json::Value simJson;
+        is >> simJson;
+        is.close();
+
+        // Create trajectory file properties
+        LOG_F(INFO, "Processed simularium file will be assigned to identifier %s", fileName.c_str());
+        Json::Value& trajectoryInfo = simJson["trajectoryInfo"];
+        this->ParseFileProperties(trajectoryInfo, fileName);
+        this->WriteFilePropertiesToDisk(fileName);
+
+        // Convert the simularium file to a binary cache file
+        fileio::SimulariumFileReader simulariumFileReader;
+        std::ofstream& os = this->GetOfstream(fileName);
+
+        Json::Value& spatialData = simJson["spatialData"];
+        int nFrames = spatialData["bundleSize"].asInt();
+        LOG_F(INFO, "%i frames found in simularium json file", nFrames);
+        for(int i = 0; i < nFrames; i++) {
+          AgentDataFrame adf;
+          if(simulariumFileReader.DeserializeFrame(simJson, i, adf)) {
+            this->m_binaryCacheWriter.SerializeFrame(os, i, adf);
+          } else {
+            LOG_F(ERROR, "Failed to deserialize frame from simularium JSON");
+          }
         }
 
         return true;
     }
 
-    bool SimulationCache::UploadRuntimeCache(std::string awsFilePath, std::string identifier)
-    {
-        std::string destination = awsFilePath + "_cache";
-        std::string source = this->GetFilePath(identifier);
-        LOG_F(INFO, "Uploading cache file for %s to S3", identifier.c_str());
-        if(!aics::agentsim::aws_util::Upload(source, destination)) {
-            return false;
+    bool SimulationCache::FindFile(std::string fileName) {
+        std::string rawPath = this->GetLocalRawTrajectoryFilePath(fileName);
+        std::string awsPath = this->GetAwsFilePath(fileName);
+
+        // Download the file from AWS if it is not present locally
+        if (!FileExists(rawPath)) {
+            LOG_F(INFO, "%s doesn't exist locally, checking S3...", fileName.c_str());
+            if (!aics::agentsim::aws_util::Download(awsPath, rawPath)) {
+                LOG_F(WARNING, "%s not found on AWS S3", fileName.c_str());
+                return false;
+            }
         }
 
-        std::string filePropsPath = this->GetInfoFilePath(identifier);
-        std::string filePropsDest = awsFilePath + "_info";
+        return true;
+    }
+
+    bool SimulationCache::FindFiles(std::vector<std::string> files) {
+        for(std::string& file : files) {
+            if(!FindFile(file)) return false;
+        }
+
+        return true;
+    }
+
+    void SimulationCache::WriteFilePropertiesToDisk(std::string identifier) {
+        std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
+        std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
         std::ofstream propsFile;
         propsFile.open(filePropsPath);
 
         TrajectoryFileProperties tfp = this->GetFileProperties(identifier);
         Json::Value fprops;
         fprops["fileName"] = tfp.fileName;
-        fprops["numberOfFrames"] = static_cast<int>(tfp.numberOfFrames);
+        fprops["version"] = 1;
+        fprops["totalSteps"] = static_cast<int>(tfp.numberOfFrames);
         fprops["timeStepSize"] = tfp.timeStepSize;
-        fprops["boxSizeX"] = static_cast<float>(tfp.boxX);
-        fprops["boxSizeY"] = static_cast<float>(tfp.boxY);
-        fprops["boxSizeZ"] = static_cast<float>(tfp.boxZ);
+
+        Json::Value size;
+        size["x"] = static_cast<float>(tfp.boxX);
+        size["y"] = static_cast<float>(tfp.boxY);
+        size["z"] = static_cast<float>(tfp.boxZ);
+        fprops["size"] = size;
 
         Json::Value typeMapping;
         for(auto& entry : tfp.typeMapping)
@@ -174,11 +261,30 @@ namespace agentsim {
             std::string id = std::to_string(entry.first);
             std::string name = entry.second;
 
-            typeMapping[id] = name;
+            Json::Value newEntry;
+            newEntry["name"] = name;
+
+            typeMapping[id] = newEntry;
         }
         fprops["typeMapping"] = typeMapping;
         propsFile << fprops;
         propsFile.close();
+    }
+
+    bool SimulationCache::UploadRuntimeCache(std::string identifier)
+    {
+        std::string awsFilePath = this->GetAwsFilePath(identifier);
+        this->WriteFilePropertiesToDisk(identifier);
+
+        std::string destination = awsFilePath + "_cache";
+        std::string source = this->GetLocalFilePath(identifier);
+        LOG_F(INFO, "Uploading cache file for %s to S3", identifier.c_str());
+        if(!aics::agentsim::aws_util::Upload(source, destination)) {
+            return false;
+        }
+
+        std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
+        std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
 
         LOG_F(INFO, "Uploading info file for %s to S3", identifier.c_str());
         if(!aics::agentsim::aws_util::Upload(filePropsPath, filePropsDest))
@@ -189,46 +295,62 @@ namespace agentsim {
         return true;
     }
 
+
+
     void SimulationCache::ParseFileProperties(std::string identifier)
     {
-        std::string filePath = this->GetInfoFilePath(identifier);
+        std::string filePath = this->GetLocalInfoFilePath(identifier);
+        LOG_F(INFO, "Loading file %s from filepath %s", identifier.c_str(), filePath.c_str());
+
         std::ifstream is(filePath);
         Json::Value fprops;
-        is >> fprops;
 
-        TrajectoryFileProperties trajFileProps;
+        if(is.is_open()) {
+          is >> fprops;
+          this->ParseFileProperties(fprops, identifier);
+        } else {
+          LOG_F(ERROR, "Failed to open file %s", filePath.c_str());
+        }
+    }
+
+    void SimulationCache::ParseFileProperties(Json::Value& fprops, std::string identifier)
+    {
+        TrajectoryFileProperties tfp;
+
         const Json::Value typeMapping = fprops["typeMapping"];
         std::vector<std::string> ids = typeMapping.getMemberNames();
         for(auto& id : ids)
         {
             std::size_t idKey = std::atoi(id.c_str());
-            trajFileProps.typeMapping[idKey] =
-                typeMapping[id].asString();
+            const Json::Value entry = typeMapping[id];
+            tfp.typeMapping[idKey] = entry["name"].asString();
         }
 
-        trajFileProps.boxX = fprops["boxSizeX"].asFloat();
-        trajFileProps.boxY = fprops["boxSizeY"].asFloat();
-        trajFileProps.boxZ = fprops["boxSizeZ"].asFloat();
-        trajFileProps.fileName = fprops["fileName"].asString();
-        trajFileProps.numberOfFrames = fprops["numberOfFrames"].asInt();
-        trajFileProps.timeStepSize = fprops["timeStepSize"].asFloat();
-        this->m_fileProps[identifier] = trajFileProps;
+        const Json::Value& size = fprops["size"];
+        tfp.boxX = size["x"].asFloat();
+        tfp.boxY = size["y"].asFloat();
+        tfp.boxZ = size["z"].asFloat();
+
+        tfp.fileName = fprops["fileName"].asString();
+        tfp.numberOfFrames = fprops["totalSteps"].asInt();
+        tfp.timeStepSize = fprops["timeStepSize"].asFloat();
+
+        this->m_fileProps[identifier] = tfp;
     }
 
     bool SimulationCache::IsFilePropertiesValid(std::string identifier)
     {
-        std::string filePath = this->GetInfoFilePath(identifier);
+        std::string filePath = this->GetLocalInfoFilePath(identifier);
         std::ifstream is(filePath);
         Json::Value fprops;
         is >> fprops;
 
         std::vector<std::string> keys({
-            "boxSizeX",
-            "boxSizeY",
-            "boxSizeZ",
+            "version",
+            "size",
             "typeMapping",
             "fileName",
-            "numberOfFrames",
+            "totalSteps",
             "timeStepSize"
         });
 
@@ -242,25 +364,39 @@ namespace agentsim {
         return true;
     }
 
-    std::string SimulationCache::GetFilePath(std::string identifier)
-    {
-        return this->m_cacheFolder + identifier + ".bin";
+    std::string SimulationCache::GetLocalRawTrajectoryFilePath(std::string identifier) {
+      return this->kCacheFolder + identifier;
     }
 
-    std::string SimulationCache::GetInfoFilePath(std::string identifier)
+    std::string SimulationCache::GetAwsFilePath(std::string identifier)
     {
-        return this->m_cacheFolder + identifier + ".json";
+      return this->kAwsPrefix + identifier;
+    }
+
+    std::string SimulationCache::GetAwsInfoFilePath(std::string identifier)
+    {
+      return this->kAwsPrefix + identifier + "_info";
+    }
+
+    std::string SimulationCache::GetLocalFilePath(std::string identifier)
+    {
+        return this->kCacheFolder + identifier + ".bin";
+    }
+
+    std::string SimulationCache::GetLocalInfoFilePath(std::string identifier)
+    {
+        return this->kCacheFolder + identifier + ".json";
     }
 
     std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {
         if(!this->m_ofstreams.count(identifier)) {
             std::ofstream& newStream = this->m_ofstreams[identifier];
-            newStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            newStream.open(this->GetLocalFilePath(identifier), this->m_ofstreamFlags);
             return newStream;
         } else if (!this->m_ofstreams[identifier]) {
             std::ofstream& badStream = this->m_ofstreams[identifier];
             badStream.close();
-            badStream.open(this->GetFilePath(identifier), this->m_ofstreamFlags);
+            badStream.open(this->GetLocalFilePath(identifier), this->m_ofstreamFlags);
             return badStream;
         } else {
             std::ofstream& currentStream = this->m_ofstreams[identifier];
@@ -271,12 +407,12 @@ namespace agentsim {
     std::ifstream& SimulationCache::GetIfstream(std::string& identifier) {
         if(!this->m_ifstreams.count(identifier)) {
             std::ifstream& newStream = this->m_ifstreams[identifier];
-            newStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            newStream.open(this->GetLocalFilePath(identifier), this->m_ifstreamFlags);
             return newStream;
         } else if(!this->m_ifstreams[identifier]) {
             std::ifstream& badStream = this->m_ifstreams[identifier];
             badStream.close();
-            badStream.open(this->GetFilePath(identifier), this->m_ifstreamFlags);
+            badStream.open(this->GetLocalFilePath(identifier), this->m_ifstreamFlags);
             return badStream;
         } else {
             std::ifstream& currentStream = this->m_ifstreams[identifier];
@@ -298,104 +434,3 @@ namespace agentsim {
 
 } // namespace agentsim
 } // namespace aics
-
-/**
-*	File Serialization Functions
-*/
-bool goto_frameno(
-    std::ifstream& is,
-    std::size_t fno,
-    std::string& line)
-{
-    is.seekg(0, is.beg); // go to beginning
-    for (std::size_t i = 0; i < fno; ++i) {
-        if (std::getline(is, line)) {
-            line = "";
-        } else {
-            return false;
-        }
-    }
-
-    std::getline(is, line, delimiter[0]);
-    return true;
-}
-
-void serialize(
-    std::ofstream& os,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf)
-{
-    os << "F" << frame_number << delimiter
-       << adf.size() << delimiter;
-    for (aics::agentsim::AgentData ad : adf) {
-        serialize(os, ad);
-    }
-    os << std::endl;
-}
-
-bool deserialize(
-    std::ifstream& is,
-    std::size_t frame_number,
-    aics::agentsim::AgentDataFrame& adf)
-{
-    std::string line;
-    if (!goto_frameno(is, frame_number, line)) {
-        return false;
-    }
-
-    // Get the number of agents in this data frame
-    std::getline(is, line, delimiter[0]);
-    std::size_t num_agents = std::stoi(line);
-
-    for (std::size_t i = 0; i < num_agents; ++i) {
-        aics::agentsim::AgentData ad;
-        if (deserialize(is, ad)) {
-            adf.push_back(ad);
-        }
-    }
-
-    return true;
-}
-
-void serialize(std::ofstream& os, aics::agentsim::AgentData& ad)
-{
-    auto vals = aics::agentsim::Serialize(ad);
-    for (auto val : vals) {
-        os << val << delimiter;
-    }
-}
-
-bool deserialize(std::ifstream& is, aics::agentsim::AgentData& ad)
-{
-    std::string line;
-    std::vector<float> vals;
-    for (std::size_t i = 0; i < 11; ++i) {
-        if (std::getline(is, line, delimiter[0])) {
-            vals.push_back(std::atof(line.c_str()));
-        } else {
-            return false;
-        }
-    }
-
-    ad.vis_type = vals[0];
-    ad.id = vals[1];
-    ad.type = vals[2];
-    ad.x = vals[3];
-    ad.y = vals[4];
-    ad.z = vals[5];
-    ad.xrot = vals[6];
-    ad.yrot = vals[7];
-    ad.zrot = vals[8];
-    ad.collision_radius = vals[9];
-
-    std::size_t num_sp = vals[10];
-    for (std::size_t i = 0; i < num_sp; ++i) {
-        if (std::getline(is, line, delimiter[0])) {
-            ad.subpoints.push_back(std::atof(line.c_str()));
-        } else {
-            return false;
-        }
-    }
-
-    return true;
-}

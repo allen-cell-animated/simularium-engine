@@ -29,6 +29,7 @@ namespace test {
 
         ConnectionManager connectionManager;
         connectionManager.ListenAsync();
+        connectionManager.StartFileIOAsync(isRunning, simulation);
         connectionManager.StartSimAsync(isRunning, simulation, timeStep);
 
         CliClient controller(uri);

@@ -163,11 +163,14 @@ namespace agentsim {
         /**
         *   UploadRuntimeCache
         *
+        *   @param fileName   The name of the trajectory file to upload a cache
+        *                     for to S3
+        *
         *   Saves the runtime cache on S3
         *   The run-time cache is the version of a trajectory/simulation result
         *   that can be immediately streamed to a client with-out any processing
         */
-        void UploadRuntimeCache();
+        void UploadRuntimeCache(std::string fileName);
 
         /**
         *   DownloadRuntimeCache
@@ -187,6 +190,9 @@ namespace agentsim {
         *   and implement any optimizations for finding individual frames
         */
         void PreprocessRuntimeCache(std::string identifier);
+
+        bool FindSimulariumFile(std::string identifier)
+          { return this->m_cache.FindSimulariumFile(identifier); }
 
         /**
         *   IsPlayingTrajectory

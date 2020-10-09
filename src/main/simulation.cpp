@@ -10,44 +10,6 @@
 #include <time.h>
 #include <sys/stat.h>
 
-inline bool FileExists(const std::string& name)
-{
-    struct stat buffer;
-    return (stat(name.c_str(), &buffer) == 0);
-}
-
-bool FindFile(std::string& filePath)
-{
-    // Download the file from AWS if it is not present locally
-    if (!FileExists(filePath)) {
-        LOG_F(INFO, "%s doesn't exist locally, checking S3...", filePath.c_str());
-        if (!aics::agentsim::aws_util::Download(filePath, filePath)) {
-            LOG_F(WARNING, "%s not found on AWS S3", filePath.c_str());
-            return false;
-        }
-    }
-
-    // Modifies the file-path  to a format that H5rd can reliably load
-    // H5rd is a library written by the ReaDDy developers to load H5 files
-    if (FileExists("/" + filePath)) {
-        filePath = "/" + filePath;
-        LOG_F(INFO,"File name modified to %s", filePath.c_str());
-    } else if (FileExists("./" + filePath)) {
-        filePath = "./" + filePath;
-        LOG_F(INFO, "File name modified to %s", filePath.c_str());
-    }
-
-    return true;
-}
-
-bool FindFiles(std::vector<std::string>& files) {
-    for(std::string& file : files) {
-        if(!FindFile(file)) return false;
-    }
-
-    return true;
-}
-
 namespace aics {
 namespace agentsim {
 
@@ -172,7 +134,6 @@ namespace agentsim {
 
     bool Simulation::LoadTrajectoryFile(std::string fileName)
     {
-        std::string filePath = "trajectory/" + fileName;
         TrajectoryFileProperties tfp;
         tfp.fileName = fileName;
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
@@ -181,16 +142,18 @@ namespace agentsim {
             if(simPkg->CanLoadFile(fileName)) {
                 this->m_activeSimPkg = i;
 
-                std::vector<std::string> files = simPkg->GetFileNames(filePath);
+                std::vector<std::string> files = simPkg->GetFileNames(fileName);
                 for(auto file : files) {
                     LOG_F(INFO, "File to load: %s", file.c_str());
                 }
 
-                if(!FindFiles(files)) {
+                if(!this->m_cache.FindFiles(files)) {
                     LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;
                 }
 
+                std::string filePath =
+                    this->m_cache.GetLocalRawTrajectoryFilePath(fileName);
                 simPkg->LoadTrajectoryFile(filePath, tfp);
                 this->m_cache.SetFileProperties(fileName, tfp);
                 this->m_simIdentifier = fileName;
@@ -208,16 +171,14 @@ namespace agentsim {
         this->m_agents.clear();
     }
 
-    void Simulation::UploadRuntimeCache()
+    void Simulation::UploadRuntimeCache(std::string fileName)
     {
-        std::string awsFilePath = "trajectory/" + this->m_simIdentifier;
-        this->m_cache.UploadRuntimeCache(awsFilePath, this->m_simIdentifier);
+        this->m_cache.UploadRuntimeCache(fileName);
     }
 
     bool Simulation::DownloadRuntimeCache(std::string fileName)
     {
-        std::string awsFilePath = "trajectory/" + fileName;
-        return this->m_cache.DownloadRuntimeCache(awsFilePath, fileName);
+        return this->m_cache.DownloadRuntimeCache(fileName);
     }
 
     void Simulation::PreprocessRuntimeCache(std::string identifier)
