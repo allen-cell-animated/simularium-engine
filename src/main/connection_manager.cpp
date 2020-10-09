@@ -201,6 +201,50 @@ namespace agentsim {
         });
     }
 
+    void ConnectionManager::StartFileIOAsync(
+      std::atomic<bool>& isRunning,
+      Simulation& simulation)
+    {
+        this->m_fileIoThread = std::thread([&isRunning, &simulation, this] {
+            loguru::set_thread_name("File IO");
+            while (isRunning) {
+                while(this->m_fileRequests.size()) {
+                  auto request = this->m_fileRequests.front();
+                  LOG_F(INFO, "Handling request for file %s", request.fileName.c_str());
+
+                  this->m_fileMutex.lock();
+                  std::string senderUid = request.senderUid;
+                  std::string fileName = request.fileName;
+                  int frameNumber = request.frameNumber;
+
+                  this->InitializeTrajectoryFile(
+                      simulation,
+                      senderUid,
+                      fileName
+                  );
+
+                  if(frameNumber > 0) {
+                    this->SendSingleFrameToClient(
+                        simulation,
+                        senderUid,
+                        frameNumber
+                    );
+
+                    this->SetClientState(senderUid, ClientPlayState::Stopped);
+                  } else {
+                    this->SetClientState(senderUid, ClientPlayState::Playing);
+                    this->SetClientFrame(senderUid, 0);
+                  }
+
+                  this->m_fileRequests.pop();
+                  this->m_fileMutex.unlock();
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(this->kFileIoCheckIntervalMilliSeconds));
+            }
+        });
+    }
+
     void ConnectionManager::AddConnection(websocketpp::connection_hdl hd1)
     {
         std::string newUid;
@@ -304,6 +348,11 @@ namespace agentsim {
         std::string connectionUID
     )
     {
+        if(!this->m_netStates.count(connectionUID)) {
+            LOG_F(ERROR, "No net state for client %s", connectionUID.c_str());
+            return;
+        }
+
         auto& netState = this->m_netStates.at(connectionUID);
         auto sid = netState.sim_identifier;
         auto totalNumberOfFrames =
@@ -390,12 +439,17 @@ namespace agentsim {
     void ConnectionManager::SendWebsocketMessage(
         std::string connectionUID, Json::Value jsonMessage)
     {
+        if(!this->m_netConnections.count(connectionUID)) {
+          LOG_F(ERROR, "Ignoring message send to invalid/untracked client %s", connectionUID.c_str());
+          return;
+        }
+
         jsonMessage["connId"] = connectionUID;
         std::string message = Json::writeString(this->m_jsonStreamWriter, jsonMessage);
 
         try {
             this->m_server.send(
-                this->m_netConnections[connectionUID],
+                this->m_netConnections.at(connectionUID),
                 message, websocketpp::frame::opcode::text);
         } catch (...) {
             this->LogClientEvent(connectionUID, "Failed to send websocket message to client");
@@ -529,6 +583,11 @@ namespace agentsim {
         bool force // set to true for one-off sends
     )
     {
+        if(!this->m_netStates.count(connectionUID)) {
+            LOG_F(ERROR, "No net state for client %s", connectionUID.c_str());
+            return;
+        }
+
         auto& netState = this->m_netStates.at(connectionUID);
         std::string sid = netState.sim_identifier;
         auto totalNumberOfFrames = simulation.GetNumFrames(sid);
@@ -643,39 +702,28 @@ namespace agentsim {
                             simulation.SetFileProperties("prerun", tfp);
                             this->SetClientSimId(senderUid, "prerun");
                             simulation.SetSimId("prerun");
-                            this->SetupRuntimeCacheAsync(simulation, 500);
+                            this->SetupRuntimeCache(simulation);
                         } break;
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
                             this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
-                            this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
+
+                            FileRequest request;
+                            request.senderUid = senderUid;
+                            request.fileName = trajectoryFileName;
+
+                            if(jsonMsg.isMember("frameNumber")) {
+                              int frameNumber = jsonMsg["frameNumber"].asInt();
+                              request.frameNumber = std::max(frameNumber,0);
+                            } else {
+                              request.frameNumber = -1;
+                            }
+                            this->m_fileRequests.push(request);
                         } break;
                         }
                     } else {
                         LOG_F(WARNING, "Ignoring request to change server mode; other clients are listening");
-                    }
-
-                    if(jsonMsg.isMember("frameNumber"))
-                    {
-                        int frameNumber = jsonMsg["frameNumber"].asInt();
-                        frameNumber = std::max(frameNumber, 0);
-
-                        this->LogClientEvent(
-                            senderUid,
-                            "Data request for frame " + std::to_string(frameNumber)
-                        );
-                        this->SendSingleFrameToClient(
-                            simulation,
-                            senderUid,
-                            frameNumber
-                        );
-
-                        this->SetClientState(senderUid, ClientPlayState::Stopped);
-                    }
-                    else {
-                        this->SetClientState(senderUid, ClientPlayState::Playing);
-                        this->SetClientFrame(senderUid, 0);
                     }
                 } break;
                 case WebRequestTypes::id_vis_data_pause: {
@@ -776,7 +824,12 @@ namespace agentsim {
                 case WebRequestTypes::id_init_trajectory_file: {
                     std::string trajectoryFileName = jsonMsg["fileName"].asString();
                     simulation.SetPlaybackMode(SimulationMode::id_traj_file_playback);
-                    this->InitializeTrajectoryFile(simulation, senderUid, trajectoryFileName);
+
+                    FileRequest request;
+                    request.senderUid = senderUid;
+                    request.fileName = trajectoryFileName;
+                    request.frameNumber = -1;
+                    this->m_fileRequests.push(request);
                 } break;
                 default: {
                 } break;
@@ -793,13 +846,8 @@ namespace agentsim {
         std::string fileName
     )
     {
-        this->m_fileMutex.lock();
-        LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
-
         if (fileName.empty()) {
             this->LogClientEvent(connectionUID, "Trajectory file not specified, ignoring request");
-            this->m_fileMutex.unlock();
-            LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
             return;
         }
 
@@ -837,14 +885,8 @@ namespace agentsim {
                 simulation.Reset();
                 if(simulation.LoadTrajectoryFile(fileName))
                 {
-                    this->m_fileMutex.unlock();
-                    LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
-
-                    this->SetupRuntimeCacheAsync(simulation, 500);
+                    this->SetupRuntimeCache(simulation);
                     this->SendSingleFrameToClient(simulation, connectionUID, 0);
-
-                    this->m_fileMutex.lock();
-                    LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
                 }
             }
         }
@@ -880,43 +922,26 @@ namespace agentsim {
         fprops["size"] = size;
 
         this->SendWebsocketMessage(connectionUID, fprops);
-        this->m_fileMutex.unlock();
-        LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
     }
 
-    void ConnectionManager::SetupRuntimeCacheAsync(
-        Simulation& simulation,
-        std::size_t waitTimeMs
+    void ConnectionManager::SetupRuntimeCache(
+        Simulation& simulation
     ) {
-        if (this->m_fileIoThread.joinable()) {
-            this->m_fileIoThread.join();
+        std::string fileName = simulation.GetSimId();
+
+        LOG_F(INFO,"[%s] Loading trajectory file into runtime cache", fileName.c_str());
+        std::size_t fn = 0;
+
+        while (!simulation.HasLoadedAllFrames()) {
+            simulation.LoadNextFrame();
         }
+        LOG_F(INFO, "[%s] Finished loading trajectory into runtime cache", fileName.c_str());
 
-        this->m_fileIoThread = std::thread([&simulation, this] {
-            loguru::set_thread_name("File IO");
-            std::string fileName = simulation.GetSimId();
-
-            this->m_fileMutex.lock();
-            LOG_F(INFO,"[%s] File mutex locked", fileName.c_str());
-
-            LOG_F(INFO,"[%s] Loading trajectory file into runtime cache", fileName.c_str());
-            std::size_t fn = 0;
-
-            while (!simulation.HasLoadedAllFrames()) {
-                simulation.LoadNextFrame();
-            }
-            LOG_F(INFO, "[%s] Finished loading trajectory into runtime cache", fileName.c_str());
-            this->m_fileMutex.unlock();
-            LOG_F(INFO,"[%s] File mutex unlocked", fileName.c_str());
-
-            // Save the result so it doesn't need to be calculated again
-            if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
-            {
-                simulation.UploadRuntimeCache(fileName);
-            }
-        });
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeMs));
+        // Save the result so it doesn't need to be calculated again
+        if(simulation.IsPlayingTrajectory() && !(this->m_argNoUpload))
+        {
+            simulation.UploadRuntimeCache(fileName);
+        }
     }
 
 } // namespace agentsim

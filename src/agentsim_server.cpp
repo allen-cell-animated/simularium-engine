@@ -52,6 +52,7 @@ int main(int argc, char* argv[])
     connectionManager.ListenAsync();
     connectionManager.StartSimAsync(isServerRunning, simulation, timeStep);
     connectionManager.StartHeartbeatAsync(isServerRunning);
+    connectionManager.StartFileIOAsync(isServerRunning, simulation);
 
     auto ioThread = std::thread([&] {
         std::string input;
