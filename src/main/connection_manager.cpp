@@ -868,8 +868,7 @@ namespace agentsim {
 
             // Attempt to download an already processed runtime cache
             if(!this->m_argForceInit // this will force the server to re-download/process a trajectory
-                && simulation.DownloadRuntimeCache(fileName)
-                && !isSimulariumFile)
+                && simulation.DownloadRuntimeCache(fileName))
             {
                 simulation.PreprocessRuntimeCache(fileName);
                 this->SendSingleFrameToClient(simulation, connectionUID, 0);
