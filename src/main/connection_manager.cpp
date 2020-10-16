@@ -229,11 +229,6 @@ namespace agentsim {
                         senderUid,
                         frameNumber
                     );
-
-                    this->SetClientState(senderUid, ClientPlayState::Stopped);
-                  } else {
-                    this->SetClientState(senderUid, ClientPlayState::Playing);
-                    this->SetClientFrame(senderUid, 0);
                   }
 
                   this->m_fileRequests.pop();
@@ -361,6 +356,10 @@ namespace agentsim {
 
         auto currentFrame = netState.frame_no;
         auto currentState = netState.play_state;
+
+        if(totalNumberOfFrames == 0) {
+          return; // no data
+        }
 
         // Invalid frame, set to last frame
         if(currentFrame >= totalNumberOfFrames)
@@ -592,6 +591,10 @@ namespace agentsim {
         std::string sid = netState.sim_identifier;
         auto totalNumberOfFrames = simulation.GetNumFrames(sid);
 
+        if(totalNumberOfFrames == 0) {
+          return; // no data to send
+        }
+
         if(!force)
         {
             if (netState.play_state != ClientPlayState::Playing) {
@@ -707,6 +710,13 @@ namespace agentsim {
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
+
+                            if(!jsonMsg.isMember("file-name")) {
+                              this->SetClientState(senderUid, ClientPlayState::Paused);
+                              this->SetClientFrame(senderUid, 0);
+                              continue;
+                            }
+
                             this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
 
                             FileRequest request;
@@ -716,9 +726,11 @@ namespace agentsim {
                             if(jsonMsg.isMember("frameNumber")) {
                               int frameNumber = jsonMsg["frameNumber"].asInt();
                               request.frameNumber = std::max(frameNumber,0);
+                              this->SetClientState(senderUid, ClientPlayState::Paused);
                             } else {
-                              request.frameNumber = -1;
+                              this->SetClientState(senderUid, ClientPlayState::Playing);
                             }
+
                             this->m_fileRequests.push(request);
                         } break;
                         }
