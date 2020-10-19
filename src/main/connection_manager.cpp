@@ -953,6 +953,8 @@ namespace agentsim {
         {
             simulation.UploadRuntimeCache(fileName);
         }
+
+        simulation.CleanupTmpFiles(fileName);
     }
 
 } // namespace agentsim

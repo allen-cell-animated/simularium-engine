@@ -86,6 +86,9 @@ namespace agentsim {
         */
         bool FindSimulariumFile(std::string fileName);
 
+        void MarkTmpFiles(std::string identifier, std::vector<std::string> files);
+        void DeleteTmpFiles(std::string identifier);
+
     private:
         bool FindFile(std::string file);
         void WriteFilePropertiesToDisk(std::string identifier);
@@ -119,6 +122,7 @@ namespace agentsim {
         std::unordered_map<std::string, std::ifstream> m_ifstreams;
         std::unordered_map<std::string, std::size_t> m_numFrames;
         std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
+        std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;
 
         fileio::BinaryCacheWriter m_binaryCacheWriter;
         fileio::BinaryCacheReader m_binaryCacheReader;

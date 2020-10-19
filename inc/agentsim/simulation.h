@@ -246,6 +246,8 @@ namespace agentsim {
 
         void SetSimId(std::string identifier) { this->m_simIdentifier = identifier; }
         std::string GetSimId() { return this->m_simIdentifier; }
+
+        void CleanupTmpFiles(std::string identifier);
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;

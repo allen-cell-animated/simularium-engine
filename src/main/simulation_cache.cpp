@@ -168,7 +168,7 @@ namespace agentsim {
             std::string awsPath = this->GetAwsFilePath(path);
 
             if(!aics::agentsim::aws_util::Download(awsPath, tmpFile)) {
-              LOG_F(WARNING, "Simularium file %s not found on AWS S3", awsPath.c_str());
+              LOG_F(INFO, "Simularium file %s not found on AWS S3", awsPath.c_str());
             } else {
                 LOG_F(INFO, "Simularium file %s found on AWS S3", awsPath.c_str());
                 fileFound = true;
@@ -209,6 +209,7 @@ namespace agentsim {
           }
         }
 
+        std::remove(tmpFile.c_str());
         return true;
     }
 
@@ -234,6 +235,22 @@ namespace agentsim {
         }
 
         return true;
+    }
+
+    void SimulationCache::MarkTmpFiles(
+      std::string identifier,
+      std::vector<std::string> files) {
+      this->m_tmpFiles[identifier] = files;
+    }
+
+    void SimulationCache::DeleteTmpFiles(std::string identifier) {
+      auto files = this->m_tmpFiles[identifier];
+      for(auto file: files) {
+        if(std::remove(file.c_str()) != 0)
+          LOG_F(WARNING, "Error deleting file %s", file.c_str());
+        else
+          LOG_F(INFO, "File %s succesfully deleted", file.c_str());
+      }
     }
 
     void SimulationCache::WriteFilePropertiesToDisk(std::string identifier) {

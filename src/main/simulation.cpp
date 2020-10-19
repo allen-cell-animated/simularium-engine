@@ -152,6 +152,14 @@ namespace agentsim {
                     return false;
                 }
 
+                std::vector<std::string> rawFilePaths;
+                for(auto file : files) {
+                    rawFilePaths.push_back(
+                      this->m_cache.GetLocalRawTrajectoryFilePath(file)
+                    );
+                }
+                this->m_cache.MarkTmpFiles(fileName, rawFilePaths);
+
                 std::string filePath =
                     this->m_cache.GetLocalRawTrajectoryFilePath(fileName);
                 simPkg->LoadTrajectoryFile(filePath, tfp);
@@ -163,6 +171,10 @@ namespace agentsim {
 
         LOG_F(WARNING,"No Sim PKG can load %s", fileName.c_str());
         return false;
+    }
+
+    void Simulation::CleanupTmpFiles(std::string identifier) {
+        this->m_cache.DeleteTmpFiles(identifier);
     }
 
     void Simulation::SetPlaybackMode(SimulationMode playbackMode)
