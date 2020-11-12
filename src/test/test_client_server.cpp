@@ -1,12 +1,12 @@
-#include "agentsim/agentsim.h"
-#include "agentsim/agentsim.h"
-#include "agentsim/network/cli_client.h"
-#include "agentsim/network/net_message_ids.h"
+#include "simularium/simularium.h"
+#include "simularium/simularium.h"
+#include "simularium/network/cli_client.h"
+#include "simularium/network/net_message_ids.h"
 #include "test/network/test_client_server.h"
 #include <memory>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace test {
 
     TEST_F(ClientServerTests, HundredClient)
@@ -106,5 +106,5 @@ namespace test {
     }
 
 } // namespace test
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

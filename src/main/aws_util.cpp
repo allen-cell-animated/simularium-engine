@@ -11,7 +11,7 @@ static const Aws::String kBucketName = "aics-agentviz-data";
 static const Aws::String kAwsRegion = "us-east-2";
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
     namespace aws_util {
 
         bool Download(std::string objectNameStr, std::string destinationStr)
@@ -101,5 +101,5 @@ namespace agentsim {
         }
 
 } // namespace aws_util
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

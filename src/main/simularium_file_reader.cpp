@@ -1,9 +1,9 @@
-#include "agentsim/fileio/simularium_file_reader.h"
+#include "simularium/fileio/simularium_file_reader.h"
 #include "loguru/loguru.hpp"
 #include <algorithm>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace fileio {
 
     bool SimulariumFileReader::DeserializeFrame(
@@ -52,5 +52,5 @@ namespace fileio {
     }
 
 } // namespace fileio
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

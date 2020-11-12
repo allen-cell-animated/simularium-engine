@@ -1,8 +1,8 @@
-#include "agentsim/simulation.h"
-#include "agentsim/agents/agent.h"
-#include "agentsim/network/net_message_ids.h"
-#include "agentsim/simpkg/simpkg.h"
-#include "agentsim/aws/aws_util.h"
+#include "simularium/simulation.h"
+#include "simularium/agents/agent.h"
+#include "simularium/network/net_message_ids.h"
+#include "simularium/simpkg/simpkg.h"
+#include "simularium/aws/aws_util.h"
 #include "loguru/loguru.hpp"
 #include <cmath>
 #include <iostream>
@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     void AppendAgentData(
         std::vector<AgentData>& out,
@@ -317,5 +317,5 @@ namespace agentsim {
         return 0;
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

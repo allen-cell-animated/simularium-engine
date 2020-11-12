@@ -1,4 +1,4 @@
-#include "agentsim/model/model.h"
+#include "simularium/model/model.h"
 #include <algorithm>
 #include <iostream>
 
@@ -7,13 +7,13 @@ bool parse(Json::Value& obj, std::string key, float& out);
 bool parse(Json::Value& obj, std::string key, std::string& out);
 bool parse(Json::Value& obj, std::string key, bool& out);
 
-aics::agentsim::Reaction reverse(
-    aics::agentsim::Reaction& rx);
+aics::simularium::Reaction reverse(
+    aics::simularium::Reaction& rx);
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
-    void parse_model(Json::Value& json_obj, aics::agentsim::Model& model)
+    void parse_model(Json::Value& json_obj, aics::simularium::Model& model)
     {
         parse(json_obj, "name", model.name);
 
@@ -173,7 +173,7 @@ namespace agentsim {
         }
     }
 
-    void print_model(aics::agentsim::Model& model)
+    void print_model(aics::simularium::Model& model)
     {
         std::cout << "\nBEGIN MODEL\n";
         std::cout << "Name: " << model.name << "\n";
@@ -263,7 +263,7 @@ namespace agentsim {
         std::cout << "\nEND MODEL\n\n";
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 bool parse(Json::Value& obj, std::string key, int& out)
@@ -310,10 +310,10 @@ bool parse(Json::Value& obj, std::string key, bool& out)
     }
 }
 
-aics::agentsim::Reaction reverse(
-    aics::agentsim::Reaction& rx)
+aics::simularium::Reaction reverse(
+    aics::simularium::Reaction& rx)
 {
-    aics::agentsim::Reaction out;
+    aics::simularium::Reaction out;
     out.name = "rev_" + rx.name;
     out.rate = rx.reverse_rate;
     out.reverse_rate = rx.rate;

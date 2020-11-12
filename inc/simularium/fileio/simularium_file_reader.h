@@ -1,12 +1,12 @@
 #ifndef AICS_SIMULARIUM_FILE_READER_H
 #define AICS_SIMULARIUM_FILE_READER_H
 
-#include "agentsim/agent_data.h"
-#include "agentsim/network/trajectory_properties.h"
+#include "simularium/agent_data.h"
+#include "simularium/network/trajectory_properties.h"
 #include <json/json.h>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace fileio {
 
 class SimulariumFileReader {
@@ -19,7 +19,7 @@ public:
 };
 
 } // namespace fileio
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_SIMULARIUM_FILE_READER_H

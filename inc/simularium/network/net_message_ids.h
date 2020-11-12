@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     enum WebRequestTypes {
         id_undefined_web_request = 0,
@@ -53,7 +53,7 @@ namespace agentsim {
         id_traj_file_playback = 2
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_NET_MESSAGE_IDS

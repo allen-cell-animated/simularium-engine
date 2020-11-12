@@ -10,8 +10,8 @@
 #include <csignal>
 #include <stdlib.h>
 
-#include "agentsim/simpkg/cytosimpkg.h"
-#include "agentsim/agents/agent.h"
+#include "simularium/simpkg/cytosimpkg.h"
+#include "simularium/agents/agent.h"
 #include "loguru/loguru.hpp"
 
 using std::endl;
@@ -20,7 +20,7 @@ using std::endl;
 *	Simulation API
 **/
 namespace aics {
-namespace agentsim {
+namespace simularium {
     const std::string CytosimPkg::PKG_DIRECTORY = "/tmp/aics/simularium/pkg/cytosimpkg";
 
     CytosimPkg::CytosimPkg()
@@ -277,5 +277,5 @@ namespace agentsim {
         }
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

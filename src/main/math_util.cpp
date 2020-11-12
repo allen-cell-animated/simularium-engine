@@ -1,9 +1,9 @@
-#include "agentsim/util/math_util.h"
+#include "simularium/util/math_util.h"
 #include "loguru/loguru.hpp"
 #include <iostream>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace mathutil {
 
     Eigen::Matrix3d eulerToMatrix(
@@ -87,5 +87,5 @@ namespace mathutil {
     }
 
 } // namespace mathutil
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

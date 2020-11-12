@@ -1,6 +1,6 @@
-#include "agentsim/simulation_cache.h"
-#include "agentsim/aws/aws_util.h"
-#include "agentsim/fileio/simularium_file_reader.h"
+#include "simularium/simulation_cache.h"
+#include "simularium/aws/aws_util.h"
+#include "simularium/fileio/simularium_file_reader.h"
 #include "loguru/loguru.hpp"
 #include <json/json.h>
 #include <algorithm>
@@ -24,7 +24,7 @@ inline bool FileExists(const std::string& name)
 *	Simulation API
 */
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     SimulationCache::SimulationCache()
     {
@@ -129,7 +129,7 @@ namespace agentsim {
         // Otherwise, look for the binary cache file
         std::string fpropsFilePath = this->GetAwsInfoFilePath(identifier);
         std::string fpropsDestination = this->GetLocalInfoFilePath(identifier);
-        if(!aics::agentsim::aws_util::Download(fpropsFilePath, fpropsDestination))
+        if(!aics::simularium::aws_util::Download(fpropsFilePath, fpropsDestination))
         {
             LOG_F(WARNING, "Info file for %s not found on AWS S3", awsFilePath.c_str());
             filesFound = false;
@@ -143,7 +143,7 @@ namespace agentsim {
         LOG_F(INFO, "Downloading cache for %s from S3", awsFilePath.c_str());
         std::string destination = this->GetLocalFilePath(identifier);
         std::string cacheFilePath = awsFilePath + "_cache";
-        if (!aics::agentsim::aws_util::Download(cacheFilePath, destination)) {
+        if (!aics::simularium::aws_util::Download(cacheFilePath, destination)) {
             LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
             filesFound = false;
         }
@@ -167,7 +167,7 @@ namespace agentsim {
           if(!fileFound) {
             std::string awsPath = this->GetAwsFilePath(path);
 
-            if(!aics::agentsim::aws_util::Download(awsPath, tmpFile)) {
+            if(!aics::simularium::aws_util::Download(awsPath, tmpFile)) {
               LOG_F(INFO, "Simularium file %s not found on AWS S3", awsPath.c_str());
             } else {
                 LOG_F(INFO, "Simularium file %s found on AWS S3", awsPath.c_str());
@@ -220,7 +220,7 @@ namespace agentsim {
         // Download the file from AWS if it is not present locally
         if (!FileExists(rawPath)) {
             LOG_F(INFO, "%s doesn't exist locally, checking S3...", fileName.c_str());
-            if (!aics::agentsim::aws_util::Download(awsPath, rawPath)) {
+            if (!aics::simularium::aws_util::Download(awsPath, rawPath)) {
                 LOG_F(WARNING, "%s not found on AWS S3", fileName.c_str());
                 return false;
             }
@@ -296,7 +296,7 @@ namespace agentsim {
         std::string destination = awsFilePath + "_cache";
         std::string source = this->GetLocalFilePath(identifier);
         LOG_F(INFO, "Uploading cache file for %s to S3", identifier.c_str());
-        if(!aics::agentsim::aws_util::Upload(source, destination)) {
+        if(!aics::simularium::aws_util::Upload(source, destination)) {
             return false;
         }
 
@@ -304,7 +304,7 @@ namespace agentsim {
         std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
 
         LOG_F(INFO, "Uploading info file for %s to S3", identifier.c_str());
-        if(!aics::agentsim::aws_util::Upload(filePropsPath, filePropsDest))
+        if(!aics::simularium::aws_util::Upload(filePropsPath, filePropsDest))
         {
             return false;
         }
@@ -449,5 +449,5 @@ namespace agentsim {
         }
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

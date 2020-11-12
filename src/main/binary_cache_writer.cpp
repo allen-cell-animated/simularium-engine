@@ -1,7 +1,7 @@
-#include "agentsim/fileio/binary_cache_writer.h"
+#include "simularium/fileio/binary_cache_writer.h"
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace fileio {
 
 void BinaryCacheWriter::SerializeFrame(
@@ -11,7 +11,7 @@ void BinaryCacheWriter::SerializeFrame(
 ) {
   os << "F" << frame_number << this->m_delimiter
      << adf.size() << this->m_delimiter;
-  for (aics::agentsim::AgentData ad : adf) {
+  for (aics::simularium::AgentData ad : adf) {
       this->SerializeAgent(os, ad);
   }
   os << std::endl;
@@ -21,12 +21,12 @@ void BinaryCacheWriter::SerializeAgent(
   std::ofstream& os,
   AgentData& ad
 ) {
-    auto vals = aics::agentsim::Serialize(ad);
+    auto vals = aics::simularium::Serialize(ad);
     for (auto val : vals) {
         os << val << this->m_delimiter;
     }
 }
 
 } // namespace fileio
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

@@ -17,7 +17,7 @@ enum kVisType {
 };
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     class Agent {
     public:
@@ -70,7 +70,7 @@ namespace agentsim {
         kVisType m_visType = kVisType::vis_type_default;
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_AGENT_H

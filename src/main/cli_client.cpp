@@ -1,5 +1,5 @@
-#include "agentsim/network/cli_client.h"
-#include "agentsim/network/net_message_ids.h"
+#include "simularium/network/cli_client.h"
+#include "simularium/network/net_message_ids.h"
 
 #include <fstream>
 #include <iostream>
@@ -16,7 +16,7 @@ inline bool file_exists(const std::string& name)
 
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
     void printAgentData(const Json::Value& jsonMsg)
     {
         const Json::Value& data = jsonMsg["data"];
@@ -367,5 +367,5 @@ namespace agentsim {
         throw std::logic_error("Web socket client requires a connection");
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

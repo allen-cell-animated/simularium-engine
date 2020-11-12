@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace mathutil {
     
     Eigen::Matrix3d eulerToMatrix( 
@@ -28,7 +28,7 @@ namespace mathutil {
     );
 
 } // namespace mathutil
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_MATH_UTIL_H

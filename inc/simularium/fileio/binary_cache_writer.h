@@ -1,13 +1,13 @@
 #ifndef AICS_BINARY_CACHE_WRITER_H
 #define AICS_BINARY_CACHE_WRITER_H
 
-#include "agentsim/agent_data.h"
+#include "simularium/agent_data.h"
 #include <string>
 #include <fstream>
 #include <iostream>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace fileio {
 
 class BinaryCacheWriter {
@@ -28,7 +28,7 @@ private:
 };
 
 } // namespace fileio
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_BINARY_CACHE_WRITER_H

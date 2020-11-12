@@ -1,14 +1,14 @@
 #ifndef AICS_SIMPKG_H
 #define AICS_SIMPKG_H
 
-#include "agentsim/model/model.h"
-#include "agentsim/network/trajectory_properties.h"
+#include "simularium/model/model.h"
+#include "simularium/network/trajectory_properties.h"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     class Agent;
 
@@ -20,7 +20,7 @@ namespace agentsim {
 *
 * For instance, a third party library that evalutates Simulation
 * will have it's results interpreted by a SimPkg subclass,
-* to return a list of aics::agentsim::Agent entitites
+* to return a list of aics::simularium::Agent entitites
 */
     class SimPkg {
     public:
@@ -96,7 +96,7 @@ namespace agentsim {
         virtual std::vector<std::string> GetFileNames(std::string filePath) = 0;
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_SIMPKG_H

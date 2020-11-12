@@ -4,7 +4,7 @@
 #include <string>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
     namespace aws_util {
 
         /**
@@ -30,7 +30,7 @@ namespace agentsim {
         bool Upload(std::string fileName, std::string objectName);
 
     } // namespace aws_util
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_AWS_UTIL_H

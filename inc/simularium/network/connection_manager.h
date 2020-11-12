@@ -17,15 +17,15 @@
 #include <websocketpp/config/asio.hpp>
 #include <websocketpp/server.hpp>
 
-#include "agentsim/network/net_message_ids.h"
-#include "agentsim/network/trajectory_properties.h"
-#include "agentsim/simulation.h"
+#include "simularium/network/net_message_ids.h"
+#include "simularium/network/trajectory_properties.h"
+#include "simularium/simulation.h"
 
 typedef websocketpp::server<websocketpp::config::asio_tls> server;
 typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> context_ptr;
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     enum ClientPlayState {
         Playing = 0,
@@ -208,7 +208,7 @@ namespace agentsim {
         std::mutex m_fileMutex;
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_CONNECTION_MANAGER_H

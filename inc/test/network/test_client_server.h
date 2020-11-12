@@ -1,9 +1,9 @@
 #include "gtest/gtest.h"
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace test {
     class ClientServerTests : public ::testing::Test {};
 } // namespace test
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

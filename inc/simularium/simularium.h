@@ -1,5 +1,5 @@
-#ifndef AICS_AGENTSIM_H
-#define AICS_AGENTSIM_H
+#ifndef AICS_SIMULARIUM_H
+#define AICS_SIMULARIUM_H
 
 #include "agents/agent.h"
 #include "aws/aws_util.h"
@@ -16,4 +16,4 @@
 #include "network/net_message_ids.h"
 #include "network/trajectory_properties.h"
 
-#endif // AICS_AGENTSIM_H
+#endif // AICS_SIMULARIUM_H

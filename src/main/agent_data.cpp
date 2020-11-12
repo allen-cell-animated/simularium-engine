@@ -1,8 +1,8 @@
-#include "agentsim/agent_data.h"
+#include "simularium/agent_data.h"
 #include "json/json.h"
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
 Json::Value Serialize(AgentDataFrame& adf) {
     std::vector<float> vals;
@@ -48,5 +48,5 @@ std::vector<float> Serialize(AgentData& agentData) {
     return vals;
 }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

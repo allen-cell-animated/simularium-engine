@@ -1,7 +1,7 @@
 #ifndef AICS_CYTOSIMPKG_H
 #define AICS_CYTOSIMPKG_H
 
-#include "agentsim/simpkg/simpkg.h"
+#include "simularium/simpkg/simpkg.h"
 
 #include <string>
 #include <vector>
@@ -10,7 +10,7 @@ class Simul;
 class FrameReader;
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     class CytosimPkg : public SimPkg {
     public:
@@ -90,7 +90,7 @@ namespace agentsim {
         };
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_CYTOSIMPKG_H

@@ -1,4 +1,4 @@
-#include "agentsim/aws/aws_util.h"
+#include "simularium/aws/aws_util.h"
 #include "test/aws/test_aws_util.h"
 #include <aws/core/Aws.h>
 #include <aws/core/utils/memory/AWSMemory.h>
@@ -8,7 +8,7 @@
 #include <iostream>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace test {
 
     TEST_F(AwsSdkTest, DownloadUsingSDK)
@@ -48,9 +48,9 @@ namespace test {
 
     TEST_F(AwsSdkTest, DownloadUsingUtil)
     {
-        aics::agentsim::aws_util::Download("trajectory/test.txt", "trajectory/test.txt");
+        aics::simularium::aws_util::Download("trajectory/test.txt", "trajectory/test.txt");
     }
 
 } // namespace test
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

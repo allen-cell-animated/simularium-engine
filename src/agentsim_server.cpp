@@ -11,9 +11,9 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
-#include "agentsim/agentsim.h"
+#include "simularium/simularium.h"
 
-using namespace aics::agentsim;
+using namespace aics::simularium;
 
 // Arg List:
 //  --no-exit  don't use the no client timeout

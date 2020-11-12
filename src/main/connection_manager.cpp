@@ -1,7 +1,7 @@
-#include "agentsim/network/connection_manager.h"
-#include "agentsim/network/net_message_ids.h"
-#include "agentsim/network/trajectory_properties.h"
-#include "agentsim/aws/aws_util.h"
+#include "simularium/network/connection_manager.h"
+#include "simularium/network/net_message_ids.h"
+#include "simularium/network/trajectory_properties.h"
+#include "simularium/aws/aws_util.h"
 #include "loguru/loguru.hpp"
 #include <fstream>
 #include <iostream>
@@ -15,7 +15,7 @@ inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
 static const std::string LIVE_SIM_IDENTIFIER = "live";
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     ConnectionManager::ConnectionManager()
     {
@@ -770,7 +770,7 @@ namespace agentsim {
                 } break;
                 case WebRequestTypes::id_model_definition: {
                     this->LogClientEvent(senderUid, "New Model Arrived");
-                    aics::agentsim::Model sim_model;
+                    aics::simularium::Model sim_model;
                     parse_model(jsonMsg, sim_model);
                     print_model(sim_model);
                     simulation.SetModel(sim_model);
@@ -957,5 +957,5 @@ namespace agentsim {
         simulation.CleanupTmpFiles(fileName);
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

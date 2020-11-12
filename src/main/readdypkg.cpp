@@ -1,6 +1,6 @@
 #include "readdy/readdy.h"
-#include "agentsim/agents/agent.h"
-#include "agentsim/simpkg/readdypkg.h"
+#include "simularium/agents/agent.h"
+#include "simularium/simpkg/readdypkg.h"
 #include "readdy/model/observables/io/TrajectoryEntry.h"
 #include "readdy/model/observables/io/Types.h"
 #include <fstream>
@@ -119,7 +119,7 @@ using IdParticleMapping = std::vector<std::unordered_map<std::size_t, std::size_
 using OrientationDataMap = std::unordered_map<std::string,std::vector<std::pair<MonomerType,OrientationData>>>;
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     struct ReaDDyConfigInfo {
         float boxX, boxY, boxZ; // box size
@@ -177,7 +177,7 @@ namespace agentsim {
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents) {}
     void ReaDDyPkg::UpdateParameter(std::string paramName, float paramValue) {}
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #include "readdypkg_fileio.cc"

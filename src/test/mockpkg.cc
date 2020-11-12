@@ -1,7 +1,7 @@
-#include "agentsim/agentsim.h"
+#include "simularium/simularium.h"
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace test {
 
     class MockSimPkg : public SimPkg {
@@ -58,5 +58,5 @@ namespace test {
     };
 
 } // namespace test
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

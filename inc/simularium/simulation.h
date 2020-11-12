@@ -1,11 +1,11 @@
 #ifndef AICS_SIMULATION_H
 #define AICS_SIMULATION_H
 
-#include "agentsim/agent_data.h"
-#include "agentsim/model/model.h"
-#include "agentsim/simulation_cache.h"
-#include "agentsim/network/trajectory_properties.h"
-#include "agentsim/network/net_message_ids.h"
+#include "simularium/agent_data.h"
+#include "simularium/model/model.h"
+#include "simularium/simulation_cache.h"
+#include "simularium/network/trajectory_properties.h"
+#include "simularium/network/net_message_ids.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -13,7 +13,7 @@
 #include <vector>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     class Agent;
     class SimPkg;

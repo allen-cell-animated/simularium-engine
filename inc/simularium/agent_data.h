@@ -5,17 +5,17 @@
 #include <vector>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
     struct AgentData;
 
-    typedef std::vector<aics::agentsim::AgentData> AgentDataFrame;
-    typedef std::vector<aics::agentsim::AgentDataFrame> AgentDataFrameBundle;
-} // namespace agentsim
+    typedef std::vector<aics::simularium::AgentData> AgentDataFrame;
+    typedef std::vector<aics::simularium::AgentDataFrame> AgentDataFrameBundle;
+} // namespace simularium
 } // namespace aics
 
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     struct AgentData {
         float vis_type = 0;

@@ -1,10 +1,10 @@
-#include "agentsim/agents/agent.h"
+#include "simularium/agents/agent.h"
 #include <stdlib.h>
 #include <time.h>
 #include <iostream>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     namespace agents {
         void GenerateLocalUUID(std::string& uuid)
@@ -83,5 +83,5 @@ namespace agentsim {
         return std::vector<float>(first, last);
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

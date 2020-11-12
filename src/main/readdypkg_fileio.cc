@@ -1,4 +1,4 @@
-#include "agentsim/util/math_util.h"
+#include "simularium/util/math_util.h"
 #define LOGURU_WITH_STREAMS 1
 #include "loguru/loguru.hpp"
 #include <json/json.h>
@@ -168,7 +168,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
+    std::shared_ptr<aics::simularium::ReaDDyFileInfo>& readdyFileInfo,
     IdParticleMapping& particleLookup
 );
 
@@ -180,7 +180,7 @@ void copy_frame(
     readdy::Simulation* sim,
     const std::vector<ParticleData>& particle_data,
     RotationH5List& rotationInfo,
-    std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents);
+    std::vector<std::shared_ptr<aics::simularium::Agent>>& agents);
 
 TimeTrajectoryH5Info readTrajectory(
     const std::shared_ptr<h5rd::File>& file,
@@ -261,13 +261,13 @@ static Eigen::Matrix3d getRotationUsingAxis(
 static void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
+    std::shared_ptr<aics::simularium::ReaDDyFileInfo>& readdyFileInfo,
     const IdParticleMapping& particleLookup,
     const OrientationDataMap& orientationDataLookup
 );
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     std::size_t frame_no = 0;
     std::string last_loaded_file = "";
@@ -398,7 +398,7 @@ namespace agentsim {
         return frame;
     }
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 /**
@@ -431,7 +431,7 @@ void run_and_save_h5file(
 
 void read_h5file(
     std::string file_name,
-    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
+    std::shared_ptr<aics::simularium::ReaDDyFileInfo>& readdyFileInfo,
     IdParticleMapping& particleLookup
     )
 {
@@ -533,7 +533,7 @@ void copy_frame(
     readdy::Simulation* sim,
     const std::vector<ParticleData>& particle_data,
     RotationH5List& rotationInfo,
-    std::vector<std::shared_ptr<aics::agentsim::Agent>>& agents)
+    std::vector<std::shared_ptr<aics::simularium::Agent>>& agents)
 {
     std::size_t agentIndex = 0;
     std::size_t ignore_count = 0;
@@ -1078,7 +1078,7 @@ static Eigen::Matrix3d getCurrentRotation(
     auto neighbor2Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos2, boxSize);
     basisPositions.push_back(neighbor2Position);
 
-    return aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+    return aics::simularium::mathutil::GetRotationMatrix(basisPositions);
 }
 
 static Eigen::Matrix3d getInitialRotation(
@@ -1090,7 +1090,7 @@ static Eigen::Matrix3d getInitialRotation(
     basisPositions.push_back(Eigen::Vector3d(0,0,0));
     basisPositions.push_back(neighborOrientationData.at(1).data.localPosition);
 
-    return aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+    return aics::simularium::mathutil::GetRotationMatrix(basisPositions);
 }
 
 static Eigen::Matrix3d getRotationUsingAxis(
@@ -1108,7 +1108,7 @@ static Eigen::Matrix3d getRotationUsingAxis(
     auto neighbor0Position = getNeighborNonPeriodicBoundaryPosition(pos1, pos0, boxSize);
 
     Eigen::Vector3d axis = neighbor0Position - pos1;
-    auto normal = aics::agentsim::mathutil::getRandomPerpendicularVector(axis);
+    auto normal = aics::simularium::mathutil::getRandomPerpendicularVector(axis);
     auto pos2 = pos1 + normal;
 
     std::vector<Eigen::Vector3d> basisPositions {};
@@ -1116,14 +1116,14 @@ static Eigen::Matrix3d getRotationUsingAxis(
     basisPositions.push_back(pos1);
     basisPositions.push_back(pos2);
 
-    Eigen::Matrix3d rotation = aics::agentsim::mathutil::GetRotationMatrix(basisPositions);
+    Eigen::Matrix3d rotation = aics::simularium::mathutil::GetRotationMatrix(basisPositions);
     return rotation * axisRotation;
 }
 
 static void calculateOrientations(
     const TopologyH5Info& topologyH5Info,
     const TrajectoryH5Info& trajectoryH5Info,
-    std::shared_ptr<aics::agentsim::ReaDDyFileInfo>& readdyFileInfo,
+    std::shared_ptr<aics::simularium::ReaDDyFileInfo>& readdyFileInfo,
     const IdParticleMapping& particleLookup,
     const OrientationDataMap& orientationDataLookup
 )
@@ -1155,7 +1155,7 @@ static void calculateOrientations(
             auto currentParticle = trajectoryFrame.at(particleIndex);
             if (is_child_particle(currentParticle.type))
             {
-                orientationFrame.push_back(aics::agentsim::mathutil::getErrorOrientation(0));
+                orientationFrame.push_back(aics::simularium::mathutil::getErrorOrientation(0));
                 continue;
             }
 
@@ -1186,7 +1186,7 @@ static void calculateOrientations(
                         frameIndex, currentParticle.type.c_str(), currentParticle.id
                     );
                 }
-                orientationFrame.push_back(aics::agentsim::mathutil::getRandomOrientation());
+                orientationFrame.push_back(aics::simularium::mathutil::getRandomOrientation());
                 continue;
             }
 
@@ -1199,7 +1199,7 @@ static void calculateOrientations(
                         frameIndex, currentParticle.type.c_str(), currentParticle.id
                     );
                 }
-                orientationFrame.push_back(aics::agentsim::mathutil::getErrorOrientation(0));
+                orientationFrame.push_back(aics::simularium::mathutil::getErrorOrientation(0));
                 particlesToOrientRelativeToNeighbor[particleIndex] = RelativeOrientationData(
                     neighborOrientationData.at(0)
                 );
@@ -1230,14 +1230,14 @@ static void calculateOrientations(
         {
             auto particleID = it.first;
 
-            if (orientationFrame.at(particleID) != aics::agentsim::mathutil::getErrorOrientation(0))
+            if (orientationFrame.at(particleID) != aics::simularium::mathutil::getErrorOrientation(0))
             {
                 continue;
             }
 
             auto neighborID = it.second.neighborID;
             auto neighborOrientation = orientationFrame.at(neighborID);
-            if (neighborOrientation == aics::agentsim::mathutil::getErrorOrientation(0))
+            if (neighborOrientation == aics::simularium::mathutil::getErrorOrientation(0))
             {
                 // neighbor hasn't been oriented, so use axis rotation instead
                 orientationFrame.at(particleID) = getRotationUsingAxis(

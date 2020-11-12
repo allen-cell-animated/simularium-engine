@@ -1,7 +1,7 @@
 #ifndef AICS_READDYPKG_H
 #define AICS_READDYPKG_H
 
-#include "agentsim/simpkg/simpkg.h"
+#include "simularium/simpkg/simpkg.h"
 #include <string>
 #include <vector>
 
@@ -14,7 +14,7 @@ class BloscFilter;
 } // namespace readdy
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
     struct ReaDDyFileInfo;
 
     class ReaDDyPkg : public SimPkg {
@@ -71,7 +71,7 @@ namespace agentsim {
         std::shared_ptr<ReaDDyFileInfo> m_fileInfo;
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_READDYPKG_H

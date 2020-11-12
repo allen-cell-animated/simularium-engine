@@ -1,7 +1,7 @@
 #ifndef AICS_MODEL_H
 #define AICS_MODEL_H
 
-#include "agentsim/reactions/reaction.h"
+#include "simularium/reactions/reaction.h"
 #include <json/json.h>
 #include <memory>
 #include <string>
@@ -9,7 +9,7 @@
 #include <unordered_map>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     struct SubComplexModelData {
         std::string name;
@@ -65,10 +65,10 @@ namespace agentsim {
         std::vector<DynamicsConstraintConfig> constraints;
     };
 
-    void parse_model(Json::Value& json_obj, aics::agentsim::Model& model);
-    void print_model(aics::agentsim::Model& model);
+    void parse_model(Json::Value& json_obj, aics::simularium::Model& model);
+    void print_model(aics::simularium::Model& model);
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_MODEL_H

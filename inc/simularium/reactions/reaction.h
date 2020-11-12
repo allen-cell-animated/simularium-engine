@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     struct rxChildState {
         std::string name;
@@ -47,7 +47,7 @@ namespace agentsim {
         std::string product;
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_REACTION_H

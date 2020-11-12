@@ -60,7 +60,7 @@ A single frame at time 200 with a single agent:
 The corresponding object constructed in Agent-Viz (C++):
 
 ```
-using namespace aics::agentsim;
+using namespace aics::simularium;
 
 AgentData ad;
 ad.vis_type = kVisType::vis_type_default; // 1000

@@ -1,10 +1,10 @@
 #ifndef AICS_SIMULATION_CACHE_H
 #define AICS_SIMULATION_CACHE_H
 
-#include "agentsim/agent_data.h"
-#include "agentsim/network/trajectory_properties.h"
-#include "agentsim/fileio/binary_cache_reader.h"
-#include "agentsim/fileio/binary_cache_writer.h"
+#include "simularium/agent_data.h"
+#include "simularium/network/trajectory_properties.h"
+#include "simularium/fileio/binary_cache_reader.h"
+#include "simularium/fileio/binary_cache_writer.h"
 #include <json/json.h>
 #include <algorithm>
 #include <iostream>
@@ -15,7 +15,7 @@
 #include <unordered_map>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     class SimulationCache {
     public:

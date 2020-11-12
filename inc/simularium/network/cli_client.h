@@ -15,10 +15,10 @@ typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
 typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> context_ptr;
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
     // A websocket client for command line
-    //  can issue commands to the agentsim server
+    //  can issue commands to the simularium server
     class CliClient {
     public:
         CliClient(std::string uri);
@@ -66,7 +66,7 @@ namespace agentsim {
         std::thread m_listeningThread;
     };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_CLI_CLIENT_H

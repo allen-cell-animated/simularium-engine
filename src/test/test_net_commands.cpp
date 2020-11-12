@@ -1,11 +1,11 @@
-#include "agentsim/agentsim.h"
-#include "agentsim/network/cli_client.h"
-#include "agentsim/network/net_message_ids.h"
+#include "simularium/simularium.h"
+#include "simularium/network/cli_client.h"
+#include "simularium/network/net_message_ids.h"
 #include "test/network/test_net_commands.h"
 #include <memory>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace test {
 
     TEST_F(NetCommandTests, PlayPause)
@@ -54,5 +54,5 @@ namespace test {
     }
 
 } // namespace test
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

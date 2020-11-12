@@ -1,7 +1,7 @@
-#include "agentsim/fileio/binary_cache_reader.h"
+#include "simularium/fileio/binary_cache_reader.h"
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace fileio {
 
 bool BinaryCacheReader::GotoFrameNumber(
@@ -37,7 +37,7 @@ bool BinaryCacheReader::DeserializeFrame(
     std::size_t num_agents = std::stoi(line);
 
     for (std::size_t i = 0; i < num_agents; ++i) {
-        aics::agentsim::AgentData ad;
+        aics::simularium::AgentData ad;
         if (this->DeserializeAgent(is, ad)) {
             adf.push_back(ad);
         }
@@ -84,5 +84,5 @@ bool BinaryCacheReader::DeserializeAgent(
 }
 
 } // namespace fileio
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

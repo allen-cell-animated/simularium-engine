@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 
 struct TrajectoryFileProperties{
     std::string fileName = "";
@@ -24,7 +24,7 @@ struct TrajectoryFileProperties{
     }
 };
 
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics
 
 #endif // AICS_TRAJECTORY_PROPERTIES_H

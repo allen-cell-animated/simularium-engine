@@ -1,10 +1,10 @@
-#include "agentsim/agentsim.h"
+#include "simularium/simularium.h"
 #include "mockpkg.cc"
 #include "gtest/gtest.h"
 #include <cstdio>
 
 namespace aics {
-namespace agentsim {
+namespace simularium {
 namespace test {
     class SimulationTimeTests : public ::testing::Test { };
 
@@ -100,5 +100,5 @@ namespace test {
     }
 
 } // namespace test
-} // namespace agentsim
+} // namespace simularium
 } // namespace aics

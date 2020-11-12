@@ -1,6 +1,6 @@
-#include "agentsim/network/cli_client.h"
-#include "agentsim/network/net_message_ids.h"
-using namespace aics::agentsim;
+#include "simularium/network/cli_client.h"
+#include "simularium/network/net_message_ids.h"
+using namespace aics::simularium;
 
 int main(int argc, char* argv[])
 {
