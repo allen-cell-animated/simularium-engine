@@ -5,6 +5,7 @@
 #include "simularium/network/trajectory_properties.h"
 #include "simularium/fileio/binary_cache_reader.h"
 #include "simularium/fileio/binary_cache_writer.h"
+#include "simularium/fileio/simularium_binary_file.h"
 #include <json/json.h>
 #include <algorithm>
 #include <iostream>
@@ -32,7 +33,7 @@ namespace simularium {
         *   Stores data for a single trajectory frame in a cache that can be
         *   retrieved using the 'identifier' parameter
         */
-        void AddFrame(std::string identifier, AgentDataFrame data);
+        void AddFrame(std::string identifier, TrajectoryFrame frame);
 
         /**
         *   GetFrame
@@ -104,10 +105,7 @@ namespace simularium {
         inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium"); }
         inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium"); }
 
-        std::ofstream& GetOfstream(std::string& identifier);
-        std::ifstream& GetIfstream(std::string& identifier);
-
-        void CloseFileStreams();
+        SimulariumBinaryFile* GetBinaryFile(std::string identifier);
 
         void ParseFileProperties(std::string identifier);
         void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
@@ -116,15 +114,13 @@ namespace simularium {
         const std::string kCacheFolder = "/tmp/aics/simularium/";
         const std::string kAwsPrefix = "trajectory/";
 
-        std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
         std::ios_base::openmode m_ifstreamFlags = std::ios::in | std::ios::binary;
-        std::unordered_map<std::string, std::ofstream> m_ofstreams;
         std::unordered_map<std::string, std::ifstream> m_ifstreams;
         std::unordered_map<std::string, std::size_t> m_numFrames;
         std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
         std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;
 
-        fileio::BinaryCacheWriter m_binaryCacheWriter;
+        std::unordered_map<std::string, std::shared_ptr<SimulariumBinaryFile>> m_binaryFiles;
         fileio::BinaryCacheReader m_binaryCacheReader;
     };
 

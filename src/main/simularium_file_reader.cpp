@@ -9,8 +9,9 @@ namespace fileio {
     bool SimulariumFileReader::DeserializeFrame(
       Json::Value& jsonRoot,
       std::size_t frameNumber,
-      AgentDataFrame& adf
+      TrajectoryFrame& outFrame
     ) {
+      AgentDataFrame adf;
       Json::Value& spatialData = jsonRoot["spatialData"];
       std::size_t start = spatialData["bundleStart"].asInt();
       std::size_t size = spatialData["bundleSize"].asInt();
@@ -47,6 +48,10 @@ namespace fileio {
 
           adf.push_back(ad);
       }
+
+      outFrame.data = adf;
+      outFrame.time = frameJson["time"].asFloat();
+      outFrame.frameNumber = frameNumber;
 
       return true;
     }

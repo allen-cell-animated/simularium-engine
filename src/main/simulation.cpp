@@ -123,10 +123,10 @@ namespace simularium {
 
     void Simulation::CacheCurrentAgents()
     {
-        AgentDataFrame newFrame;
+        TrajectoryFrame newFrame;
         for (std::size_t i = 0; i < this->m_agents.size(); ++i) {
             auto agent = this->m_agents[i];
-            AppendAgentData(newFrame, agent);
+            AppendAgentData(newFrame.data, agent);
         }
 
         this->m_cache.AddFrame(this->m_simIdentifier, newFrame);
