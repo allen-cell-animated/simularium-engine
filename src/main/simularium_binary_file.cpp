@@ -75,7 +75,7 @@ void SimulariumBinaryFile::WriteHeader() {
     header.push_back(char(0)); // patch version
 
     this->m_fstream.seekp(0, std::ios_base::beg);
-    this->m_fstream.write((char*)&header[0], header.size() * sizeof(float));
+    this->m_fstream.write((char*)&header[0], header.size() * sizeof(unsigned char));
 }
 
 void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
@@ -86,8 +86,8 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
 
     std::vector<int> tocChunk (size, 0);
 
-    this->m_fstream.seekp(0, std::ios_base::beg);
-    this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(float));
+    this->m_fstream.seekp(16, std::ios_base::beg);
+    this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
 }
 
 } // namespace simularium
