@@ -4,7 +4,6 @@
 
 namespace aics {
 namespace simularium {
-namespace fileio {
 
 void SimulariumBinaryFile::Create(std::string filePath, std::size_t numFrames) {
     if(this->m_fstream) {
@@ -19,11 +18,6 @@ void SimulariumBinaryFile::Create(std::string filePath, std::size_t numFrames) {
       std::ios_base::in |
       std::ios_base::out |
       std::ios_base::trunc
-    );
-
-    this->m_fstream.exceptions(
-      std::ios::failbit |
-      std::ios::badbit
     );
 
     this->WriteHeader();
@@ -60,29 +54,10 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
         }
     }
 
-    // Read the current number of frames saved to the file
-    this->m_fstream.seekg(16, std::ios_base::beg);
-    int nFrames;
-    this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
+    //@TODO: MAKE RECORD OF WHERE TO FIND THE FRAME
 
-    // Get the stream position of the new frame chunk
-    this->m_fstream.seekg(0, std::ios_base::end);
-    int framePos = int(this->m_fstream.tellg());
-
-    // Save the frame-chunk stream position in the offset look-up
-    int tocPos = 20 + nFrames * 4; // 16 bit header + 4 bit toc size
-    this->m_fstream.seekp(tocPos, std::ios_base::beg);
-    this->m_fstream.write((char*)&framePos, sizeof(int));
-
-    // Save the frame chunk data out
     this->m_fstream.seekp(0, std::ios_base::end);
     this->m_fstream.write((char*)&frameChunk[0], frameChunk.size() * sizeof(float));
-    this->m_fstream.write((char*)fileio::binary::eof, sizeof(unsigned char) * 20);
-
-    // Update the number of frames loaded in the file
-    nFrames++;
-    this->m_fstream.seekp(16, std::ios_base::beg);
-    this->m_fstream.write((char*)&nFrames, sizeof(nFrames));
 }
 
 void SimulariumBinaryFile::WriteHeader() {
@@ -100,7 +75,7 @@ void SimulariumBinaryFile::WriteHeader() {
     header.push_back(char(0)); // patch version
 
     this->m_fstream.seekp(0, std::ios_base::beg);
-    this->m_fstream.write((char*)&header[0], header.size() * sizeof(unsigned char));
+    this->m_fstream.write((char*)&header[0], header.size() * sizeof(float));
 }
 
 void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
@@ -109,106 +84,11 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
         return;
     }
 
-    std::vector<int> tocChunk (size + 1, 0);
+    std::vector<int> tocChunk (size, 0);
 
-    this->m_fstream.seekp(16, std::ios_base::beg);
-    this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
-
-    this->m_fstream.seekg(0, std::ios_base::end);
-    this->m_endTOC = std::size_t(this->m_fstream.tellg());
+    this->m_fstream.seekp(0, std::ios_base::beg);
+    this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(float));
 }
 
-std::size_t SimulariumBinaryFile::NumSavedFrames() {
-    this->m_fstream.seekg(16, std::ios_base::beg);
-    int nFrames;
-    this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
-    return nFrames;
-}
-
-BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
-  std::size_t frameNumber
-) {
-    if(!this->m_fstream) {
-        LOG_F(WARNING, "No file opened. Call SimulariumBinaryFile.Create([filepath])");
-        return BroadcastUpdate();
-    }
-    auto nFrames = this->NumSavedFrames();
-    if(frameNumber >= nFrames) {
-      LOG_F(WARNING, "Request for invalid frame %zu", frameNumber);
-      return BroadcastUpdate();
-    }
-
-    int tocPos = 20 + frameNumber * 4;
-    this->m_fstream.seekg(tocPos, std::ios_base::beg);
-    int frameStart;
-    this->m_fstream.read((char*)&frameStart, sizeof(frameStart));
-
-    int frameEnd; // start of the next frame
-    if(nFrames > frameNumber + 1) {
-      this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
-      this->m_fstream.read((char*)&frameEnd, sizeof(frameEnd));
-    } else {
-      frameEnd = this->GetEndOfFilePos();
-    }
-
-    this->m_fstream.seekg(frameStart, std::ios_base::beg);
-
-    BroadcastUpdate out;
-
-    if(frameEnd > frameStart) {
-      out.buffer.resize((frameEnd - frameStart) / 4);
-      this->m_fstream.read(
-        reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
-      );
-
-      out.new_pos = frameEnd;
-    } else {
-      LOG_F(ERROR, "Invalid Frame Bounds found. (%i, %i)", frameStart, frameEnd);
-    }
-
-    return out;
-}
-
-BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
-  std::size_t currentPos,
-  std::size_t bufferSize
-) {
-    if(!this->m_fstream) {
-        LOG_F(WARNING, "No file opened. Call SimulariumBinaryFile.Create([filepath])");
-        return BroadcastUpdate();
-    }
-
-    auto start = std::max(currentPos, this->m_endTOC);
-    auto end = std::min(start + bufferSize, this->GetEndOfFilePos());
-    this->m_fstream.seekg(start, std::ios_base::beg);
-
-    BroadcastUpdate out;
-    out.buffer.resize((end - start) / 4);
-    this->m_fstream.read(
-      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
-    );
-
-    out.new_pos = start + bufferSize;
-
-    return out;
-}
-
-std::size_t SimulariumBinaryFile::GetEndOfFilePos() {
-  this->m_fstream.seekg(0, std::ios_base::end);
-  return std::size_t(this->m_fstream.tellg());
-}
-
-std::size_t SimulariumBinaryFile::GetFramePos(
-  std::size_t frameNumber
-) {
-  int tocPos = 20 + frameNumber * 4;
-  this->m_fstream.seekg(tocPos, std::ios_base::beg);
-  int framePos;
-  this->m_fstream.read((char*)&framePos, sizeof(framePos));
-
-  return framePos;
-}
-
-} // namespace fileio
 } // namespace simularium
 } // namespace aics

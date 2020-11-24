@@ -39,7 +39,13 @@ namespace simularium {
 
     void SimulationCache::AddFrame(std::string identifier, TrajectoryFrame frame)
     {
-        fileio::SimulariumBinaryFile* file = this->GetBinaryFile(identifier);
+        if(this->m_numFrames.count(identifier) == 0) {
+            this->m_numFrames[identifier] = 0;
+        } else {
+            this->m_numFrames[identifier]++;
+        }
+
+        SimulariumBinaryFile* file = this->GetBinaryFile(identifier);
         file->WriteFrame(frame);
     }
 
@@ -56,18 +62,7 @@ namespace simularium {
             return BroadcastUpdate();
         }
 
-        return this->m_binaryFiles.at(identifier)->GetBroadcastFrame(frameNumber);
-    }
-
-    BroadcastUpdate SimulationCache::GetBroadcastUpdate(
-      std::string identifier,
-      std::size_t currentPosition,
-      std::size_t bufferSize
-    ) {
-        if(!this->m_binaryFiles.count(identifier)) {
-            LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
-            return BroadcastUpdate();
-        }
+        // @TODO: GET AND RETURN FRAME FROM SIMULARIUM BINARY FILE
 
         return this->m_binaryFiles.at(identifier)->GetBroadcastUpdate(currentPosition, bufferSize);
     }
@@ -107,6 +102,8 @@ namespace simularium {
         std::remove(filePath.c_str());
 
         this->m_binaryFiles.erase(identifier);
+
+        this->m_numFrames.erase(identifier);
         this->m_fileProps.erase(identifier);
     }
 
@@ -196,7 +193,7 @@ namespace simularium {
 
         // Convert the simularium file to a binary cache file
         fileio::SimulariumFileReader simulariumFileReader;
-        fileio::SimulariumBinaryFile* outFile = this->GetBinaryFile(fileName);
+        SimulariumBinaryFile* outFile = this->GetBinaryFile(fileName);
 
         Json::Value& spatialData = simJson["spatialData"];
         int nFrames = spatialData["bundleSize"].asInt();
@@ -410,12 +407,12 @@ namespace simularium {
         return this->kCacheFolder + identifier + ".json";
     }
 
-    fileio::SimulariumBinaryFile* SimulationCache::GetBinaryFile(std::string identifier) {
+    SimulariumBinaryFile* SimulationCache::GetBinaryFile(std::string identifier) {
       std::string path = this->GetLocalFilePath(identifier);
 
       if(!this->m_binaryFiles.count(identifier)) {
           this->m_binaryFiles[identifier] =
-            std::make_shared<fileio::SimulariumBinaryFile>();
+            std::make_shared<SimulariumBinaryFile>();
           this->m_binaryFiles[identifier]->Create(path);
       }
 
