@@ -121,7 +121,6 @@ namespace simularium {
         std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;
 
         std::unordered_map<std::string, std::shared_ptr<SimulariumBinaryFile>> m_binaryFiles;
-        fileio::BinaryCacheReader m_binaryCacheReader;
     };
 
 }
