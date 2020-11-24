@@ -54,10 +54,28 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
         }
     }
 
-    //@TODO: MAKE RECORD OF WHERE TO FIND THE FRAME
+    // Read the current number of frames saved to the file
+    this->m_fstream.seekg(16, std::ios_base::beg);
+    int nFrames;
+    this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
 
+    // Get the stream position of the new frame chunk
+    this->m_fstream.seekg(0, std::ios_base::end);
+    int framePos = int(this->m_fstream.tellg());
+
+    // Save the frame-chunk stream position in the offset look-up
+    int tocPos = 20 + frame.frameNumber * 4; // 16 bit header + 4 bit toc size
+    this->m_fstream.seekp(tocPos, std::ios_base::beg);
+    this->m_fstream.write((char*)&framePos, sizeof(int));
+
+    // Save the frame chunk data out
     this->m_fstream.seekp(0, std::ios_base::end);
     this->m_fstream.write((char*)&frameChunk[0], frameChunk.size() * sizeof(float));
+
+    // Update the number of frames loaded in the file
+    nFrames++;
+    this->m_fstream.seekp(16, std::ios_base::beg);
+    this->m_fstream.write((char*)&nFrames, sizeof(nFrames));
 }
 
 void SimulariumBinaryFile::WriteHeader() {
@@ -84,7 +102,7 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
         return;
     }
 
-    std::vector<int> tocChunk (size, 0);
+    std::vector<int> tocChunk (size + 1, 0);
 
     this->m_fstream.seekp(16, std::ios_base::beg);
     this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
