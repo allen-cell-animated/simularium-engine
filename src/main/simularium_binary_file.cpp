@@ -4,6 +4,7 @@
 
 namespace aics {
 namespace simularium {
+namespace fileio {
 
 void SimulariumBinaryFile::Create(std::string filePath, std::size_t numFrames) {
     if(this->m_fstream) {
@@ -64,13 +65,14 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     int framePos = int(this->m_fstream.tellg());
 
     // Save the frame-chunk stream position in the offset look-up
-    int tocPos = 20 + frame.frameNumber * 4; // 16 bit header + 4 bit toc size
+    int tocPos = 20 + nFrames * 4; // 16 bit header + 4 bit toc size
     this->m_fstream.seekp(tocPos, std::ios_base::beg);
     this->m_fstream.write((char*)&framePos, sizeof(int));
 
     // Save the frame chunk data out
     this->m_fstream.seekp(0, std::ios_base::end);
     this->m_fstream.write((char*)&frameChunk[0], frameChunk.size() * sizeof(float));
+    this->m_fstream.write((char*)fileio::binary::eof, sizeof(unsigned char) * 4);
 
     // Update the number of frames loaded in the file
     nFrames++;
@@ -108,5 +110,25 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
     this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
 }
 
+std::size_t SimulariumBinaryFile::NumSavedFrames() {
+    this->m_fstream.seekg(16, std::ios_base::beg);
+    int nFrames;
+    this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
+    return nFrames;
+}
+
+TrajectoryFrame SimulariumBinaryFile::GetFrame(std::size_t frameNumber) {
+    int tocPos = 20 + frameNumber * 4;
+    this->m_fstream.seekg(tocPos, std::ios_base::beg);
+    int framePos;
+    this->m_fstream.read((char*)&framePos, sizeof(framePos));
+
+    this->m_fstream.seekg(framePos, std::ios_base::beg);
+
+    TrajectoryFrame out;
+    return out;
+}
+
+} // namespace fileio
 } // namespace simularium
 } // namespace aics
