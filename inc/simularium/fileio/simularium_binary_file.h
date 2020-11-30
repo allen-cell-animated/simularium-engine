@@ -7,11 +7,18 @@
 
 namespace aics {
 namespace simularium {
+namespace fileio {
+namespace binary {
+  const unsigned char eof[4] = {'\\', 'e', 'o', 'f'}; //@TODO LOOK AT ME
+}
 
 class SimulariumBinaryFile {
   public:
     void Create(std::string filePath, std::size_t numFrames=10000);
     void WriteFrame(TrajectoryFrame tf);
+    TrajectoryFrame GetFrame(std::size_t frameNumber);
+
+    std::size_t NumSavedFrames();
 
   private:
     void WriteHeader();
@@ -20,6 +27,7 @@ class SimulariumBinaryFile {
     std::fstream m_fstream;
 };
 
+} // namespace fileio
 } // namespace simularium
 } // namespace aics
 

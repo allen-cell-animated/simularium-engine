@@ -3,8 +3,6 @@
 
 #include "simularium/agent_data.h"
 #include "simularium/network/trajectory_properties.h"
-#include "simularium/fileio/binary_cache_reader.h"
-#include "simularium/fileio/binary_cache_writer.h"
 #include "simularium/fileio/simularium_binary_file.h"
 #include <json/json.h>
 #include <algorithm>
@@ -134,7 +132,7 @@ namespace simularium {
         inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium"); }
         inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium"); }
 
-        SimulariumBinaryFile* GetBinaryFile(std::string identifier);
+        fileio::SimulariumBinaryFile* GetBinaryFile(std::string identifier);
 
         void ParseFileProperties(std::string identifier);
         void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
@@ -143,13 +141,9 @@ namespace simularium {
         const std::string kCacheFolder = "/tmp/aics/simularium/";
         const std::string kAwsPrefix = "trajectory/";
 
-        std::ios_base::openmode m_ifstreamFlags = std::ios::in | std::ios::binary;
-        std::unordered_map<std::string, std::ifstream> m_ifstreams;
-        std::unordered_map<std::string, std::size_t> m_numFrames;
         std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
         std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;
-
-        std::unordered_map<std::string, std::shared_ptr<SimulariumBinaryFile>> m_binaryFiles;
+        std::unordered_map<std::string, std::shared_ptr<fileio::SimulariumBinaryFile>> m_binaryFiles;
     };
 }
 }
