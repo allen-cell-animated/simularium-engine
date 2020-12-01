@@ -16,7 +16,7 @@ struct BroadcastUpdate {
 
 namespace fileio {
 namespace binary {
-  const unsigned char eof[4] = {'\\', 'e', 'o', 'f'};
+  const char eof[4] = {'\\', 'E', 'O', 'F'};
 }
 
 class SimulariumBinaryFile {

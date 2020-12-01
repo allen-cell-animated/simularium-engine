@@ -185,7 +185,7 @@ namespace broadcast {
         const std::size_t kNoClientTimeoutSeconds = 30;
         const std::size_t kServerTickIntervalMilliSeconds = 200;
         const std::size_t kFileIoCheckIntervalMilliSeconds = 100;
-        const std::size_t kBroadcastBufferSize = 10000;
+        const std::size_t kBroadcastBufferSize = 100000; // 25kb
 
         bool m_argNoTimeout = false;
         bool m_argForceInit = false;
