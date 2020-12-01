@@ -75,11 +75,6 @@ namespace simularium {
       std::string identifier
     ) { return this->m_cache.GetEndOfStreamPos(identifier); }
 
-    std::size_t Simulation::GetFramePos(
-      std::string identifier,
-      std::size_t frameNumber
-    ) { return this->m_cache.GetFramePos(identifier, frameNumber); }
-
     void Simulation::Reset()
     {
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {

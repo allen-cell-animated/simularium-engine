@@ -410,7 +410,7 @@ namespace simularium {
             this->SetClientState(connectionUID, ClientPlayState::Waiting);
         }
         // Invalid frame, set to last frame
-        else if(isClientAtEndOfStream && isFileFinishedProcessing)
+        if(isClientAtEndOfStream && isFileFinishedProcessing)
         {
             if(netState.sim_identifier == LIVE_SIM_IDENTIFIER) {
                 this->SetClientState(connectionUID, ClientPlayState::Waiting);

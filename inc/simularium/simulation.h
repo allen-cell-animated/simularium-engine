@@ -82,11 +82,6 @@ namespace simularium {
           std::size_t bufferSize
         );
 
-        std::size_t GetFramePos(
-          std::string identifier,
-          std::size_t frameNumber
-        );
-
         std::size_t GetEndOfStreamPos(
           std::string identifier
         );

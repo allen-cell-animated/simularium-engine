@@ -117,16 +117,51 @@ std::size_t SimulariumBinaryFile::NumSavedFrames() {
     return nFrames;
 }
 
-TrajectoryFrame SimulariumBinaryFile::GetFrame(std::size_t frameNumber) {
+BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
+  std::size_t frameNumber
+) {
     int tocPos = 20 + frameNumber * 4;
     this->m_fstream.seekg(tocPos, std::ios_base::beg);
-    int framePos;
-    this->m_fstream.read((char*)&framePos, sizeof(framePos));
+    int frameStart;
+    this->m_fstream.read((char*)&frameStart, sizeof(frameStart));
 
-    this->m_fstream.seekg(framePos, std::ios_base::beg);
+    this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
+    int frameEnd; // start of the next frame
+    this->m_fstream.read((char*)&frameEnd, sizeof(frameEnd));
 
-    TrajectoryFrame out;
+    this->m_fstream.seekg(frameStart, std::ios_base::beg);
+
+    BroadcastUpdate out;
+    out.buffer.resize((frameEnd - frameStart) / 4);
+    this->m_fstream.read(
+      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
+    );
+
+    out.new_pos = frameEnd;
+
     return out;
+}
+
+BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
+  std::size_t currentPos,
+  std::size_t bufferSize
+) {
+    this->m_fstream.seekg(currentPos, std::ios_base::beg);
+
+    BroadcastUpdate out;
+    out.buffer.resize(bufferSize / 4);
+    this->m_fstream.read(
+      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
+    );
+
+    out.new_pos = currentPos + bufferSize;
+
+    return out;
+}
+
+std::size_t SimulariumBinaryFile::GetEndOfFilePos() {
+  this->m_fstream.seekg(0, std::ios_base::end);
+  return std::size_t(this->m_fstream.tellg());
 }
 
 } // namespace fileio
