@@ -499,8 +499,6 @@ namespace simularium {
             );
       } catch (...) {
           this->LogClientEvent(connectionUID, "Failed to send websocket message to client");
-          LOG_F(ERROR, "Websocket send failed with exception, removing offending connection...");
-          this->RemoveConnection(connectionUID);
       }
     }
 
@@ -543,14 +541,6 @@ namespace simularium {
     {
         this->LogClientEvent(connectionUID, "Registered client heartbeat");
         this->m_missedHeartbeats[connectionUID] = 0;
-    }
-
-    void ConnectionManager::SendSingleFrameToClient(
-        Simulation& simulation,
-        std::string connectionUID,
-        std::size_t frameNumber
-    ) {
-      this->SendDataToClient(simulation, connectionUID, frameNumber, 1, true);
     }
 
     void ConnectionManager::SendDataToClients(Simulation& simulation)
