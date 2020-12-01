@@ -499,6 +499,8 @@ namespace simularium {
             );
       } catch (...) {
           this->LogClientEvent(connectionUID, "Failed to send websocket message to client");
+          LOG_F(ERROR, "Websocket send failed with exception, removing offending connection...");
+          this->RemoveConnection(connectionUID);
       }
     }
 
