@@ -40,9 +40,33 @@ namespace simularium {
         *   @param      frameNumber     the frame number to retrieve
         *
         *   Returns a single trajectory frame from a cache specified by the
-        *   'identifier' parameter
+        *   'identifier' parameter. The frame is returned as a broadcastable data
+        *   buffer
         */
-        AgentDataFrame GetFrame(std::string identifier, std::size_t frameNumber);
+        BroadcastUpdate GetBroadcastFrame(std::string identifier, std::size_t frameNumber);
+
+        /**
+        *   GetBroadcastUpdate
+        *
+        *   @param    identifier        specifies the cache to be read
+        *   @param    currentPosition   the position of the requesting trajectory
+        *                                 playback streamer. Indicates a file
+        *                                 position for the binary file being read/streamed
+        *   @param    bufferSize        how many bits of data to include in this broadcast
+        *                                 update
+        *
+        *   Returns a BufferUpdate object, containing data to be transmited
+        *     and a new playback-position for the requesting streamer to save
+        */
+        BroadcastUpdate GetBroadcastUpdate(
+          std::string identifier,
+          std::size_t currentPosition,
+          std::size_t bufferSize
+        );
+
+        std::size_t GetEndOfStreamPos(
+          std::string identifier
+        );
 
         std::size_t GetNumFrames(std::string identifier);
 

@@ -55,13 +55,35 @@ namespace simularium {
 	*
 	*	@param	frame_no	the frame-number/index of the agent data frame to load
 	*
-	*	Get a list of data corresponding to the agents owned by this simulation object
-	*	Includes information regarding position, type, and other relevant visualization
-	*   information to be streamed to a front-end
+  *   Returns a BufferUpdate object, containing data to be transmited
+  *     and a new playback-position for the requesting streamer to save
 	*/
-        std::vector<AgentData> GetDataFrame(
+        BroadcastUpdate GetBroadcastFrame(
             std::string identifier,
             std::size_t frame_no
+        );
+
+        /**
+        *   GetBroadcastUpdate
+        *
+        *   @param    identifier        specifies the cache to be read
+        *   @param    currentPosition   the position of the requesting trajectory
+        *                                 playback streamer. Indicates a file
+        *                                 position for the binary file being read/streamed
+        *   @param    bufferSize        how many bits of data to include in this broadcast
+        *                                 update
+        *
+        *   Returns a BufferUpdate object, containing data to be transmited
+        *     and a new playback-position for the requesting streamer to save
+        */
+        BroadcastUpdate GetBroadcastUpdate(
+          std::string identifier,
+          std::size_t currentPosition,
+          std::size_t bufferSize
+        );
+
+        std::size_t GetEndOfStreamPos(
+          std::string identifier
         );
 
         /**

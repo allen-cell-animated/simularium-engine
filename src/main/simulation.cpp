@@ -49,13 +49,29 @@ namespace simularium {
         this->CacheCurrentAgents();
     }
 
-    std::vector<AgentData> Simulation::GetDataFrame(
+    BroadcastUpdate Simulation::GetBroadcastFrame(
         std::string identifier,
         std::size_t frame_no
     )
     {
-        return this->m_cache.GetFrame(identifier, frame_no);
+        return this->m_cache.GetBroadcastFrame(identifier, frame_no);
     }
+
+    BroadcastUpdate Simulation::GetBroadcastUpdate(
+      std::string identifier,
+      std::size_t currentPosition,
+      std::size_t bufferSize
+    ) {
+        return this->m_cache.GetBroadcastUpdate(
+          identifier,
+          currentPosition,
+          bufferSize
+        );
+    }
+
+    std::size_t Simulation::GetEndOfStreamPos(
+      std::string identifier
+    ) { return this->m_cache.GetEndOfStreamPos(identifier); }
 
     void Simulation::Reset()
     {

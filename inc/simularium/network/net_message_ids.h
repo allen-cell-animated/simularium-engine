@@ -21,7 +21,6 @@ namespace simularium {
         id_model_definition,
         id_heartbeat_ping,
         id_heartbeat_pong,
-        id_play_cache,
         id_trajectory_file_info,
         id_goto_simulation_time,
         id_init_trajectory_file
@@ -41,7 +40,6 @@ namespace simularium {
         { id_model_definition, "model definition" },
         { id_heartbeat_ping, "heartbeat ping" },
         { id_heartbeat_pong, "heartbeat pong" },
-        { id_play_cache, "play cache" },
         { id_trajectory_file_info, "trajectory file info" },
         { id_goto_simulation_time, "go to simulation time" },
         { id_init_trajectory_file, "init trajectory file" },

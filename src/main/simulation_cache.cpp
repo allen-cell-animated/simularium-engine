@@ -43,23 +43,44 @@ namespace simularium {
         file->WriteFrame(frame);
     }
 
-    AgentDataFrame SimulationCache::GetFrame(std::string identifier, std::size_t frameNumber)
+    BroadcastUpdate SimulationCache::GetBroadcastFrame(std::string identifier, std::size_t frameNumber)
     {
         if(!this->m_binaryFiles.count(identifier)) {
             LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
-            return AgentDataFrame();
+            return BroadcastUpdate();
         }
 
         std::size_t numFrames = this->GetNumFrames(identifier);
         if (frameNumber > numFrames || numFrames == 0) {
             LOG_F(ERROR, "Request for frame %zu of identifier %s, which is not in cache", frameNumber, identifier.c_str());
-            return AgentDataFrame();
+            return BroadcastUpdate();
         }
 
-        // @TODO: GET AND RETURN FRAME FROM SIMULARIUM BINARY FILE
+        return this->m_binaryFiles.at(identifier)->GetBroadcastFrame(frameNumber);
+    }
 
-        LOG_F(ERROR, "Failed to load frame %zu from cache %s", frameNumber, identifier.c_str());
-        return AgentDataFrame();
+    BroadcastUpdate SimulationCache::GetBroadcastUpdate(
+      std::string identifier,
+      std::size_t currentPosition,
+      std::size_t bufferSize
+    ) {
+        if(!this->m_binaryFiles.count(identifier)) {
+            LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+            return BroadcastUpdate();
+        }
+
+        return this->m_binaryFiles.at(identifier)->GetBroadcastUpdate(currentPosition, bufferSize);
+    }
+
+    std::size_t SimulationCache::GetEndOfStreamPos(
+      std::string identifier
+    ) {
+        if(!this->m_binaryFiles.count(identifier)) {
+            LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+            return 0;
+        }
+
+        return this->m_binaryFiles.at(identifier)->GetEndOfFilePos();
     }
 
     std::size_t SimulationCache::GetNumFrames(std::string identifier)
