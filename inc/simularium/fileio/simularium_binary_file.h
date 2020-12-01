@@ -28,12 +28,14 @@ class SimulariumBinaryFile {
 
     std::size_t NumSavedFrames();
     std::size_t GetEndOfFilePos();
+    std::size_t GetFramePos(std::size_t frameNumber);
 
   private:
     void WriteHeader();
     void AllocateTOC(std::size_t size);
 
     std::fstream m_fstream;
+    std::size_t m_endTOC;
 };
 
 } // namespace fileio
