@@ -68,6 +68,11 @@ namespace simularium {
           std::string identifier
         );
 
+        std::size_t GetFramePos(
+          std::string identifier,
+          std::size_t frameNumber
+        );
+
         std::size_t GetNumFrames(std::string identifier);
 
         /**

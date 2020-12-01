@@ -83,6 +83,18 @@ namespace simularium {
         return this->m_binaryFiles.at(identifier)->GetEndOfFilePos();
     }
 
+    std::size_t SimulationCache::GetFramePos(
+      std::string identifier,
+      std::size_t frameNumber
+    ) {
+      if(!this->m_binaryFiles.count(identifier)) {
+          LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+          return 0;
+      }
+
+      return this->m_binaryFiles.at(identifier)->GetFramePos(frameNumber);
+    }
+
     std::size_t SimulationCache::GetNumFrames(std::string identifier)
     {
         return this->m_binaryFiles.count(identifier) ?

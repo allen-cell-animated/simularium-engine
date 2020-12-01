@@ -108,6 +108,9 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
 
     this->m_fstream.seekp(16, std::ios_base::beg);
     this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
+
+    this->m_fstream.seekg(0, std::ios_base::end);
+    this->m_endTOC = std::size_t(this->m_fstream.tellg());
 }
 
 std::size_t SimulariumBinaryFile::NumSavedFrames() {
@@ -146,7 +149,8 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
   std::size_t currentPos,
   std::size_t bufferSize
 ) {
-    this->m_fstream.seekg(currentPos, std::ios_base::beg);
+    auto start = std::max(currentPos, this->m_endTOC);
+    this->m_fstream.seekg(start, std::ios_base::beg);
 
     BroadcastUpdate out;
     out.buffer.resize(bufferSize / 4);
@@ -154,7 +158,7 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
       reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
     );
 
-    out.new_pos = currentPos + bufferSize;
+    out.new_pos = start + bufferSize;
 
     return out;
 }
@@ -162,6 +166,17 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
 std::size_t SimulariumBinaryFile::GetEndOfFilePos() {
   this->m_fstream.seekg(0, std::ios_base::end);
   return std::size_t(this->m_fstream.tellg());
+}
+
+std::size_t SimulariumBinaryFile::GetFramePos(
+  std::size_t frameNumber
+) {
+  int tocPos = 20 + frameNumber * 4;
+  this->m_fstream.seekg(tocPos, std::ios_base::beg);
+  int framePos;
+  this->m_fstream.read((char*)&framePos, sizeof(framePos));
+
+  return framePos;
 }
 
 } // namespace fileio

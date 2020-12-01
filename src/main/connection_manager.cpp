@@ -786,6 +786,7 @@ namespace simularium {
                               continue;
                             }
 
+                            auto trajectoryFileName = jsonMsg["file-name"].asString();
                             this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
                             this->SetClientSimId(senderUid, trajectoryFileName);
 
@@ -947,6 +948,10 @@ namespace simularium {
                 }
             }
         }
+
+        // Need to call this after the binary cache is processed
+        //  in 'SetupRuntimeCache' above
+        this->SetClientPos(connectionUID, simulation.GetFramePos(fileName, 0));
 
         // Send Trajectory File Properties
         TrajectoryFileProperties tfp = simulation.GetFileProperties(fileName);
