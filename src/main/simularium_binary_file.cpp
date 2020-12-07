@@ -72,7 +72,7 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     // Save the frame chunk data out
     this->m_fstream.seekp(0, std::ios_base::end);
     this->m_fstream.write((char*)&frameChunk[0], frameChunk.size() * sizeof(float));
-    this->m_fstream.write((char*)fileio::binary::eof, sizeof(unsigned char) * 4);
+    this->m_fstream.write((char*)fileio::binary::eof, sizeof(unsigned char) * 20);
 
     // Update the number of frames loaded in the file
     nFrames++;
