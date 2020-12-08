@@ -21,6 +21,11 @@ void SimulariumBinaryFile::Create(std::string filePath, std::size_t numFrames) {
       std::ios_base::trunc
     );
 
+    this->m_fstream.exceptions(
+      std::ios::failbit |
+      std::ios::badbit
+    );
+
     this->WriteHeader();
     this->AllocateTOC(numFrames);
 }
@@ -123,6 +128,11 @@ std::size_t SimulariumBinaryFile::NumSavedFrames() {
 BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
   std::size_t frameNumber
 ) {
+    if(!this->m_fstream) {
+        LOG_F(WARNING, "No file opened. Call SimulariumBinaryFile.Create([filepath])");
+        return BroadcastUpdate();
+    }
+
     int tocPos = 20 + frameNumber * 4;
     this->m_fstream.seekg(tocPos, std::ios_base::beg);
     int frameStart;
@@ -149,11 +159,17 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
   std::size_t currentPos,
   std::size_t bufferSize
 ) {
+    if(!this->m_fstream) {
+        LOG_F(WARNING, "No file opened. Call SimulariumBinaryFile.Create([filepath])");
+        return BroadcastUpdate();
+    }
+
     auto start = std::max(currentPos, this->m_endTOC);
+    auto end = std::min(start + bufferSize, this->GetEndOfFilePos());
     this->m_fstream.seekg(start, std::ios_base::beg);
 
     BroadcastUpdate out;
-    out.buffer.resize(bufferSize / 4);
+    out.buffer.resize((end - start) / 4);
     this->m_fstream.read(
       reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
     );

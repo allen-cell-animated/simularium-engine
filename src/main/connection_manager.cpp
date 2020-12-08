@@ -405,12 +405,12 @@ namespace simularium {
 
         auto currentState = netState.play_state;
 
-        if(totalNumberOfFrames == 0) {
-          return; // no data
+        // Nothing to load yet
+        if(totalNumberOfFrames == 0 || numberOfLoadedFrames == 0) {
+            this->SetClientState(connectionUID, ClientPlayState::Waiting);
         }
-
         // Invalid frame, set to last frame
-        if(isClientAtEndOfStream && isFileFinishedProcessing)
+        else if(isClientAtEndOfStream && isFileFinishedProcessing)
         {
             if(netState.sim_identifier == LIVE_SIM_IDENTIFIER) {
                 this->SetClientState(connectionUID, ClientPlayState::Waiting);
