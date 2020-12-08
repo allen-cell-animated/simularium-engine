@@ -132,25 +132,39 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
         LOG_F(WARNING, "No file opened. Call SimulariumBinaryFile.Create([filepath])");
         return BroadcastUpdate();
     }
+    auto nFrames = this->NumSavedFrames();
+    if(frameNumber >= nFrames) {
+      LOG_F(WARNING, "Request for invalid frame %zu", frameNumber);
+      return BroadcastUpdate();
+    }
 
     int tocPos = 20 + frameNumber * 4;
     this->m_fstream.seekg(tocPos, std::ios_base::beg);
     int frameStart;
     this->m_fstream.read((char*)&frameStart, sizeof(frameStart));
 
-    this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
     int frameEnd; // start of the next frame
-    this->m_fstream.read((char*)&frameEnd, sizeof(frameEnd));
+    if(nFrames > frameNumber + 1) {
+      this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
+      this->m_fstream.read((char*)&frameEnd, sizeof(frameEnd));
+    } else {
+      frameEnd = this->GetEndOfFilePos();
+    }
 
     this->m_fstream.seekg(frameStart, std::ios_base::beg);
 
     BroadcastUpdate out;
-    out.buffer.resize((frameEnd - frameStart) / 4);
-    this->m_fstream.read(
-      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
-    );
 
-    out.new_pos = frameEnd;
+    if(frameEnd > frameStart) {
+      out.buffer.resize((frameEnd - frameStart) / 4);
+      this->m_fstream.read(
+        reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
+      );
+
+      out.new_pos = frameEnd;
+    } else {
+      LOG_F(ERROR, "Invalid Frame Bounds found. (%i, %i)", frameStart, frameEnd);
+    }
 
     return out;
 }

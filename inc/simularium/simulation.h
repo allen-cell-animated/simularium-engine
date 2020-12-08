@@ -284,6 +284,7 @@ namespace simularium {
         std::string m_simIdentifier = "runtime"; // identifier for currently running simulation
 
         std::size_t m_activeSimPkg = 0;
+        std::size_t m_frameCounter = 0;
     };
 
 }
