@@ -265,6 +265,7 @@ namespace simularium {
         fprops["version"] = 1;
         fprops["totalSteps"] = static_cast<int>(tfp.numberOfFrames);
         fprops["timeStepSize"] = tfp.timeStepSize;
+        fprops["spatialUnitFactorMeters"] = tfp.spatialUnitFactorMeters;
 
         Json::Value size;
         size["x"] = static_cast<float>(tfp.boxX);
@@ -351,6 +352,7 @@ namespace simularium {
         tfp.fileName = fprops["fileName"].asString();
         tfp.numberOfFrames = fprops["totalSteps"].asInt();
         tfp.timeStepSize = fprops["timeStepSize"].asFloat();
+        tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
 
         this->m_fileProps[identifier] = tfp;
     }
@@ -368,7 +370,8 @@ namespace simularium {
             "typeMapping",
             "fileName",
             "totalSteps",
-            "timeStepSize"
+            "timeStepSize",
+            "spatialUnitFactorMeters"
         });
 
         for(auto key : keys) {
