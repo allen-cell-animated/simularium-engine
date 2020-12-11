@@ -146,8 +146,11 @@ namespace simularium {
         }
     }
 
-    void Simulation::CacheCurrentAgents()
-    {
+    void Simulation::CacheAgents(
+      std::vector<std::shared_ptr<Agent>>& agents,
+      std::size_t frameNumber,
+      float time
+    ) {
         TrajectoryFrame newFrame;
         for (std::size_t i = 0; i < this->m_agents.size(); ++i) {
             auto agent = this->m_agents[i];
