@@ -217,11 +217,52 @@ namespace simularium {
                   std::string fileName = request.fileName;
                   int frameNumber = request.frameNumber;
 
+                  // Check that the client is still connected/valid
+                  if(!this->m_netStates.count(senderUid)) {
+                    LOG_F(ERROR, "No net state for client %s", senderUid.c_str());
+                    this->m_fileRequests.pop();
+                    this->m_fileMutex.unlock();
+                    continue;
+                  }
+
+                  auto state = this->m_netStates.at(senderUid);
+                  std::string id = state.sim_identifier;
+
+                  // Check that the requested file hasn't changed
+                  if(id != fileName) {
+                    LOG_F(WARNING,
+                      "Client %s has selected file %s, ignoring previous request for file %s",
+                       senderUid.c_str(), id.c_str(), fileName.c_str()
+                     );
+                     this->m_fileRequests.pop();
+                     this->m_fileMutex.unlock();
+                    continue;
+                  }
+
                   this->InitializeTrajectoryFile(
                       simulation,
                       senderUid,
                       fileName
                   );
+
+                  // Check that the client is still connected/valid
+                  if(!this->m_netStates.count(senderUid)) {
+                    LOG_F(ERROR, "No net state for client %s", senderUid.c_str());
+                    this->m_fileRequests.pop();
+                    this->m_fileMutex.unlock();
+                    continue;
+                  }
+
+                  state = this->m_netStates.at(senderUid);
+                  id = state.sim_identifier;
+
+                  // Check again that the requested file hasn't changed
+                  if(id != fileName) {
+                    LOG_F(WARNING, "Client %s has selected a new file, ignoring previous request", senderUid.c_str());
+                    this->m_fileRequests.pop();
+                    this->m_fileMutex.unlock();
+                    continue;
+                  }
 
                   if(frameNumber > 0) {
                     this->SendSingleFrameToClient(
@@ -489,6 +530,14 @@ namespace simularium {
         }
     }
 
+    void ConnectionManager::SendSingleFrameToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t frameNumber
+    ) {
+      this->SendDataToClient(simulation, connectionUID, frameNumber, 1, true);
+    }
+
     void ConnectionManager::SendDataToClients(Simulation& simulation)
     {
         for (auto& entry : this->m_netStates) {
@@ -623,6 +672,7 @@ namespace simularium {
 
         netState.frame_no = currentFrame - 1;
         dataFrameMessage["bundleData"] = frameArr;
+        dataFrameMessage["fileName"] = sid;
         this->SendWebsocketMessage(connectionUID, dataFrameMessage);
     }
 
@@ -709,15 +759,20 @@ namespace simularium {
                         } break;
                         case SimulationMode::id_traj_file_playback: {
                             simulation.SetPlaybackMode(runMode);
-                            auto trajectoryFileName = jsonMsg["file-name"].asString();
 
                             if(!jsonMsg.isMember("file-name")) {
                               this->SetClientState(senderUid, ClientPlayState::Paused);
                               this->SetClientFrame(senderUid, 0);
                               continue;
                             }
+                            auto trajectoryFileName = jsonMsg["file-name"].asString();
+                            if(trajectoryFileName.empty()) {
+                              LOG_F(INFO, "Ignoring request with empty file-name");
+                              continue;
+                            }
 
                             this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
+                            this->SetClientSimId(senderUid, trajectoryFileName);
 
                             FileRequest request;
                             request.senderUid = senderUid;
@@ -863,10 +918,19 @@ namespace simularium {
             return;
         }
 
-        this->LogClientEvent(connectionUID, "Set to file " + fileName);
-        this->SetClientSimId(connectionUID, fileName);
-        this->SetClientFrame(connectionUID, 0);
+        if(!this->m_netStates.count(connectionUID)) {
+          LOG_F(ERROR, "No net state for client %s", connectionUID.c_str());
+          return;
+        }
 
+        auto state = this->m_netStates.at(connectionUID);
+        std::string currentFile = state.sim_identifier;
+        if(currentFile != fileName) {
+          LOG_F(WARNING, "Client has changed trajectory files since this request was made");
+          return;
+        }
+
+        this->SetClientFrame(connectionUID, 0);
         if(simulation.HasFileInCache(fileName))
         {
             LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());

@@ -125,7 +125,7 @@ namespace simularium {
             Simulation& simulation,
             std::string connectionUID,
             std::size_t frameNumber
-        ) { this->SendDataToClient(simulation, connectionUID, frameNumber, 1, true); }
+        );
 
         void SendDataToClient(
             Simulation& simulation,
