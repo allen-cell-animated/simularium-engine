@@ -142,12 +142,16 @@ namespace simularium {
         void LoadNextFrame();
 
         /**
-	*	CacheCurrentAgents
+	*	CacheAgents
 	*
 	*	Saves an AgentFrame with the visualization data for the current
 	*	state of agents owned by this simulation
 	*/
-        void CacheCurrentAgents();
+        void CacheAgents(
+          std::vector<std::shared_ptr<Agent>>& agents,
+          std::size_t frameNumber,
+          float time
+        );
 
         /**
 	*	LoadTrajectoryFile
@@ -284,7 +288,6 @@ namespace simularium {
         std::string m_simIdentifier = "runtime"; // identifier for currently running simulation
 
         std::size_t m_activeSimPkg = 0;
-        std::size_t m_frameCounter = 0;
     };
 
 }

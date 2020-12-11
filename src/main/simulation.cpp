@@ -46,7 +46,9 @@ namespace simularium {
             this->m_SimPkgs[i]->RunTimeStep(timeStep, this->m_agents);
         }
 
-        this->CacheCurrentAgents();
+        auto frameNumber = this->GetNumFrames(this->m_simIdentifier);
+        float time = frameNumber;
+        this->CacheAgents(this->m_agents, frameNumber, time);
     }
 
     BroadcastUpdate Simulation::GetBroadcastFrame(
@@ -137,18 +139,26 @@ namespace simularium {
         auto simPkg = this->m_SimPkgs[this->m_activeSimPkg];
         if (!simPkg->IsFinished()) {
             simPkg->GetNextFrame(this->m_agents);
-        }
 
-        this->CacheCurrentAgents();
+            auto frameNumber = this->GetNumFrames(this->m_simIdentifier);
+            auto time = simPkg->GetSimulationTimeAtFrame(frameNumber);
+            this->CacheAgents(this->m_agents, frameNumber, time);
+        }
     }
 
-    void Simulation::CacheCurrentAgents()
-    {
+    void Simulation::CacheAgents(
+      std::vector<std::shared_ptr<Agent>>& agents,
+      std::size_t frameNumber,
+      float time
+    ) {
         TrajectoryFrame newFrame;
         for (std::size_t i = 0; i < this->m_agents.size(); ++i) {
             auto agent = this->m_agents[i];
             AppendAgentData(newFrame.data, agent);
         }
+
+        newFrame.frameNumber = frameNumber;
+        newFrame.time = time;
 
         this->m_cache.AddFrame(this->m_simIdentifier, newFrame);
     }
