@@ -780,7 +780,6 @@ namespace simularium {
                               continue;
                             }
 
-                            auto trajectoryFileName = jsonMsg["file-name"].asString();
                             this->LogClientEvent(senderUid, "Playing back trajectory file: " + trajectoryFileName);
                             this->SetClientSimId(senderUid, trajectoryFileName);
 
@@ -907,7 +906,6 @@ namespace simularium {
           return;
         }
 
-        this->SetClientFrame(connectionUID, 0);
         if(simulation.HasFileInCache(fileName))
         {
             LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
