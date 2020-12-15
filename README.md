@@ -1,19 +1,25 @@
-# Simularium
-
-Simularium is a spatial simulation framework and visualization environment for biological simulations.
+## Simularium repositories
+This repository is part of the Simularium project ([simularium.allencell.org](https://simularium.allencell.org)), which includes repositories:
+- [simulariumIO](https://github.com/allen-cell-animated/simulariumio) - Python package that converts simulation outputs to the format consumed by the Simularium viewer website
+- [simularium-engine](https://github.com/allen-cell-animated/simularium-engine) - C++ backend application that interfaces with biological simulation engines and serves simulation data to the front end website
+- [simularium-viewer](https://github.com/allen-cell-animated/simularium-viewer) - NPM package to view Simularium trajectories in 3D
+- [simularium-website](https://github.com/allen-cell-animated/simularium-website) - Front end website for the Simularium project, includes the Simularium viewer
 
 ---
 
-## Description
+# Simularium Engine
 
-Simularium is a spatial simulation framework and visualization environment for biological simulations.
-
-## Installation
+simularium-engine is a C++ application that integrates existing biological spatial simulation engines and serves simulation data, both pre-computed and live calculating, to front end websites via websockets.
 
 Simularium integrates existing spatial simulation software:
 
-* [ReaDDy](https://readdy.github.io/) : Molecular Dynamics
+* [ReaDDy](https://readdy.github.io/) : Reaction Diffusion & Dynamics
 * [Cytosim](https://gitlab.com/f.nedelec/cytosim): Cytoskeletal Dynamics
+* and more to be added
+
+---
+
+## Quick Start
 
 ### Dependencies
 * blosc
@@ -63,15 +69,8 @@ The following steps are necessary to allow a local build to upload to S3.
 2. [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) the aws-cli using your [private key](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_CreateAccessKey_CLIAPI); the region is **us-east-2**
 
 Simularium will use the credentials configured above to upload, download, and otherwise interact with other components of the application setup on AWS. The application should function normally without these credentials, but will be unable to upload files to the AWS S3 repository.
-## Documentation
 
-If you have more extensive technical documentation (whether generated or not), ensure they are published to the following address:
-For full package documentation please visit
-[organization.github.io/projectname](https://organization.github.io/projectname/index.html).
-
-## Quick Start
-
-Describe the most common operations, step by step, that a first time user would want to know, here.
+---
 
 ## Development
 
