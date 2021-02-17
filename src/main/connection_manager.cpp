@@ -628,6 +628,30 @@ namespace simularium {
         uuid = strUuid;
     }
 
+    void ConnectionManager::PrependArraybufferHeader(
+      BroadcastUpdate& update,
+      std::string fileName
+    ) {
+        // Append the file-name and message-type
+        BroadcastDataBuffer prefix;
+        prefix.push_back(static_cast<float>(id_vis_data_arrive));
+        float* tmp_buf = (float*)(fileName.c_str());
+        auto tmp_buf_size = (fileName.length() + 3) / 4; // 4 char per float
+
+        prefix.push_back(fileName.length());
+        prefix.insert(
+          prefix.end(),
+          tmp_buf,
+          tmp_buf + tmp_buf_size
+        );
+
+        update.buffer.insert(
+          update.buffer.begin(),
+          prefix.begin(),
+          prefix.end()
+        );
+    }
+
     void ConnectionManager::SendDataToClient(
         Simulation& simulation,
         std::string connectionUID
@@ -654,6 +678,7 @@ namespace simularium {
           netState.playback_pos,
           this->kBroadcastBufferSize
         );
+        this->PrependArraybufferHeader(update, sid);
 
         netState.playback_pos = update.new_pos;
         this->SendArrayBufferMessage(connectionUID, update.buffer);
@@ -681,6 +706,9 @@ namespace simularium {
           sid, frameNumber
         );
 
+        this->PrependArraybufferHeader(update, sid);
+
+        // Send the message
         netState.playback_pos = update.new_pos;
         this->SendArrayBufferMessage(connectionUID, update.buffer);
     }

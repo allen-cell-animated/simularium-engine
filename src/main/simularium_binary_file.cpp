@@ -123,14 +123,24 @@ std::size_t SimulariumBinaryFile::NumSavedFrames() {
 BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
   std::size_t frameNumber
 ) {
+    auto numFrames = this->NumSavedFrames();
+    if(frameNumber >= numFrames) {
+      LOG_F(WARNING, "Frame %zu requested when there are only %zu saved", frameNumber, numFrames);
+      return BroadcastUpdate();
+    }
+
     int tocPos = 20 + frameNumber * 4;
     this->m_fstream.seekg(tocPos, std::ios_base::beg);
     int frameStart;
     this->m_fstream.read((char*)&frameStart, sizeof(frameStart));
 
-    this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
     int frameEnd; // start of the next frame
-    this->m_fstream.read((char*)&frameEnd, sizeof(frameEnd));
+    if(frameNumber == (numFrames - 1)) { // is this the final entry?
+      frameEnd = this->GetEndOfFilePos(); // if yes, read to end of file
+    } else {
+      this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
+      this->m_fstream.read((char*)&frameEnd, sizeof(frameEnd));
+    }
 
     this->m_fstream.seekg(frameStart, std::ios_base::beg);
 
