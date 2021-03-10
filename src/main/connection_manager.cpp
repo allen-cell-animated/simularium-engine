@@ -499,8 +499,8 @@ namespace simularium {
             );
       } catch (...) {
           this->LogClientEvent(connectionUID, "Failed to send websocket message to client");
-          LOG_F(ERROR, "Websocket send failed with exception, removing offending connection...");
-          this->RemoveConnection(connectionUID);
+          LOG_F(ERROR, "Websocket send failed with exception, marking offending connection for removal...");
+          this->m_uidsToDelete.push_back(connectionUID);
       }
     }
 
@@ -547,6 +547,7 @@ namespace simularium {
 
     void ConnectionManager::SendDataToClients(Simulation& simulation)
     {
+        
         for (auto& entry : this->m_netStates) {
             auto& uid = entry.first;
             auto& netState = entry.second;
