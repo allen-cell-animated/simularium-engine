@@ -55,8 +55,8 @@ namespace simularium {
 	*
 	*	@param	frame_no	the frame-number/index of the agent data frame to load
 	*
-  *   Returns a BufferUpdate object, containing data to be transmited
-  *     and a new playback-position for the requesting streamer to save
+        *   Returns a BroadcastUpdate object, containing data to be transmited
+        *     and a new playback-position for the requesting streamer to save
 	*/
         BroadcastUpdate GetBroadcastFrame(
             std::string identifier,

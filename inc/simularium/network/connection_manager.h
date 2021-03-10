@@ -28,6 +28,8 @@ typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> conte
 namespace aics {
 namespace simularium {
 namespace broadcast {
+    // Used to signal that a client should not stream any more data
+    //  by setting their current position to eos ('end of stream')
     const std::size_t eos = std::numeric_limits<std::size_t>::max();
 }
 
