@@ -295,10 +295,13 @@ namespace simularium {
 
     void ConnectionManager::RemoveConnection(std::string connectionUID)
     {
+      if(this->m_netConnections.count(connectionUID)) {
+	this->SetClientState(connectionUID, ClientPlayState::Stopped);
         this->LogClientEvent(connectionUID, "Removing closed network connection");
         this->m_netConnections.erase(connectionUID);
         this->m_missedHeartbeats.erase(connectionUID);
         this->m_netStates.erase(connectionUID);
+      }
     }
 
     void ConnectionManager::CloseConnection(std::string connectionUID)
