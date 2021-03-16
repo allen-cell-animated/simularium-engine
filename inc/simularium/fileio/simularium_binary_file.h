@@ -23,6 +23,11 @@ namespace binary {
     'E','N','D','S',
     'H','E','R','E'
   };
+
+  static const int HEADER_SIZE = 16;
+  static const int TOC_ENTRY_COUNT_OFFSET = HEADER_SIZE;
+  static const int TOC_ENTRY_START_OFFSET = HEADER_SIZE + 4;
+  
 }
 
 class SimulariumBinaryFile {

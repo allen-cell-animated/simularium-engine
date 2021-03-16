@@ -56,7 +56,7 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     }
 
     // Read the current number of frames saved to the file
-    this->m_fstream.seekg(16, std::ios_base::beg);
+    this->m_fstream.seekg(fileio::binary::TOC_ENTRY_COUNT_OFFSET, std::ios_base::beg);
     int nFrames;
     this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
 
@@ -65,7 +65,7 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     int framePos = int(this->m_fstream.tellg());
 
     // Save the frame-chunk stream position in the offset look-up
-    int tocPos = 20 + nFrames * 4; // 16 bit header + 4 bit toc size
+    int tocPos = fileio::binary::TOC_ENTRY_COUNT_OFFSET + nFrames * 4;
     this->m_fstream.seekp(tocPos, std::ios_base::beg);
     this->m_fstream.write((char*)&framePos, sizeof(int));
 
@@ -76,7 +76,7 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
 
     // Update the number of frames loaded in the file
     nFrames++;
-    this->m_fstream.seekp(16, std::ios_base::beg);
+    this->m_fstream.seekp(fileio::binary::TOC_ENTRY_COUNT_OFFSET, std::ios_base::beg);
     this->m_fstream.write((char*)&nFrames, sizeof(nFrames));
 }
 
@@ -106,7 +106,7 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
 
     std::vector<int> tocChunk (size + 1, 0);
 
-    this->m_fstream.seekp(16, std::ios_base::beg);
+    this->m_fstream.seekp(fileio::binary::HEADER_SIZE, std::ios_base::beg);
     this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
 
     this->m_fstream.seekg(0, std::ios_base::end);
@@ -114,7 +114,7 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
 }
 
 std::size_t SimulariumBinaryFile::NumSavedFrames() {
-    this->m_fstream.seekg(16, std::ios_base::beg);
+  this->m_fstream.seekg(fileio::binary::TOC_ENTRY_COUNT_OFFSET, std::ios_base::beg);
     int nFrames;
     this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
     return nFrames;
@@ -129,7 +129,8 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
       return BroadcastUpdate();
     }
 
-    int tocPos = 20 + frameNumber * 4;
+    // Get the stored offset for the frame from the 'table of contents' block
+    int tocPos = fileio::binary::TOC_ENTRY_START_OFFSET + frameNumber * 4;
     this->m_fstream.seekg(tocPos, std::ios_base::beg);
     int frameStart;
     this->m_fstream.read((char*)&frameStart, sizeof(frameStart));
@@ -181,7 +182,7 @@ std::size_t SimulariumBinaryFile::GetEndOfFilePos() {
 std::size_t SimulariumBinaryFile::GetFramePos(
   std::size_t frameNumber
 ) {
-  int tocPos = 20 + frameNumber * 4;
+  int tocPos = fileio::binary::TOC_ENTRY_START_OFFSET + frameNumber * 4;
   this->m_fstream.seekg(tocPos, std::ios_base::beg);
   int framePos;
   this->m_fstream.read((char*)&framePos, sizeof(framePos));
