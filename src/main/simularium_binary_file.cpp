@@ -65,7 +65,7 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     int framePos = int(this->m_fstream.tellg());
 
     // Save the frame-chunk stream position in the offset look-up
-    int tocPos = fileio::binary::TOC_ENTRY_COUNT_OFFSET + nFrames * 4;
+    int tocPos = fileio::binary::TOC_ENTRY_START_OFFSET + nFrames * 4;
     this->m_fstream.seekp(tocPos, std::ios_base::beg);
     this->m_fstream.write((char*)&framePos, sizeof(int));
 
