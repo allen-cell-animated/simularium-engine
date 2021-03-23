@@ -67,11 +67,11 @@ void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     // Save the frame-chunk stream position in the offset look-up
     int tocPos = fileio::binary::TOC_ENTRY_START_OFFSET + nFrames * 4;
     this->m_fstream.seekp(tocPos, std::ios_base::beg);
-    this->m_fstream.write((char*)&framePos, sizeof(int));
+    this->m_fstream.write((char*)&framePos, sizeof(framePos));
 
     // Save the frame chunk data out
     this->m_fstream.seekp(0, std::ios_base::end);
-    this->m_fstream.write((char*)&frameChunk[0], frameChunk.size() * sizeof(float));
+    this->m_fstream.write((char*)&frameChunk[0], frameChunk.size() * sizeof(frameChunk[0]));
     this->m_fstream.write((char*)fileio::binary::eof, sizeof(unsigned char) * 20);
 
     // Update the number of frames loaded in the file
@@ -95,7 +95,7 @@ void SimulariumBinaryFile::WriteHeader() {
     header.push_back(char(0)); // patch version
 
     this->m_fstream.seekp(0, std::ios_base::beg);
-    this->m_fstream.write((char*)&header[0], header.size() * sizeof(unsigned char));
+    this->m_fstream.write((char*)&header[0], header.size() * sizeof(header[0]));
 }
 
 void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
@@ -107,7 +107,7 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
     std::vector<int> tocChunk (size + 1, 0);
 
     this->m_fstream.seekp(fileio::binary::HEADER_SIZE, std::ios_base::beg);
-    this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(int));
+    this->m_fstream.write((char*)&tocChunk[0], tocChunk.size() * sizeof(tocChunk[0]));
 
     this->m_fstream.seekg(0, std::ios_base::end);
     this->m_endTOC = std::size_t(this->m_fstream.tellg());
@@ -148,7 +148,7 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
     BroadcastUpdate out;
     out.buffer.resize((frameEnd - frameStart) / 4);
     this->m_fstream.read(
-      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
+      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(out.buffer[0])
     );
 
     out.new_pos = frameEnd;
@@ -166,7 +166,7 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastUpdate(
     BroadcastUpdate out;
     out.buffer.resize(bufferSize / 4);
     this->m_fstream.read(
-      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(float)
+      reinterpret_cast<char*>(out.buffer.data()), out.buffer.size()*sizeof(out.buffer[0])
     );
 
     out.new_pos = start + bufferSize;
