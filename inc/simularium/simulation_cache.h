@@ -129,8 +129,14 @@ namespace simularium {
         std::string GetAwsFilePath(std::string identifier);
         std::string GetAwsInfoFilePath(std::string identifier);
 
-        inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium"); }
-        inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium"); }
+      inline void CreateCacheFolder() {
+	std::string cmd = "mkdir -p " + this->kCacheFolder;
+	int ignore = system(cmd.c_str());
+      }
+      inline void DeleteCacheFolder() {
+	std::string cmd = "rm -rf " + this->kCacheFolder;
+	int ignore = system(cmd.c_str());
+      }
 
         fileio::SimulariumBinaryFile* GetBinaryFile(std::string identifier);
 
