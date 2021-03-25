@@ -3,8 +3,7 @@
 
 #include "simularium/agent_data.h"
 #include "simularium/network/trajectory_properties.h"
-#include "simularium/fileio/binary_cache_reader.h"
-#include "simularium/fileio/binary_cache_writer.h"
+#include "simularium/fileio/simularium_binary_file.h"
 #include <json/json.h>
 #include <algorithm>
 #include <iostream>
@@ -32,7 +31,7 @@ namespace simularium {
         *   Stores data for a single trajectory frame in a cache that can be
         *   retrieved using the 'identifier' parameter
         */
-        void AddFrame(std::string identifier, AgentDataFrame data);
+        void AddFrame(std::string identifier, TrajectoryFrame frame);
 
         /**
         *   GetFrame
@@ -41,9 +40,38 @@ namespace simularium {
         *   @param      frameNumber     the frame number to retrieve
         *
         *   Returns a single trajectory frame from a cache specified by the
-        *   'identifier' parameter
+        *   'identifier' parameter. The frame is returned as a broadcastable data
+        *   buffer
         */
-        AgentDataFrame GetFrame(std::string identifier, std::size_t frameNumber);
+        BroadcastUpdate GetBroadcastFrame(std::string identifier, std::size_t frameNumber);
+
+        /**
+        *   GetBroadcastUpdate
+        *
+        *   @param    identifier        specifies the cache to be read
+        *   @param    currentPosition   the position of the requesting trajectory
+        *                                 playback streamer. Indicates a file
+        *                                 position for the binary file being read/streamed
+        *   @param    bufferSize        how many bits of data to include in this broadcast
+        *                                 update
+        *
+        *   Returns a BroadcastUpdate object, containing data to be transmited
+        *     and a new playback-position for the requesting streamer to save
+        */
+        BroadcastUpdate GetBroadcastUpdate(
+          std::string identifier,
+          std::size_t currentPosition,
+          std::size_t bufferSize
+        );
+
+        std::size_t GetEndOfStreamPos(
+          std::string identifier
+        );
+
+        std::size_t GetFramePos(
+          std::string identifier,
+          std::size_t frameNumber
+        );
 
         std::size_t GetNumFrames(std::string identifier);
 
@@ -101,13 +129,16 @@ namespace simularium {
         std::string GetAwsFilePath(std::string identifier);
         std::string GetAwsInfoFilePath(std::string identifier);
 
-        inline void CreateCacheFolder() { int ignore = system("mkdir -p /tmp/aics/simularium"); }
-        inline void DeleteCacheFolder() { int ignore = system("rm -rf /tmp/aics/simularium"); }
+      inline void CreateCacheFolder() {
+	std::string cmd = "mkdir -p " + this->kCacheFolder;
+	int ignore = system(cmd.c_str());
+      }
+      inline void DeleteCacheFolder() {
+	std::string cmd = "rm -rf " + this->kCacheFolder;
+	int ignore = system(cmd.c_str());
+      }
 
-        std::ofstream& GetOfstream(std::string& identifier);
-        std::ifstream& GetIfstream(std::string& identifier);
-
-        void CloseFileStreams();
+        fileio::SimulariumBinaryFile* GetBinaryFile(std::string identifier);
 
         void ParseFileProperties(std::string identifier);
         void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
@@ -116,18 +147,10 @@ namespace simularium {
         const std::string kCacheFolder = "/tmp/aics/simularium/";
         const std::string kAwsPrefix = "trajectory/";
 
-        std::ios_base::openmode m_ofstreamFlags = std::ios::out | std::ios::app | std::ios::binary;
-        std::ios_base::openmode m_ifstreamFlags = std::ios::in | std::ios::binary;
-        std::unordered_map<std::string, std::ofstream> m_ofstreams;
-        std::unordered_map<std::string, std::ifstream> m_ifstreams;
-        std::unordered_map<std::string, std::size_t> m_numFrames;
         std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
         std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;
-
-        fileio::BinaryCacheWriter m_binaryCacheWriter;
-        fileio::BinaryCacheReader m_binaryCacheReader;
+        std::unordered_map<std::string, std::shared_ptr<fileio::SimulariumBinaryFile>> m_binaryFiles;
     };
-
 }
 }
 

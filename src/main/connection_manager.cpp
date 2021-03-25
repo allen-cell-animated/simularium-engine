@@ -177,7 +177,6 @@ namespace simularium {
 
                 this->CheckForFinishedClients(simulation);
                 this->SendDataToClients(simulation);
-                this->AdvanceClients();
             }
         });
     }
@@ -296,10 +295,13 @@ namespace simularium {
 
     void ConnectionManager::RemoveConnection(std::string connectionUID)
     {
+      if(this->m_netConnections.count(connectionUID)) {
+	this->SetClientState(connectionUID, ClientPlayState::Stopped);
         this->LogClientEvent(connectionUID, "Removing closed network connection");
         this->m_netConnections.erase(connectionUID);
         this->m_missedHeartbeats.erase(connectionUID);
         this->m_netStates.erase(connectionUID);
+      }
     }
 
     void ConnectionManager::CloseConnection(std::string connectionUID)
@@ -367,10 +369,10 @@ namespace simularium {
         this->m_netStates[connectionUID].play_state = state;
     }
 
-    void ConnectionManager::SetClientFrame(
-        std::string connectionUID, std::size_t frameNumber)
+    void ConnectionManager::SetClientPos(
+        std::string connectionUID, std::size_t pos)
     {
-        this->m_netStates[connectionUID].frame_no = frameNumber;
+        this->m_netStates[connectionUID].playback_pos = pos;
     }
 
     void ConnectionManager::SetClientSimId(
@@ -382,8 +384,7 @@ namespace simularium {
     void ConnectionManager::CheckForFinishedClient(
         Simulation& simulation,
         std::string connectionUID
-    )
-    {
+    ) {
         if(!this->m_netStates.count(connectionUID)) {
             LOG_F(ERROR, "No net state for client %s", connectionUID.c_str());
             return;
@@ -391,44 +392,47 @@ namespace simularium {
 
         auto& netState = this->m_netStates.at(connectionUID);
         auto sid = netState.sim_identifier;
+        if(!simulation.HasFileInCache(sid)) { return; }
+
         auto totalNumberOfFrames =
             simulation.GetFileProperties(sid).numberOfFrames;
         auto numberOfLoadedFrames = simulation.GetNumFrames(sid);
+        auto endPos = simulation.GetEndOfStreamPos(sid);
 
-        auto currentFrame = netState.frame_no;
+        bool isFileFinishedProcessing =
+          (totalNumberOfFrames == numberOfLoadedFrames)
+          && totalNumberOfFrames > 0;
+        bool isClientAtEndOfStream =
+          (netState.playback_pos >= endPos)
+          && endPos > 0;
+
         auto currentState = netState.play_state;
 
-        if(totalNumberOfFrames == 0) {
-          return; // no data
+        // Nothing to load yet
+        if(totalNumberOfFrames == 0 || numberOfLoadedFrames == 0) {
+            this->SetClientState(connectionUID, ClientPlayState::Waiting);
         }
-
         // Invalid frame, set to last frame
-        if(currentFrame >= totalNumberOfFrames)
+        if(isClientAtEndOfStream && isFileFinishedProcessing)
         {
             if(netState.sim_identifier == LIVE_SIM_IDENTIFIER) {
                 this->SetClientState(connectionUID, ClientPlayState::Waiting);
             } else {
                 this->LogClientEvent(connectionUID, "Finished Streaming");
-                this->SetClientFrame(connectionUID, totalNumberOfFrames - 1);
+                this->SetClientPos(connectionUID, broadcast::eos);
                 this->SetClientState(connectionUID, ClientPlayState::Finished);
             }
         }
-
         // Frame is valid but not loaded yet
-        if(currentState == ClientPlayState::Playing &&
-            currentFrame >= numberOfLoadedFrames &&
-            currentFrame < totalNumberOfFrames)
+        else if(currentState == ClientPlayState::Playing &&
+            isClientAtEndOfStream &&
+            !isFileFinishedProcessing)
         {
-            this->LogClientEvent(connectionUID, "Waiting for frame " + std::to_string(currentFrame));
             this->SetClientState(connectionUID, ClientPlayState::Waiting);
         }
-
         // If the waited for frame has been loaded
-        if(currentFrame < numberOfLoadedFrames && currentState == ClientPlayState::Waiting)
+        else if(!isClientAtEndOfStream && currentState == ClientPlayState::Waiting)
         {
-            if(netState.sim_identifier != LIVE_SIM_IDENTIFIER) {
-                this->LogClientEvent(connectionUID, "Done waiting for frame " + std::to_string(currentFrame));
-            }
             this->SetClientState(connectionUID, ClientPlayState::Playing);
         }
     }
@@ -476,6 +480,33 @@ namespace simularium {
         this->m_uidsToDelete.clear();
     }
 
+    void ConnectionManager::SendArrayBufferMessage(
+      std::string connectionUID, std::vector<float> buffer
+    ) {
+      if(!this->m_netConnections.count(connectionUID)) {
+        LOG_F(ERROR, "Ignoring message send to invalid/untracked client %s", connectionUID.c_str());
+        return;
+      }
+
+      if(buffer.size() == 0) {
+        LOG_F(WARNING, "Ignoring empty arraybuffer message");
+        return;
+      }
+
+      try {
+          this->m_server.send(
+              this->m_netConnections.at(connectionUID),
+              buffer.data(),
+              buffer.size() * sizeof(float),
+              websocketpp::frame::opcode::binary
+            );
+      } catch (...) {
+          this->LogClientEvent(connectionUID, "Failed to send websocket message to client");
+          LOG_F(ERROR, "Websocket send failed with exception, marking offending connection for removal...");
+          this->m_uidsToDelete.push_back(connectionUID);
+      }
+    }
+
     void ConnectionManager::SendWebsocketMessage(
         std::string connectionUID, Json::Value jsonMessage)
     {
@@ -517,38 +548,16 @@ namespace simularium {
         this->m_missedHeartbeats[connectionUID] = 0;
     }
 
-    void ConnectionManager::AdvanceClients()
-    {
-        for (auto& entry : this->m_netStates) {
-            auto& netState = entry.second;
-
-            if (netState.play_state != ClientPlayState::Playing) {
-                continue;
-            }
-
-            netState.frame_no++;
-        }
-    }
-
-    void ConnectionManager::SendSingleFrameToClient(
-        Simulation& simulation,
-        std::string connectionUID,
-        std::size_t frameNumber
-    ) {
-      this->SendDataToClient(simulation, connectionUID, frameNumber, 1, true);
-    }
-
     void ConnectionManager::SendDataToClients(Simulation& simulation)
     {
+        
         for (auto& entry : this->m_netStates) {
             auto& uid = entry.first;
             auto& netState = entry.second;
 
             this->SendDataToClient(
                 simulation,
-                uid,
-                netState.frame_no,
-                this->kNumberOfFramesToBulkBroadcast
+                uid
             );
         }
     }
@@ -623,14 +632,34 @@ namespace simularium {
         uuid = strUuid;
     }
 
+    void ConnectionManager::PrependArraybufferHeader(
+      BroadcastUpdate& update,
+      std::string fileName
+    ) {
+        // Append the file-name and message-type
+        BroadcastDataBuffer prefix;
+        prefix.push_back(static_cast<float>(id_vis_data_arrive));
+        float* tmp_buf = (float*)(fileName.c_str());
+        auto tmp_buf_size = (fileName.length() + 3) / 4; // 4 char per float
+
+        prefix.push_back(fileName.length());
+        prefix.insert(
+          prefix.end(),
+          tmp_buf,
+          tmp_buf + tmp_buf_size
+        );
+
+        update.buffer.insert(
+          update.buffer.begin(),
+          prefix.begin(),
+          prefix.end()
+        );
+    }
+
     void ConnectionManager::SendDataToClient(
         Simulation& simulation,
-        std::string connectionUID,
-        std::size_t startingFrame,
-        std::size_t numberOfFrames,
-        bool force // set to true for one-off sends
-    )
-    {
+        std::string connectionUID
+    ) {
         if(!this->m_netStates.count(connectionUID)) {
             LOG_F(ERROR, "No net state for client %s", connectionUID.c_str());
             return;
@@ -644,36 +673,48 @@ namespace simularium {
           return; // no data to send
         }
 
-        if(!force)
-        {
-            if (netState.play_state != ClientPlayState::Playing) {
-                return;
-            }
+        if (netState.play_state != ClientPlayState::Playing) {
+            return;
         }
 
-        Json::Value dataFrameMessage;
-        dataFrameMessage["msgType"] = id_vis_data_arrive;
-        dataFrameMessage["bundleSize"] = (int)numberOfFrames;
-        dataFrameMessage["bundleStart"] = (int)startingFrame;
-        Json::Value frameArr = Json::Value(Json::arrayValue);
-        int endFrame = std::min(startingFrame + numberOfFrames, totalNumberOfFrames);
-        int currentFrame = startingFrame;
+        auto update = simulation.GetBroadcastUpdate(
+          sid,
+          netState.playback_pos,
+          this->kBroadcastBufferSize
+        );
+        this->PrependArraybufferHeader(update, sid);
 
-        for(; currentFrame < endFrame; currentFrame++)
-        {
-            AgentDataFrame adf = simulation.GetDataFrame(sid, currentFrame);
-            Json::Value frameJSON;
-            frameJSON["data"] = Serialize(adf);
-            frameJSON["frameNumber"] = currentFrame;
-            frameJSON["time"] = simulation.GetSimulationTimeAtFrame(sid, currentFrame);
+        netState.playback_pos = update.new_pos;
+        this->SendArrayBufferMessage(connectionUID, update.buffer);
+    }
 
-            frameArr.append(frameJSON);
+    void ConnectionManager::SendSingleFrameToClient(
+        Simulation& simulation,
+        std::string connectionUID,
+        std::size_t frameNumber
+    ) {
+        if(!this->m_netStates.count(connectionUID)) {
+            LOG_F(ERROR, "No net state for client %s", connectionUID.c_str());
+            return;
         }
 
-        netState.frame_no = currentFrame - 1;
-        dataFrameMessage["bundleData"] = frameArr;
-        dataFrameMessage["fileName"] = sid;
-        this->SendWebsocketMessage(connectionUID, dataFrameMessage);
+        auto& netState = this->m_netStates.at(connectionUID);
+        std::string sid = netState.sim_identifier;
+        auto totalNumberOfFrames = simulation.GetNumFrames(sid);
+
+        if(totalNumberOfFrames == 0) {
+          return; // no data to send
+        }
+
+        auto update = simulation.GetBroadcastFrame(
+          sid, frameNumber
+        );
+
+        this->PrependArraybufferHeader(update, sid);
+
+        // Send the message
+        netState.playback_pos = update.new_pos;
+        this->SendArrayBufferMessage(connectionUID, update.buffer);
     }
 
     void ConnectionManager::HandleMessage(NetMessage nm)
@@ -762,7 +803,7 @@ namespace simularium {
 
                             if(!jsonMsg.isMember("file-name")) {
                               this->SetClientState(senderUid, ClientPlayState::Paused);
-                              this->SetClientFrame(senderUid, 0);
+                              this->SetClientPos(senderUid, 0);
                               continue;
                             }
                             auto trajectoryFileName = jsonMsg["file-name"].asString();
@@ -838,39 +879,6 @@ namespace simularium {
 
                     this->BroadcastModelDefinition(jsonMsg);
                 } break;
-                case WebRequestTypes::id_play_cache: {
-                    if(jsonMsg.isMember("time"))
-                    {
-                        auto& netState = this->m_netStates[senderUid];
-                        double timeNs = jsonMsg["time"].asDouble();
-                        std::size_t frameNumber = simulation.GetClosestFrameNumberForTime(
-                            netState.sim_identifier, timeNs
-                        );
-                        double closestTime = simulation.GetSimulationTimeAtFrame(
-                            netState.sim_identifier, frameNumber
-                        );
-
-                        std::string description =
-                            "Request to play cached from time " + std::to_string(timeNs) +
-                            " (frame " + std::to_string(frameNumber) + " with time " +
-                            std::to_string(closestTime) + ")";
-                        this->LogClientEvent(senderUid, description);
-
-                        this->SetClientFrame(senderUid, frameNumber);
-                        this->SetClientState(senderUid, ClientPlayState::Playing);
-                    }
-                    else if (jsonMsg.isMember("frame-num"))
-                    {
-                        auto frameNumber = jsonMsg["frame-num"].asInt();
-                        this->LogClientEvent(
-                            senderUid,
-                            "Request to play cached from frame " + std::to_string(frameNumber)
-                        );
-                        this->SetClientFrame(senderUid, frameNumber);
-                        this->SetClientState(senderUid, ClientPlayState::Playing);
-                    }
-
-                } break;
                 case WebRequestTypes::id_goto_simulation_time: {
                     auto& netState = this->m_netStates[senderUid];
                     double timeNs = std::stod(jsonMsg["time"].asString());
@@ -885,7 +893,7 @@ namespace simularium {
                         "Request for time " + std::to_string(timeNs) + " -> selected frame " +
                         std::to_string(frameNumber) + " with time " + std::to_string(closestTime)
                     );
-                    this->SetClientFrame(senderUid, frameNumber);
+
                     this->SendSingleFrameToClient(simulation, senderUid, frameNumber);
                 } break;
                 case WebRequestTypes::id_init_trajectory_file: {
@@ -930,7 +938,6 @@ namespace simularium {
           return;
         }
 
-        this->SetClientFrame(connectionUID, 0);
         if(simulation.HasFileInCache(fileName))
         {
             LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
@@ -965,6 +972,10 @@ namespace simularium {
                 }
             }
         }
+
+        // Need to call this after the binary cache is processed
+        //  in 'SetupRuntimeCache' above
+        this->SetClientPos(connectionUID, simulation.GetFramePos(fileName, 0));
 
         // Send Trajectory File Properties
         TrajectoryFileProperties tfp = simulation.GetFileProperties(fileName);

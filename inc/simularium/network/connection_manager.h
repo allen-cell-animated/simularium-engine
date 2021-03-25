@@ -10,6 +10,7 @@
 #include <vector>
 #include <mutex>
 #include <queue>
+#include <limits>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -26,6 +27,11 @@ typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> conte
 
 namespace aics {
 namespace simularium {
+namespace broadcast {
+    // Used to signal that a client should not stream any more data
+    //  by setting their current position to eos ('end of stream')
+    const std::size_t eos = std::numeric_limits<std::size_t>::max();
+}
 
     enum ClientPlayState {
         Playing = 0,
@@ -36,7 +42,7 @@ namespace simularium {
     };
 
     struct NetState {
-        std::size_t frame_no = 0;
+        std::size_t playback_pos = 0;
         ClientPlayState play_state = ClientPlayState::Stopped;
         std::string sim_identifier = "runtime";
     };
@@ -76,16 +82,16 @@ namespace simularium {
         std::string GetUid(websocketpp::connection_hdl hd1);
 
         void SetClientState(std::string connectionUID, ClientPlayState state);
-        void SetClientFrame(std::string connectionUID, std::size_t frameNumber);
+        void SetClientPos(std::string connectionUID, std::size_t pos);
         void SetClientSimId(std::string connectionUID, std::string simId);
 
+        void SendArrayBufferMessage(std::string connectionUID, std::vector<float> buffer);
         void SendWebsocketMessage(std::string connectionUID, Json::Value jsonMessage);
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
 
         void CheckForFinishedClients(
             Simulation& simulation
         );
-        void AdvanceClients();
         void SendDataToClients(Simulation& simulation);
 
         void SetNoUploadArg(bool val) { this->m_argNoUpload = val; }
@@ -129,10 +135,7 @@ namespace simularium {
 
         void SendDataToClient(
             Simulation& simulation,
-            std::string connectionUID,
-            std::size_t startingFrame,
-            std::size_t numberOfFrames,
-            bool force = false // ignore play state & all conditions, just send
+            std::string connectionUID
         );
 
         void CheckForFinishedClient(
@@ -172,6 +175,8 @@ namespace simularium {
 
         void LogClientEvent(std::string uid, std::string msg);
 
+        void PrependArraybufferHeader(BroadcastUpdate& update, std::string fileName);
+
         std::unordered_map<std::string, NetState> m_netStates;
         std::unordered_map<std::string, websocketpp::connection_hdl> m_netConnections;
         std::unordered_map<std::string, std::size_t> m_missedHeartbeats;
@@ -183,8 +188,8 @@ namespace simularium {
         const std::size_t kHeartBeatIntervalSeconds = 15;
         const std::size_t kNoClientTimeoutSeconds = 30;
         const std::size_t kServerTickIntervalMilliSeconds = 200;
-        const std::size_t kNumberOfFramesToBulkBroadcast = 100;
         const std::size_t kFileIoCheckIntervalMilliSeconds = 100;
+        const std::size_t kBroadcastBufferSize = 100000; // 25kb
 
         bool m_argNoTimeout = false;
         bool m_argForceInit = false;

@@ -46,16 +46,39 @@ namespace simularium {
             this->m_SimPkgs[i]->RunTimeStep(timeStep, this->m_agents);
         }
 
-        this->CacheCurrentAgents();
+        auto frameNumber = this->GetNumFrames(this->m_simIdentifier);
+        float time = frameNumber;
+        this->CacheAgents(this->m_agents, frameNumber, time);
     }
 
-    std::vector<AgentData> Simulation::GetDataFrame(
+    BroadcastUpdate Simulation::GetBroadcastFrame(
         std::string identifier,
         std::size_t frame_no
     )
     {
-        return this->m_cache.GetFrame(identifier, frame_no);
+        return this->m_cache.GetBroadcastFrame(identifier, frame_no);
     }
+
+    BroadcastUpdate Simulation::GetBroadcastUpdate(
+      std::string identifier,
+      std::size_t currentPosition,
+      std::size_t bufferSize
+    ) {
+        return this->m_cache.GetBroadcastUpdate(
+          identifier,
+          currentPosition,
+          bufferSize
+        );
+    }
+
+    std::size_t Simulation::GetEndOfStreamPos(
+      std::string identifier
+    ) { return this->m_cache.GetEndOfStreamPos(identifier); }
+
+    std::size_t Simulation::GetFramePos(
+      std::string identifier,
+      std::size_t frameNumber
+    ) { return this->m_cache.GetFramePos(identifier, frameNumber); }
 
     void Simulation::Reset()
     {
@@ -116,18 +139,26 @@ namespace simularium {
         auto simPkg = this->m_SimPkgs[this->m_activeSimPkg];
         if (!simPkg->IsFinished()) {
             simPkg->GetNextFrame(this->m_agents);
-        }
 
-        this->CacheCurrentAgents();
+            auto frameNumber = this->GetNumFrames(this->m_simIdentifier);
+            auto time = simPkg->GetSimulationTimeAtFrame(frameNumber);
+            this->CacheAgents(this->m_agents, frameNumber, time);
+        }
     }
 
-    void Simulation::CacheCurrentAgents()
-    {
-        AgentDataFrame newFrame;
+    void Simulation::CacheAgents(
+      std::vector<std::shared_ptr<Agent>>& agents,
+      std::size_t frameNumber,
+      float time
+    ) {
+        TrajectoryFrame newFrame;
         for (std::size_t i = 0; i < this->m_agents.size(); ++i) {
             auto agent = this->m_agents[i];
-            AppendAgentData(newFrame, agent);
+            AppendAgentData(newFrame.data, agent);
         }
+
+        newFrame.frameNumber = frameNumber;
+        newFrame.time = time;
 
         this->m_cache.AddFrame(this->m_simIdentifier, newFrame);
     }

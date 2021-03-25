@@ -13,8 +13,7 @@ set(SOURCES
 "simulation.cpp"
 "connection_manager.cpp"
 "cli_client.cpp"
-"binary_cache_reader.cpp"
-"binary_cache_writer.cpp"
+"simularium_binary_file.cpp"
 "simularium_file_reader.cpp"
 )
 

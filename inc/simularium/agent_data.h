@@ -9,7 +9,12 @@ namespace simularium {
     struct AgentData;
 
     typedef std::vector<aics::simularium::AgentData> AgentDataFrame;
-    typedef std::vector<aics::simularium::AgentDataFrame> AgentDataFrameBundle;
+
+    struct TrajectoryFrame {
+        AgentDataFrame data;
+        float time;
+        std::size_t frameNumber;
+    };
 } // namespace simularium
 } // namespace aics
 

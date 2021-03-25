@@ -34,56 +34,71 @@ namespace simularium {
 
     SimulationCache::~SimulationCache()
     {
-        this->CloseFileStreams();
         this->DeleteCacheFolder();
     }
 
-    void SimulationCache::AddFrame(std::string identifier, AgentDataFrame data)
+    void SimulationCache::AddFrame(std::string identifier, TrajectoryFrame frame)
     {
-        if(this->m_numFrames.count(identifier) == 0) {
-            this->m_numFrames[identifier] = 0;
-        } else {
-            this->m_numFrames[identifier]++;
-        }
-
-        auto& fstream = this->GetOfstream(identifier);
-        this->m_binaryCacheWriter.SerializeFrame(
-          fstream,
-          this->m_numFrames[identifier],
-          data
-        );
+        fileio::SimulariumBinaryFile* file = this->GetBinaryFile(identifier);
+        file->WriteFrame(frame);
     }
 
-    AgentDataFrame SimulationCache::GetFrame(std::string identifier, std::size_t frameNumber)
+    BroadcastUpdate SimulationCache::GetBroadcastFrame(std::string identifier, std::size_t frameNumber)
     {
-        if(this->m_numFrames.count(identifier) == 0) {
-            return AgentDataFrame(); // not in cache at all
+        if(!this->m_binaryFiles.count(identifier)) {
+            LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+            return BroadcastUpdate();
         }
 
-        std::size_t numFrames = this->m_numFrames.at(identifier);
+        std::size_t numFrames = this->GetNumFrames(identifier);
         if (frameNumber > numFrames || numFrames == 0) {
-            return AgentDataFrame();
+            LOG_F(ERROR, "Request for frame %zu of identifier %s, which is not in cache", frameNumber, identifier.c_str());
+            return BroadcastUpdate();
         }
 
-        std::ifstream& is = this->GetIfstream(identifier);
-        if (is) {
-            AgentDataFrame adf;
-            this->m_binaryCacheReader.DeserializeFrame(
-              is,
-              frameNumber,
-              adf
-            );
-            return adf;
+        return this->m_binaryFiles.at(identifier)->GetBroadcastFrame(frameNumber);
+    }
+
+    BroadcastUpdate SimulationCache::GetBroadcastUpdate(
+      std::string identifier,
+      std::size_t currentPosition,
+      std::size_t bufferSize
+    ) {
+        if(!this->m_binaryFiles.count(identifier)) {
+            LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+            return BroadcastUpdate();
         }
 
-        LOG_F(ERROR, "Failed to load frame %zu from cache %s", frameNumber, identifier.c_str());
-        return AgentDataFrame();
+        return this->m_binaryFiles.at(identifier)->GetBroadcastUpdate(currentPosition, bufferSize);
+    }
+
+    std::size_t SimulationCache::GetEndOfStreamPos(
+      std::string identifier
+    ) {
+        if(!this->m_binaryFiles.count(identifier)) {
+            LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+            return 0;
+        }
+
+        return this->m_binaryFiles.at(identifier)->GetEndOfFilePos();
+    }
+
+    std::size_t SimulationCache::GetFramePos(
+      std::string identifier,
+      std::size_t frameNumber
+    ) {
+      if(!this->m_binaryFiles.count(identifier)) {
+          LOG_F(ERROR, "Request for identifier %s, which is not in cache", identifier.c_str());
+          return 0;
+      }
+
+      return this->m_binaryFiles.at(identifier)->GetFramePos(frameNumber);
     }
 
     std::size_t SimulationCache::GetNumFrames(std::string identifier)
     {
-        return this->m_numFrames.count(identifier) ?
-            this->m_numFrames.at(identifier) : 0;
+        return this->m_binaryFiles.count(identifier) ?
+            this->m_binaryFiles.at(identifier)->NumSavedFrames() : 0;
     }
 
     void SimulationCache::ClearCache(std::string identifier)
@@ -91,27 +106,13 @@ namespace simularium {
         std::string filePath = this->GetLocalFilePath(identifier);
         std::remove(filePath.c_str());
 
-        std::ifstream& is = this->GetIfstream(identifier);
-        std::ofstream& os = this->GetOfstream(identifier);
-
-        is.close();
-        os.close();
-
-        this->m_ofstreams.erase(identifier);
-        this->m_ifstreams.erase(identifier);
-
-        this->m_numFrames.erase(identifier);
+        this->m_binaryFiles.erase(identifier);
         this->m_fileProps.erase(identifier);
     }
 
     void SimulationCache::Preprocess(std::string identifier)
     {
         this->ParseFileProperties(identifier);
-
-        this->m_numFrames[identifier] = this->m_fileProps[identifier].numberOfFrames;
-        LOG_F(INFO, "Number of frames in %s cache: %zu",
-            identifier.c_str(), this->m_numFrames[identifier]
-        );
     }
 
     bool SimulationCache::DownloadRuntimeCache(std::string identifier)
@@ -195,21 +196,22 @@ namespace simularium {
 
         // Convert the simularium file to a binary cache file
         fileio::SimulariumFileReader simulariumFileReader;
-        std::ofstream& os = this->GetOfstream(fileName);
+        fileio::SimulariumBinaryFile* outFile = this->GetBinaryFile(fileName);
 
         Json::Value& spatialData = simJson["spatialData"];
         int nFrames = spatialData["bundleSize"].asInt();
         LOG_F(INFO, "%i frames found in simularium json file", nFrames);
         for(int i = 0; i < nFrames; i++) {
-          AgentDataFrame adf;
-          if(simulariumFileReader.DeserializeFrame(simJson, i, adf)) {
-            this->m_binaryCacheWriter.SerializeFrame(os, i, adf);
+          TrajectoryFrame frame;
+          if(simulariumFileReader.DeserializeFrame(simJson, i, frame)) {
+            outFile->WriteFrame(frame);
           } else {
             LOG_F(ERROR, "Failed to deserialize frame from simularium JSON");
           }
         }
 
         std::remove(tmpFile.c_str());
+
         return true;
     }
 
@@ -408,48 +410,16 @@ namespace simularium {
         return this->kCacheFolder + identifier + ".json";
     }
 
-    std::ofstream& SimulationCache::GetOfstream(std::string& identifier) {
-        if(!this->m_ofstreams.count(identifier)) {
-            std::ofstream& newStream = this->m_ofstreams[identifier];
-            newStream.open(this->GetLocalFilePath(identifier), this->m_ofstreamFlags);
-            return newStream;
-        } else if (!this->m_ofstreams[identifier]) {
-            std::ofstream& badStream = this->m_ofstreams[identifier];
-            badStream.close();
-            badStream.open(this->GetLocalFilePath(identifier), this->m_ofstreamFlags);
-            return badStream;
-        } else {
-            std::ofstream& currentStream = this->m_ofstreams[identifier];
-            return currentStream;
-        }
-    }
+    fileio::SimulariumBinaryFile* SimulationCache::GetBinaryFile(std::string identifier) {
+      std::string path = this->GetLocalFilePath(identifier);
 
-    std::ifstream& SimulationCache::GetIfstream(std::string& identifier) {
-        if(!this->m_ifstreams.count(identifier)) {
-            std::ifstream& newStream = this->m_ifstreams[identifier];
-            newStream.open(this->GetLocalFilePath(identifier), this->m_ifstreamFlags);
-            return newStream;
-        } else if(!this->m_ifstreams[identifier]) {
-            std::ifstream& badStream = this->m_ifstreams[identifier];
-            badStream.close();
-            badStream.open(this->GetLocalFilePath(identifier), this->m_ifstreamFlags);
-            return badStream;
-        } else {
-            std::ifstream& currentStream = this->m_ifstreams[identifier];
-            return currentStream;
-        }
-    }
+      if(!this->m_binaryFiles.count(identifier)) {
+          this->m_binaryFiles[identifier] =
+            std::make_shared<fileio::SimulariumBinaryFile>();
+          this->m_binaryFiles[identifier]->Create(path);
+      }
 
-    void SimulationCache::CloseFileStreams() {
-        for (auto& entry : this->m_ofstreams)
-        {
-            entry.second.close();
-        }
-
-        for (auto& entry : this->m_ifstreams)
-        {
-            entry.second.close();
-        }
+      return this->m_binaryFiles[identifier].get();
     }
 
 } // namespace simularium

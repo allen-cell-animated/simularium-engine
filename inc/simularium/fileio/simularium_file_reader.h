@@ -14,7 +14,7 @@ public:
     bool DeserializeFrame(
       Json::Value& jsonRoot,
       std::size_t frameNumber,
-      AgentDataFrame& adf
+      TrajectoryFrame& outFrame
     );
 };
 
