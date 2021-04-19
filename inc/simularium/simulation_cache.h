@@ -126,26 +126,16 @@ namespace simularium {
         //  outdated cache-files will need to be manually removed from S3
         std::string GetLocalFilePath(std::string identifier);
         std::string GetLocalInfoFilePath(std::string identifier);
-        std::string GetAwsFilePath(std::string identifier);
-        std::string GetAwsInfoFilePath(std::string identifier);
-
-      inline void CreateCacheFolder() {
-	std::string cmd = "mkdir -p " + this->kCacheFolder;
-	int ignore = system(cmd.c_str());
-      }
-      inline void DeleteCacheFolder() {
-	std::string cmd = "rm -rf " + this->kCacheFolder;
-	int ignore = system(cmd.c_str());
-      }
+        std::string GetS3TrajectoryPath(std::string identifier);
+        std::string GetS3TrajectoryCachePath(std::string identifier);
+        std::string GetS3InfoPath(std::string identifier);
+        std::string GetS3InfoCachePath(std::string identifer);
 
         fileio::SimulariumBinaryFile* GetBinaryFile(std::string identifier);
 
         void ParseFileProperties(std::string identifier);
         void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
         bool IsFilePropertiesValid(std::string identifier);
-
-        const std::string kCacheFolder = "/tmp/aics/simularium/";
-        const std::string kAwsPrefix = "trajectory/";
 
         std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
         std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;

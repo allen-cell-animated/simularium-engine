@@ -1,6 +1,7 @@
 #include "simularium/simulation_cache.h"
 #include "simularium/aws/aws_util.h"
 #include "simularium/fileio/simularium_file_reader.h"
+#include "simularium/config/config.h"
 #include "loguru/loguru.hpp"
 #include <json/json.h>
 #include <algorithm>
@@ -26,15 +27,24 @@ inline bool FileExists(const std::string& name)
 namespace aics {
 namespace simularium {
 
+    inline void CreateCacheFolder() {
+	std::string cmd = "mkdir -p " + config::GetCacheFolder();
+	int ignore = system(cmd.c_str());
+    }
+    inline void DeleteCacheFolder() {
+	std::string cmd = "rm -rf " + config::GetCacheFolder();
+	int ignore = system(cmd.c_str());
+    }
+  
     SimulationCache::SimulationCache()
     {
-        this->DeleteCacheFolder();
-        this->CreateCacheFolder();
+        DeleteCacheFolder();
+        CreateCacheFolder();
     }
 
     SimulationCache::~SimulationCache()
     {
-        this->DeleteCacheFolder();
+        DeleteCacheFolder();
     }
 
     void SimulationCache::AddFrame(std::string identifier, TrajectoryFrame frame)
@@ -117,7 +127,7 @@ namespace simularium {
 
     bool SimulationCache::DownloadRuntimeCache(std::string identifier)
     {
-        std::string awsFilePath = this->GetAwsFilePath(identifier);
+        std::string awsFilePath = this->GetS3TrajectoryCachePath(identifier);
         bool isSimulariumFile = false;
         bool filesFound = true;
 
@@ -128,7 +138,7 @@ namespace simularium {
         }
 
         // Otherwise, look for the binary cache file
-        std::string fpropsFilePath = this->GetAwsInfoFilePath(identifier);
+        std::string fpropsFilePath = this->GetS3InfoCachePath(identifier);
         std::string fpropsDestination = this->GetLocalInfoFilePath(identifier);
         if(!aics::simularium::aws_util::Download(fpropsFilePath, fpropsDestination))
         {
@@ -143,8 +153,7 @@ namespace simularium {
 
         LOG_F(INFO, "Downloading cache for %s from S3", awsFilePath.c_str());
         std::string destination = this->GetLocalFilePath(identifier);
-        std::string cacheFilePath = awsFilePath + "_cache";
-        if (!aics::simularium::aws_util::Download(cacheFilePath, destination)) {
+        if (!aics::simularium::aws_util::Download(awsFilePath, destination)) {
             LOG_F(WARNING, "Cache file for %s not found on AWS S3", identifier.c_str());
             filesFound = false;
         }
@@ -166,7 +175,7 @@ namespace simularium {
 
         for(auto path: pathsToTry) {
           if(!fileFound) {
-            std::string awsPath = this->GetAwsFilePath(path);
+            std::string awsPath = this->GetS3TrajectoryPath(path);
 
             if(!aics::simularium::aws_util::Download(awsPath, tmpFile)) {
               LOG_F(INFO, "Simularium file %s not found on AWS S3", awsPath.c_str());
@@ -217,7 +226,7 @@ namespace simularium {
 
     bool SimulationCache::FindFile(std::string fileName) {
         std::string rawPath = this->GetLocalRawTrajectoryFilePath(fileName);
-        std::string awsPath = this->GetAwsFilePath(fileName);
+        std::string awsPath = this->GetS3TrajectoryPath(fileName);
 
         // Download the file from AWS if it is not present locally
         if (!FileExists(rawPath)) {
@@ -257,7 +266,7 @@ namespace simularium {
 
     void SimulationCache::WriteFilePropertiesToDisk(std::string identifier) {
         std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
-        std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
+        std::string filePropsDest = this->GetS3InfoCachePath(identifier);
         std::ofstream propsFile;
         propsFile.open(filePropsPath);
 
@@ -293,10 +302,10 @@ namespace simularium {
 
     bool SimulationCache::UploadRuntimeCache(std::string identifier)
     {
-        std::string awsFilePath = this->GetAwsFilePath(identifier);
+        std::string awsFilePath = this->GetS3TrajectoryCachePath(identifier);
         this->WriteFilePropertiesToDisk(identifier);
 
-        std::string destination = awsFilePath + "_cache";
+        std::string destination = awsFilePath;
         std::string source = this->GetLocalFilePath(identifier);
         LOG_F(INFO, "Uploading cache file for %s to S3", identifier.c_str());
         if(!aics::simularium::aws_util::Upload(source, destination)) {
@@ -304,7 +313,7 @@ namespace simularium {
         }
 
         std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
-        std::string filePropsDest = this->GetAwsInfoFilePath(identifier);
+        std::string filePropsDest = this->GetS3InfoCachePath(identifier);
 
         LOG_F(INFO, "Uploading info file for %s to S3", identifier.c_str());
         if(!aics::simularium::aws_util::Upload(filePropsPath, filePropsDest))
@@ -387,29 +396,39 @@ namespace simularium {
     }
 
     std::string SimulationCache::GetLocalRawTrajectoryFilePath(std::string identifier) {
-      return this->kCacheFolder + identifier;
-    }
-
-    std::string SimulationCache::GetAwsFilePath(std::string identifier)
-    {
-      return this->kAwsPrefix + identifier;
-    }
-
-    std::string SimulationCache::GetAwsInfoFilePath(std::string identifier)
-    {
-      return this->kAwsPrefix + identifier + "_info";
+      return config::GetCacheFolder() + identifier;
     }
 
     std::string SimulationCache::GetLocalFilePath(std::string identifier)
     {
-        return this->kCacheFolder + identifier + ".bin";
+        return config::GetCacheFolder() + identifier + ".bin";
     }
 
     std::string SimulationCache::GetLocalInfoFilePath(std::string identifier)
     {
-        return this->kCacheFolder + identifier + ".json";
+        return config::GetCacheFolder() + identifier + ".json";
     }
 
+    std::string SimulationCache::GetS3TrajectoryPath(std::string identifier)
+    {
+        return config::GetS3Location() + identifier;
+    }
+
+    std::string SimulationCache::GetS3TrajectoryCachePath(std::string identifier)
+    {
+        return config::GetS3CacheLocation() + identifier + ".bin";
+    }
+
+    std::string SimulationCache::GetS3InfoPath(std::string identifier)
+    {
+        return config::GetS3Location() + identifier + ".info";
+    }
+
+    std::string SimulationCache::GetS3InfoCachePath(std::string identifier)
+    {
+        return config::GetS3CacheLocation() + identifier + ".info";
+    }
+  
     fileio::SimulariumBinaryFile* SimulationCache::GetBinaryFile(std::string identifier) {
       std::string path = this->GetLocalFilePath(identifier);
 

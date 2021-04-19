@@ -30,6 +30,7 @@ int main(int argc, char* argv[])
         setenv("TLS_PASSWORD","test", false);
         setenv("TLS_CERT_PATH","localhost.pem", false);
         setenv("TLS_KEY_PATH","localhost-key.pem", false);
+	setenv("APP_ENVIRONMENT","development",false);
     }
 
     ConnectionManager connectionManager;
