@@ -25,6 +25,22 @@ void SimulariumBinaryFile::Create(std::string filePath, std::size_t numFrames) {
     this->AllocateTOC(numFrames);
 }
 
+void SimulariumBinaryFile::Open(std::string filePath) {
+    if(this->m_fstream) {
+      this->m_fstream.close();
+    }
+
+    LOG_F(INFO, "Opening existing simularium binary file at %s", filePath.c_str());
+
+    this->m_fstream.open(
+      filePath.c_str(),
+      std::ios_base::binary |
+      std::ios_base::in |
+      std::ios_base::out |
+      std::ios_base::app
+    );
+}
+
 void SimulariumBinaryFile::WriteFrame(TrajectoryFrame frame) {
     if(!this->m_fstream) {
         LOG_F(WARNING, "No file opened. Call SimulariumBinaryFile.Create([filepath])");

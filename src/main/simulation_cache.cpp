@@ -158,6 +158,11 @@ namespace simularium {
             filesFound = false;
         }
 
+	// @HACK: called to add the file to the 'list'
+	if(filesFound) {
+	  auto ignore = this->GetBinaryFile(identifier);
+	}
+	
         return filesFound;
     }
 
@@ -329,7 +334,7 @@ namespace simularium {
     void SimulationCache::ParseFileProperties(std::string identifier)
     {
         std::string filePath = this->GetLocalInfoFilePath(identifier);
-        LOG_F(INFO, "Loading file %s from filepath %s", identifier.c_str(), filePath.c_str());
+        LOG_F(INFO, "Loading info file %s from filepath %s", identifier.c_str(), filePath.c_str());
 
         std::ifstream is(filePath);
         Json::Value fprops;
@@ -406,7 +411,7 @@ namespace simularium {
 
     std::string SimulationCache::GetLocalInfoFilePath(std::string identifier)
     {
-        return config::GetCacheFolder() + identifier + ".json";
+        return config::GetCacheFolder() + identifier + ".info";
     }
 
     std::string SimulationCache::GetS3TrajectoryPath(std::string identifier)
@@ -433,9 +438,14 @@ namespace simularium {
       std::string path = this->GetLocalFilePath(identifier);
 
       if(!this->m_binaryFiles.count(identifier)) {
-          this->m_binaryFiles[identifier] =
+	this->m_binaryFiles[identifier] =
             std::make_shared<fileio::SimulariumBinaryFile>();
-          this->m_binaryFiles[identifier]->Create(path);
+
+	if(FileExists(path)) {
+	    this->m_binaryFiles[identifier]->Open(path);
+	} else {
+            this->m_binaryFiles[identifier]->Create(path);
+	}
       }
 
       return this->m_binaryFiles[identifier].get();

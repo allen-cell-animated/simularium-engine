@@ -33,6 +33,7 @@ namespace binary {
 class SimulariumBinaryFile {
   public:
     void Create(std::string filePath, std::size_t numFrames=10000);
+    void Open(std::string filePath);
     void WriteFrame(TrajectoryFrame tf);
     BroadcastUpdate GetBroadcastFrame(std::size_t frameNumber);
     BroadcastUpdate GetBroadcastUpdate(std::size_t currentPos, std::size_t bufferSize);
