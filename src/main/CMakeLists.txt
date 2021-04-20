@@ -13,6 +13,7 @@ set(SOURCES
 "simulation.cpp"
 "connection_manager.cpp"
 "cli_client.cpp"
+"config.cpp"
 "simularium_binary_file.cpp"
 "simularium_file_reader.cpp"
 )
