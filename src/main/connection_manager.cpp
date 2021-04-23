@@ -701,15 +701,17 @@ namespace simularium {
         auto& netState = this->m_netStates.at(connectionUID);
         std::string sid = netState.sim_identifier;
         auto totalNumberOfFrames = simulation.GetNumFrames(sid);
+	LOG_F(INFO, "Sending single frame %zu for simulation %s to client %s", frameNumber, sid.c_str(), connectionUID.c_str());
 
         if(totalNumberOfFrames == 0) {
+	  LOG_F(WARNING, "There are no frames stored for simulation %s", sid.c_str());
           return; // no data to send
         }
 
         auto update = simulation.GetBroadcastFrame(
           sid, frameNumber
         );
-
+	
         this->PrependArraybufferHeader(update, sid);
 
         // Send the message
@@ -941,7 +943,7 @@ namespace simularium {
         if(simulation.HasFileInCache(fileName))
         {
             LOG_F(INFO,"[%s] Using previously loaded file for trajectory", fileName.c_str());
-            this->SendSingleFrameToClient(simulation, connectionUID, 0);
+            
         }
         else {
             bool isSimulariumFile = fileName.substr(fileName.find_last_of(".") + 1) == "simularium";
@@ -954,10 +956,8 @@ namespace simularium {
                 && simulation.DownloadRuntimeCache(fileName))
             {
                 simulation.PreprocessRuntimeCache(fileName);
-                this->SendSingleFrameToClient(simulation, connectionUID, 0);
             } else if(simulation.FindSimulariumFile(fileName)) { // find .simularium file instead
                 simulation.PreprocessRuntimeCache(fileName);
-                this->SendSingleFrameToClient(simulation, connectionUID, 0);
                 if(!this->m_argNoUpload) {
                   simulation.UploadRuntimeCache(fileName);
                 }
@@ -968,8 +968,10 @@ namespace simularium {
                 if(simulation.LoadTrajectoryFile(fileName))
                 {
                     this->SetupRuntimeCache(simulation);
-                    this->SendSingleFrameToClient(simulation, connectionUID, 0);
-                }
+                } else {
+		    LOG_F(ERROR, "Failed to load trajectory %s", fileName.c_str());
+		    return;
+		}
             }
         }
 
@@ -1009,6 +1011,7 @@ namespace simularium {
         fprops["size"] = size;
 
         this->SendWebsocketMessage(connectionUID, fprops);
+	this->SendSingleFrameToClient(simulation, connectionUID, 0);
     }
 
     void ConnectionManager::SetupRuntimeCache(
