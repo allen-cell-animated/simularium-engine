@@ -36,8 +36,7 @@ void SimulariumBinaryFile::Open(std::string filePath) {
       filePath.c_str(),
       std::ios_base::binary |
       std::ios_base::in |
-      std::ios_base::out |
-      std::ios_base::app
+      std::ios_base::out
     );
 }
 
@@ -130,6 +129,13 @@ void SimulariumBinaryFile::AllocateTOC(std::size_t size) {
 }
 
 std::size_t SimulariumBinaryFile::NumSavedFrames() {
+  if(!this->m_fstream || !this->m_fstream.good()) {
+      LOG_F(WARNING, "fstream is invalid, resetting...");
+      this->m_fstream.clear();
+      this->m_fstream.seekg(0, std::ios_base::beg);
+      this->m_fstream.seekp(0, std::ios_base::beg);
+  }
+  
   this->m_fstream.seekg(fileio::binary::TOC_ENTRY_COUNT_OFFSET, std::ios_base::beg);
     int nFrames;
     this->m_fstream.read((char*)&nFrames, sizeof(nFrames));
@@ -145,6 +151,8 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
       return BroadcastUpdate();
     }
 
+    bool isLastFrame = (frameNumber == (numFrames - 1));
+    
     // Get the stored offset for the frame from the 'table of contents' block
     int tocPos = fileio::binary::TOC_ENTRY_START_OFFSET + frameNumber * 4;
     this->m_fstream.seekg(tocPos, std::ios_base::beg);
@@ -152,7 +160,7 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
     this->m_fstream.read((char*)&frameStart, sizeof(frameStart));
 
     int frameEnd; // start of the next frame
-    if(frameNumber == (numFrames - 1)) { // is this the final entry?
+    if(isLastFrame) {
       frameEnd = this->GetEndOfFilePos(); // if yes, read to end of file
     } else {
       this->m_fstream.seekg(tocPos + 4, std::ios_base::beg);
@@ -168,7 +176,7 @@ BroadcastUpdate SimulariumBinaryFile::GetBroadcastFrame(
     );
 
     out.new_pos = frameEnd;
-
+    
     return out;
 }
 
