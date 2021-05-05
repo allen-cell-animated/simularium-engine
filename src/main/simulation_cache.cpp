@@ -305,6 +305,28 @@ namespace simularium {
             typeMapping[id] = newEntry;
         }
         fprops["typeMapping"] = typeMapping;
+
+	Json::Value cameraDefault;
+	Json::Value camPos, camLook, camUp;
+	camPos["x"] = tfp.cameraDefault.position[0];
+	camPos["y"] = tfp.cameraDefault.position[1];
+	camPos["z"] = tfp.cameraDefault.position[2];
+
+	camLook["x"] = tfp.cameraDefault.lookAt[0];
+	camLook["y"] = tfp.cameraDefault.lookAt[1];
+	camLook["z"] = tfp.cameraDefault.lookAt[2];
+
+	camUp["x"] = tfp.cameraDefault.upVector[0];
+	camUp["y"] = tfp.cameraDefault.upVector[1];
+	camUp["z"] = tfp.cameraDefault.upVector[2];
+
+	
+	cameraDefault["position"] = camPos;
+	cameraDefault["lookAt"] = camLook;
+	cameraDefault["upVector"] = camUp;
+	cameraDefault["fov"] = tfp.cameraDefault.fov;
+	fprops["cameraDefault"] = cameraDefault;
+	
         propsFile << fprops;
         propsFile.close();
     }
@@ -352,6 +374,7 @@ namespace simularium {
     {
         TrajectoryFileProperties tfp;
 
+	// Required Fields
         const Json::Value typeMapping = fprops["typeMapping"];
         std::vector<std::string> ids = typeMapping.getMemberNames();
         for (auto& id : ids) {
@@ -369,7 +392,34 @@ namespace simularium {
         tfp.numberOfFrames = fprops["totalSteps"].asInt();
         tfp.timeStepSize = fprops["timeStepSize"].asFloat();
         tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
+	// Optional Fields
+	const Json::Value& cameraDefault = fprops["cameraDefault"];
+	if(cameraDefault != Json::nullValue) {
+	  const Json::Value& cpos = cameraDefault["position"];
+	  if(cpos != Json::nullValue) {
+	    tfp.cameraDefault.lookAt[0] = cpos["x"].asFloat();
+   	    tfp.cameraDefault.lookAt[1] = cpos["y"].asFloat();
+    	    tfp.cameraDefault.lookAt[2] = cpos["z"].asFloat(); 
+	  }
+	  const Json::Value& lookAt = cameraDefault["lookAt"];
+	  if(lookAt != Json::nullValue) {
+	    tfp.cameraDefault.lookAt[0] = lookAt["x"].asFloat();
+   	    tfp.cameraDefault.lookAt[1] = lookAt["y"].asFloat();
+    	    tfp.cameraDefault.lookAt[2] = lookAt["z"].asFloat(); 
+	  }
+	  const Json::Value& upVec = cameraDefault["upVector"];
+	  if(upVec != Json::nullValue) {
+	    tfp.cameraDefault.upVector[0] = upVec["x"].asFloat();
+   	    tfp.cameraDefault.upVector[1] = upVec["y"].asFloat();
+    	    tfp.cameraDefault.upVector[2] = upVec["z"].asFloat(); 
+	  }
 
+	  if(cameraDefault.isMember("fov")) {
+	    tfp.cameraDefault.fov = cameraDefault["fov"].asFloat();
+	  }
+	}
+	
+	// Store the result
         this->m_fileProps[identifier] = tfp;
     }
 
