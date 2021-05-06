@@ -1,11 +1,27 @@
 #ifndef AICS_TRAJECTORY_PROPERTIES_H
 #define AICS_TRAJECTORY_PROPERTIES_H
 
+#include <array>
 #include <string>
 #include <unordered_map>
 
 namespace aics {
 namespace simularium {
+
+    struct CameraPosition {
+        CameraPosition()
+        {
+            position = { 0, 0, 120 };
+            lookAtPoint = { 0, 0, 0 };
+            upVector = { 0, 1, 0 };
+            fovDegrees = 50;
+        }
+
+        std::array<float, 3> position;
+        std::array<float, 3> lookAtPoint;
+        std::array<float, 3> upVector;
+        float fovDegrees;
+    };
 
     struct TrajectoryFileProperties {
         std::string fileName = "";
@@ -14,6 +30,7 @@ namespace simularium {
         float spatialUnitFactorMeters = 1e-9;
         std::unordered_map<std::size_t, std::string> typeMapping;
         float boxX, boxY, boxZ;
+        CameraPosition cameraDefault;
 
         std::string Str()
         {
