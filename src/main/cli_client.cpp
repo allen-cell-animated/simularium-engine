@@ -14,7 +14,6 @@ inline bool file_exists(const std::string& name)
     return (stat(name.c_str(), &buffer) == 0);
 }
 
-
 namespace aics {
 namespace simularium {
     void printAgentData(const Json::Value& jsonMsg)
@@ -26,25 +25,25 @@ namespace simularium {
         Json::ArrayIndex size = data.size();
         std::size_t agentCount = 0;
         Json::ArrayIndex i = 0;
-        std::cout << std::endl << "Frame " << frameNumber << " [" << time << "]:" << std::endl;
+        std::cout << std::endl
+                  << "Frame " << frameNumber << " [" << time << "]:" << std::endl;
 
-        while(i < size)
-        {
+        while (i < size) {
             std::cout << "Agent " << agentCount++ << ": "
-            << "vis-type: " << data[i++].asFloat() << " | "
-            << "type: " << data[i++].asFloat() << " | "
-            << "pos: ["
-                << data[i++].asFloat() << ", "
-                << data[i++].asFloat() << ", "
-                << data[i++].asFloat() <<"]"
-                << " | "
-            << "rot: ["
-                << data[i++].asFloat() << ", "
-                << data[i++].asFloat() << ", "
-                << data[i++].asFloat() <<"]"
-                << " | "
-            << "col-radius: " << data[i++].asFloat()
-            << std::endl;
+                      << "vis-type: " << data[i++].asFloat() << " | "
+                      << "type: " << data[i++].asFloat() << " | "
+                      << "pos: ["
+                      << data[i++].asFloat() << ", "
+                      << data[i++].asFloat() << ", "
+                      << data[i++].asFloat() << "]"
+                      << " | "
+                      << "rot: ["
+                      << data[i++].asFloat() << ", "
+                      << data[i++].asFloat() << ", "
+                      << data[i++].asFloat() << "]"
+                      << " | "
+                      << "col-radius: " << data[i++].asFloat()
+                      << std::endl;
 
             Json::ArrayIndex nSubPoints = data[i++].asInt();
             i += nSubPoints; // don't care right now
@@ -185,8 +184,7 @@ namespace simularium {
         this->m_webSocketClient.set_tls_init_handler(
             std::bind(
                 &CliClient::OnTLSConnect,
-                this
-        ));
+                this));
 
         websocketpp::lib::error_code ec;
         client::connection_ptr con = this->m_webSocketClient.get_connection(uri, ec);
@@ -203,8 +201,7 @@ namespace simularium {
 
     void CliClient::Disconnect()
     {
-        if(this->m_listeningThread.joinable())
-        {
+        if (this->m_listeningThread.joinable()) {
             this->m_webSocketClient.stop();
             this->m_listeningThread.detach();
         }
@@ -294,21 +291,16 @@ namespace simularium {
         this->SendMessage(jsonMsg, "load command " + fileName);
     }
 
-    context_ptr CliClient::OnTLSConnect() {
+    context_ptr CliClient::OnTLSConnect()
+    {
         namespace asio = websocketpp::lib::asio;
-        context_ptr ctx =
-            websocketpp::lib::make_shared<asio::ssl::context>(
-                asio::ssl::context::sslv23
-            );
+        context_ptr ctx = websocketpp::lib::make_shared<asio::ssl::context>(
+            asio::ssl::context::sslv23);
 
         try {
             ctx->set_options(
-                asio::ssl::context::default_workarounds |
-                asio::ssl::context::no_sslv2 |
-                asio::ssl::context::no_sslv3 |
-                asio::ssl::context::single_dh_use
-            );
-        } catch(std::exception& e) {
+                asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::no_sslv3 | asio::ssl::context::single_dh_use);
+        } catch (std::exception& e) {
             std::cout << "Exception: " << e.what() << std::endl;
         }
 

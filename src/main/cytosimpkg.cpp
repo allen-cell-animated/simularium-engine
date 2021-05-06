@@ -1,18 +1,18 @@
-#include "simul_prop.h"
 #include "exceptions.h"
 #include "frame_reader.h"
 #include "glossary.h"
 #include "messages.h"
 #include "parser.h"
 #include "simul.h"
+#include "simul_prop.h"
 #include "stream_func.h"
 #include "tictoc.h"
 #include <csignal>
 #include <stdlib.h>
 
-#include "simularium/simpkg/cytosimpkg.h"
-#include "simularium/agents/agent.h"
 #include "loguru/loguru.hpp"
+#include "simularium/agents/agent.h"
+#include "simularium/simpkg/cytosimpkg.h"
 
 using std::endl;
 
@@ -31,17 +31,16 @@ namespace simularium {
 
     CytosimPkg::~CytosimPkg()
     {
-
     }
 
     void CytosimPkg::Setup()
     {
         LOG_F(INFO, "Cytosim PKG Setup called");
-        if(!this->m_reader.get()) {
+        if (!this->m_reader.get()) {
             this->m_reader.reset(new FrameReader());
         }
 
-        if(!this->m_simul.get()) {
+        if (!this->m_simul.get()) {
             this->m_simul.reset(new Simul());
         }
     }
@@ -49,11 +48,11 @@ namespace simularium {
     void CytosimPkg::Shutdown()
     {
         LOG_F(INFO, "Cytosim PKG Shutdown called");
-        if(this->m_reader.get() && this->m_reader->good()) {
+        if (this->m_reader.get() && this->m_reader->good()) {
             this->m_reader->clear();
         }
 
-        if(this->m_simul.get()) {
+        if (this->m_simul.get()) {
             this->m_simul->erase();
             this->m_simul->prop->clear();
         }
@@ -73,7 +72,7 @@ namespace simularium {
         }
     }
 
-    void CytosimPkg::InitReactions(Model& model) { }
+    void CytosimPkg::InitReactions(Model& model) {}
     void CytosimPkg::RunTimeStep(
         float timeStep, std::vector<std::shared_ptr<Agent>>& agents)
     {
@@ -81,7 +80,7 @@ namespace simularium {
         // @TODO: option to return error code from this function
     }
 
-    void CytosimPkg::UpdateParameter(std::string paramName, float paramValue) { }
+    void CytosimPkg::UpdateParameter(std::string paramName, float paramValue) {}
     void CytosimPkg::Run(float timeStep, std::size_t nTimeSteps)
     {
         this->m_trajectoryFile = CytosimPkg::TrajectoryFilePath();
@@ -92,34 +91,38 @@ namespace simularium {
         simul.prop->property_file = this->m_propertyFile;
         simul.prop->config_file = this->m_configFile;
         if (Parser(simul, 1, 1, 1, 0, 0).readConfig()) {
-                std::cerr << "You must specify a config file\n";
+            std::cerr << "You must specify a config file\n";
         }
 
         simul.prepare();
 
-        unsigned     nb_steps = nTimeSteps;
-        unsigned     nb_frames  = 0;
-        int          solve      = 1;
-        bool         prune      = true;
-        bool         binary     = true;
+        unsigned nb_steps = nTimeSteps;
+        unsigned nb_frames = 0;
+        int solve = 1;
+        bool prune = true;
+        bool binary = true;
 
         unsigned sss = 0;
 
-        unsigned int  frame = 1;
-        real          delta = nb_steps;
+        unsigned int frame = 1;
+        real delta = nb_steps;
         unsigned long check = nb_steps;
 
-        void (Simul::* solveFunc)() = &Simul::solve_not;
-        switch ( solve )
-        {
-            case 1: solveFunc = &Simul::solve;      break;
-            case 2: solveFunc = &Simul::solve_auto; break;
-            case 3: solveFunc = &Simul::solveX;     break;
+        void (Simul::*solveFunc)() = &Simul::solve_not;
+        switch (solve) {
+        case 1:
+            solveFunc = &Simul::solve;
+            break;
+        case 2:
+            solveFunc = &Simul::solve_auto;
+            break;
+        case 3:
+            solveFunc = &Simul::solveX;
+            break;
         }
 
         simul.writeProperties(nullptr, prune);
-        if ( simul.prop->clear_trajectory )
-        {
+        if (simul.prop->clear_trajectory) {
             simul.writeObjects(simul.prop->trajectory_file, false, binary);
             simul.prop->clear_trajectory = false;
         }
@@ -127,16 +130,14 @@ namespace simularium {
         check = delta;
 
         simul.prop->time_step = real(timeStep);
-        while ( 1 )
-        {
-            if ( sss >= check )
-            {
+        while (1) {
+            if (sss >= check) {
                 simul.relax();
                 simul.writeObjects(simul.prop->trajectory_file, true, binary);
                 simul.unrelax();
-                if ( sss >= nb_steps )
+                if (sss >= nb_steps)
                     break;
-                check = ( ++frame * delta );
+                check = (++frame * delta);
             }
 
             fprintf(stderr, "> step %6i\n", sss);
@@ -153,10 +154,10 @@ namespace simularium {
 
     void CytosimPkg::GetNextFrame(std::vector<std::shared_ptr<Agent>>& agents)
     {
-        if(this->m_hasFinishedStreaming)
+        if (this->m_hasFinishedStreaming)
             return;
 
-        if(agents.size() == 0) {
+        if (agents.size() == 0) {
             LOG_F(INFO, "Cytosim PKG Creating 1000 agents");
             for (std::size_t i = 0; i < 1000; ++i) {
                 std::shared_ptr<Agent> agent;
@@ -166,7 +167,7 @@ namespace simularium {
             }
         }
 
-        if(!this->m_hasLoadedFile) {
+        if (!this->m_hasLoadedFile) {
             TrajectoryFileProperties ignore;
             std::string currentFile = this->m_trajectoryFile;
 
@@ -174,19 +175,18 @@ namespace simularium {
 
             this->LoadTrajectoryFile(
                 currentFile,
-                ignore
-            );
+                ignore);
         }
 
-        if(this->m_reader->eof()) {
+        if (this->m_reader->eof()) {
             LOG_F(INFO, "Finished processing Cytosim Trajectory");
             this->m_hasFinishedStreaming = true;
         }
 
-        if(this->m_reader->good()) {
+        if (this->m_reader->good()) {
             int errCode = this->m_reader->loadNextFrame(*(this->m_simul.get()));
             std::size_t currentFrame = this->m_reader->currentFrame();
-            if(errCode != 0) {
+            if (errCode != 0) {
                 LOG_F(ERROR, "Error loading Cytosim Reader: err-no %i", errCode);
                 this->m_hasFinishedStreaming = true;
                 return;
@@ -195,8 +195,7 @@ namespace simularium {
                 this->CopyFibers(
                     agents,
                     this->m_reader.get(),
-                    this->m_simul.get()
-                );
+                    this->m_simul.get());
             }
         } else {
             LOG_F(ERROR, "File could not be opened");
@@ -207,8 +206,8 @@ namespace simularium {
 
     void CytosimPkg::LoadTrajectoryFile(
         std::string filePath,
-        TrajectoryFileProperties& fileProps
-    ) {
+        TrajectoryFileProperties& fileProps)
+    {
         this->m_trajectoryFile = filePath;
         this->m_propertyFile = this->GetPropertyFileName(this->m_trajectoryFile);
 
@@ -217,7 +216,7 @@ namespace simularium {
         this->m_simul->prop->property_file = this->m_propertyFile;
         this->m_simul->loadProperties(); // @BREAK HERE AFTER LUNCH
 
-        if(!this->m_reader->hasFile()) {
+        if (!this->m_reader->hasFile()) {
             try {
                 this->m_reader->openFile(this->m_trajectoryFile);
             } catch (Exception& e) {
@@ -227,8 +226,8 @@ namespace simularium {
         }
 
         std::size_t numTimeSteps = 0;
-        while(!this->m_reader->eof()) {
-            if(this->m_reader->loadNextFrame(*(this->m_simul.get())) == 0) {
+        while (!this->m_reader->eof()) {
+            if (this->m_reader->loadNextFrame(*(this->m_simul.get())) == 0) {
                 numTimeSteps++;
             };
         }
@@ -249,30 +248,28 @@ namespace simularium {
     void CytosimPkg::CopyFibers(
         std::vector<std::shared_ptr<Agent>>& agents,
         FrameReader* reader,
-        Simul* simul
-    )
+        Simul* simul)
     {
         int fiberIndex = 0;
-        for (Fiber * fib = simul->fibers.first(); fib; fib = fib->next(), fiberIndex++)
-        {
+        for (Fiber* fib = simul->fibers.first(); fib; fib = fib->next(), fiberIndex++) {
             if (fiberIndex >= agents.size()) {
                 LOG_F(ERROR, "Not enough agents to represent fibers");
                 return;
             }
 
             auto agent = agents[fiberIndex];
-            agents[fiberIndex]->SetLocation(0,0,0);
+            agents[fiberIndex]->SetLocation(0, 0, 0);
 
             agents[fiberIndex]->SetVisType(vis_type_fiber);
             agents[fiberIndex]->SetVisibility(true);
             agents[fiberIndex]->SetCollisionRadius(0.5);
             agents[fiberIndex]->SetTypeID(CytosimPkg::TypeId::FiberId);
-            for(std::size_t p=0; p < fib->nbPoints(); ++p) {
+            for (std::size_t p = 0; p < fib->nbPoints(); ++p) {
                 Vector cytosimPos = fib->posPoint(p);
                 float x = cytosimPos[0];
                 float y = cytosimPos[1];
                 float z = cytosimPos[2];
-                agents[fiberIndex]->UpdateSubPoint(p,x,y,z);
+                agents[fiberIndex]->UpdateSubPoint(p, x, y, z);
             }
         }
     }

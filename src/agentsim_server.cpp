@@ -1,9 +1,9 @@
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <cstdlib>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -24,13 +24,12 @@ void ParseArguments(
 
 int main(int argc, char* argv[])
 {
-    if(!std::getenv("TLS_CERT_PATH") || !std::getenv("TLS_KEY_PATH"))
-    {
+    if (!std::getenv("TLS_CERT_PATH") || !std::getenv("TLS_KEY_PATH")) {
         std::cout << "Setting up local TLS environment (dev)" << std::endl;
-        setenv("TLS_PASSWORD","test", false);
-        setenv("TLS_CERT_PATH","localhost.pem", false);
-        setenv("TLS_KEY_PATH","localhost-key.pem", false);
-        setenv("APP_ENVIRONMENT","development",false);
+        setenv("TLS_PASSWORD", "test", false);
+        setenv("TLS_CERT_PATH", "localhost.pem", false);
+        setenv("TLS_KEY_PATH", "localhost-key.pem", false);
+        setenv("APP_ENVIRONMENT", "development", false);
     }
 
     ConnectionManager connectionManager;

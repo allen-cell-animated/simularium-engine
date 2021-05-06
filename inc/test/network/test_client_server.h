@@ -2,8 +2,9 @@
 
 namespace aics {
 namespace simularium {
-namespace test {
-    class ClientServerTests : public ::testing::Test {};
-} // namespace test
+    namespace test {
+        class ClientServerTests : public ::testing::Test {
+        };
+    } // namespace test
 } // namespace simularium
 } // namespace aics

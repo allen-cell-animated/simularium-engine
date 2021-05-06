@@ -1,9 +1,9 @@
 #include <aws/core/Aws.h>
+#include <aws/core/utils/logging/ConsoleLogSystem.h>
 #include <aws/core/utils/memory/AWSMemory.h>
 #include <aws/core/utils/threading/Executor.h>
 #include <aws/s3/S3Client.h>
 #include <aws/transfer/TransferManager.h>
-#include <aws/core/utils/logging/ConsoleLogSystem.h>
 #include <iostream>
 #include <string>
 
@@ -25,9 +25,8 @@ namespace simularium {
             options.loggingOptions.logger_create_fn =
                 [] {
                     return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
-                        Aws::Utils::Logging::LogLevel::Error
-                    );
-                 };
+                        Aws::Utils::Logging::LogLevel::Error);
+                };
 
             Aws::InitAPI(options);
             {
@@ -65,9 +64,8 @@ namespace simularium {
             options.loggingOptions.logger_create_fn =
                 [] {
                     return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
-                        Aws::Utils::Logging::LogLevel::Error
-                    );
-                 };
+                        Aws::Utils::Logging::LogLevel::Error);
+                };
 
             Aws::InitAPI(options);
             {
@@ -84,8 +82,7 @@ namespace simularium {
                     kBucketName,
                     objectName,
                     "text/binary",
-                    Aws::Map<Aws::String, Aws::String>()
-                );
+                    Aws::Map<Aws::String, Aws::String>());
 
                 uploadHandle->WaitUntilFinished();
 
@@ -100,6 +97,6 @@ namespace simularium {
             return success;
         }
 
-} // namespace aws_util
+    } // namespace aws_util
 } // namespace simularium
 } // namespace aics

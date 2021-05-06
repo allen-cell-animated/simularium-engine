@@ -1,13 +1,13 @@
-#include "readdy/readdy.h"
-#include "simularium/agents/agent.h"
 #include "simularium/simpkg/readdypkg.h"
+#include "Eigen/Dense"
+#include "Eigen/Geometry"
 #include "readdy/model/observables/io/TrajectoryEntry.h"
 #include "readdy/model/observables/io/Types.h"
+#include "readdy/readdy.h"
+#include "simularium/agents/agent.h"
 #include <fstream>
 #include <limits>
 #include <readdy/model/topologies/TopologyRecord.h>
-#include "Eigen/Dense"
-#include "Eigen/Geometry"
 
 struct ParticleData {
     ParticleData(std::string type, std::string flavor, const std::array<readdy::scalar, 3>& pos,
@@ -116,7 +116,7 @@ using TopologyH5Info = std::vector<TopologyH5List>;
 using TimeTopologyH5Info = std::tuple<TimestepH5List, TopologyH5Info>;
 
 using IdParticleMapping = std::vector<std::unordered_map<std::size_t, std::size_t>>;
-using OrientationDataMap = std::unordered_map<std::string,std::vector<std::pair<MonomerType,OrientationData>>>;
+using OrientationDataMap = std::unordered_map<std::string, std::vector<std::pair<MonomerType, OrientationData>>>;
 
 namespace aics {
 namespace simularium {
@@ -136,7 +136,8 @@ namespace simularium {
         ReaDDyConfigInfo configInfo;
     };
 
-    ReaDDyPkg::ReaDDyPkg() {
+    ReaDDyPkg::ReaDDyPkg()
+    {
         this->m_simulation = new readdy::Simulation("SingleCPU", readdy::model::Context());
 
         this->m_fileInfo = std::make_shared<ReaDDyFileInfo>();
@@ -145,7 +146,8 @@ namespace simularium {
         this->m_bloscFilter->registerFilter();
     }
 
-    ReaDDyPkg::~ReaDDyPkg() {
+    ReaDDyPkg::~ReaDDyPkg()
+    {
         delete this->m_simulation;
         this->m_simulation = nullptr;
     }
@@ -163,14 +165,15 @@ namespace simularium {
 
     // Live Simulation API
     void ReaDDyPkg::InitReactions(Model& model) {}
-    void ReaDDyPkg::Setup() {
-      this->m_agents_initialized = false;
-      this->m_reactions_initialized = false;
-      this->m_timeStepCount = 0;
+    void ReaDDyPkg::Setup()
+    {
+        this->m_agents_initialized = false;
+        this->m_reactions_initialized = false;
+        this->m_timeStepCount = 0;
 
-      this->m_hasAlreadyRun = false;
-      this->m_hasLoadedRunFile = false;
-      this->m_hasFinishedStreaming = false;
+        this->m_hasAlreadyRun = false;
+        this->m_hasLoadedRunFile = false;
+        this->m_hasFinishedStreaming = false;
     }
     void ReaDDyPkg::Shutdown() {}
     void ReaDDyPkg::RunTimeStep(

@@ -7,18 +7,17 @@
 
 namespace aics {
 namespace simularium {
-namespace fileio {
+    namespace fileio {
 
-class SimulariumFileReader {
-public:
-    bool DeserializeFrame(
-      Json::Value& jsonRoot,
-      std::size_t frameNumber,
-      TrajectoryFrame& outFrame
-    );
-};
+        class SimulariumFileReader {
+        public:
+            bool DeserializeFrame(
+                Json::Value& jsonRoot,
+                std::size_t frameNumber,
+                TrajectoryFrame& outFrame);
+        };
 
-} // namespace fileio
+    } // namespace fileio
 } // namespace simularium
 } // namespace aics
 

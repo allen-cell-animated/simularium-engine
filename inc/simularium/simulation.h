@@ -3,9 +3,9 @@
 
 #include "simularium/agent_data.h"
 #include "simularium/model/model.h"
-#include "simularium/simulation_cache.h"
-#include "simularium/network/trajectory_properties.h"
 #include "simularium/network/net_message_ids.h"
+#include "simularium/network/trajectory_properties.h"
+#include "simularium/simulation_cache.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -60,8 +60,7 @@ namespace simularium {
 	*/
         BroadcastUpdate GetBroadcastFrame(
             std::string identifier,
-            std::size_t frame_no
-        );
+            std::size_t frame_no);
 
         /**
         *   GetBroadcastUpdate
@@ -77,19 +76,16 @@ namespace simularium {
         *     and a new playback-position for the requesting streamer to save
         */
         BroadcastUpdate GetBroadcastUpdate(
-          std::string identifier,
-          std::size_t currentPosition,
-          std::size_t bufferSize
-        );
+            std::string identifier,
+            std::size_t currentPosition,
+            std::size_t bufferSize);
 
         std::size_t GetFramePos(
-          std::string identifier,
-          std::size_t frameNumber
-        );
+            std::string identifier,
+            std::size_t frameNumber);
 
         std::size_t GetEndOfStreamPos(
-          std::string identifier
-        );
+            std::string identifier);
 
         /**
 	*	Reset
@@ -148,10 +144,9 @@ namespace simularium {
 	*	state of agents owned by this simulation
 	*/
         void CacheAgents(
-          std::vector<std::shared_ptr<Agent>>& agents,
-          std::size_t frameNumber,
-          float time
-        );
+            std::vector<std::shared_ptr<Agent>>& agents,
+            std::size_t frameNumber,
+            float time);
 
         /**
 	*	LoadTrajectoryFile
@@ -163,8 +158,7 @@ namespace simularium {
 	*	Loads a trajectory file to play back. Behavior will resemble live & pre-run playback.
 	*/
         bool LoadTrajectoryFile(
-            std::string fileName
-        );
+            std::string fileName);
 
         /**
         *   SetPlaybackMode
@@ -187,7 +181,8 @@ namespace simularium {
         *   while clients are streaming? Returns true if yes
         *   e.g. while streaming a pre-computed trajectory, this should return false
         */
-        bool IsRunningLive()  {
+        bool IsRunningLive()
+        {
             return this->m_playbackMode == SimulationMode::id_live_simulation;
         }
 
@@ -223,7 +218,9 @@ namespace simularium {
         void PreprocessRuntimeCache(std::string identifier);
 
         bool FindSimulariumFile(std::string identifier)
-          { return this->m_cache.FindSimulariumFile(identifier); }
+        {
+            return this->m_cache.FindSimulariumFile(identifier);
+        }
 
         /**
         *   IsPlayingTrajectory
@@ -232,7 +229,8 @@ namespace simularium {
         *   This is true for a specifically requested trajectory playback
         *   and false in 'live' mode or pre-run mode
         */
-        bool IsPlayingTrajectory()  {
+        bool IsPlayingTrajectory()
+        {
             return this->m_playbackMode == SimulationMode::id_traj_file_playback;
         }
 
@@ -246,8 +244,7 @@ namespace simularium {
         */
         double GetSimulationTimeAtFrame(
             std::string identifier,
-            std::size_t frameNumber
-        );
+            std::size_t frameNumber);
 
         /**
         *   GetClosestFrameNumberForTime
@@ -260,25 +257,30 @@ namespace simularium {
         */
         std::size_t GetClosestFrameNumberForTime(
             std::string identifier,
-            double simulationTimeNs
-        );
+            double simulationTimeNs);
 
         bool HasFileInCache(std::string identifier) { return this->m_cache.HasIdentifier(identifier); }
 
         TrajectoryFileProperties GetFileProperties(std::string identifier)
-            { return this->m_cache.GetFileProperties(identifier); }
+        {
+            return this->m_cache.GetFileProperties(identifier);
+        }
 
-        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp) {
+        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp)
+        {
             this->m_cache.SetFileProperties(identifier, tfp);
         }
 
         std::size_t GetNumFrames(std::string identifier)
-            { return this->m_cache.GetNumFrames(identifier); }
+        {
+            return this->m_cache.GetNumFrames(identifier);
+        }
 
         void SetSimId(std::string identifier) { this->m_simIdentifier = identifier; }
         std::string GetSimId() { return this->m_simIdentifier; }
 
         void CleanupTmpFiles(std::string identifier);
+
     private:
         std::vector<std::shared_ptr<Agent>> m_agents;
         std::vector<std::shared_ptr<SimPkg>> m_SimPkgs;

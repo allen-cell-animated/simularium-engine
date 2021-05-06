@@ -78,8 +78,8 @@ namespace simularium {
 
         virtual void LoadTrajectoryFile(
             std::string file_path,
-            TrajectoryFileProperties& fileProps
-        ) = 0;
+            TrajectoryFileProperties& fileProps)
+            = 0;
 
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) = 0;
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) = 0;

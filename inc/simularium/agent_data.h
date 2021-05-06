@@ -18,7 +18,6 @@ namespace simularium {
 } // namespace simularium
 } // namespace aics
 
-
 namespace aics {
 namespace simularium {
 

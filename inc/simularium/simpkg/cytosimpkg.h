@@ -35,12 +35,13 @@ namespace simularium {
         virtual bool IsFinished() override;
         virtual void LoadTrajectoryFile(
             std::string file_path,
-            TrajectoryFileProperties& fileProps
-        ) override;
+            TrajectoryFileProperties& fileProps) override;
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override { return 0.0; };
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override { return 0; };
         virtual bool CanLoadFile(std::string filePath) override
-            { return filePath.substr(filePath.find_last_of(".") + 1) == "cmo"; }
+        {
+            return filePath.substr(filePath.find_last_of(".") + 1) == "cmo";
+        }
 
         virtual std::vector<std::string> GetFileNames(std::string filePath) override
         {
@@ -54,8 +55,7 @@ namespace simularium {
         void CopyFibers(
             std::vector<std::shared_ptr<Agent>>& agents,
             FrameReader* reader,
-            Simul* simul
-        );
+            Simul* simul);
 
         static std::string TrajectoryFilePath()
         {
@@ -67,7 +67,8 @@ namespace simularium {
             return CytosimPkg::PKG_DIRECTORY + "/properties.cmo";
         }
 
-        std::string GetPropertyFileName(std::string filePath) {
+        std::string GetPropertyFileName(std::string filePath)
+        {
             return filePath.substr(0, filePath.find_last_of(".")) + "_properties.cmo";
         }
 
@@ -86,7 +87,7 @@ namespace simularium {
         };
 
         std::unordered_map<std::size_t, std::string> m_typeMapping {
-            {TypeId::FiberId, "Fiber"}
+            { TypeId::FiberId, "Fiber" }
         };
     };
 

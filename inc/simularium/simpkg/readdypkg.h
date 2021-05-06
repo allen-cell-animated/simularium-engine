@@ -9,7 +9,7 @@ namespace readdy {
 class Simulation;
 
 namespace io {
-class BloscFilter;
+    class BloscFilter;
 } // namespace io
 } // namespace readdy
 
@@ -42,16 +42,19 @@ namespace simularium {
 
         virtual void LoadTrajectoryFile(
             std::string file_path,
-            TrajectoryFileProperties& fileProps
-        ) override;
+            TrajectoryFileProperties& fileProps) override;
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override;
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override;
 
         virtual bool CanLoadFile(std::string filePath) override
-            { return filePath.substr(filePath.find_last_of(".") + 1) == "h5"; }
+        {
+            return filePath.substr(filePath.find_last_of(".") + 1) == "h5";
+        }
 
         virtual std::vector<std::string> GetFileNames(std::string filePath) override
-            { return { filePath }; }
+        {
+            return { filePath };
+        }
 
     private:
         readdy::Simulation* m_simulation;

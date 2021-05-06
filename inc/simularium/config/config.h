@@ -5,13 +5,13 @@
 
 namespace aics {
 namespace simularium {
-namespace config {
-  std::string GetCacheFolder();
-  std::string GetS3Location();
-  std::string GetS3CacheLocation();
-  std::string GetEnvironment();
+    namespace config {
+        std::string GetCacheFolder();
+        std::string GetS3Location();
+        std::string GetS3CacheLocation();
+        std::string GetEnvironment();
 
-} // namespace config
+    } // namespace config
 } // namespace simularium
 } // namespace aics
 

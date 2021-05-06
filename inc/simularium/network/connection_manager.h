@@ -4,13 +4,13 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <mutex>
-#include <queue>
-#include <limits>
 
 #define ASIO_STANDALONE
 #include <asio/asio.hpp>
@@ -27,11 +27,11 @@ typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> conte
 
 namespace aics {
 namespace simularium {
-namespace broadcast {
-    // Used to signal that a client should not stream any more data
-    //  by setting their current position to eos ('end of stream')
-    const std::size_t eos = std::numeric_limits<std::size_t>::max();
-}
+    namespace broadcast {
+        // Used to signal that a client should not stream any more data
+        //  by setting their current position to eos ('end of stream')
+        const std::size_t eos = std::numeric_limits<std::size_t>::max();
+    }
 
     enum ClientPlayState {
         Playing = 0,
@@ -90,8 +90,7 @@ namespace broadcast {
         void SendWebsocketMessageToAll(Json::Value jsonMessage, std::string description);
 
         void CheckForFinishedClients(
-            Simulation& simulation
-        );
+            Simulation& simulation);
         void SendDataToClients(Simulation& simulation);
 
         void SetNoUploadArg(bool val) { this->m_argNoUpload = val; }
@@ -130,24 +129,20 @@ namespace broadcast {
         void SendSingleFrameToClient(
             Simulation& simulation,
             std::string connectionUID,
-            std::size_t frameNumber
-        );
+            std::size_t frameNumber);
 
         void SendDataToClient(
             Simulation& simulation,
-            std::string connectionUID
-        );
+            std::string connectionUID);
 
         void CheckForFinishedClient(
             Simulation& simulation,
-            std::string connectionUID
-        );
+            std::string connectionUID);
 
         void InitializeTrajectoryFile(
             Simulation& simulation,
             std::string connectionUID,
-            std::string fileName
-        );
+            std::string fileName);
 
         /**
         * SetupRuntimeCacheAsync
@@ -157,19 +152,21 @@ namespace broadcast {
         *   and keeping the run-time cache updated
         */
         void SetupRuntimeCache(
-            Simulation& simulation
-        );
+            Simulation& simulation);
 
         /**
         *   TLS Functions
         */
-        std::string GetPassword() {
+        std::string GetPassword()
+        {
             return std::getenv("TLS_PASSWORD") ? std::getenv("TLS_PASSWORD") : "";
         }
-        std::string GetCertificateFilepath() {
+        std::string GetCertificateFilepath()
+        {
             return std::getenv("TLS_CERT_PATH") ? std::getenv("TLS_CERT_PATH") : "";
         }
-        std::string GetKeyFilepath() {
+        std::string GetKeyFilepath()
+        {
             return std::getenv("TLS_KEY_PATH") ? std::getenv("TLS_KEY_PATH") : "";
         }
 

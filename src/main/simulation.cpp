@@ -1,14 +1,14 @@
 #include "simularium/simulation.h"
+#include "loguru/loguru.hpp"
 #include "simularium/agents/agent.h"
+#include "simularium/aws/aws_util.h"
 #include "simularium/network/net_message_ids.h"
 #include "simularium/simpkg/simpkg.h"
-#include "simularium/aws/aws_util.h"
-#include "loguru/loguru.hpp"
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
-#include <time.h>
 #include <sys/stat.h>
+#include <time.h>
 
 namespace aics {
 namespace simularium {
@@ -53,32 +53,28 @@ namespace simularium {
 
     BroadcastUpdate Simulation::GetBroadcastFrame(
         std::string identifier,
-        std::size_t frame_no
-    )
+        std::size_t frame_no)
     {
         return this->m_cache.GetBroadcastFrame(identifier, frame_no);
     }
 
     BroadcastUpdate Simulation::GetBroadcastUpdate(
-      std::string identifier,
-      std::size_t currentPosition,
-      std::size_t bufferSize
-    ) {
+        std::string identifier,
+        std::size_t currentPosition,
+        std::size_t bufferSize)
+    {
         return this->m_cache.GetBroadcastUpdate(
-          identifier,
-          currentPosition,
-          bufferSize
-        );
+            identifier,
+            currentPosition,
+            bufferSize);
     }
 
     std::size_t Simulation::GetEndOfStreamPos(
-      std::string identifier
-    ) { return this->m_cache.GetEndOfStreamPos(identifier); }
+        std::string identifier) { return this->m_cache.GetEndOfStreamPos(identifier); }
 
     std::size_t Simulation::GetFramePos(
-      std::string identifier,
-      std::size_t frameNumber
-    ) { return this->m_cache.GetFramePos(identifier, frameNumber); }
+        std::string identifier,
+        std::size_t frameNumber) { return this->m_cache.GetFramePos(identifier, frameNumber); }
 
     void Simulation::Reset()
     {
@@ -99,8 +95,7 @@ namespace simularium {
 
         // Allow trajectory file cache to persist for efficiency
         //  Assumption: live and pre-run have no use for outdated cache files
-        if(this->m_playbackMode != SimulationMode::id_traj_file_playback)
-        {
+        if (this->m_playbackMode != SimulationMode::id_traj_file_playback) {
             this->m_cache.ClearCache(this->m_simIdentifier);
         }
     }
@@ -147,10 +142,10 @@ namespace simularium {
     }
 
     void Simulation::CacheAgents(
-      std::vector<std::shared_ptr<Agent>>& agents,
-      std::size_t frameNumber,
-      float time
-    ) {
+        std::vector<std::shared_ptr<Agent>>& agents,
+        std::size_t frameNumber,
+        float time)
+    {
         TrajectoryFrame newFrame;
         for (std::size_t i = 0; i < this->m_agents.size(); ++i) {
             auto agent = this->m_agents[i];
@@ -170,29 +165,27 @@ namespace simularium {
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
             auto simPkg = this->m_SimPkgs[i];
 
-            if(simPkg->CanLoadFile(fileName)) {
+            if (simPkg->CanLoadFile(fileName)) {
                 this->m_activeSimPkg = i;
 
                 std::vector<std::string> files = simPkg->GetFileNames(fileName);
-                for(auto file : files) {
+                for (auto file : files) {
                     LOG_F(INFO, "File to load: %s", file.c_str());
                 }
 
-                if(!this->m_cache.FindFiles(files)) {
+                if (!this->m_cache.FindFiles(files)) {
                     LOG_F(ERROR, "%s | File not found", fileName.c_str());
                     return false;
                 }
 
                 std::vector<std::string> rawFilePaths;
-                for(auto file : files) {
+                for (auto file : files) {
                     rawFilePaths.push_back(
-                      this->m_cache.GetLocalRawTrajectoryFilePath(file)
-                    );
+                        this->m_cache.GetLocalRawTrajectoryFilePath(file));
                 }
                 this->m_cache.MarkTmpFiles(fileName, rawFilePaths);
 
-                std::string filePath =
-                    this->m_cache.GetLocalRawTrajectoryFilePath(fileName);
+                std::string filePath = this->m_cache.GetLocalRawTrajectoryFilePath(fileName);
                 simPkg->LoadTrajectoryFile(filePath, tfp);
                 this->m_cache.SetFileProperties(fileName, tfp);
                 this->m_simIdentifier = fileName;
@@ -200,11 +193,12 @@ namespace simularium {
             }
         }
 
-        LOG_F(WARNING,"No Sim PKG can load %s", fileName.c_str());
+        LOG_F(WARNING, "No Sim PKG can load %s", fileName.c_str());
         return false;
     }
 
-    void Simulation::CleanupTmpFiles(std::string identifier) {
+    void Simulation::CleanupTmpFiles(std::string identifier)
+    {
         this->m_cache.DeleteTmpFiles(identifier);
     }
 
@@ -270,29 +264,28 @@ namespace simularium {
     }
 
     double Simulation::GetSimulationTimeAtFrame(
-        std::string identifier, std::size_t frameNumber
-    )
+        std::string identifier, std::size_t frameNumber)
     {
-        if(this->m_playbackMode == SimulationMode::id_live_simulation) {
+        if (this->m_playbackMode == SimulationMode::id_live_simulation) {
             // @TODO Handle variable frame-rate for 'live' mode
             //      is this needed functionality?
             return frameNumber;
         }
 
-        if(frameNumber == 0) { return 0; } // Assumption: the first frame is at 0
+        if (frameNumber == 0) {
+            return 0;
+        } // Assumption: the first frame is at 0
 
         auto tfp = this->GetFileProperties(identifier);
         double time = 0.0;
         time = static_cast<double>(tfp.timeStepSize * frameNumber);
-        if(time > 0.0) {
+        if (time > 0.0) {
             return time;
         }
 
-        if(this->m_SimPkgs.size() > 0 &&
-            this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier))
-        {
+        if (this->m_SimPkgs.size() > 0 && this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier)) {
             time = this->m_SimPkgs[this->m_activeSimPkg]->GetSimulationTimeAtFrame(frameNumber);
-            if(time > 0.0) {
+            if (time > 0.0) {
                 return time;
             }
         }
@@ -302,35 +295,33 @@ namespace simularium {
     }
 
     std::size_t Simulation::GetClosestFrameNumberForTime(
-        std::string identifier, double simulationTimeNs
-    )
+        std::string identifier, double simulationTimeNs)
     {
         // Return the first frame for a negative time
         //  the assumption is that simulation time starts at a non-negative value
-        if(simulationTimeNs < 0) { return 0; }
+        if (simulationTimeNs < 0) {
+            return 0;
+        }
 
-        if(this->m_playbackMode == SimulationMode::id_live_simulation) {
+        if (this->m_playbackMode == SimulationMode::id_live_simulation) {
             // @TODO Handle variable frame-rate for 'live' mode
             //      is this needed functionality?
             std::size_t numFrames = this->m_cache.GetNumFrames(identifier);
             return std::min(
-              static_cast<std::size_t>(simulationTimeNs),
-              numFrames
-            );
+                static_cast<std::size_t>(simulationTimeNs),
+                numFrames);
         }
-
 
         auto tfp = this->GetFileProperties(identifier);
 
         // If there is cached meta-data for the simulation,
         //  assume we are running using a cache pulled down from the network
-        if(tfp.numberOfFrames != 0)
-        {
+        if (tfp.numberOfFrames != 0) {
             // If the requested time is past the end,
             //  return the last frame avaliable
             auto totalDuration = tfp.numberOfFrames * tfp.timeStepSize;
-            if(simulationTimeNs >= totalDuration) {
-              return tfp.numberOfFrames - 1;
+            if (simulationTimeNs >= totalDuration) {
+                return tfp.numberOfFrames - 1;
             }
 
             // Integer division performed to get nearest frames
@@ -339,9 +330,7 @@ namespace simularium {
             return time;
         }
 
-        if(this->m_SimPkgs.size() > 0 &&
-            this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier))
-        {
+        if (this->m_SimPkgs.size() > 0 && this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier)) {
             return this->m_SimPkgs[this->m_activeSimPkg]->GetClosestFrameNumberForTime(simulationTimeNs);
         }
 

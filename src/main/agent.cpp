@@ -1,7 +1,7 @@
 #include "simularium/agents/agent.h"
+#include <iostream>
 #include <stdlib.h>
 #include <time.h>
-#include <iostream>
 
 namespace aics {
 namespace simularium {
@@ -50,7 +50,6 @@ namespace simularium {
         this->m_zrot = zrot;
     }
 
-
     std::size_t Agent::GetNumSubPoints()
     {
         return this->m_subPoints.size() / 3;
@@ -58,13 +57,15 @@ namespace simularium {
 
     bool Agent::HasSubPoints() { return this->m_subPoints.size(); }
 
-    void Agent::AddSubPoint(float x, float y, float z) {
+    void Agent::AddSubPoint(float x, float y, float z)
+    {
         this->m_subPoints.push_back(x);
         this->m_subPoints.push_back(y);
         this->m_subPoints.push_back(z);
     }
 
-    void Agent::UpdateSubPoint(std::size_t index, float x, float y, float z) {
+    void Agent::UpdateSubPoint(std::size_t index, float x, float y, float z)
+    {
         std::size_t nbSubPoints = this->GetNumSubPoints();
         if (index < 0 || index > nbSubPoints) {
             return;
@@ -73,11 +74,12 @@ namespace simularium {
             this->m_subPoints[index * 3 + 1] = y;
             this->m_subPoints[index * 3 + 2] = z;
         } else if (index == nbSubPoints) {
-            AddSubPoint(x,y,z);
+            AddSubPoint(x, y, z);
         }
     }
 
-    std::vector<float> Agent::GetSubPoint(std::size_t index) {
+    std::vector<float> Agent::GetSubPoint(std::size_t index)
+    {
         auto first = this->m_subPoints.begin() + index * 3;
         auto last = this->m_subPoints.begin() + index * 3 + 3;
         return std::vector<float>(first, last);

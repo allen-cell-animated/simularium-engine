@@ -2,16 +2,16 @@
 #define AICS_SIMULATION_CACHE_H
 
 #include "simularium/agent_data.h"
-#include "simularium/network/trajectory_properties.h"
 #include "simularium/fileio/simularium_binary_file.h"
-#include <json/json.h>
+#include "simularium/network/trajectory_properties.h"
 #include <algorithm>
+#include <fstream>
 #include <iostream>
+#include <json/json.h>
 #include <memory>
 #include <string>
-#include <vector>
-#include <fstream>
 #include <unordered_map>
+#include <vector>
 
 namespace aics {
 namespace simularium {
@@ -59,19 +59,16 @@ namespace simularium {
         *     and a new playback-position for the requesting streamer to save
         */
         BroadcastUpdate GetBroadcastUpdate(
-          std::string identifier,
-          std::size_t currentPosition,
-          std::size_t bufferSize
-        );
+            std::string identifier,
+            std::size_t currentPosition,
+            std::size_t bufferSize);
 
         std::size_t GetEndOfStreamPos(
-          std::string identifier
-        );
+            std::string identifier);
 
         std::size_t GetFramePos(
-          std::string identifier,
-          std::size_t frameNumber
-        );
+            std::string identifier,
+            std::size_t frameNumber);
 
         std::size_t GetNumFrames(std::string identifier);
 
@@ -89,12 +86,13 @@ namespace simularium {
 
         bool HasIdentifier(std::string identifier) { return this->m_fileProps.count(identifier); }
 
-        TrajectoryFileProperties GetFileProperties(std::string identifier) {
-            return this->m_fileProps.count(identifier) ?
-                this->m_fileProps[identifier] : TrajectoryFileProperties();
+        TrajectoryFileProperties GetFileProperties(std::string identifier)
+        {
+            return this->m_fileProps.count(identifier) ? this->m_fileProps[identifier] : TrajectoryFileProperties();
         }
 
-        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp) {
+        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp)
+        {
             this->m_fileProps[identifier] = tfp;
         }
 
