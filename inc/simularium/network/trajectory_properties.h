@@ -12,15 +12,15 @@ namespace simularium {
         CameraPosition()
         {
             position = { 0, 0, 120 };
-            lookAt = { 0, 0, 0 };
+            lookAtPosition = { 0, 0, 0 };
             upVector = { 0, 1, 0 };
-            fov = 50;
+            fovDegrees = 50;
         }
 
         std::array<float, 3> position;
-        std::array<float, 3> lookAt;
+        std::array<float, 3> lookAtPosition;
         std::array<float, 3> upVector;
-        float fov;
+        float fovDegrees;
     };
 
     struct TrajectoryFileProperties {

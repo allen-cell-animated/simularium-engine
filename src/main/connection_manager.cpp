@@ -967,18 +967,18 @@ namespace simularium {
         camPos["y"] = tfp.cameraDefault.position[1];
         camPos["z"] = tfp.cameraDefault.position[2];
 
-        camLook["x"] = tfp.cameraDefault.lookAt[0];
-        camLook["y"] = tfp.cameraDefault.lookAt[1];
-        camLook["z"] = tfp.cameraDefault.lookAt[2];
+        camLook["x"] = tfp.cameraDefault.lookAtPosition[0];
+        camLook["y"] = tfp.cameraDefault.lookAtPosition[1];
+        camLook["z"] = tfp.cameraDefault.lookAtPosition[2];
 
         upVec["x"] = tfp.cameraDefault.upVector[0];
         upVec["y"] = tfp.cameraDefault.upVector[1];
         upVec["z"] = tfp.cameraDefault.upVector[2];
 
         cameraDefault["position"] = camPos;
-        cameraDefault["lookAt"] = camLook;
+        cameraDefault["lookAtPosition"] = camLook;
         cameraDefault["upVector"] = upVec;
-        cameraDefault["fov"] = tfp.cameraDefault.fov;
+        cameraDefault["fovDegrees"] = tfp.cameraDefault.fovDegrees;
         fprops["cameraDefault"] = cameraDefault;
 
         this->SendWebsocketMessage(connectionUID, fprops);
