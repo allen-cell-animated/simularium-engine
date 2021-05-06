@@ -12,13 +12,13 @@ namespace simularium {
         CameraPosition()
         {
             position = { 0, 0, 120 };
-            lookAtPosition = { 0, 0, 0 };
+            lookAtPoint = { 0, 0, 0 };
             upVector = { 0, 1, 0 };
             fovDegrees = 50;
         }
 
         std::array<float, 3> position;
-        std::array<float, 3> lookAtPosition;
+        std::array<float, 3> lookAtPoint;
         std::array<float, 3> upVector;
         float fovDegrees;
     };

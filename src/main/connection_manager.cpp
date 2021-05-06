@@ -967,16 +967,16 @@ namespace simularium {
         camPos["y"] = tfp.cameraDefault.position[1];
         camPos["z"] = tfp.cameraDefault.position[2];
 
-        camLook["x"] = tfp.cameraDefault.lookAtPosition[0];
-        camLook["y"] = tfp.cameraDefault.lookAtPosition[1];
-        camLook["z"] = tfp.cameraDefault.lookAtPosition[2];
+        camLook["x"] = tfp.cameraDefault.lookAtPoint[0];
+        camLook["y"] = tfp.cameraDefault.lookAtPoint[1];
+        camLook["z"] = tfp.cameraDefault.lookAtPoint[2];
 
         upVec["x"] = tfp.cameraDefault.upVector[0];
         upVec["y"] = tfp.cameraDefault.upVector[1];
         upVec["z"] = tfp.cameraDefault.upVector[2];
 
         cameraDefault["position"] = camPos;
-        cameraDefault["lookAtPosition"] = camLook;
+        cameraDefault["lookAtPoint"] = camLook;
         cameraDefault["upVector"] = upVec;
         cameraDefault["fovDegrees"] = tfp.cameraDefault.fovDegrees;
         fprops["cameraDefault"] = cameraDefault;

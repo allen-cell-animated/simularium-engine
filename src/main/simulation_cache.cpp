@@ -312,16 +312,16 @@ namespace simularium {
         camPos["y"] = tfp.cameraDefault.position[1];
         camPos["z"] = tfp.cameraDefault.position[2];
 
-        camLook["x"] = tfp.cameraDefault.lookAtPosition[0];
-        camLook["y"] = tfp.cameraDefault.lookAtPosition[1];
-        camLook["z"] = tfp.cameraDefault.lookAtPosition[2];
+        camLook["x"] = tfp.cameraDefault.lookAtPoint[0];
+        camLook["y"] = tfp.cameraDefault.lookAtPoint[1];
+        camLook["z"] = tfp.cameraDefault.lookAtPoint[2];
 
         camUp["x"] = tfp.cameraDefault.upVector[0];
         camUp["y"] = tfp.cameraDefault.upVector[1];
         camUp["z"] = tfp.cameraDefault.upVector[2];
 
         cameraDefault["position"] = camPos;
-        cameraDefault["lookAtPosition"] = camLook;
+        cameraDefault["lookAtPoint"] = camLook;
         cameraDefault["upVector"] = camUp;
         cameraDefault["fovDegrees"] = tfp.cameraDefault.fovDegrees;
         fprops["cameraDefault"] = cameraDefault;
@@ -400,11 +400,11 @@ namespace simularium {
                 tfp.cameraDefault.position[1] = cpos["y"].asFloat();
                 tfp.cameraDefault.position[2] = cpos["z"].asFloat();
             }
-            const Json::Value& lookAt = cameraDefault["lookAtPosition"];
+            const Json::Value& lookAt = cameraDefault["lookAtPoint"];
             if (lookAt != Json::nullValue) {
-                tfp.cameraDefault.lookAtPosition[0] = lookAt["x"].asFloat();
-                tfp.cameraDefault.lookAtPosition[1] = lookAt["y"].asFloat();
-                tfp.cameraDefault.lookAtPosition[2] = lookAt["z"].asFloat();
+                tfp.cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
+                tfp.cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
+                tfp.cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
             }
             const Json::Value& upVec = cameraDefault["upVector"];
             if (upVec != Json::nullValue) {
