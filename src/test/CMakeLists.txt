@@ -5,7 +5,6 @@ set(EXECUTABLE_OUTPUT_PATH
 )
 
 set(TEST_LIST
-"test_aws_util"
 "test_client_server"
 "test_net_commands"
 "test_sim_time"
@@ -17,10 +16,6 @@ set(TEST_INCLUDES
     "${EXTERNAL_DIRECTORY}/websocketpp"
     "${EXTERNAL_DIRECTORY}/websocketpp/common"
     "${EXTERNAL_DIRECTORY}/asio"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-core/include"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-transfer/include"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"
-    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-s3/include"
     "${DEPENDENCY_DIRECTORY}/gtest/googletest/include"
     "${OPENSSL_INCLUDES}"
     "/usr/local/opt/openssl/include"
@@ -39,3 +34,29 @@ foreach(TEST_NAME ${TEST_LIST})
 	target_include_directories(${TEST_NAME} PUBLIC "${TEST_INCLUDES}")
 	target_link_libraries(${TEST_NAME} PUBLIC "${TEST_LIBS}")
 endforeach()
+
+add_executable(test_aws_util "test_aws_util.cpp")
+target_include_directories(test_aws_util PUBLIC
+    "${INCLUDE_DIRECTORY}"
+    "${EXTERNAL_DIRECTORY}"
+    "${EXTERNAL_DIRECTORY}/websocketpp"
+    "${EXTERNAL_DIRECTORY}/websocketpp/common"
+    "${EXTERNAL_DIRECTORY}/asio"
+    "${DEPENDENCY_DIRECTORY}/gtest/googletest/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/crt/aws-crt-cpp/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/crt/aws-crt-cpp/crt/aws-c-common/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/crt/aws-crt-cpp/crt/aws-c-common/verification/cbmc/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/crt/aws-crt-cpp/crt/aws-c-io/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/crt/aws-crt-cpp/crt/aws-c-mqtt/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-core/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-s3/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-awstransfer/include"
+    "${DEPENDENCY_DIRECTORY}/aws-sdk-cpp/aws-cpp-sdk-transfer/include"
+    "${OPENSSL_INCLUDES}"
+    "/usr/local/opt/openssl/include"
+)
+target_link_libraries(test_aws_util PUBLIC
+	"${TARGET}"
+	"gtest_main"
+	"gtest"
+)
