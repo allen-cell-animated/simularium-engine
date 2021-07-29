@@ -4,7 +4,7 @@ add_library("cytosimPKG" STATIC
     "cytosimpkg.cpp"
 )
 
-target_compile_definitions("cytosimPKG" PRIVATE 
+target_compile_definitions("cytosimPKG" PRIVATE
 -DDIM=${DIMENSION}
 )
 
@@ -30,6 +30,8 @@ set(CYTOSIM_PKG_INCLUDES
   CACHE STRING "The include directories needed by the Cytosim simulation package"
 )
 
+message("Cytosim packages ${CYTOSIM_LIBRARIES}")
+
 target_include_directories("cytosimPKG" PRIVATE
     "${CYTOSIM_PKG_INCLUDES}"
     "${INCLUDE_DIRECTORY}"
@@ -37,7 +39,11 @@ target_include_directories("cytosimPKG" PRIVATE
 )
 
 target_link_libraries("cytosimPKG" PRIVATE
-    "${CYTOSIM_LIBRARIES}"
+    "cytosimD3"
+    "cytospaceD3";
+    "cytomath";
+    "cytobase"
+    Threads::Threads
     "${LAPACK_LIB}"
     "${BLAS_LIB}"
     "loguru"
