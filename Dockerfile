@@ -12,14 +12,14 @@ RUN mkdir /agentsim-dev && \
 	cmake \
 	curl \
 	git \
-  openssl \
+	openssl \
 	libblas-dev \
 	libhdf5-dev \
 	liblapack-dev \
 	python-dev \
 	libssl-dev libcurl4-openssl-dev \
 	libblosc1 \
-  libglew-dev mesa-common-dev freeglut3-dev
+  	libglew-dev mesa-common-dev freeglut3-dev
 
 # copy agent sim project
 COPY . /agentsim-dev/agentsim
@@ -32,7 +32,7 @@ RUN git submodule update --init --recursive
 RUN cd ../build && \
 	cmake ../agentsim -DBUILD_ONLY="s3;awstransfer;transfer" -DCMAKE_BUILD_TYPE=Release -DAUTORUN_UNIT_TESTS=OFF && \
 	make && \
-  openssl dhparam -out /dh.pem 2048 && \
+  	openssl dhparam -out /dh.pem 2048 && \
 	find /agentsim-dev/build | grep -i so$ | xargs -i cp {} /agentsim-dev/lib/
 
 ### Run image ###

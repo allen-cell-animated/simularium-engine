@@ -23,7 +23,6 @@ set(TEST_INCLUDES
 
 set(TEST_LIBS
     "${TARGET}"
-    #Threads::Threads
     "gtest_main"
     "gtest"
     "${CYTOSIM_LIBRARIES}"
