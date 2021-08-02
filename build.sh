@@ -32,7 +32,7 @@ function next_image_tag {
 
     branch_name=$(get_branch_name)
 
-    if [[ $branch_name == 'master' ]] ; then
+    if [[ $branch_name == 'main' ]] ; then
         base_aics_version=$(/usr/bin/jq -e --raw-output '.base_aics_version' build.json)
         latest_tag=$(/usr/bin/git tag -l --sort version:refname | /bin/egrep '^[0-9]+\.[0-9]+\.[0-9]+$' | tail -1)
         if [[ $latest_tag == '' ]] ; then
@@ -108,7 +108,7 @@ if [[ $push_to_remote == 1 ]] ; then
     stage_registry=$(get_stage_registry)
     /usr/bin/docker tag ${image_name_tag} ${stage_registry}/${image_name_tag}
     /usr/bin/docker push ${stage_registry}/${image_name_tag}
-    if [[ $(get_branch_name) == 'master' ]] ; then
+    if [[ $(get_branch_name) == 'main' ]] ; then
         latest_snap_tag="${image_name}:latest-snapshot"
         /usr/bin/docker tag ${image_name_tag} ${stage_registry}/${latest_snap_tag}
         /usr/bin/docker push ${stage_registry}/${latest_snap_tag}

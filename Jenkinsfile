@@ -18,7 +18,7 @@ pipeline {
         }
         stage ("git-tag-and-push") {
             when {
-                branch "master"
+                branch "main"
             }
             steps {
                 // sh can only return values in a script step:
@@ -32,7 +32,7 @@ pipeline {
         }
         stage ("promote") {
             when {
-                branch "master"
+                branch "main"
             }
             steps {
                 sh "./build.sh -p ${tag}"
