@@ -2,26 +2,17 @@ cmake_minimum_required(VERSION 3.2.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(AGENTVIZ_FULL_DEBUG_SYMBOLS TRUE)
-
-if(NOT DEFINED DIMENSION)
-    set(DIMENSION 3) # Used by Cytosim to compile 2D or 3D
-endif()
+set(DIMENSION 3) # Used by Cytosim to compile 2D or 3D
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 set(TARGET "agentsim")
 set(SERVER_TARGET "agentsim_server")
 set(CLIENT_TARGET "agentsim_client")
 
-link_directories(
-  "/usr/local/opt/openssl/lib"
-)
-
 add_compile_options(-Wno-deprecated-declarations)
 
-if(${AGENTVIZ_FULL_DEBUG_SYMBOLS})
-  message("Building Agent Viz with full debugging symbols")
-  add_definitions("-g3 -ggdb")
-endif()
+message("Building Agent Viz with full debugging symbols")
+add_definitions("-g3 -ggdb")
 
 # The file extension to attach to executables built
 set(EXE_FILE_TYPE "exe")
@@ -34,59 +25,9 @@ set(INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/inc")
 set(EXTERNAL_DIRECTORY "${CMAKE_SOURCE_DIR}/ext")
 set(DEPENDENCY_DIRECTORY "${CMAKE_SOURCE_DIR}/dep")
 
-SET(CMAKE_EXE_LINKER_FLAGS
-"${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath /usr/local/lib -Wl,-rpath /usr/lib")
-
 project(${TARGET})
-add_executable(${SERVER_PROGRAM} ${SOURCE_DIRECTORY}/${SERVER_TARGET}.cpp)
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
-find_package(HDF5 COMPONENTS HL REQUIRED)
-
-if(UNIX AND APPLE)
-  set(PLATFORM_LIBRARIES
-    "crypto"
-  )
-endif()
-
-target_include_directories(${SERVER_PROGRAM} PUBLIC
-"${INCLUDE_DIRECTORY}"
-"${EXTERNAL_DIRECTORY}"
-"${EXTERNAL_DIRECTORY}/websocketpp"
-"${EXTERNAL_DIRECTORY}/websocketpp/common"
-"${EXTERNAL_DIRECTORY}/asio"
-"/usr/local/opt/openssl/include"
-)
 
 add_subdirectory(${DEPENDENCY_DIRECTORY})
 add_subdirectory(${SOURCE_DIRECTORY})
-
-target_link_libraries(${SERVER_PROGRAM}
-    "${TARGET}"
-    Threads::Threads
-)
-
-set(CLIENT_PROGRAM_SOURCES
-    "${SOURCE_DIRECTORY}/${CLIENT_TARGET}.cpp"
-    "${EXTERNAL_DIRECTORY}/json/jsoncpp.cpp"
-    "${SOURCE_DIRECTORY}/main/cli_client.cpp"
-)
-add_executable(${CLIENT_PROGRAM} ${CLIENT_PROGRAM_SOURCES})
-target_include_directories(${CLIENT_PROGRAM} PRIVATE
-    "${INCLUDE_DIRECTORY}"
-    "${EXTERNAL_DIRECTORY}"
-    "${EXTERNAL_DIRECTORY}/websocketpp"
-    "${EXTERNAL_DIRECTORY}/websocketpp/common"
-    "${EXTERNAL_DIRECTORY}/asio"
-    "${OPENSSL_INCLUDES}"
-    "/usr/local/opt/openssl/include"
-)
-target_link_libraries(${CLIENT_PROGRAM}
-    Threads::Threads
-    ${OPENSSL_LIBRARIES}
-    ${PLATFORM_LIBRARIES}
-)
 
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/trajectory")

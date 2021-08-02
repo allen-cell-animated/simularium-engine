@@ -4,7 +4,7 @@ add_library("readdyPKG" STATIC
     "readdypkg.cpp"
 )
 
-set(READDY_PKG_INCLUDES
+set(READDY_PKG_INCLUDE_DIRECTORIES
     "${DEPENDENCY_DIRECTORY}/readdy/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/readdy_testing/include"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/c-blosc/include/"
@@ -13,17 +13,19 @@ set(READDY_PKG_INCLUDES
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/json/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/pybind11/include/"
     "${DEPENDENCY_DIRECTORY}/readdy/libraries/spdlog/include/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/graph/"
+    "${DEPENDENCY_DIRECTORY}/readdy/libraries/graph/libs/fmt/include"
     "${HDF5_INCLUDE_DIRS}"
     "${HDF5_HL_INCLUDE_DIR}"
     CACHE STRING "The include directories needed by the ReaDDy simulation package"
 )
 
-target_include_directories("readdyPKG" PRIVATE
+target_include_directories("readdyPKG" PUBLIC
     "${READDY_PKG_INCLUDE_DIRECTORIES}"
     "${INCLUDE_DIRECTORY}"
     "${EXTERNAL_DIRECTORY}"
 )
-target_link_libraries("readdyPKG" PRIVATE
+target_link_libraries("readdyPKG" PUBLIC
     "readdy"
     "readdy_model"
     "readdy_kernel_cpu"
