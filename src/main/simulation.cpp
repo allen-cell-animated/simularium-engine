@@ -324,10 +324,10 @@ namespace simularium {
                 return tfp.numberOfFrames - 1;
             }
 
-            // Integer division performed to get nearest frames
-            // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
-            int time = simulationTimeNs / tfp.timeStepSize;
-            return time;
+            // Return the nearest frame based on a fixed time-step size
+            //  e.g. timestep = 2, requestedTime = 5.1,
+            //   round(5.1/2) = round(2.55) = frame 3
+            return std::round(simulationTimeNs / tfp.timeStepSize);
         }
 
         if (this->m_SimPkgs.size() > 0 && this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier)) {
