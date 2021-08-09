@@ -53,6 +53,18 @@ namespace simularium {
             frameNum = simulation.GetClosestFrameNumberForTime(simFileName, -1);
             EXPECT_EQ(frameNum, 0);
 
+            // A non integer time request, round up
+            frameNum = simulation.GetClosestFrameNumberForTime(simFileName, 4.6);
+            EXPECT_EQ(frameNum, 5);
+
+            // A non integer time request, round up
+            frameNum = simulation.GetClosestFrameNumberForTime(simFileName, 4.4);
+            EXPECT_EQ(frameNum, 4);
+
+            // A non integer time request, round up w/ epsilon
+            frameNum = simulation.GetClosestFrameNumberForTime(simFileName, 4.5);
+            EXPECT_EQ(frameNum, 5);
+
             std::remove(simFilePath.c_str());
         }
 
