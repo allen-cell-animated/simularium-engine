@@ -309,7 +309,7 @@ namespace simularium {
             std::size_t numFrames = this->m_cache.GetNumFrames(identifier);
             return std::min(
                 static_cast<std::size_t>(simulationTimeNs),
-                numFrames);
+                numFrames - 1);
         }
 
         auto tfp = this->GetFileProperties(identifier);
