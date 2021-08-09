@@ -309,7 +309,7 @@ namespace simularium {
             std::size_t numFrames = this->m_cache.GetNumFrames(identifier);
             return std::min(
                 static_cast<std::size_t>(simulationTimeNs),
-                numFrames);
+                numFrames - 1);
         }
 
         auto tfp = this->GetFileProperties(identifier);
@@ -320,14 +320,19 @@ namespace simularium {
             // If the requested time is past the end,
             //  return the last frame avaliable
             auto totalDuration = tfp.numberOfFrames * tfp.timeStepSize;
-            if (simulationTimeNs >= totalDuration) {
+            float epsilon = 1e-15;
+            if (simulationTimeNs >= totalDuration + epsilon) {
                 return tfp.numberOfFrames - 1;
             }
 
-            // Integer division performed to get nearest frames
-            // e.g. 8 ns / 3 ns = use frame 2 (time - 6 ns)
-            int time = simulationTimeNs / tfp.timeStepSize;
-            return time;
+            // Return the nearest frame based on a fixed time-step size
+            //  e.g. timestep = 2, requestedTime = 5.1,
+            //   round(5.1/2) = round(2.55) = frame 3
+            std::size_t frameNum = std::round(simulationTimeNs / tfp.timeStepSize);
+            return std::min(
+              frameNum,
+              tfp.numberOfFrames - 1
+            );
         }
 
         if (this->m_SimPkgs.size() > 0 && this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier)) {

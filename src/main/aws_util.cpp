@@ -7,7 +7,7 @@
 #include <iostream>
 #include <string>
 
-static const Aws::String kBucketName = "aics-agentviz-data";
+static const Aws::String kBucketName = "aics-simularium-data";
 static const Aws::String kAwsRegion = "us-east-2";
 
 namespace aics {
