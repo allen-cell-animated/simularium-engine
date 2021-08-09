@@ -57,7 +57,7 @@ namespace simularium {
             frameNum = simulation.GetClosestFrameNumberForTime(simFileName, 4.6);
             EXPECT_EQ(frameNum, 5);
 
-            // A non integer time request, round up
+            // A non integer time request, round down
             frameNum = simulation.GetClosestFrameNumberForTime(simFileName, 4.4);
             EXPECT_EQ(frameNum, 4);
 
