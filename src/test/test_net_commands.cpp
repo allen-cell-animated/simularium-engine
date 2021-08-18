@@ -1,4 +1,4 @@
-#include "test/network/test_net_commands.h"
+#include "gtest/gtest.h"
 #include "simularium/network/cli_client.h"
 #include "simularium/network/net_message_ids.h"
 #include "simularium/simularium.h"
@@ -7,6 +7,8 @@
 namespace aics {
 namespace simularium {
     namespace test {
+        class NetCommandTests : public ::testing::Test {
+        };
 
         TEST_F(NetCommandTests, PlayPause)
         {

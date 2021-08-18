@@ -8,6 +8,7 @@ set(TEST_LIST
 "test_client_server"
 "test_net_commands"
 "test_sim_time"
+"test_trajectory_info_v1"
 )
 
 set(TEST_INCLUDES

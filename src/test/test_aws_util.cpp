@@ -1,4 +1,4 @@
-#include "test/aws/test_aws_util.h"
+#include "gtest/gtest.h"
 #include "simularium/aws/aws_util.h"
 #include <aws/core/Aws.h>
 #include <aws/core/utils/memory/AWSMemory.h>
@@ -10,6 +10,8 @@
 namespace aics {
 namespace simularium {
     namespace test {
+        class AwsSdkTest : public ::testing::Test {
+        };
 
         TEST_F(AwsSdkTest, DownloadUsingSDK)
         {
