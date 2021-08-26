@@ -53,6 +53,7 @@ Json::Value TrajectoryFileInfoV1::GetJSON() {
   cameraDefault["fovDegrees"] = this->m_cameraDefault.fovDegrees;
 
   out["cameraDefault"] = cameraDefault;
+  return out;
 }
 
 } // namespace fileio

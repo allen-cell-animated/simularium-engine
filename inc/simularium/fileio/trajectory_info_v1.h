@@ -30,7 +30,7 @@ namespace fileio {
 
     class TrajectoryFileInfoV1 {
     public:
-        void ParseJSON(Json::Value& jsonRoot);
+        bool ParseJSON(Json::Value& jsonRoot);
         Json::Value GetJSON();
 
     private:

@@ -10,11 +10,19 @@ namespace simularium {
         class TrajectoryInfoV1Tests : public ::testing::Test {
         };
 
+        // A basic test to ensure parsing doesn't crash
         TEST_F(TrajectoryInfoV1Tests, BasicTest)
         {
-          std::cout << test::v1_trajectory_info << std::endl;
-        }
+          Json::Value fprops;
+          Json::Reader reader;
+          bool parseSuccess = reader.parse(v1_trajectory_info, fprops);
+          EXPECT_EQ(parseSuccess, true);
 
+          aics::simularium::fileio::TrajectoryFileInfoV1 v1;
+          v1.ParseJSON(fprops);
+
+          Json::Value out = v1.GetJSON();
+        }
     } // namespace test
 } // namespace simularium
 } // namespace aics
