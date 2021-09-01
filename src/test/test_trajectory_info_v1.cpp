@@ -22,6 +22,7 @@ namespace simularium {
           v1.ParseJSON(fprops);
 
           Json::Value out = v1.GetJSON();
+          std::cout << out << std::endl;
         }
     } // namespace test
 } // namespace simularium

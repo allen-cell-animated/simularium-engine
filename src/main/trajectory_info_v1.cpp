@@ -4,8 +4,52 @@ namespace aics {
 namespace simularium {
 namespace fileio {
 
-void TrajectoryFileInfoV1::ParseJSON(Json::Value& jsonRoot) {
+void TrajectoryFileInfoV1::ParseJSON(Json::Value& fprops) {
+    // Required Fields
+    const Json::Value typeMapping = fprops["typeMapping"];
+    std::vector<std::string> ids = typeMapping.getMemberNames();
+    for (auto& id : ids) {
+        std::size_t idKey = std::atoi(id.c_str());
+        const Json::Value entry = typeMapping[id];
+        this->m_typeMapping[idKey] = entry["name"].asString();
+    }
 
+    const Json::Value& size = fprops["size"];
+    this->m_size.x = size["x"].asFloat();
+    this->m_size.y = size["y"].asFloat();
+    this->m_size.z = size["z"].asFloat();
+
+    this->m_filename = fprops["fileName"].asString();
+    this->m_totalSteps = fprops["totalSteps"].asInt();
+    this->m_timeStepSize = fprops["timeStepSize"].asFloat();
+    this->m_spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
+
+    // Optional Fields
+    const Json::Value& cameraDefault = fprops["cameraDefault"];
+    if (cameraDefault != Json::nullValue) {
+        const Json::Value& cpos = cameraDefault["position"];
+        if (cpos != Json::nullValue) {
+            this->m_cameraDefault.position[0] = cpos["x"].asFloat();
+            this->m_cameraDefault.position[1] = cpos["y"].asFloat();
+            this->m_cameraDefault.position[2] = cpos["z"].asFloat();
+        }
+        const Json::Value& lookAt = cameraDefault["lookAtPoint"];
+        if (lookAt != Json::nullValue) {
+            this->m_cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
+            this->m_cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
+            this->m_cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
+        }
+        const Json::Value& upVec = cameraDefault["upVector"];
+        if (upVec != Json::nullValue) {
+            this->m_cameraDefault.upVector[0] = upVec["x"].asFloat();
+            this->m_cameraDefault.upVector[1] = upVec["y"].asFloat();
+            this->m_cameraDefault.upVector[2] = upVec["z"].asFloat();
+        }
+
+        if (cameraDefault.isMember("fovDegrees")) {
+            this->m_cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
+        }
+    }
 }
 
 Json::Value TrajectoryFileInfoV1::GetJSON() {

@@ -1,6 +1,7 @@
 #ifndef AICS_TRAJECTORY_INFO_V1_H
 #define AICS_TRAJECTORY_INFO_V1_H
 
+#include "simularium/fileio/trajectory_info.h"
 #include <array>
 #include <string>
 #include <unordered_map>
@@ -28,9 +29,9 @@ namespace fileio {
         float fovDegrees;
     };
 
-    class TrajectoryFileInfoV1 {
+    class TrajectoryFileInfoV1: public TrajectoryInfo {
     public:
-        bool ParseJSON(Json::Value& jsonRoot);
+        virtual void ParseJSON(Json::Value& jsonRoot) override;
         Json::Value GetJSON();
 
     private:

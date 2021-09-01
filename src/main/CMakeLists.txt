@@ -17,6 +17,7 @@ set(SOURCES
 "simularium_binary_file.cpp"
 "simularium_file_reader.cpp"
 "trajectory_info_v1.cpp"
+"trajectory_info_parser.cpp"
 )
 
 add_library(${TARGET} STATIC ${SOURCES})
