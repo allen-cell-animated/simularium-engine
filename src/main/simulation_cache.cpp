@@ -3,6 +3,8 @@
 #include "simularium/aws/aws_util.h"
 #include "simularium/config/config.h"
 #include "simularium/fileio/simularium_file_reader.h"
+#include "simularium/fileio/trajectory_info_parser.h"
+#include "simularium/fileio/trajectory_info.h"
 #include <algorithm>
 #include <csignal>
 #include <cstdio>
@@ -280,53 +282,8 @@ namespace simularium {
         std::ofstream propsFile;
         propsFile.open(filePropsPath);
 
-        TrajectoryFileProperties tfp = this->GetFileProperties(identifier);
-        Json::Value fprops;
-        fprops["fileName"] = tfp.fileName;
-        fprops["version"] = 1;
-        fprops["totalSteps"] = static_cast<int>(tfp.numberOfFrames);
-        fprops["timeStepSize"] = tfp.timeStepSize;
-        fprops["spatialUnitFactorMeters"] = tfp.spatialUnitFactorMeters;
-
-        Json::Value size;
-        size["x"] = static_cast<float>(tfp.boxX);
-        size["y"] = static_cast<float>(tfp.boxY);
-        size["z"] = static_cast<float>(tfp.boxZ);
-        fprops["size"] = size;
-
-        Json::Value typeMapping;
-        for (auto& entry : tfp.typeMapping) {
-            std::string id = std::to_string(entry.first);
-            std::string name = entry.second;
-
-            Json::Value newEntry;
-            newEntry["name"] = name;
-
-            typeMapping[id] = newEntry;
-        }
-        fprops["typeMapping"] = typeMapping;
-
-        Json::Value cameraDefault;
-        Json::Value camPos, camLook, camUp;
-        camPos["x"] = tfp.cameraDefault.position[0];
-        camPos["y"] = tfp.cameraDefault.position[1];
-        camPos["z"] = tfp.cameraDefault.position[2];
-
-        camLook["x"] = tfp.cameraDefault.lookAtPoint[0];
-        camLook["y"] = tfp.cameraDefault.lookAtPoint[1];
-        camLook["z"] = tfp.cameraDefault.lookAtPoint[2];
-
-        camUp["x"] = tfp.cameraDefault.upVector[0];
-        camUp["y"] = tfp.cameraDefault.upVector[1];
-        camUp["z"] = tfp.cameraDefault.upVector[2];
-
-        cameraDefault["position"] = camPos;
-        cameraDefault["lookAtPoint"] = camLook;
-        cameraDefault["upVector"] = camUp;
-        cameraDefault["fovDegrees"] = tfp.cameraDefault.fovDegrees;
-        fprops["cameraDefault"] = cameraDefault;
-
-        propsFile << fprops;
+        auto tfpJSON = this->GetFileProperties(identifier)->GetJSON();
+        propsFile << tfpJSON;
         propsFile.close();
     }
 
@@ -371,55 +328,13 @@ namespace simularium {
 
     void SimulationCache::ParseFileProperties(Json::Value& fprops, std::string identifier)
     {
-        TrajectoryFileProperties tfp;
-
-        // Required Fields
-        const Json::Value typeMapping = fprops["typeMapping"];
-        std::vector<std::string> ids = typeMapping.getMemberNames();
-        for (auto& id : ids) {
-            std::size_t idKey = std::atoi(id.c_str());
-            const Json::Value entry = typeMapping[id];
-            tfp.typeMapping[idKey] = entry["name"].asString();
-        }
-
-        const Json::Value& size = fprops["size"];
-        tfp.boxX = size["x"].asFloat();
-        tfp.boxY = size["y"].asFloat();
-        tfp.boxZ = size["z"].asFloat();
-
-        tfp.fileName = fprops["fileName"].asString();
-        tfp.numberOfFrames = fprops["totalSteps"].asInt();
-        tfp.timeStepSize = fprops["timeStepSize"].asFloat();
-        tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
-        // Optional Fields
-        const Json::Value& cameraDefault = fprops["cameraDefault"];
-        if (cameraDefault != Json::nullValue) {
-            const Json::Value& cpos = cameraDefault["position"];
-            if (cpos != Json::nullValue) {
-                tfp.cameraDefault.position[0] = cpos["x"].asFloat();
-                tfp.cameraDefault.position[1] = cpos["y"].asFloat();
-                tfp.cameraDefault.position[2] = cpos["z"].asFloat();
-            }
-            const Json::Value& lookAt = cameraDefault["lookAtPoint"];
-            if (lookAt != Json::nullValue) {
-                tfp.cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
-                tfp.cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
-                tfp.cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
-            }
-            const Json::Value& upVec = cameraDefault["upVector"];
-            if (upVec != Json::nullValue) {
-                tfp.cameraDefault.upVector[0] = upVec["x"].asFloat();
-                tfp.cameraDefault.upVector[1] = upVec["y"].asFloat();
-                tfp.cameraDefault.upVector[2] = upVec["z"].asFloat();
-            }
-
-            if (cameraDefault.isMember("fovDegrees")) {
-                tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
-            }
-        }
+        aics::simularium::fileio::TrajectoryInfoParser parser;
+        std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> tfi;
+        tfi = parser.Parse(fprops);
+        std::cout << tfi->GetJSON() << std::endl;
 
         // Store the result
-        this->m_fileProps[identifier] = tfp;
+        this->m_fileProps[identifier] = tfi;
     }
 
     bool SimulationCache::IsFilePropertiesValid(std::string identifier)

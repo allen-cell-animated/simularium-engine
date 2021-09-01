@@ -1,24 +1,24 @@
 #include "simularium/fileio/trajectory_info_parser.h"
 #include "simularium/fileio/trajectory_info_v1.h"
 #include "loguru/loguru.hpp"
+#include <iostream>
 
 namespace aics {
 namespace simularium {
 namespace fileio {
 
 std::shared_ptr<TrajectoryInfo> TrajectoryInfoParser::Parse(Json::Value& root) {
-    std::string version = root["version"].asString();
-    int major_version = std::atoi(version.substr(version.find('.')).c_str());
+    int version = root["version"].asInt();
 
     std::shared_ptr<TrajectoryInfo> tfi;
-    switch(major_version) {
+    switch(version) {
       case 1: {
           tfi = std::make_shared<TrajectoryFileInfoV1>();
           tfi->ParseJSON(root);
         break;
       }
       default:
-      LOG_F(ERROR, "Unrecognized version of trajectory info: version %i", major_version);
+      LOG_F(ERROR, "Unrecognized version of trajectory info: version %i", version);
     }
 
     return tfi;

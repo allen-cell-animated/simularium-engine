@@ -32,7 +32,7 @@ namespace fileio {
     class TrajectoryFileInfoV1: public TrajectoryInfo {
     public:
         virtual void ParseJSON(Json::Value& jsonRoot) override;
-        Json::Value GetJSON();
+        virtual Json::Value GetJSON() override;
 
     private:
         std::string m_filename = "";

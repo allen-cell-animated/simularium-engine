@@ -261,7 +261,7 @@ namespace simularium {
 
         bool HasFileInCache(std::string identifier) { return this->m_cache.HasIdentifier(identifier); }
 
-        TrajectoryFileProperties GetFileProperties(std::string identifier)
+        std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> GetFileProperties(std::string identifier)
         {
             return this->m_cache.GetFileProperties(identifier);
         }

@@ -276,9 +276,10 @@ namespace simularium {
             return 0;
         } // Assumption: the first frame is at 0
 
-        auto tfp = this->GetFileProperties(identifier);
+        auto tfpJSON = this->GetFileProperties(identifier)->GetJSON();
+        auto timeStepSize = tfpJSON["timeStepSize"].asFloat();
         double time = 0.0;
-        time = static_cast<double>(tfp.timeStepSize * frameNumber);
+        time = static_cast<double>(timeStepSize * frameNumber);
         if (time > 0.0) {
             return time;
         }
@@ -312,26 +313,28 @@ namespace simularium {
                 numFrames - 1);
         }
 
-        auto tfp = this->GetFileProperties(identifier);
+        auto tfpJSON = this->GetFileProperties(identifier)->GetJSON();
+        auto timeStepSize = tfpJSON["timeStepSize"].asFloat();
+        std::size_t totalNumberOfFrames = tfpJSON["totalSteps"].asInt();
 
         // If there is cached meta-data for the simulation,
         //  assume we are running using a cache pulled down from the network
-        if (tfp.numberOfFrames != 0) {
+        if (totalNumberOfFrames != 0) {
             // If the requested time is past the end,
             //  return the last frame avaliable
-            auto totalDuration = tfp.numberOfFrames * tfp.timeStepSize;
+            auto totalDuration = totalNumberOfFrames * timeStepSize;
             float epsilon = 1e-15;
             if (simulationTimeNs >= totalDuration + epsilon) {
-                return tfp.numberOfFrames - 1;
+                return totalNumberOfFrames - 1;
             }
 
             // Return the nearest frame based on a fixed time-step size
             //  e.g. timestep = 2, requestedTime = 5.1,
             //   round(5.1/2) = round(2.55) = frame 3
-            std::size_t frameNum = std::round(simulationTimeNs / tfp.timeStepSize);
+            std::size_t frameNum = std::round(simulationTimeNs / timeStepSize);
             return std::min(
               frameNum,
-              tfp.numberOfFrames - 1
+              totalNumberOfFrames - 1
             );
         }
 

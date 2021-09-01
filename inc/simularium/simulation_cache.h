@@ -4,6 +4,7 @@
 #include "simularium/agent_data.h"
 #include "simularium/fileio/simularium_binary_file.h"
 #include "simularium/network/trajectory_properties.h"
+#include "simularium/fileio/trajectory_info_v1.h"
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -86,14 +87,17 @@ namespace simularium {
 
         bool HasIdentifier(std::string identifier) { return this->m_fileProps.count(identifier); }
 
-        TrajectoryFileProperties GetFileProperties(std::string identifier)
+        std::shared_ptr<aics::simularium::fileio::TrajectoryInfo>
+          GetFileProperties(std::string identifier)
         {
-            return this->m_fileProps.count(identifier) ? this->m_fileProps[identifier] : TrajectoryFileProperties();
+            return this->m_fileProps.count(identifier) ?
+              this->m_fileProps[identifier] :
+              std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
         }
 
         void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp)
         {
-            this->m_fileProps[identifier] = tfp;
+            //this->m_fileProps[identifier] = tfp;
         }
 
         std::string GetLocalRawTrajectoryFilePath(std::string identifier);
@@ -135,7 +139,7 @@ namespace simularium {
         void ParseFileProperties(Json::Value& jsonRoot, std::string identifier);
         bool IsFilePropertiesValid(std::string identifier);
 
-        std::unordered_map<std::string, TrajectoryFileProperties> m_fileProps;
+        std::unordered_map<std::string, std::shared_ptr<aics::simularium::fileio::TrajectoryInfo>> m_fileProps;
         std::unordered_map<std::string, std::vector<std::string>> m_tmpFiles;
         std::unordered_map<std::string, std::shared_ptr<fileio::SimulariumBinaryFile>> m_binaryFiles;
     };
