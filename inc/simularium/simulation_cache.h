@@ -3,7 +3,6 @@
 
 #include "simularium/agent_data.h"
 #include "simularium/fileio/simularium_binary_file.h"
-#include "simularium/network/trajectory_properties.h"
 #include "simularium/fileio/trajectory_info_v1.h"
 #include <algorithm>
 #include <fstream>
@@ -95,9 +94,9 @@ namespace simularium {
               std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
         }
 
-        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp)
+        void SetFileProperties(std::string identifier, std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> ti)
         {
-            //this->m_fileProps[identifier] = tfp;
+            this->m_fileProps[identifier] = ti;
         }
 
         std::string GetLocalRawTrajectoryFilePath(std::string identifier);

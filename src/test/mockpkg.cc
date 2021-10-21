@@ -1,4 +1,5 @@
 #include "simularium/simularium.h"
+#include "simularium/network/trajectory_properties.h"
 
 namespace aics {
 namespace simularium {
@@ -6,9 +7,9 @@ namespace simularium {
 
         class MockSimPkg : public SimPkg {
         public:
-            MockSimPkg(TrajectoryFileProperties& tfp)
+            MockSimPkg(std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> fileProps)
             {
-                this->m_fileProps = tfp;
+                this->m_fileProps = fileProps;
             }
             virtual ~MockSimPkg() {};
 
@@ -33,9 +34,10 @@ namespace simularium {
 
             virtual void LoadTrajectoryFile(
                 std::string file_path,
-                TrajectoryFileProperties& fileProps) override
+                std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> fileProps) override
             {
-                fileProps = this->m_fileProps;
+                auto json = this->m_fileProps->GetJSON();
+                fileProps->ParseJSON(json);
             };
 
             virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override
@@ -59,7 +61,7 @@ namespace simularium {
             }
 
         private:
-            TrajectoryFileProperties m_fileProps;
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> m_fileProps;
         };
 
     } // namespace test

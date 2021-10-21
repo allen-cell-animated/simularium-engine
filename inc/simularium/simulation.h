@@ -4,7 +4,6 @@
 #include "simularium/agent_data.h"
 #include "simularium/model/model.h"
 #include "simularium/network/net_message_ids.h"
-#include "simularium/network/trajectory_properties.h"
 #include "simularium/simulation_cache.h"
 #include <algorithm>
 #include <iostream>
@@ -266,9 +265,9 @@ namespace simularium {
             return this->m_cache.GetFileProperties(identifier);
         }
 
-        void SetFileProperties(std::string identifier, TrajectoryFileProperties tfp)
+        void SetFileProperties(std::string identifier, std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> ti)
         {
-            this->m_cache.SetFileProperties(identifier, tfp);
+            this->m_cache.SetFileProperties(identifier, ti);
         }
 
         std::size_t GetNumFrames(std::string identifier)

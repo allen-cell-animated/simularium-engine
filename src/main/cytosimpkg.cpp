@@ -168,7 +168,7 @@ namespace simularium {
         }
 
         if (!this->m_hasLoadedFile) {
-            TrajectoryFileProperties ignore;
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> ignore;
             std::string currentFile = this->m_trajectoryFile;
 
             LOG_F(INFO, "Loading current trajectory file %s", currentFile.c_str());
@@ -206,7 +206,7 @@ namespace simularium {
 
     void CytosimPkg::LoadTrajectoryFile(
         std::string filePath,
-        TrajectoryFileProperties& fileProps)
+        std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> fileProps)
     {
         this->m_trajectoryFile = filePath;
         this->m_propertyFile = this->GetPropertyFileName(this->m_trajectoryFile);
@@ -235,13 +235,30 @@ namespace simularium {
         // Assuming this should put the reader back to frame '0'
         this->m_reader->rewind();
 
-        fileProps.fileName = filePath;
-        fileProps.numberOfFrames = numTimeSteps;
-        fileProps.timeStepSize = real(this->m_simul->prop->time_step);
-        fileProps.typeMapping = this->m_typeMapping;
-        fileProps.boxX = 100;
-        fileProps.boxY = 100;
-        fileProps.boxZ = 100;
+        Json::Value update;
+        update["totalSteps"] = numTimeSteps;
+        update["timeStepSize"] = real(this->m_simul->prop->time_step);
+        update["fileName"] = filePath;
+
+        Json::Value size;
+        size["x"] = 100;
+        size["y"] = 100;
+        size["z"] = 100;
+        update["size"] = size;
+
+        Json::Value typeMapping;
+        for (auto& entry : this->m_typeMapping) {
+            std::string id = std::to_string(entry.first);
+            std::string name = entry.second;
+
+            Json::Value newEntry;
+            newEntry["name"] = name;
+
+            typeMapping[id] = newEntry;
+        }
+        update["typeMapping"] = typeMapping;
+
+        fileProps->ParseJSON(update);
         this->m_hasLoadedFile = true;
     }
 

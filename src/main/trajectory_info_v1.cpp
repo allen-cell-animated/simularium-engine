@@ -52,6 +52,20 @@ void TrajectoryFileInfoV1::ParseJSON(Json::Value& fprops) {
     }
 }
 
+void TrajectoryFileInfoV1::UpdateFromJSON(Json::Value& update) {
+  if(update.isMember("fileName")) {
+    this->m_filename = update["fileName"].asString();
+  }
+
+  if(update.isMember("totalSteps")) {
+    this->m_totalSteps = update["totalSteps"].asInt();
+  }
+
+  if(update.isMember("timeStepSize")) {
+    this->m_timeStepSize = update["timeStepSize"].asFloat();
+  }
+}
+
 Json::Value TrajectoryFileInfoV1::GetJSON() {
   Json::Value out;
   out["fileName"] = this->m_filename;

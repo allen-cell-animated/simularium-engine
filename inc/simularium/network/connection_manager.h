@@ -19,7 +19,6 @@
 #include <websocketpp/server.hpp>
 
 #include "simularium/network/net_message_ids.h"
-#include "simularium/network/trajectory_properties.h"
 #include "simularium/simulation.h"
 
 typedef websocketpp::server<websocketpp::config::asio_tls> server;

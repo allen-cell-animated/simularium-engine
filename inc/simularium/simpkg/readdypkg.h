@@ -42,7 +42,7 @@ namespace simularium {
 
         virtual void LoadTrajectoryFile(
             std::string file_path,
-            TrajectoryFileProperties& fileProps) override;
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> fileProps) override;
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) override;
         virtual std::size_t GetClosestFrameNumberForTime(double timeNs) override;
 

@@ -9,6 +9,7 @@ namespace fileio {
 class TrajectoryInfo {
 public:
   virtual void ParseJSON(Json::Value& root) = 0;
+  virtual void UpdateFromJSON(Json::Value& root) = 0;
   virtual Json::Value GetJSON() = 0;
 private:
 

@@ -254,7 +254,7 @@ namespace simularium {
         }
 
         if (!this->m_hasLoadedRunFile) {
-            TrajectoryFileProperties ignore;
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> ignore;
             this->LoadTrajectoryFile("/tmp/test.h5", ignore);
         }
 
@@ -293,8 +293,9 @@ namespace simularium {
 
     void ReaDDyPkg::LoadTrajectoryFile(
         std::string filePath,
-        TrajectoryFileProperties& fileProps)
+        std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> fileProps)
     {
+        Json::Value update;
         if (last_loaded_file != filePath) {
             this->m_hasLoadedRunFile = false;
         } else {
@@ -302,9 +303,9 @@ namespace simularium {
             auto& time = std::get<0>(this->m_fileInfo->trajectoryInfo);
             auto& traj = std::get<1>(this->m_fileInfo->trajectoryInfo);
 
-            fileProps.numberOfFrames = traj.size();
-            fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
-
+            update["totalSteps"] = traj.size();
+            update["timeStepSize"] = time.size() >= 2 ? time[1] - time[0] : 0;
+            fileProps->UpdateFromJSON(update);
             return;
         }
 
@@ -322,12 +323,28 @@ namespace simularium {
             auto& time = std::get<0>(this->m_fileInfo->trajectoryInfo);
             auto& traj = std::get<1>(this->m_fileInfo->trajectoryInfo);
 
-            fileProps.numberOfFrames = traj.size();
-            fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
-            fileProps.typeMapping = this->m_fileInfo->typeMapping;
-            fileProps.boxX = this->m_fileInfo->configInfo.boxX;
-            fileProps.boxY = this->m_fileInfo->configInfo.boxY;
-            fileProps.boxZ = this->m_fileInfo->configInfo.boxZ;
+            update["totalSteps"] = traj.size();
+            update["timeStepSize"] = time.size() >= 2 ? time[1] - time[0] : 0;
+
+            Json::Value size;
+            size["x"] = this->m_fileInfo->configInfo.boxX;
+            size["y"] = this->m_fileInfo->configInfo.boxY;
+            size["z"] = this->m_fileInfo->configInfo.boxZ;
+            update["size"] = size;
+
+            Json::Value typeMapping;
+            for (auto& entry : this->m_fileInfo->typeMapping) {
+                std::string id = std::to_string(entry.first);
+                std::string name = entry.second;
+
+                Json::Value newEntry;
+                newEntry["name"] = name;
+
+                typeMapping[id] = newEntry;
+            }
+            update["typeMapping"] = typeMapping;
+
+            fileProps->ParseJSON(update);
         }
     }
 

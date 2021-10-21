@@ -2,7 +2,7 @@
 #define AICS_SIMPKG_H
 
 #include "simularium/model/model.h"
-#include "simularium/network/trajectory_properties.h"
+#include "simularium/fileio/trajectory_info.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -78,7 +78,7 @@ namespace simularium {
 
         virtual void LoadTrajectoryFile(
             std::string file_path,
-            TrajectoryFileProperties& fileProps)
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> fileProps)
             = 0;
 
         virtual double GetSimulationTimeAtFrame(std::size_t frameNumber) = 0;

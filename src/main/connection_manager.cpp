@@ -2,7 +2,6 @@
 #include "loguru/loguru.hpp"
 #include "simularium/aws/aws_util.h"
 #include "simularium/network/net_message_ids.h"
-#include "simularium/network/trajectory_properties.h"
 #include <fstream>
 #include <iostream>
 
@@ -757,10 +756,13 @@ namespace simularium {
                             simulation.Reset();
                             simulation.RunAndSaveFrames(timeStep, numberOfTimeSteps);
 
-                            TrajectoryFileProperties tfp;
-                            tfp.numberOfFrames = numberOfTimeSteps;
-                            tfp.timeStepSize = timeStep;
-                            simulation.SetFileProperties("prerun", tfp);
+                            auto ti = std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
+                            Json::Value update;
+                            update["totalSteps"] = numberOfTimeSteps;
+                            update["timeStepSize"] = timeStep;
+                            ti->UpdateFromJSON(update);
+
+                            simulation.SetFileProperties("prerun", ti);
                             this->SetClientSimId(senderUid, "prerun");
                             simulation.SetSimId("prerun");
                             this->SetupRuntimeCache(simulation);

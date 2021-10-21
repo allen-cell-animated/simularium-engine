@@ -2,7 +2,6 @@
 #define AICS_SIMULARIUM_FILE_READER_H
 
 #include "simularium/agent_data.h"
-#include "simularium/network/trajectory_properties.h"
 #include <json/json.h>
 
 namespace aics {

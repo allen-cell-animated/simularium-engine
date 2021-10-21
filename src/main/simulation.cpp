@@ -160,8 +160,11 @@ namespace simularium {
 
     bool Simulation::LoadTrajectoryFile(std::string fileName)
     {
-        TrajectoryFileProperties tfp;
-        tfp.fileName = fileName;
+        auto trajInfo = std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
+        Json::Value update;
+        update["fileName"] = fileName;
+        trajInfo->UpdateFromJSON(update);
+
         for (std::size_t i = 0; i < this->m_SimPkgs.size(); ++i) {
             auto simPkg = this->m_SimPkgs[i];
 
@@ -186,8 +189,8 @@ namespace simularium {
                 this->m_cache.MarkTmpFiles(fileName, rawFilePaths);
 
                 std::string filePath = this->m_cache.GetLocalRawTrajectoryFilePath(fileName);
-                simPkg->LoadTrajectoryFile(filePath, tfp);
-                this->m_cache.SetFileProperties(fileName, tfp);
+                simPkg->LoadTrajectoryFile(filePath, trajInfo);
+                this->m_cache.SetFileProperties(fileName, trajInfo);
                 this->m_simIdentifier = fileName;
                 return true;
             }

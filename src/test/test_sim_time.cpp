@@ -18,9 +18,14 @@ namespace simularium {
             outfile << "TRAJECTORY MOCK FILE";
             outfile.close();
 
-            TrajectoryFileProperties tfp;
-            tfp.timeStepSize = 1.0;
-            tfp.numberOfFrames = 100;
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> tfp;
+            tfp = std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
+
+            Json::Value update;
+            update["totalSteps"] = 100;
+            update["timeStepSize"] = 1.0;
+            ASSERT_NE(tfp.get(), nullptr);
+            tfp->UpdateFromJSON(update);
             std::shared_ptr<SimPkg> mockPkg(new MockSimPkg(tfp));
 
             std::vector<std::shared_ptr<SimPkg>> simulators;
@@ -87,9 +92,13 @@ namespace simularium {
 
         TEST_F(SimulationTimeTests, LiveModeScrubbing)
         {
-            TrajectoryFileProperties tfp;
-            tfp.timeStepSize = 1.0;
-            tfp.numberOfFrames = 100;
+            std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> tfp;
+            tfp = std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
+
+            Json::Value update;
+            update["totalSteps"] = 100;
+            update["timeStepSize"] = 1.0;
+            tfp->UpdateFromJSON(update);
             std::shared_ptr<SimPkg> mockPkg(new MockSimPkg(tfp));
 
             std::vector<std::shared_ptr<SimPkg>> simulators;
