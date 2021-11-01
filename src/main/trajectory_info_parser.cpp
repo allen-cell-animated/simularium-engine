@@ -17,6 +17,11 @@ std::shared_ptr<TrajectoryInfo> TrajectoryInfoParser::Parse(Json::Value& root) {
           tfi->ParseJSON(root);
         break;
       }
+      case 2: {
+          tfi = std::make_shared<TrajectoryFileInfoV1>();
+          tfi->ParseJSON(root);
+          break;
+      }
       default:
       LOG_F(ERROR, "Unrecognized version of trajectory info: version %i", version);
     }

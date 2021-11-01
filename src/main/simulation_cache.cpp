@@ -275,6 +275,17 @@ namespace simularium {
         }
     }
 
+    std::shared_ptr<aics::simularium::fileio::TrajectoryInfo>
+      SimulationCache::GetFileProperties(std::string identifier)
+    {
+        if(this->m_fileProps.count(identifier)) {
+          return this->m_fileProps[identifier];
+        } else {
+          LOG_F(ERROR, "File properties for %s not found", identifier.c_str());
+          return std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
+        }
+    }
+
     void SimulationCache::WriteFilePropertiesToDisk(std::string identifier)
     {
         std::string filePropsPath = this->GetLocalInfoFilePath(identifier);
@@ -331,7 +342,6 @@ namespace simularium {
         aics::simularium::fileio::TrajectoryInfoParser parser;
         std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> tfi;
         tfi = parser.Parse(fprops);
-        std::cout << tfi->GetJSON() << std::endl;
 
         // Store the result
         this->m_fileProps[identifier] = tfi;

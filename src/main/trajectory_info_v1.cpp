@@ -68,6 +68,7 @@ void TrajectoryFileInfoV1::UpdateFromJSON(Json::Value& update) {
 
 Json::Value TrajectoryFileInfoV1::GetJSON() {
   Json::Value out;
+  out["version"] = 1;
   out["fileName"] = this->m_filename;
   out["totalSteps"] = this->m_totalSteps;
   out["timeStepSize"] = this->m_timeStepSize;

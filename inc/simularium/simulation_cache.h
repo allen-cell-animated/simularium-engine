@@ -87,12 +87,7 @@ namespace simularium {
         bool HasIdentifier(std::string identifier) { return this->m_fileProps.count(identifier); }
 
         std::shared_ptr<aics::simularium::fileio::TrajectoryInfo>
-          GetFileProperties(std::string identifier)
-        {
-            return this->m_fileProps.count(identifier) ?
-              this->m_fileProps[identifier] :
-              std::make_shared<aics::simularium::fileio::TrajectoryFileInfoV1>();
-        }
+          GetFileProperties(std::string identifier);
 
         void SetFileProperties(std::string identifier, std::shared_ptr<aics::simularium::fileio::TrajectoryInfo> ti)
         {
