@@ -3,6 +3,7 @@
 #include "simularium/aws/aws_util.h"
 #include "simularium/network/net_message_ids.h"
 #include "simularium/network/trajectory_properties.h"
+#include "simularium/network/tfp_to_json.h"
 #include <fstream>
 #include <iostream>
 
@@ -10,57 +11,6 @@ template <typename T, typename U>
 inline bool equals(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u)
 {
     return !t.owner_before(u) && !u.owner_before(t);
-}
-
-Json::Value tfp_to_json(aics::simularium::TrajectoryFileProperties tfp) {
-  Json::Value fprops;
-  fprops["version"] = 1;
-  fprops["msgType"] = aics::simularium::WebRequestTypes::id_trajectory_file_info;
-  fprops["totalSteps"] = tfp.numberOfFrames;
-  fprops["timeStepSize"] = tfp.timeStepSize;
-  fprops["spatialUnitFactorMeters"] = tfp.spatialUnitFactorMeters;
-
-  Json::Value typeMapping;
-  for (auto entry : tfp.typeMapping) {
-      std::string id = std::to_string(entry.first);
-      std::string name = entry.second;
-
-      Json::Value typeEntry;
-      typeEntry["name"] = name;
-
-      typeMapping[id] = typeEntry;
-  }
-
-  Json::Value size;
-  size["x"] = tfp.boxX;
-  size["y"] = tfp.boxY;
-  size["z"] = tfp.boxZ;
-
-  fprops["typeMapping"] = typeMapping;
-  fprops["size"] = size;
-
-  Json::Value cameraDefault;
-  Json::Value camPos, camLook, upVec;
-
-  camPos["x"] = tfp.cameraDefault.position[0];
-  camPos["y"] = tfp.cameraDefault.position[1];
-  camPos["z"] = tfp.cameraDefault.position[2];
-
-  camLook["x"] = tfp.cameraDefault.lookAtPoint[0];
-  camLook["y"] = tfp.cameraDefault.lookAtPoint[1];
-  camLook["z"] = tfp.cameraDefault.lookAtPoint[2];
-
-  upVec["x"] = tfp.cameraDefault.upVector[0];
-  upVec["y"] = tfp.cameraDefault.upVector[1];
-  upVec["z"] = tfp.cameraDefault.upVector[2];
-
-  cameraDefault["position"] = camPos;
-  cameraDefault["lookAtPoint"] = camLook;
-  cameraDefault["upVector"] = upVec;
-  cameraDefault["fovDegrees"] = tfp.cameraDefault.fovDegrees;
-  fprops["cameraDefault"] = cameraDefault;
-
-  return fprops;
 }
 
 static const std::string LIVE_SIM_IDENTIFIER = "live";

@@ -3,6 +3,7 @@
 #include "simularium/aws/aws_util.h"
 #include "simularium/config/config.h"
 #include "simularium/fileio/simularium_file_reader.h"
+#include "simularium/network/tfp_to_json.h"
 #include <algorithm>
 #include <csignal>
 #include <cstdio>
@@ -283,50 +284,7 @@ namespace simularium {
         propsFile.open(filePropsPath);
 
         TrajectoryFileProperties tfp = this->GetFileProperties(identifier);
-        Json::Value fprops;
-        fprops["fileName"] = tfp.fileName;
-        fprops["version"] = 1;
-        fprops["totalSteps"] = static_cast<int>(tfp.numberOfFrames);
-        fprops["timeStepSize"] = tfp.timeStepSize;
-        fprops["spatialUnitFactorMeters"] = tfp.spatialUnitFactorMeters;
-
-        Json::Value size;
-        size["x"] = static_cast<float>(tfp.boxX);
-        size["y"] = static_cast<float>(tfp.boxY);
-        size["z"] = static_cast<float>(tfp.boxZ);
-        fprops["size"] = size;
-
-        Json::Value typeMapping;
-        for (auto& entry : tfp.typeMapping) {
-            std::string id = std::to_string(entry.first);
-            std::string name = entry.second;
-
-            Json::Value newEntry;
-            newEntry["name"] = name;
-
-            typeMapping[id] = newEntry;
-        }
-        fprops["typeMapping"] = typeMapping;
-
-        Json::Value cameraDefault;
-        Json::Value camPos, camLook, camUp;
-        camPos["x"] = tfp.cameraDefault.position[0];
-        camPos["y"] = tfp.cameraDefault.position[1];
-        camPos["z"] = tfp.cameraDefault.position[2];
-
-        camLook["x"] = tfp.cameraDefault.lookAtPoint[0];
-        camLook["y"] = tfp.cameraDefault.lookAtPoint[1];
-        camLook["z"] = tfp.cameraDefault.lookAtPoint[2];
-
-        camUp["x"] = tfp.cameraDefault.upVector[0];
-        camUp["y"] = tfp.cameraDefault.upVector[1];
-        camUp["z"] = tfp.cameraDefault.upVector[2];
-
-        cameraDefault["position"] = camPos;
-        cameraDefault["lookAtPoint"] = camLook;
-        cameraDefault["upVector"] = camUp;
-        cameraDefault["fovDegrees"] = tfp.cameraDefault.fovDegrees;
-        fprops["cameraDefault"] = cameraDefault;
+        Json::Value fprops = tfp_to_json(tfp);
 
         propsFile << fprops;
         propsFile.close();

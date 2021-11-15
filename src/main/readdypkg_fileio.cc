@@ -324,7 +324,13 @@ namespace simularium {
 
             fileProps.numberOfFrames = traj.size();
             fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
-            fileProps.typeMapping = this->m_fileInfo->typeMapping;
+
+            for(auto entry: this->m_fileInfo->typeMapping) {
+              TypeEntry newEntry;
+              newEntry.name = entry.second;
+              fileProps.typeMapping[entry.first] = newEntry;
+            }
+
             fileProps.boxX = this->m_fileInfo->configInfo.boxX;
             fileProps.boxY = this->m_fileInfo->configInfo.boxY;
             fileProps.boxZ = this->m_fileInfo->configInfo.boxZ;

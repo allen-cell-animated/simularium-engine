@@ -4,9 +4,12 @@ TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops) {
   const Json::Value typeMapping = fprops["typeMapping"];
   std::vector<std::string> ids = typeMapping.getMemberNames();
   for (auto& id : ids) {
-      std::size_t idKey = std::atoi(id.c_str());
-      const Json::Value entry = typeMapping[id];
-      tfp.typeMapping[idKey] = entry["name"].asString();
+    std::size_t idKey = std::atoi(id.c_str());
+    const Json::Value entry = typeMapping[id];
+    TypeEntry newEntry;
+    newEntry.name = entry["name"].asString();
+
+    tfp.typeMapping[idKey] = newEntry;
   }
 
   const Json::Value& size = fprops["size"];
@@ -17,8 +20,10 @@ TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops) {
   tfp.fileName = fprops["fileName"].asString();
   tfp.numberOfFrames = fprops["totalSteps"].asInt();
   tfp.timeStepSize = fprops["timeStepSize"].asFloat();
-  tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
-  // Optional Fields
+
+  // @TODO (if needed): Translate spatial unit factor to space units
+  //tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
+
   const Json::Value& cameraDefault = fprops["cameraDefault"];
   if (cameraDefault != Json::nullValue) {
       const Json::Value& cpos = cameraDefault["position"];
@@ -43,9 +48,9 @@ TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops) {
       if (cameraDefault.isMember("fovDegrees")) {
           tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
       }
-
-      return tfp;
     }
+
+    return tfp;
 }
 
 TrajectoryFileProperties parse_traj_info_v2(Json::Value fprops) {
@@ -56,7 +61,10 @@ TrajectoryFileProperties parse_traj_info_v2(Json::Value fprops) {
   for (auto& id : ids) {
       std::size_t idKey = std::atoi(id.c_str());
       const Json::Value entry = typeMapping[id];
-      tfp.typeMapping[idKey] = entry["name"].asString();
+      TypeEntry newEntry;
+      newEntry.name = entry["name"].asString();
+
+      tfp.typeMapping[idKey] = newEntry;
   }
 
   const Json::Value& size = fprops["size"];
@@ -67,8 +75,15 @@ TrajectoryFileProperties parse_traj_info_v2(Json::Value fprops) {
   tfp.fileName = fprops["fileName"].asString();
   tfp.numberOfFrames = fprops["totalSteps"].asInt();
   tfp.timeStepSize = fprops["timeStepSize"].asFloat();
-  tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
-  // Optional Fields
+
+  const Json::Value& timeUnits = fprops["timeUnits"];
+  tfp.timeUnits.magnitude = timeUnits["magnitude"].asFloat();
+  tfp.timeUnits.name = timeUnits["name"].asString();
+
+  const Json::Value& spatialUnits = fprops["spatialUnits"];
+  tfp.spatialUnits.magnitude = spatialUnits["magnitude"].asFloat();
+  tfp.spatialUnits.name = spatialUnits["name"].asString();
+
   const Json::Value& cameraDefault = fprops["cameraDefault"];
   if (cameraDefault != Json::nullValue) {
       const Json::Value& cpos = cameraDefault["position"];
@@ -93,9 +108,9 @@ TrajectoryFileProperties parse_traj_info_v2(Json::Value fprops) {
       if (cameraDefault.isMember("fovDegrees")) {
           tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
       }
-
-      return tfp;
     }
+
+    return tfp;
 }
 
 TrajectoryFileProperties parse_traj_info_v3(Json::Value fprops) {
@@ -106,7 +121,17 @@ TrajectoryFileProperties parse_traj_info_v3(Json::Value fprops) {
   for (auto& id : ids) {
       std::size_t idKey = std::atoi(id.c_str());
       const Json::Value entry = typeMapping[id];
-      tfp.typeMapping[idKey] = entry["name"].asString();
+      TypeEntry newEntry;
+      newEntry.name = entry["name"].asString();
+
+      const Json::Value geom = entry["geometry"];
+      if (geom != Json::nullValue) {
+        newEntry.geometry.displayType = geom["displayType"].asString();
+        newEntry.geometry.url = geom["url"].asString();
+        newEntry.geometry.color = geom["color"].asString();
+      }
+
+      tfp.typeMapping[idKey] = newEntry;
   }
 
   const Json::Value& size = fprops["size"];
@@ -117,8 +142,15 @@ TrajectoryFileProperties parse_traj_info_v3(Json::Value fprops) {
   tfp.fileName = fprops["fileName"].asString();
   tfp.numberOfFrames = fprops["totalSteps"].asInt();
   tfp.timeStepSize = fprops["timeStepSize"].asFloat();
-  tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
-  // Optional Fields
+
+  const Json::Value& timeUnits = fprops["timeUnits"];
+  tfp.timeUnits.magnitude = timeUnits["magnitude"].asFloat();
+  tfp.timeUnits.name = timeUnits["name"].asString();
+
+  const Json::Value& spatialUnits = fprops["spatialUnits"];
+  tfp.spatialUnits.magnitude = spatialUnits["magnitude"].asFloat();
+  tfp.spatialUnits.name = spatialUnits["name"].asString();
+
   const Json::Value& cameraDefault = fprops["cameraDefault"];
   if (cameraDefault != Json::nullValue) {
       const Json::Value& cpos = cameraDefault["position"];
@@ -143,13 +175,14 @@ TrajectoryFileProperties parse_traj_info_v3(Json::Value fprops) {
       if (cameraDefault.isMember("fovDegrees")) {
           tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
       }
-
-      return tfp;
     }
+
+    return tfp;
 }
 
 TrajectoryFileProperties parse_trajectory_info_json(Json::Value trajInfo) {
     int version = trajInfo["version"].asInt();
+
     switch(version) {
       case 3: {
         return parse_traj_info_v3(trajInfo);

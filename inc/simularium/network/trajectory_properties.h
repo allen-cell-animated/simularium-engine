@@ -8,6 +8,16 @@
 namespace aics {
 namespace simularium {
 
+    struct TimeUnits {
+      float magnitude = 1.;
+      std::string name = "second";
+    };
+
+    struct SpatialUnits {
+      float magnitude = 1.;
+      std::string name = "meter";
+    };
+
     struct CameraPosition {
         CameraPosition()
         {
@@ -23,13 +33,27 @@ namespace simularium {
         float fovDegrees;
     };
 
+    struct Geometry {
+        std::string displayType = "SPHERE";
+        std::string url;
+        std::string color;
+    };
+
+    struct TypeEntry {
+        std::string name;
+        Geometry geometry;
+    };
+
     struct TrajectoryFileProperties {
         std::string fileName = "";
         std::size_t numberOfFrames = 0;
         double timeStepSize = 100;
         float spatialUnitFactorMeters = 1e-9;
-        std::unordered_map<std::size_t, std::string> typeMapping;
+        std::unordered_map<std::size_t, TypeEntry> typeMapping;
         float boxX, boxY, boxZ;
+
+        TimeUnits timeUnits;
+        SpatialUnits spatialUnits;
         CameraPosition cameraDefault;
 
         std::string Str()
