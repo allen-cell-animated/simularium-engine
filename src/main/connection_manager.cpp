@@ -2,8 +2,8 @@
 #include "loguru/loguru.hpp"
 #include "simularium/aws/aws_util.h"
 #include "simularium/network/net_message_ids.h"
-#include "simularium/network/trajectory_properties.h"
 #include "simularium/network/tfp_to_json.h"
+#include "simularium/network/trajectory_properties.h"
 #include <fstream>
 #include <iostream>
 

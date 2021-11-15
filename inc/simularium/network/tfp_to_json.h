@@ -7,7 +7,7 @@
 namespace aics {
 namespace simularium {
 
-Json::Value tfp_to_json(TrajectoryFileProperties tfp);
+    Json::Value tfp_to_json(TrajectoryFileProperties tfp);
 
 } // namespace simularium
 } // namespace aics

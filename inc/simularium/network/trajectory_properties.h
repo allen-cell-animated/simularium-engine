@@ -9,13 +9,13 @@ namespace aics {
 namespace simularium {
 
     struct TimeUnits {
-      float magnitude = 1.;
-      std::string name = "second";
+        float magnitude = 1.;
+        std::string name = "second";
     };
 
     struct SpatialUnits {
-      float magnitude = 1.;
-      std::string name = "meter";
+        float magnitude = 1.;
+        std::string name = "meter";
     };
 
     struct CameraPosition {
