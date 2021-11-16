@@ -25,7 +25,7 @@ namespace simularium {
             for (Json::Value::ArrayIndex i = 0; i != frameData.size();) {
                 AgentData ad;
                 ad.vis_type = frameData[i++].asInt();
-                ad.id = frameData[i++].asInt();
+                ad.id = frameData[i++].asFloat();
                 ad.type = frameData[i++].asInt();
                 ad.x = frameData[i++].asFloat();
                 ad.y = frameData[i++].asFloat();
