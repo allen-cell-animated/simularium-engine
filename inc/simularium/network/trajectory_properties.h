@@ -10,12 +10,12 @@ namespace simularium {
 
     struct TimeUnits {
         float magnitude = 1.;
-        std::string name = "second";
+        std::string name = "s";
     };
 
     struct SpatialUnits {
         float magnitude = 1.;
-        std::string name = "meter";
+        std::string name = "m";
     };
 
     struct CameraPosition {
