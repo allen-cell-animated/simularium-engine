@@ -198,9 +198,9 @@ TrajectoryFileProperties parse_trajectory_info_json(Json::Value trajInfo)
         break;
     }
     default: {
-        LOG_F(WARNING, "Unrecognized version %i, defaulting to version 1", version);
+        LOG_F(WARNING, "Unrecognized version %i, defaulting to version 3", version);
     }
     }
 
-    return parse_traj_info_v1(trajInfo);
+    return parse_traj_info_v3(trajInfo);
 }
