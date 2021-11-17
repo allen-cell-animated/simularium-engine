@@ -22,9 +22,6 @@ TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops)
     tfp.numberOfFrames = fprops["totalSteps"].asInt();
     tfp.timeStepSize = fprops["timeStepSize"].asFloat();
 
-    // @TODO (if needed): Translate spatial unit factor to space units
-    //tfp.spatialUnitFactorMeters = fprops["spatialUnitFactorMeters"].asFloat();
-
     const Json::Value& cameraDefault = fprops["cameraDefault"];
     if (cameraDefault != Json::nullValue) {
         const Json::Value& cpos = cameraDefault["position"];
