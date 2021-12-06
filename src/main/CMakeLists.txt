@@ -17,6 +17,7 @@ set(SOURCES
 "simularium_binary_file.cpp"
 "simularium_file_reader.cpp"
 "tfp_to_json.cpp"
+"parse_traj_info.cpp"
 )
 
 add_library(${TARGET} STATIC ${SOURCES})

@@ -4,6 +4,7 @@
 #include "simularium/config/config.h"
 #include "simularium/fileio/simularium_file_reader.h"
 #include "simularium/network/tfp_to_json.h"
+#include "simularium/fileio/parse_traj_info.h"
 #include <algorithm>
 #include <csignal>
 #include <cstdio>
@@ -27,8 +28,6 @@ inline bool FileExists(const std::string& name)
 */
 namespace aics {
 namespace simularium {
-
-#include "parse_traj_info.cc"
 
     inline void CreateCacheFolder()
     {

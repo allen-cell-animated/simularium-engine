@@ -1,3 +1,9 @@
+#include "simularium/fileio/parse_traj_info.h"
+#include "loguru/loguru.hpp"
+
+namespace aics {
+namespace simularium {
+
 TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops)
 {
     TrajectoryFileProperties tfp;
@@ -21,6 +27,12 @@ TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops)
     tfp.fileName = fprops["fileName"].asString();
     tfp.numberOfFrames = fprops["totalSteps"].asInt();
     tfp.timeStepSize = fprops["timeStepSize"].asFloat();
+
+    tfp.spatialUnits.magnitude = 1e-9;
+    tfp.spatialUnits.name = "nano";
+
+    tfp.timeUnits.magnitude = 1e-9;
+    tfp.timeUnits.name = "nano";
 
     const Json::Value& cameraDefault = fprops["cameraDefault"];
     if (cameraDefault != Json::nullValue) {
@@ -204,3 +216,6 @@ TrajectoryFileProperties parse_trajectory_info_json(Json::Value trajInfo)
 
     return parse_traj_info_v3(trajInfo);
 }
+
+} // namespace simularium
+} // namespace aics
