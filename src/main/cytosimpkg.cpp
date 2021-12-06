@@ -17,8 +17,8 @@
 using std::endl;
 
 /**
-*	Simulation API
-**/
+ *	Simulation API
+ **/
 namespace aics {
 namespace simularium {
     const std::string CytosimPkg::PKG_DIRECTORY = "/tmp/aics/simularium/pkg/cytosimpkg";

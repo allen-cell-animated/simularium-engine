@@ -7,7 +7,7 @@
 namespace aics {
 namespace simularium {
 
-  TrajectoryFileProperties parse_trajectory_info_json(Json::Value trajInfo);
+    TrajectoryFileProperties parse_trajectory_info_json(Json::Value trajInfo);
 
 } // namespace simularium
 } // namespace aics

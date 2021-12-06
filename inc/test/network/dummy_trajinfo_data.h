@@ -5,9 +5,9 @@
 
 namespace aics {
 namespace simularium {
-namespace test {
+    namespace test {
 
-static std::string v1_trajectory_info = R""""(
+        static std::string v1_trajectory_info = R""""(
   {
     "filename": "dummy_test_data_v1",
     "version": 1,
@@ -48,7 +48,7 @@ static std::string v1_trajectory_info = R""""(
   }
 )"""";
 
-static std::string v2_trajectory_info = R""""(
+        static std::string v2_trajectory_info = R""""(
   {
     "filename": "dummy_test_data_v2",
     "version": 2,
@@ -96,7 +96,7 @@ static std::string v2_trajectory_info = R""""(
   }
 )"""";
 
-static std::string v3_trajectory_info = R""""(
+        static std::string v3_trajectory_info = R""""(
   {
     "filename": "dummy_test_data_v3",
     "version": 3,
@@ -154,7 +154,7 @@ static std::string v3_trajectory_info = R""""(
   }
 )"""";
 
-} // namespace test
+    } // namespace test
 } // namespace simularium
 } // namespace aics
 
