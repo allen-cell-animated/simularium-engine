@@ -3,12 +3,20 @@
 
 namespace aics {
 namespace simularium {
-
-    TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops)
+    void parse_metadata_v1(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
     {
-        TrajectoryFileProperties tfp;
+        out.fileName = root["fileName"].asString();
+        out.numberOfFrames = root["totalSteps"].asInt();
+        out.timeStepSize = root["timeStepSize"].asFloat();
+    }
 
-        const Json::Value typeMapping = fprops["typeMapping"];
+    void parse_v1_type_mapping(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
+    {
+        const Json::Value typeMapping = root["typeMapping"];
         std::vector<std::string> ids = typeMapping.getMemberNames();
         for (auto& id : ids) {
             std::size_t idKey = std::atoi(id.c_str());
@@ -16,119 +24,78 @@ namespace simularium {
             TypeEntry newEntry;
             newEntry.name = entry["name"].asString();
 
-            tfp.typeMapping[idKey] = newEntry;
+            out.typeMapping[idKey] = newEntry;
         }
+    }
 
-        const Json::Value& size = fprops["size"];
-        tfp.boxX = size["x"].asFloat();
-        tfp.boxY = size["y"].asFloat();
-        tfp.boxZ = size["z"].asFloat();
+    void parse_v1_box_size(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
+    {
+        const Json::Value& size = root["size"];
+        out.boxX = size["x"].asFloat();
+        out.boxY = size["y"].asFloat();
+        out.boxZ = size["z"].asFloat();
+    }
 
-        tfp.fileName = fprops["fileName"].asString();
-        tfp.numberOfFrames = fprops["totalSteps"].asInt();
-        tfp.timeStepSize = fprops["timeStepSize"].asFloat();
-
-        tfp.spatialUnits.magnitude = 1e-9;
-        tfp.spatialUnits.name = "nano";
-
-        tfp.timeUnits.magnitude = 1e-9;
-        tfp.timeUnits.name = "nano";
-
-        const Json::Value& cameraDefault = fprops["cameraDefault"];
-        if (cameraDefault != Json::nullValue) {
+    void parse_optional_v1_camera_default(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
+    {
+        const Json::Value& cameraDefault = root["cameraDefault"];
+        if (root != Json::nullValue) {
             const Json::Value& cpos = cameraDefault["position"];
             if (cpos != Json::nullValue) {
-                tfp.cameraDefault.position[0] = cpos["x"].asFloat();
-                tfp.cameraDefault.position[1] = cpos["y"].asFloat();
-                tfp.cameraDefault.position[2] = cpos["z"].asFloat();
+                out.cameraDefault.position[0] = cpos["x"].asFloat();
+                out.cameraDefault.position[1] = cpos["y"].asFloat();
+                out.cameraDefault.position[2] = cpos["z"].asFloat();
             }
             const Json::Value& lookAt = cameraDefault["lookAtPoint"];
             if (lookAt != Json::nullValue) {
-                tfp.cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
-                tfp.cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
-                tfp.cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
+                out.cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
+                out.cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
+                out.cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
             }
             const Json::Value& upVec = cameraDefault["upVector"];
             if (upVec != Json::nullValue) {
-                tfp.cameraDefault.upVector[0] = upVec["x"].asFloat();
-                tfp.cameraDefault.upVector[1] = upVec["y"].asFloat();
-                tfp.cameraDefault.upVector[2] = upVec["z"].asFloat();
+                out.cameraDefault.upVector[0] = upVec["x"].asFloat();
+                out.cameraDefault.upVector[1] = upVec["y"].asFloat();
+                out.cameraDefault.upVector[2] = upVec["z"].asFloat();
             }
 
             if (cameraDefault.isMember("fovDegrees")) {
-                tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
+                out.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
             }
         }
-
-        return tfp;
     }
 
-    TrajectoryFileProperties parse_traj_info_v2(Json::Value fprops)
+    void parse_optional_time_units_v2(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
     {
-        TrajectoryFileProperties tfp;
-
-        const Json::Value typeMapping = fprops["typeMapping"];
-        std::vector<std::string> ids = typeMapping.getMemberNames();
-        for (auto& id : ids) {
-            std::size_t idKey = std::atoi(id.c_str());
-            const Json::Value entry = typeMapping[id];
-            TypeEntry newEntry;
-            newEntry.name = entry["name"].asString();
-
-            tfp.typeMapping[idKey] = newEntry;
+        const Json::Value& timeUnits = root["timeUnits"];
+        if (timeUnits != Json::nullValue) {
+            out.timeUnits.magnitude = timeUnits["magnitude"].asFloat();
+            out.timeUnits.name = timeUnits["name"].asString();
         }
-
-        const Json::Value& size = fprops["size"];
-        tfp.boxX = size["x"].asFloat();
-        tfp.boxY = size["y"].asFloat();
-        tfp.boxZ = size["z"].asFloat();
-
-        tfp.fileName = fprops["fileName"].asString();
-        tfp.numberOfFrames = fprops["totalSteps"].asInt();
-        tfp.timeStepSize = fprops["timeStepSize"].asFloat();
-
-        const Json::Value& timeUnits = fprops["timeUnits"];
-        tfp.timeUnits.magnitude = timeUnits["magnitude"].asFloat();
-        tfp.timeUnits.name = timeUnits["name"].asString();
-
-        const Json::Value& spatialUnits = fprops["spatialUnits"];
-        tfp.spatialUnits.magnitude = spatialUnits["magnitude"].asFloat();
-        tfp.spatialUnits.name = spatialUnits["name"].asString();
-
-        const Json::Value& cameraDefault = fprops["cameraDefault"];
-        if (cameraDefault != Json::nullValue) {
-            const Json::Value& cpos = cameraDefault["position"];
-            if (cpos != Json::nullValue) {
-                tfp.cameraDefault.position[0] = cpos["x"].asFloat();
-                tfp.cameraDefault.position[1] = cpos["y"].asFloat();
-                tfp.cameraDefault.position[2] = cpos["z"].asFloat();
-            }
-            const Json::Value& lookAt = cameraDefault["lookAtPoint"];
-            if (lookAt != Json::nullValue) {
-                tfp.cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
-                tfp.cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
-                tfp.cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
-            }
-            const Json::Value& upVec = cameraDefault["upVector"];
-            if (upVec != Json::nullValue) {
-                tfp.cameraDefault.upVector[0] = upVec["x"].asFloat();
-                tfp.cameraDefault.upVector[1] = upVec["y"].asFloat();
-                tfp.cameraDefault.upVector[2] = upVec["z"].asFloat();
-            }
-
-            if (cameraDefault.isMember("fovDegrees")) {
-                tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
-            }
-        }
-
-        return tfp;
     }
 
-    TrajectoryFileProperties parse_traj_info_v3(Json::Value fprops)
+    void parse_optional_space_units_v2(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
     {
-        TrajectoryFileProperties tfp;
+        const Json::Value& spatialUnits = root["spatialUnits"];
+        if (spatialUnits != Json::nullValue) {
+            out.spatialUnits.magnitude = spatialUnits["magnitude"].asFloat();
+            out.spatialUnits.name = spatialUnits["name"].asString();
+        }
+    }
 
-        const Json::Value typeMapping = fprops["typeMapping"];
+    void parse_v2_typemapping(
+        TrajectoryFileProperties& out,
+        const Json::Value& root)
+    {
+        const Json::Value typeMapping = root["typeMapping"];
         std::vector<std::string> ids = typeMapping.getMemberNames();
         for (auto& id : ids) {
             std::size_t idKey = std::atoi(id.c_str());
@@ -143,51 +110,57 @@ namespace simularium {
                 newEntry.geometry.color = geom["color"].asString();
             }
 
-            tfp.typeMapping[idKey] = newEntry;
+            out.typeMapping[idKey] = newEntry;
         }
+    }
 
-        const Json::Value& size = fprops["size"];
-        tfp.boxX = size["x"].asFloat();
-        tfp.boxY = size["y"].asFloat();
-        tfp.boxZ = size["z"].asFloat();
+    TrajectoryFileProperties parse_traj_info_v1(Json::Value fprops)
+    {
+        TrajectoryFileProperties tfp;
 
-        tfp.fileName = fprops["fileName"].asString();
-        tfp.numberOfFrames = fprops["totalSteps"].asInt();
-        tfp.timeStepSize = fprops["timeStepSize"].asFloat();
+        parse_v1_type_mapping(tfp, fprops);
+        parse_v1_box_size(tfp, fprops);
+        parse_metadata_v1(tfp, fprops);
 
-        const Json::Value& timeUnits = fprops["timeUnits"];
-        tfp.timeUnits.magnitude = timeUnits["magnitude"].asFloat();
-        tfp.timeUnits.name = timeUnits["name"].asString();
+        tfp.spatialUnits.magnitude = 1e-9;
+        tfp.spatialUnits.name = "nano";
 
-        const Json::Value& spatialUnits = fprops["spatialUnits"];
-        tfp.spatialUnits.magnitude = spatialUnits["magnitude"].asFloat();
-        tfp.spatialUnits.name = spatialUnits["name"].asString();
+        tfp.timeUnits.magnitude = 1e-9;
+        tfp.timeUnits.name = "nano";
 
-        const Json::Value& cameraDefault = fprops["cameraDefault"];
-        if (cameraDefault != Json::nullValue) {
-            const Json::Value& cpos = cameraDefault["position"];
-            if (cpos != Json::nullValue) {
-                tfp.cameraDefault.position[0] = cpos["x"].asFloat();
-                tfp.cameraDefault.position[1] = cpos["y"].asFloat();
-                tfp.cameraDefault.position[2] = cpos["z"].asFloat();
-            }
-            const Json::Value& lookAt = cameraDefault["lookAtPoint"];
-            if (lookAt != Json::nullValue) {
-                tfp.cameraDefault.lookAtPoint[0] = lookAt["x"].asFloat();
-                tfp.cameraDefault.lookAtPoint[1] = lookAt["y"].asFloat();
-                tfp.cameraDefault.lookAtPoint[2] = lookAt["z"].asFloat();
-            }
-            const Json::Value& upVec = cameraDefault["upVector"];
-            if (upVec != Json::nullValue) {
-                tfp.cameraDefault.upVector[0] = upVec["x"].asFloat();
-                tfp.cameraDefault.upVector[1] = upVec["y"].asFloat();
-                tfp.cameraDefault.upVector[2] = upVec["z"].asFloat();
-            }
+        parse_optional_v1_camera_default(tfp, fprops);
 
-            if (cameraDefault.isMember("fovDegrees")) {
-                tfp.cameraDefault.fovDegrees = cameraDefault["fovDegrees"].asFloat();
-            }
-        }
+        return tfp;
+    }
+
+    TrajectoryFileProperties parse_traj_info_v2(Json::Value fprops)
+    {
+        TrajectoryFileProperties tfp;
+
+        parse_v1_type_mapping(tfp, fprops);
+        parse_v1_box_size(tfp, fprops);
+        parse_metadata_v1(tfp, fprops);
+
+        parse_optional_time_units_v2(tfp, fprops);
+        parse_optional_space_units_v2(tfp, fprops);
+
+        parse_optional_v1_camera_default(tfp, fprops);
+
+        return tfp;
+    }
+
+    TrajectoryFileProperties parse_traj_info_v3(Json::Value fprops)
+    {
+        TrajectoryFileProperties tfp;
+
+        parse_v2_typemapping(tfp, fprops);
+        parse_v1_box_size(tfp, fprops);
+        parse_metadata_v1(tfp, fprops);
+
+        parse_optional_time_units_v2(tfp, fprops);
+        parse_optional_space_units_v2(tfp, fprops);
+
+        parse_optional_v1_camera_default(tfp, fprops);
 
         return tfp;
     }
