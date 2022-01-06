@@ -937,7 +937,7 @@ namespace simularium {
         Json::Value fprops;
         fprops["version"] = 1;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
-        fprops["totalSteps"] = tfp.numberOfFrames;
+        fprops["totalSteps"] = (Json::UInt64)tfp.numberOfFrames;
         fprops["timeStepSize"] = tfp.timeStepSize;
         fprops["spatialUnitFactorMeters"] = tfp.spatialUnitFactorMeters;
 
