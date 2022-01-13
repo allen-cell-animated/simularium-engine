@@ -9,7 +9,7 @@ namespace simularium {
         Json::Value fprops;
         fprops["version"] = 3;
         fprops["msgType"] = WebRequestTypes::id_trajectory_file_info;
-        fprops["totalSteps"] = tfp.numberOfFrames;
+        fprops["totalSteps"] = (Json::UInt64)tfp.numberOfFrames;
         fprops["timeStepSize"] = tfp.timeStepSize;
 
         Json::Value timeUnits;
