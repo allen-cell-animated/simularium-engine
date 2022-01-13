@@ -29,6 +29,7 @@ WORKDIR /agentsim-dev/agentsim
 RUN git submodule update --init --recursive
 
 # build agentsim project
+# ENABLE_UNITY_BUILD is for AWS CPP SDK.  Turn it on for faster build but requires more memory to build.
 RUN cd ../build && \
 	cmake ../agentsim -DBUILD_ONLY="s3;awstransfer;transfer" -DENABLE_UNITY_BUILD=OFF -DCMAKE_BUILD_TYPE=Release -DAUTORUN_UNIT_TESTS=OFF && \
 	make && \
