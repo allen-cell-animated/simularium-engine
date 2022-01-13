@@ -103,7 +103,7 @@ done
 image_name=$(get_image_name)
 image_tag=$(next_image_tag)
 image_name_tag="${image_name}:${image_tag}"
-/usr/bin/docker build --pull -m 4g -t ${image_name_tag} .
+/usr/bin/docker build --pull -t ${image_name_tag} .
 if [[ $push_to_remote == 1 ]] ; then
     stage_registry=$(get_stage_registry)
     /usr/bin/docker tag ${image_name_tag} ${stage_registry}/${image_name_tag}
