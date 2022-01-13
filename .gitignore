@@ -3,6 +3,7 @@ bin/
 obj/
 lib/linux/agentsim.a
 lib/mac/agentsim.a
+build/
 
 # SUBMODULES #
 dep/readdy/*
