@@ -18,12 +18,12 @@ namespace simularium {
         }
 
         /**
-    *	given three positions (p0, p1, p2), construct an orthonormal rotation basis
-    *   for the particle at p1 so that:
-    *      - X basis vector points to p2
-    *      - Y basis vector points to p0
-    *      - Z basis vector is cross product of X and Y
-    **/
+         *	given three positions (p0, p1, p2), construct an orthonormal rotation basis
+         *   for the particle at p1 so that:
+         *      - X basis vector points to p2
+         *      - Y basis vector points to p0
+         *      - Z basis vector is cross product of X and Y
+         **/
         Eigen::Matrix3d GetRotationMatrix(
             std::vector<Eigen::Vector3d> basisPositions)
         {

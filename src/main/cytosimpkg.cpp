@@ -17,8 +17,8 @@
 using std::endl;
 
 /**
-*	Simulation API
-**/
+ *	Simulation API
+ **/
 namespace aics {
 namespace simularium {
     const std::string CytosimPkg::PKG_DIRECTORY = "/tmp/aics/simularium/pkg/cytosimpkg";
@@ -238,7 +238,13 @@ namespace simularium {
         fileProps.fileName = filePath;
         fileProps.numberOfFrames = numTimeSteps;
         fileProps.timeStepSize = real(this->m_simul->prop->time_step);
-        fileProps.typeMapping = this->m_typeMapping;
+
+        for (auto entry : this->m_typeMapping) {
+            TypeEntry newEntry;
+            newEntry.name = entry.second;
+            fileProps.typeMapping[entry.first] = newEntry;
+        }
+
         fileProps.boxX = 100;
         fileProps.boxY = 100;
         fileProps.boxZ = 100;

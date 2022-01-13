@@ -330,9 +330,8 @@ namespace simularium {
             //   round(5.1/2) = round(2.55) = frame 3
             std::size_t frameNum = std::round(simulationTimeNs / tfp.timeStepSize);
             return std::min(
-              frameNum,
-              tfp.numberOfFrames - 1
-            );
+                frameNum,
+                tfp.numberOfFrames - 1);
         }
 
         if (this->m_SimPkgs.size() > 0 && this->m_SimPkgs[this->m_activeSimPkg]->CanLoadFile(identifier)) {

@@ -23,7 +23,7 @@ OrientationDataMap initOrientationData()
         -0.79675461, -0.55949104, -0.22836785,
         0.15113327, 0.18140554, -0.97172566;
 
-    //TODO test this again once periodic boundary is accounted for in orientation calculation
+    // TODO test this again once periodic boundary is accounted for in orientation calculation
     Eigen::Matrix3d rotation_barbed_from_actin_dimer_axis;
     rotation_barbed_from_actin_dimer_axis << 0.17508484, -0.52345361, -0.83387146,
         -0.3445482, 0.76082255, -0.54994144,
@@ -34,7 +34,7 @@ OrientationDataMap initOrientationData()
         -0.80873679, -0.55949491, 0.18141181,
         -0.05998622, -0.2283657, -0.97172566;
 
-    //TODO test this again once periodic boundary is accounted for in orientation calculation
+    // TODO test this again once periodic boundary is accounted for in orientation calculation
     Eigen::Matrix3d rotation_pointed_from_actin_dimer_axis;
     rotation_pointed_from_actin_dimer_axis << 0.17508484, -0.52345361, -0.83387146,
         -0.3445482, 0.76082255, -0.54994144,
@@ -72,13 +72,13 @@ OrientationDataMap initOrientationData()
             OrientationData(
                 Eigen::Vector3d(1.453012, -3.27238, -2.330608),
                 rotation_actin_to_prev_actin,
-                zero_rotation //rotation_barbed_from_actin_dimer_axis
+                zero_rotation // rotation_barbed_from_actin_dimer_axis
                 ) },
         { MonomerType("actin", { "any" }, 1),
             OrientationData(
                 Eigen::Vector3d(-3.809657, -1.078586, -1.60457),
                 rotation_actin_to_next_actin,
-                zero_rotation //rotation_pointed_from_actin_dimer_axis
+                zero_rotation // rotation_pointed_from_actin_dimer_axis
                 ) },
         { MonomerType("arp3", { "any" }, 101),
             OrientationData(
@@ -324,7 +324,13 @@ namespace simularium {
 
             fileProps.numberOfFrames = traj.size();
             fileProps.timeStepSize = time.size() >= 2 ? time[1] - time[0] : 0;
-            fileProps.typeMapping = this->m_fileInfo->typeMapping;
+
+            for (auto entry : this->m_fileInfo->typeMapping) {
+                TypeEntry newEntry;
+                newEntry.name = entry.second;
+                fileProps.typeMapping[entry.first] = newEntry;
+            }
+
             fileProps.boxX = this->m_fileInfo->configInfo.boxX;
             fileProps.boxY = this->m_fileInfo->configInfo.boxY;
             fileProps.boxZ = this->m_fileInfo->configInfo.boxZ;
@@ -357,8 +363,8 @@ namespace simularium {
 } // namespace aics
 
 /**
-*	File IO Functions
-**/
+ *	File IO Functions
+ **/
 void run_and_save_h5file(
     readdy::Simulation* sim,
     std::string file_name,
@@ -713,7 +719,7 @@ TimeTopologyH5Info readTopologies(
         std::vector<std::size_t> flatParticles;
         group.readSelection("particles", flatParticles, { particlesLimitBegin }, { stride }, { particlesLimitEnd - particlesLimitBegin });
         std::vector<std::size_t> flatEdges;
-        //readdy::log::critical("edges {} - {}", edgesLimitBegin, edgesLimitEnd);
+        // readdy::log::critical("edges {} - {}", edgesLimitBegin, edgesLimitEnd);
         group.readSelection("edges", flatEdges, { edgesLimitBegin, 0 }, { stride, 1 }, { edgesLimitEnd - edgesLimitBegin, 2 });
 
         const auto& currentTypes = types.at(ix);
@@ -884,7 +890,7 @@ static std::string monomerTypeToString(
 {
     std::string s = "[" + monomerType.name + " (";
     auto flags = monomerType.flags;
-    for (std::size_t i = 0; i < flags.size(); ++i) //numberOfFrames
+    for (std::size_t i = 0; i < flags.size(); ++i) // numberOfFrames
     {
         s += flags[i] + ", ";
     }

@@ -326,7 +326,7 @@ namespace simularium {
             this->SendMessage(jsonMsg, "heartbeat ping");
         } break;
         case WebRequestTypes::id_vis_data_arrive: {
-            //printAgentData(jsonMsg);
+            // printAgentData(jsonMsg);
         } break;
         default: {
         } break;

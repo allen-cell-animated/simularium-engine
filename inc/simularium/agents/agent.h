@@ -7,10 +7,10 @@
 #include <vector>
 
 /*
-*	Agent type flags for visualization
-*	defined starting at 1000 to allow simPkgs to start identifying agent ids from 0 w/o issue
-*	only 'first-class' visualization objects need to be defined here
-*/
+ *	Agent type flags for visualization
+ *	defined starting at 1000 to allow simPkgs to start identifying agent ids from 0 w/o issue
+ *	only 'first-class' visualization objects need to be defined here
+ */
 enum kVisType {
     vis_type_default = 1000,
     vis_type_fiber = 1001

@@ -145,18 +145,18 @@ namespace simularium {
             std::string fileName);
 
         /**
-        * SetupRuntimeCacheAsync
-        *
-        *   @param simulation: the simulation object used by the other functions
-        *   in this class; responsible for loading trajectories, running simulations
-        *   and keeping the run-time cache updated
-        */
+         * SetupRuntimeCacheAsync
+         *
+         *   @param simulation: the simulation object used by the other functions
+         *   in this class; responsible for loading trajectories, running simulations
+         *   and keeping the run-time cache updated
+         */
         void SetupRuntimeCache(
             Simulation& simulation);
 
         /**
-        *   TLS Functions
-        */
+         *   TLS Functions
+         */
         std::string GetPassword()
         {
             return std::getenv("TLS_PASSWORD") ? std::getenv("TLS_PASSWORD") : "";
