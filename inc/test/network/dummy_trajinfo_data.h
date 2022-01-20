@@ -55,12 +55,12 @@ namespace simularium {
     "totalSteps": 100,
     "timeStepSize": 1,
     "timeUnits": {
-      "magnitude": 1e-9,
-      "name": "nano"
+      "magnitude": 1,
+      "name": "ns"
     },
     "spatialUnits": {
-      "magnitude": 1e-9,
-      "name": "nano"
+      "magnitude": 1,
+      "name": "ns"
     },
     "typeMapping": {
       "0" : {
@@ -103,12 +103,12 @@ namespace simularium {
     "totalSteps": 100,
     "timeStepSize": 1,
     "timeUnits": {
-      "magnitude": 1e-9,
-      "name": "nano"
+      "magnitude": 1,
+      "name": "ns"
     },
     "spatialUnits": {
-      "magnitude": 1e-9,
-      "name": "nano"
+      "magnitude": 1,
+      "name": "ns"
     },
     "typeMapping": {
       "0" : {

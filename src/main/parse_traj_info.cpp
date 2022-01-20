@@ -122,11 +122,11 @@ namespace simularium {
         parse_v1_box_size(tfp, fprops);
         parse_metadata_v1(tfp, fprops);
 
-        tfp.spatialUnits.magnitude = 1e-9;
-        tfp.spatialUnits.name = "nano";
+        tfp.spatialUnits.magnitude = 1;
+        tfp.spatialUnits.name = "ns";
 
-        tfp.timeUnits.magnitude = 1e-9;
-        tfp.timeUnits.name = "nano";
+        tfp.timeUnits.magnitude = 1;
+        tfp.timeUnits.name = "ns";
 
         parse_optional_v1_camera_default(tfp, fprops);
 
