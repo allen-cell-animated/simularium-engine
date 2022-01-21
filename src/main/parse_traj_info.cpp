@@ -123,7 +123,7 @@ namespace simularium {
         parse_metadata_v1(tfp, fprops);
 
         tfp.spatialUnits.magnitude = 1;
-        tfp.spatialUnits.name = "ns";
+        tfp.spatialUnits.name = "nm";
 
         tfp.timeUnits.magnitude = 1;
         tfp.timeUnits.name = "ns";

@@ -60,7 +60,7 @@ namespace simularium {
     },
     "spatialUnits": {
       "magnitude": 1,
-      "name": "ns"
+      "name": "nm"
     },
     "typeMapping": {
       "0" : {
@@ -108,7 +108,7 @@ namespace simularium {
     },
     "spatialUnits": {
       "magnitude": 1,
-      "name": "ns"
+      "name": "nm"
     },
     "typeMapping": {
       "0" : {
