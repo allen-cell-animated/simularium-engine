@@ -122,6 +122,11 @@ namespace simularium {
         parse_v1_box_size(tfp, fprops);
         parse_metadata_v1(tfp, fprops);
 
+        // note that v1 data contains the field "spatialUnitFactorMeters"
+        // this code should ideally compute a magnitude and unit based on 
+        // that value, reducing the unit as intelligently as possible.
+        // eg 2e-9 would convert to magnitude 2, unit nm
+        // and 2e-7 would convert to magnitude 0.2 um (?) or 200 nm
         tfp.spatialUnits.magnitude = 1;
         tfp.spatialUnits.name = "nm";
 
