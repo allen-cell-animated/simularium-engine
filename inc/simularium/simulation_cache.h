@@ -108,7 +108,7 @@ namespace simularium {
          *                       for the search
          *
          *   This function will download, convert, and upload a cache for a
-         *   .simularium file to S3, identifiable by the fileName passed in
+         *   .simularium file to S3, identifiable by the fileName passed in.
          */
         bool FindSimulariumFile(std::string fileName);
 
